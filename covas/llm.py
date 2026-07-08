@@ -86,116 +86,9 @@ EFFORT_MODELS = {
     "claude-sonnet-5", "claude-sonnet-4-6",
 }
 
-# Client-side tools that let Claude read/update the Commander's checklist.
-# The list can be large, so these are scoped: fetch just the next items, search,
-# or set one item — never dump the whole list.
-CHECKLIST_TOOLS = [
-    {
-        "name": "get_next_objectives",
-        "description": (
-            "Return the Commander's next pending (unfinished) Elite Dangerous "
-            "checklist objectives, in order, with overall progress. Use this for "
-            "'what's next' / 'what should I do'. Returns each as '#<number>: <text>'."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer",
-                    "description": "How many upcoming pending objectives to return (default 1, max 10).",
-                },
-            },
-            "required": [],
-        },
-    },
-    {
-        "name": "find_objectives",
-        "description": (
-            "Search the checklist for objectives matching a word or phrase. Returns "
-            "matches as '#<number> [done|pending] <text>'. Use to locate an item "
-            "before marking it, or to disambiguate an unclear request."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Word or phrase to search for."},
-            },
-            "required": ["query"],
-        },
-    },
-    {
-        "name": "set_objective",
-        "description": (
-            "Mark a checklist objective completed or reopened. Identify it by 'number' "
-            "(from get_next_objectives / find_objectives), by 'query' text, or omit "
-            "both to use the current line. If a query matches multiple objectives the "
-            "tool changes nothing and returns the candidates so you can disambiguate."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "number": {"type": "integer", "description": "The objective's number, if known."},
-                "query": {"type": "string", "description": "Text identifying the objective (used if number is omitted)."},
-                "completed": {"type": "boolean", "description": "true to check off, false to reopen."},
-            },
-            "required": ["completed"],
-        },
-    },
-    {
-        "name": "add_objective",
-        "description": (
-            "Add a new (pending) objective to the checklist, positioned relative to an "
-            "anchor line. By default it is inserted right after the current line. It "
-            "inherits the anchor's indentation so it nests correctly. The new line "
-            "becomes the current line."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "description": "The objective text (without the '- [ ]')."},
-                "position": {"type": "string", "enum": ["after", "before"],
-                             "description": "Place the new line after or before the anchor. Default 'after'."},
-                "anchor_number": {"type": "integer",
-                                  "description": "Anchor objective number. Omit to use the current line."},
-            },
-            "required": ["text"],
-        },
-    },
-    {
-        "name": "modify_objective",
-        "description": (
-            "Replace the text of an existing objective (its checkbox state is kept). "
-            "Pass the full new text. Target it by 'number', or omit to modify the "
-            "current line. Use for edits like changing a destination or quantity."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "new_text": {"type": "string", "description": "The complete replacement text."},
-                "number": {"type": "integer", "description": "Objective number. Omit to modify the current line."},
-            },
-            "required": ["new_text"],
-        },
-    },
-    {
-        "name": "delete_objective",
-        "description": (
-            "Delete an objective from the checklist. Target it by 'number', or omit to "
-            "delete the current line. This is destructive — only do it when the "
-            "Commander clearly asks to remove/delete a line."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "number": {"type": "integer", "description": "Objective number. Omit to delete the current line."},
-            },
-            "required": [],
-        },
-    },
-]
 
-
-def _build_kwargs(cfg: dict, messages: list[dict]) -> dict:
+def _build_kwargs(cfg: dict, messages: list[dict],
+                  tools: list[dict] | None = None) -> dict:
     a = cfg["anthropic"]
     model = a["model"]
     kwargs: dict = {
@@ -232,25 +125,26 @@ def _build_kwargs(cfg: dict, messages: list[dict]) -> dict:
             kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
             kwargs["max_tokens"] = max(kwargs["max_tokens"], budget + 1024)
 
-    tools: list = []
+    tool_list: list = []
     # Native web search. We use the basic tool (not the _20260209 dynamic-filtering
     # variant) because it streams the query in a server_tool_use block, letting us
     # surface "Searching the web for <query>" on screen.
     if cfg.get("web_search", {}).get("enabled"):
-        tools.append({
+        tool_list.append({
             "type": "web_search_20250305",
             "name": "web_search",
             "max_uses": int(cfg["web_search"].get("max_uses", 5)),
         })
-    # Checklist tools (client-side) when a checklist file is configured.
-    if cfg.get("checklist", {}).get("file"):
-        tools.extend(CHECKLIST_TOOLS)
+    # Client-side tools come from the capability registry (checklist, etc.); the
+    # caller passes them in rather than this module hardcoding them.
     if tools:
+        tool_list.extend(tools)
+    if tool_list:
         # Cache the tool definitions too. A cache_control breakpoint on the LAST
         # tool caches every tool up to it, so the (verbose, static) checklist +
         # web-search schemas aren't re-sent at full price each turn. Same TTL.
-        tools[-1] = {**tools[-1], "cache_control": _cache_control(cfg)}
-        kwargs["tools"] = tools
+        tool_list[-1] = {**tool_list[-1], "cache_control": _cache_control(cfg)}
+        kwargs["tools"] = tool_list
     return kwargs
 
 
@@ -261,12 +155,13 @@ def stream_reply(
     cancel: threading.Event,
     on_event: Callable[[str, str], None],
     tool_handler: Callable[[str, dict], str] | None = None,
+    tools: list[dict] | None = None,
 ) -> Iterator[tuple[str, str]]:
     working = list(messages)
     # Loop to handle server-tool continuations (pause_turn) and client-tool calls
     # (tool_use). Each keeps re-sending until Claude produces a final answer.
     for _round in range(8):
-        kwargs = _build_kwargs(cfg, working)
+        kwargs = _build_kwargs(cfg, working, tools)
         tool_json = ""
         final = None
         with client.messages.stream(**kwargs) as stream:

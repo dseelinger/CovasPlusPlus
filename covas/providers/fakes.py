@@ -58,6 +58,7 @@ class FakeLLM:
         cancel: threading.Event,
         on_event,  # noqa: ANN001 — OnEvent
         tool_handler=None,  # noqa: ANN001 — ToolHandler, accepted for parity
+        tools=None,  # noqa: ANN001 — client tool schemas, accepted for parity
     ) -> Iterator[tuple[str, str]]:
         for kind, data in self._events:
             if cancel.is_set():

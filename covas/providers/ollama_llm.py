@@ -66,6 +66,7 @@ class OllamaLLM:
         cancel: threading.Event,
         on_event: OnEvent,
         tool_handler: Optional[ToolHandler] = None,
+        tools: Optional[list[dict]] = None,  # noqa: ARG002 — parity; local tools not wired yet
     ) -> Iterator[tuple[str, str]]:
         payload = {
             "model": self.model,
