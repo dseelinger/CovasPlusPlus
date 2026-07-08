@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Root PresetName="Custom" MajorVersion="4" MinorVersion="0">
+    <!-- Keyboard on Primary, nothing on Secondary -> usable, Key_L -->
+    <LandingGearToggle>
+        <Primary Device="Keyboard" Key="Key_L" />
+        <Secondary Device="{NoDevice}" Key="" />
+    </LandingGearToggle>
+
+    <!-- Keyboard on Primary WITH a keyboard modifier -> usable, Key_J + LeftShift -->
+    <HyperSuperCombination>
+        <Primary Device="Keyboard" Key="Key_J">
+            <Modifier Device="Keyboard" Key="Key_LeftShift" />
+        </Primary>
+        <Secondary Device="{NoDevice}" Key="" />
+    </HyperSuperCombination>
+
+    <!-- Joystick on Primary, keyboard on Secondary -> usable via Secondary (Key_Home) -->
+    <ToggleCargoScoop>
+        <Primary Device="221B0A57" Key="Joy_5" />
+        <Secondary Device="Keyboard" Key="Key_Home" />
+    </ToggleCargoScoop>
+
+    <!-- Joystick-only, no keyboard anywhere -> UNUSABLE -->
+    <UseBoostJuice>
+        <Primary Device="221B0A57" Key="Joy_2" />
+        <Secondary Device="{NoDevice}" Key="" />
+    </UseBoostJuice>
+
+    <!-- Completely unbound -> UNUSABLE -->
+    <SetSpeedZero>
+        <Primary Device="{NoDevice}" Key="" />
+        <Secondary Device="{NoDevice}" Key="" />
+    </SetSpeedZero>
+
+    <!-- A non-action scalar ED writes at the root (no Primary/Secondary) -> ignored -->
+    <MouseXMode Value="Yaw" />
+    <KeyboardLayout>en-US</KeyboardLayout>
+</Root>

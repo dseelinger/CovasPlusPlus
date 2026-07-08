@@ -123,6 +123,8 @@ def apply_status(ctx: EDContext, status: dict) -> dict:
         patch["landing_gear"] = d["LandingGearDown"]
         patch["supercruise"] = d["Supercruise"]
         patch["hardpoints"] = d["HardpointsDeployed"]
+        patch["in_danger"] = d["IsInDanger"]
+        patch["being_interdicted"] = d["BeingInterdicted"]
         patch["low_fuel"] = d["LowFuel"]
 
     fuel = status.get("Fuel")

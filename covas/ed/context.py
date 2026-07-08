@@ -29,6 +29,8 @@ _FIELDS: tuple[str, ...] = (
     "landing_gear",   # gear down
     "supercruise",    # in supercruise
     "hardpoints",     # hardpoints deployed
+    "in_danger",      # ED's IsInDanger flag (under fire / hostiles near) — combat guard
+    "being_interdicted",  # ED's BeingInterdicted flag — combat guard (keybinds §6)
     "low_fuel",       # ED's LowFuel flag (< 25%)
     "fuel_main",      # main tank fuel, tons
     "fuel_capacity",  # main tank capacity, tons (from the journal, not Status.json)
@@ -53,6 +55,8 @@ class EDContext:
         self.landing_gear: bool = False
         self.supercruise: bool = False
         self.hardpoints: bool = False
+        self.in_danger: bool = False
+        self.being_interdicted: bool = False
         self.low_fuel: bool = False
         self.fuel_main: float | None = None
         self.fuel_capacity: float | None = None
