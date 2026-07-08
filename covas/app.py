@@ -7,6 +7,7 @@ also interrupts current speech.
 """
 from __future__ import annotations
 import datetime as _dt
+import queue
 import sys
 import threading
 import time
@@ -89,8 +90,21 @@ class App:
         self._ptt_t0 = 0.0  # key-down time, for tap-vs-hold detection
         self.state = "Idle"
         self._quit = threading.Event()
+
+        # Proactive callouts (DESIGN §5): the companion initiates speech on notable ED
+        # events (arrival, mission complete, low fuel, near-death) without a PTT press.
+        # Opt-in ([proactive].enabled, off by default). The _proactive_lock serializes the
+        # idle-claim so a callout can never start on top of an in-progress user turn.
+        self.proactive = None
+        self._proactive_lock = threading.Lock()
+        self._pump: threading.Thread | None = None
+        self._pump_q: queue.Queue | None = None
+        self._pump_stop = threading.Event()
+
         self._logf = self._open_log()
         self._log("system", _cost_summary(self.cfg, self.mock))
+        if self.cfg.get("proactive", {}).get("enabled"):
+            self._start_proactive()
 
     # ---- Elite Dangerous monitoring (DESIGN §5) ---------------------------
     def _start_ed_monitoring(self) -> None:
@@ -134,6 +148,124 @@ class App:
             except Exception:  # noqa: BLE001
                 pass
 
+    # ---- Proactive callouts (DESIGN §5) -----------------------------------
+    def _start_proactive(self) -> None:
+        """Build the proactive-callout capability and start the event pump that feeds bus
+        events to capability on_event hooks. Fail soft: a startup problem just leaves
+        callouts off. Proactive needs ED monitoring for its events — warn (don't fail) if
+        that's not on, since the two are independently toggled."""
+        try:
+            from .capabilities.proactive_capability import (ProactiveCapability,
+                                                            ProactivePolicy)
+            policy = ProactivePolicy.from_cfg(self.cfg)
+            self.proactive = ProactiveCapability(
+                policy, self._speak_proactive,
+                log=lambda reason: self._log("proactive", reason))
+            self.registry.register(self.proactive)
+            self._start_event_pump()
+            if self.ed_ctx is None:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    "Proactive callouts ON, but ED monitoring is OFF — no events to react to."})
+            else:
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": "Proactive callouts ON."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Proactive callouts failed to start: {e}"})
+
+    def _start_event_pump(self) -> None:
+        """Subscribe to the bus (live-only, no backlog replay) and fan each event out to
+        capability on_event hooks on a dedicated daemon thread. A thread — not inline in
+        the publisher — so slow handler work (a proactive LLM call) never blocks a watcher,
+        and replay=False so stale startup events aren't delivered to a handler."""
+        self._pump_q = self.bus.subscribe(replay=False)
+        self._pump = threading.Thread(target=self._pump_events, name="event-pump",
+                                      daemon=True)
+        self._pump.start()
+
+    def _pump_events(self) -> None:
+        while not self._pump_stop.is_set():
+            try:
+                event = self._pump_q.get(timeout=0.25)
+            except queue.Empty:
+                continue
+            try:
+                self.registry.dispatch_event(event)
+            except Exception as e:  # noqa: BLE001 — one bad handler must not kill the pump
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"event pump error: {e}"})
+
+    def _stop_event_pump(self) -> None:
+        self._pump_stop.set()
+        if self._pump_q is not None:
+            try:
+                self.bus.unsubscribe(self._pump_q)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _speak_proactive(self, event_name: str, event: dict) -> bool:
+        """Originate a spoken callout for an ED event, WITHOUT a PTT press. Returns True
+        only if we actually started: we speak only when Idle, so a callout never interrupts
+        an in-progress user turn — the Commander always has the floor. The line is generated
+        on the cheap tier and spoken through the existing cancel path, so a PTT press
+        mid-callout cancels it like any other utterance (on_ptt_down sets active_cancel)."""
+        with self._proactive_lock:
+            if self.state != "Idle":
+                return False
+            if self.worker is not None and self.worker.is_alive():
+                return False
+            cancel = threading.Event()
+            self.active_cancel = cancel
+            # Claim the turn synchronously (state off Idle) before releasing the lock, so a
+            # near-simultaneous second event sees us as busy and doesn't also start.
+            self.set_state("Thinking", "proactive")
+            self.worker = threading.Thread(
+                target=self._proactive_worker, args=(event_name, event, cancel), daemon=True)
+            self.worker.start()
+        return True
+
+    def _proactive_worker(self, event_name: str, event: dict,
+                          cancel: threading.Event) -> None:
+        from .capabilities.proactive_capability import build_prompt
+        try:
+            if cancel.is_set():
+                self.set_state("Idle")
+                return
+            summary = self.ed_ctx.summary() if self.ed_ctx is not None else None
+            prompt = build_prompt(event, summary)
+            # Cheap tier by design (DESIGN §5) — a callout is one sentence; small cap.
+            cap = self.proactive.policy.cfg.max_tokens if self.proactive else None
+            route = Router.from_cfg(self.cfg).cheap_route(cap)
+            self._log("router", f"{route.model} max_tokens={route.max_tokens} — {route.reason}")
+
+            def on_event(kind: str, data) -> None:  # noqa: ANN001
+                if kind == "usage":
+                    self._log_usage(data)
+
+            reply = ""
+            stream = self.llm.stream_reply(
+                [{"role": "user", "content": prompt}], cancel, on_event,
+                model=route.model, max_tokens=route.max_tokens)
+            for kind, chunk in stream:
+                if cancel.is_set():
+                    break
+                if kind == "text":
+                    reply += chunk
+
+            if cancel.is_set() or not reply.strip():
+                self.set_state("Idle")
+                return
+            # Proactive lines are logged + spoken but NOT added to self.history — they're
+            # ambient, so keeping them out avoids polluting the conversation and paying to
+            # re-send them every following turn.
+            self._log("COVAS", f"(proactive) {reply}")
+            print(f"\n>> [proactive] {reply}")
+            self.set_state("Speaking", "proactive")
+            self._speak(reply, cancel)
+            self.set_state("Idle")
+        except Exception as e:  # noqa: BLE001 — a proactive failure must never crash the app
+            self.set_state("Idle", f"proactive error: {e}")
+
     # ---- logging & status -------------------------------------------------
     def _open_log(self):
         d = Path(self.cfg["logging"]["dir"])
@@ -162,8 +294,12 @@ class App:
     # ---- PTT / cancel handlers -------------------------------------------
     def on_ptt_down(self) -> None:
         self._ptt_t0 = time.monotonic()
-        self._interrupt()            # interrupt any current thinking/speaking
-        self.set_state("Listening")
+        # Hold the proactive lock across the interrupt + state flip so a callout can't slip
+        # its idle-claim in between and end up speaking over this capture. Either the claim
+        # loses (sees "Listening" -> skips) or it already won (this interrupt cancels it).
+        with self._proactive_lock:
+            self._interrupt()        # interrupt any current thinking/speaking (incl. a callout)
+            self.set_state("Listening")
         self.recorder.start()
         self.cues.play("listening")
 
@@ -439,6 +575,7 @@ class App:
         except KeyboardInterrupt:
             pass
         finally:
+            self._stop_event_pump()
             self._stop_ed_monitoring()
             self._logf.close()
             print("\nCOVAS++ shutting down. o7")
@@ -490,12 +627,16 @@ def _banner(cfg: dict) -> str:
     rt = cfg.get("router", {})
     router = (f"ON (default {rt.get('default_model', '?')})" if rt.get("enabled")
               else f"OFF (fixed {cfg['anthropic']['model']})")
+    ed = "ON" if cfg.get("elite", {}).get("enabled") else "OFF"
+    pro = "ON" if cfg.get("proactive", {}).get("enabled") else "OFF"
     return (
         "\n================ COVAS++ (Phase 2) ================\n"
         f"  Router     : {router}\n"
         f"  Model      : {cfg['anthropic']['model']}\n"
         f"  Voice      : {cfg['elevenlabs']['voice_name']}\n"
         f"  Whisper    : {cfg['whisper']['model']}\n"
+        f"  ED monitor : {ed}\n"
+        f"  Proactive  : {pro}\n"
         f"  Personality: {p}\n"
         f"  Cache TTL  : {cfg['anthropic'].get('cache_ttl', '1h')}\n"
         f"  Dev mock   : {'ON' if mock else 'OFF'}\n"

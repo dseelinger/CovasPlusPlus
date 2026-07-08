@@ -12,11 +12,15 @@ class EventBus:
         self._backlog: list[dict] = []
         self._max = backlog
 
-    def subscribe(self) -> queue.Queue:
+    def subscribe(self, replay: bool = True) -> queue.Queue:
+        """Register a new subscriber queue. By default the recent backlog is replayed
+        into it so a late-joining client (the web UI) sees history. Pass replay=False
+        for a live-only consumer (e.g. the proactive event pump) that must not react to
+        events published before it subscribed."""
         q: queue.Queue = queue.Queue()
         with self._lock:
             self._subs.add(q)
-            backlog = list(self._backlog)
+            backlog = list(self._backlog) if replay else []
         for e in backlog:          # replay recent history to a new client
             q.put(e)
         return q
