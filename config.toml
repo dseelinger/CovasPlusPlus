@@ -271,6 +271,33 @@ Overheating      = true   # ship over 100% heat
 Died             = true
 
 
+[keybinds]
+# Keybind automation (DESIGN §6) — the companion presses ONE ship control (toggle landing
+# gear) on request, behind a hard safety layer. This is the prototype: prove one reliable
+# action before generalizing. The model only SELECTS a named macro; a deterministic executor
+# sends the actual scancodes (ED reads DirectInput scancodes, so we inject at that level).
+#
+# DEFAULT OFF — this is the twitchy part; opt in deliberately. Requires [elite].enabled for
+# the combat guard (it reads ED Status flags to refuse acting during combat/interdiction).
+enabled = false
+# Bindings file override. Blank = auto-detect: read the active preset from
+#   %LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Bindings\StartPreset.4.start
+# then load "<preset>.4.0.binds" from that folder. Set an absolute path (or a filename
+# relative to that Bindings folder) only if auto-detection picks the wrong file.
+binds_file = ""
+# Require explicit Commander confirmation before any action fires. Arming an action does NOT
+# execute it — the Commander must confirm on a SEPARATE spoken command. Leave ON.
+require_confirmation = true
+# Refuse to touch controls when ED Status reports danger/interdiction (and when ED status is
+# unavailable — we won't act unless we can prove it's safe). Leave ON.
+combat_guard = true
+# Seconds an armed action stays confirmable before it expires for safety.
+confirm_window = 60
+# Allowlist of macro names the companion may run — the ONLY actions permitted, even if asked
+# for others. The prototype ships exactly one: landing_gear (toggle).
+allowlist = ["landing_gear"]
+
+
 [conversation]
 # Rolling in-session history so follow-ups work. Older turns are trimmed
 # once the running message count exceeds this many (user+assistant) turns.

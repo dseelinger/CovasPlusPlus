@@ -96,6 +96,10 @@ class App:
         # Opt-in ([proactive].enabled, off by default). The _proactive_lock serializes the
         # idle-claim so a callout can never start on top of an in-progress user turn.
         self.proactive = None
+        # Keybind automation (DESIGN §6): the companion presses ONE ship control (toggle
+        # landing gear) on request, behind a safety layer (confirmation, allowlist, combat
+        # guard, hard abort). Opt-in ([keybinds].enabled, off by default).
+        self.keybinds = None
         self._proactive_lock = threading.Lock()
         self._pump: threading.Thread | None = None
         self._pump_q: queue.Queue | None = None
@@ -105,6 +109,8 @@ class App:
         self._log("system", _cost_summary(self.cfg, self.mock))
         if self.cfg.get("proactive", {}).get("enabled"):
             self._start_proactive()
+        if self.cfg.get("keybinds", {}).get("enabled"):
+            self._start_keybinds()
 
     # ---- Elite Dangerous monitoring (DESIGN §5) ---------------------------
     def _start_ed_monitoring(self) -> None:
@@ -266,6 +272,61 @@ class App:
         except Exception as e:  # noqa: BLE001 — a proactive failure must never crash the app
             self.set_state("Idle", f"proactive error: {e}")
 
+    # ---- Keybind automation (DESIGN §6) -----------------------------------
+    def _start_keybinds(self) -> None:
+        """Build the keybind capability: resolve + parse the active ED bindings, build the
+        scancode executor, and register the capability behind its safety layer. Fail soft —
+        a missing bindings file or a non-Windows host just leaves ship controls off; it must
+        never block startup. The combat guard reads the live ED context snapshot (so keybinds
+        needs [elite].enabled to positively confirm it's safe to act)."""
+        try:
+            from .keybinds import BindsError, load_binds
+            from .keybinds.executor import KeyExecutor
+            from .capabilities.keybind_capability import KeybindConfig, KeybindCapability
+
+            kcfg = KeybindConfig.from_cfg(self.cfg)
+            try:
+                binds = load_binds(self.cfg)
+            except BindsError as e:
+                # Couldn't locate/read the .binds file — register anyway with no bindings so
+                # the capability gives a clear "bind it in-game / set binds_file" message
+                # rather than vanishing silently.
+                binds = {}
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"Keybinds: {e}"})
+
+            executor = KeyExecutor()   # raises ExecutorError off-Windows -> caught below
+            snapshot = ((lambda: self.ed_ctx.snapshot()) if self.ed_ctx is not None else None)
+            self.keybinds = KeybindCapability(
+                binds=binds, executor=executor, config=kcfg,
+                status_snapshot=snapshot,
+                log=lambda msg: self._log("keybind", msg))
+            self.registry.register(self.keybinds)
+
+            # Report per-macro readiness so the manual test knows what's wired.
+            for macro in self.keybinds._allowed_macros():
+                b = binds.get(macro.action)
+                if b is not None and b.usable:
+                    detail = f"{macro.name} -> {b.key}"
+                else:
+                    detail = f"{macro.name} UNUSABLE (no keyboard bind for {macro.action})"
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"Keybind macro: {detail}"})
+            guard = "on" if kcfg.combat_guard else "off"
+            if kcfg.combat_guard and self.ed_ctx is None:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    "Keybinds ON but ED monitoring is OFF — combat guard can't verify safety, "
+                    "so actions will be refused until [elite].enabled."})
+            else:
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"Keybinds ON (confirmation "
+                                          f"{'on' if kcfg.require_confirmation else 'off'}, "
+                                          f"combat guard {guard})."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.keybinds = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Keybinds failed to start: {e}"})
+
     # ---- logging & status -------------------------------------------------
     def _open_log(self):
         d = Path(self.cfg["logging"]["dir"])
@@ -418,6 +479,12 @@ class App:
                 return
             print(f"\nCommander: {text}")
             self._log("Commander", text)
+
+            # New Commander utterance -> advance the keybind confirmation gate, so an armed
+            # ship action can only be confirmed on a genuinely separate command (the model
+            # can't arm-and-confirm within one turn). DESIGN §6 safety layer.
+            if self.keybinds is not None:
+                self.keybinds.new_turn()
 
             # Local voice commands (checklist, etc.) — handled without calling Claude
             if self._handle_command(text, cancel):
@@ -629,6 +696,7 @@ def _banner(cfg: dict) -> str:
               else f"OFF (fixed {cfg['anthropic']['model']})")
     ed = "ON" if cfg.get("elite", {}).get("enabled") else "OFF"
     pro = "ON" if cfg.get("proactive", {}).get("enabled") else "OFF"
+    kb = "ON" if cfg.get("keybinds", {}).get("enabled") else "OFF"
     return (
         "\n================ COVAS++ (Phase 2) ================\n"
         f"  Router     : {router}\n"
@@ -637,6 +705,7 @@ def _banner(cfg: dict) -> str:
         f"  Whisper    : {cfg['whisper']['model']}\n"
         f"  ED monitor : {ed}\n"
         f"  Proactive  : {pro}\n"
+        f"  Keybinds   : {kb}\n"
         f"  Personality: {p}\n"
         f"  Cache TTL  : {cfg['anthropic'].get('cache_ttl', '1h')}\n"
         f"  Dev mock   : {'ON' if mock else 'OFF'}\n"

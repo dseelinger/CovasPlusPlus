@@ -164,6 +164,34 @@ The EDCopilot-style "press buttons to do stuff." Genuinely useful but the twitch
 
 Because it's a capability behind the registry and driven by the same event bus + context, this can land much later without disturbing the rest.
 
+### Implemented — one-action prototype (`[keybinds]`, default off)
+The single-action proof from this sketch is built (`covas/keybinds/` + `KeybindCapability`),
+proving toggle-landing-gear end-to-end before any generalization:
+
+- **`binds.py`** resolves the **active** preset by name — reads `StartPreset.4.start`
+  (fallback `StartPreset.start`), loads `<preset>.4.0.binds` — rather than globbing `*.binds`
+  and guessing (stale/default preset files commonly sit alongside the real one). It parses the
+  XML and, per action, extracts the **keyboard** binding specifically (the Primary/Secondary
+  slot with `Device="Keyboard"`, Primary preferred), capturing keyboard modifiers. A
+  joystick-only or unbound action is marked *unusable* with a "bind it to a key in-game"
+  message. `[keybinds].binds_file` overrides auto-detection.
+- **`executor.py`** injects via scancode-level `SendInput` (`KEYEVENTF_SCANCODE`) — ED ignores
+  plain virtual-key events — with press / hold(duration) / release + a `release_all()` used by
+  the hard abort. The `SendInput` call sits behind an injectable backend so the whole path is
+  unit-tested with a recording fake; `scancodes.py` is a pure ED-token→scancode map.
+- **`KeybindCapability`** exposes exactly one macro (`toggle_landing_gear`) behind the safety
+  layer: **allowlist** (only `[keybinds].allowlist` macros are advertised/run), **explicit
+  confirmation** (arming never fires; the Commander confirms via `confirm_keybind` on a
+  *separate* command — turn-gated by an `app`-driven `new_turn()` so the model can't
+  arm-and-confirm in one turn, with a `confirm_window` expiry), a **combat/interdiction guard**
+  (refuses when ED Status reports danger/interdiction, and when status is unavailable it can't
+  prove it's safe → also refuses; re-checked at confirm time), and a **hard abort**
+  (`abort_keybinds` clears pending + `release_all()`). The LLM only *selects* the named macro;
+  the executor runs deterministic keystrokes. The guard reads two new `EDContext` flags
+  (`in_danger`, `being_interdicted`) folded from Status.json.
+
+Next actions stay gated behind a go/no-go after on-hardware validation of this one.
+
 ---
 
 ## 7. Suggested phase order
