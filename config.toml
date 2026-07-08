@@ -1,0 +1,182 @@
+# ============================================================================
+#  COVAS++  —  configuration (defaults)
+# ----------------------------------------------------------------------------
+#  This is the single source of truth for all default settings.
+#  It is COMMENTED on purpose — edit values freely.
+#
+#  Anything you change in the web UI (Phase 3) is saved to `overrides.json`
+#  and layered ON TOP of this file at runtime, so this file stays pristine.
+#  To reset a setting back to default, just remove it from overrides.json.
+# ============================================================================
+
+
+[keys]
+# Keyboard triggers. `keyboard`-library key names.
+# HOLD push_to_talk to speak; a BRIEF TAP of the same key cancels/stops.
+# You bind a joystick button to push_to_talk yourself via JoyToKey.
+push_to_talk = "["
+# A press shorter than this many milliseconds counts as a cancel tap, not speech.
+tap_cancel_ms = 400
+# Optional separate cancel key. Blank = cancel only via a tap of push_to_talk
+# (the web UI's CANCEL button also always works).
+cancel       = ""
+
+
+[audio]
+# Microphone input. Leave input_device blank to use the Windows default mic.
+# Run check_setup.py to see the list of device names/indexes if you want to pin one.
+input_device   = "Microphone (Logi 4K Stream Edition)"  # your chosen mic (matched by name)
+sample_rate    = 16000   # 16 kHz is what Whisper expects — leave as-is
+tts_output_device = ""   # blank = default speakers/headset
+
+
+[whisper]
+# Local speech-to-text (faster-whisper). Bigger model = more accurate, slower.
+# Options: tiny, base, small, medium, large-v3.  base/small/medium are the sweet spots.
+model       = "small"
+# "cpu" is safe everywhere. If you have an NVIDIA GPU we can switch to "cuda" later.
+device      = "cpu"
+# int8 = fast + low memory on CPU. (float16 for cuda.)
+compute_type = "int8"
+language    = "en"       # force English; set "" to auto-detect
+
+
+[anthropic]
+# Model shown/selected at runtime. Default + the two alternates you asked for.
+# Cost-tuned default: Sonnet-5 balances quality vs. price for a voice companion.
+# Flip back to "claude-opus-4-8" here (or via the UI dropdown) any time you want
+# maximum quality for a session.
+model = "claude-sonnet-5"
+# Available models the UI dropdown will offer:
+available_models = ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5-20251001"]
+# Hard cap on reply length (tokens). Must exceed the thinking budget below.
+max_tokens = 4096
+
+[anthropic.thinking]
+# Named thinking-depth tiers shown in the UI. "Off" disables thinking.
+default = "Off"
+# Current-gen models (claude-opus-4-8, claude-sonnet-5) control thinking depth
+# with an EFFORT level, not a token budget. Each tier maps to an effort value:
+[anthropic.thinking.effort]
+Low    = "low"
+Medium = "medium"
+High   = "high"
+Extra  = "xhigh"
+Max    = "max"
+# Older models that still use a token budget (e.g. claude-haiku-4-5) map each
+# tier to a budget instead. (Minimum the API accepts is 1024.)
+[anthropic.thinking.budget]
+Low    = 1024
+Medium = 4096
+High   = 8192
+Extra  = 16384
+Max    = 32000
+
+
+[web_search]
+# Native web search runs automatically whenever Claude needs current info
+# (no UI toggle — it just works under the covers). Set false to hard-disable.
+enabled = true
+# Max searches Claude may run per reply. Kept low: each search result is pulled
+# into context and then persists in the rolling history, inflating the cost of
+# every following turn in the session too.
+max_uses = 3
+
+
+[personality]
+# When ON, personality.txt is loaded as the system prompt.
+# When OFF, no system prompt is sent — replies are plain/neutral
+# (and the "Commander" address + campaign context go away, as expected).
+enabled = true
+# Relative to the project root. Your private personality.txt is git-ignored;
+# copy personality.example.txt to personality.txt and edit.
+file    = "personality.txt"
+
+
+[elevenlabs]
+# API key is read from this file (not stored here). Git-ignored; copy
+# ElevenLabsAPIKey.txt.example to ElevenLabsAPIKey.txt and paste your key.
+api_key_file = "ElevenLabsAPIKey.txt"
+# TTS model + voice. Voice id is what actually gets used; name is for display.
+model      = "eleven_flash_v2_5"
+voice_id   = "EXAVITQu4vr4xnSDxMaL"
+voice_name = "Sarah"
+# Audio format streamed back for playback. pcm_16000 = low-latency, cancellable.
+output_format = "pcm_16000"
+
+
+[sound_cues]
+# Local audio played INSTANTLY on state change (zero latency). Each cue is a LIST;
+# one is chosen at random for variety. Swap in your own .wav/.mp3 anytime.
+#   listening  = ready for voice input (push-to-talk pressed)
+#   processing = working / hitting the web
+#   done       = answer ready, just before speech plays
+#   failed     = any failure (no speech heard, API/TTS error, ...)
+# Paths are relative to the project root. The sounds/ folder is git-ignored
+# (supply your own cues); the app runs fine without them.
+listening = [
+  "sounds/voiceinput1.wav",
+  "sounds/voiceinput2.wav",
+  "sounds/voiceinput3.wav",
+  "sounds/voiceinput4.wav",
+]
+processing = [
+  "sounds/processing1.wav",
+  "sounds/processing2.wav",
+  "sounds/processing3.wav",
+]
+done   = ["sounds/inputok2.wav"]
+failed = ["sounds/inputfailed1.wav"]
+
+
+[checklist]
+# Your "ultimate checklist" — a markdown to-do list read/updated by voice.
+# Format: "- [ ]" to-do, "- [x]" done. Ask "what's my next item?" / "mark it complete".
+# Relative to the project root.
+file = "ultimate_checklist.md"
+
+
+[conversation]
+# Rolling in-session history so follow-ups work. Older turns are trimmed
+# once the running message count exceeds this many (user+assistant) turns.
+max_turns = 20
+
+
+[logging]
+# Per-session prompt/response transcript files land here (git-ignored, personal).
+# Relative to the project root.
+dir = "logs"
+
+
+[ui]
+# Local control panel (Phase 3).
+host = "127.0.0.1"
+port = 8765
+
+
+# ============================================================================
+#  PROVIDERS — the swappable pieces of the voice loop (see covas/providers).
+#  Cloud defaults preserve current behavior; the local POC forces ollama+piper.
+# ============================================================================
+
+[llm]
+# Which LLM answers. "anthropic" (cloud, Claude) or "ollama" (local, e.g. Qwen).
+provider = "anthropic"
+
+[ollama]
+# Local LLM via Ollama. Start it with `ollama serve`; pull a model first.
+host        = "http://localhost:11434"
+model       = "qwen3"      # set to your exact `ollama list` tag, e.g. "qwen3:32b"
+temperature = 0.7
+think       = true          # route <think>/thinking output away from speech
+
+[tts]
+# Which voice speaks. "elevenlabs" (cloud) or "piper" (local, offline, free).
+provider = "elevenlabs"
+
+[piper]
+# Local neural TTS. Download a voice on this machine, e.g.:
+#   python -m piper.download_voices en_US-lessac-medium
+# then set model to the resulting .onnx (its .onnx.json must sit beside it).
+# Relative paths are resolved against the project root.
+model = ""

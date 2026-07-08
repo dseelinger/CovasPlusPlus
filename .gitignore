@@ -1,0 +1,48 @@
+# ============================================================================
+#  COVAS++ .gitignore  —  PUBLIC REPO. Keep secrets and personal data OUT.
+#  NOTE: git only treats '#' as a comment at the START of a line, never inline.
+#  So every comment here lives on its own line, above the pattern it describes.
+# ============================================================================
+
+# --- Secrets (NEVER commit) ---
+ElevenLabsAPIKey.txt
+*.key
+.env
+.env.*
+
+# --- Personal / per-user data ---
+# private character + campaign (use personality.example.txt instead)
+personality.txt
+# local UI / runtime settings
+overrides.json
+# per-session conversation transcripts (personal)
+logs/
+# personal game checklist
+ultimate_checklist.md
+
+# --- License-uncertain / regenerable assets ---
+# sound cues — supply your own; may be copyrighted
+sounds/
+# cached generated TTS output
+voicelines/
+# Piper voice models (large binaries)
+*.onnx
+*.onnx.json
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

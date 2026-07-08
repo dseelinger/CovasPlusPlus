@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COVAS++ Control Panel</title>
+<style>
+  :root{
+    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
+    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,#12181f,#0a0d12)}
+  header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
+  header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
+  .wrap{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px;max-width:1200px}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:16px}
+  .card h2{margin:0 0 12px;font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  .row{display:flex;align-items:center;justify-content:space-between;margin:10px 0;gap:10px}
+  .row label{color:var(--muted);font-size:13px}
+  select{background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:5px;padding:6px 8px;font-family:inherit;min-width:180px}
+  .status{display:flex;align-items:center;gap:14px;margin-left:auto}
+  .dot{width:16px;height:16px;border-radius:50%;background:#444;box-shadow:0 0 0 rgba(0,0,0,0)}
+  .state-name{font-size:16px;letter-spacing:2px;min-width:170px}
+  .toggle{position:relative;width:52px;height:26px;background:#222c38;border-radius:20px;cursor:pointer;border:1px solid var(--edge);transition:.15s}
+  .toggle.on{background:var(--accent)}
+  .toggle .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#e8eef6;transition:.15s}
+  .toggle.on .knob{left:28px}
+  button.cancel{width:100%;margin-top:8px;padding:12px;background:#3a1414;color:#ff9d9d;border:1px solid #7a2a2a;border-radius:6px;font-family:inherit;letter-spacing:2px;cursor:pointer;font-size:14px}
+  button.cancel:hover{background:#521a1a}
+  .log{height:62vh;overflow-y:auto;background:#080b10;border:1px solid var(--edge);border-radius:6px;padding:10px;font-size:13px;line-height:1.5}
+  .log .line{margin:2px 0;white-space:pre-wrap;word-break:break-word}
+  .log .ts{color:#4a5666}
+  .who-Commander{color:var(--accent2)} .who-COVAS{color:var(--accent)} .who-system{color:var(--muted);font-style:italic}
+  .who-thinking{color:#ffb020;font-style:italic}
+  .ev-status{color:#8aa0b8} .ev-status b{color:#fff}
+  .keys{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.7}
+  .keys kbd{background:#0c1119;border:1px solid var(--edge);border-radius:4px;padding:1px 6px;color:var(--text)}
+  .err{color:#ff9d9d}
+</style>
+</head>
+<body>
+<header>
+  <h1>COVAS++</h1>
+  <span class="sub">CONTROL PANEL</span>
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span class="state-name" id="stateName">CONNECTING…</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Configuration</h2>
+    <div class="row"><label>Claude model</label><select id="model"></select></div>
+    <div class="row"><label>Thinking depth</label><select id="thinking"></select></div>
+    <div class="row"><label>Whisper model</label><select id="whisper"></select></div>
+    <div class="row"><label>ElevenLabs model</label><select id="el_model"></select></div>
+    <div class="row"><label>ElevenLabs voice</label><select id="el_voice"></select></div>
+    <div class="row"><label>Personality</label><div class="toggle" id="personality"><div class="knob"></div></div></div>
+    <button class="cancel" id="cancelBtn">■ CANCEL / STOP</button>
+    <div class="keys" id="keys"></div>
+  </div>
+
+  <div class="card">
+    <h2>Live Log</h2>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+const STATE_COLORS = {
+  Idle:"#556", Listening:"#39d353", Transcribing:"#00b4ff",
+  Thinking:"#ffb020", Searching:"#20d0d0", Speaking:"#ff5cf0"
+};
+const $ = id => document.getElementById(id);
+
+function setStatus(state, extra){
+  const c = STATE_COLORS[state] || "#556";
+  const dot = $("dot");
+  dot.style.background = c;
+  dot.style.boxShadow = "0 0 12px " + c;
+  $("stateName").textContent = (state || "").toUpperCase() + (extra ? " · " + extra : "");
+}
+function pad(n){return n<10?"0"+n:n;}
+function tstr(ts){const d=new Date((ts||Date.now()/1000)*1000);return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());}
+
+function addLog(ev){
+  const log = $("log");
+  const div = document.createElement("div");
+  div.className = "line";
+  if(ev.type === "log"){
+    div.innerHTML = '<span class="ts">'+tstr(ev.ts)+'</span> ' +
+      '<span class="who-'+ev.who+'">'+ev.who+':</span> ' +
+      escapeHtml(ev.text);
+  } else if(ev.type === "status"){
+    div.className = "line ev-status";
+    div.innerHTML = '<span class="ts">'+tstr(ev.ts)+'</span> » <b>'+ev.state+'</b>'+(ev.extra?' · '+escapeHtml(ev.extra):'');
+  } else return;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+function escapeHtml(s){return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+function opt(v,t){const o=document.createElement("option");o.value=v;o.textContent=t||v;return o;}
+
+function post(body){
+  return fetch("/api/settings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+}
+
+let SETTINGS = {};
+
+async function init(){
+  const st = await (await fetch("/api/state")).json();
+  SETTINGS = st.settings;
+
+  st.options.models.forEach(m=>$("model").appendChild(opt(m)));
+  st.options.thinking.forEach(t=>$("thinking").appendChild(opt(t)));
+  st.options.whisper.forEach(w=>$("whisper").appendChild(opt(w)));
+  $("model").value = st.settings.model;
+  $("thinking").value = st.settings.thinking;
+  $("whisper").value = st.settings.whisper;
+  setToggle("personality", st.settings.personality);
+  $("keys").innerHTML = "Hold <kbd>"+st.keys.push_to_talk+"</kbd> to talk &nbsp;·&nbsp; " +
+                        "tap it briefly to cancel &nbsp;·&nbsp; Quit <kbd>Ctrl+Alt+Q</kbd>";
+  setStatus(st.status, "");
+
+  $("model").onchange = e => post({model:e.target.value});
+  $("thinking").onchange = e => post({thinking:e.target.value});
+  $("whisper").onchange = e => post({whisper:e.target.value});
+
+  // ElevenLabs lists (may take a moment / may fail offline)
+  try{
+    const el = await (await fetch("/api/elevenlabs")).json();
+    if(el.error) throw new Error(el.error);
+    el.models.forEach(m=>$("el_model").appendChild(opt(m.model_id, m.name)));
+    el.voices.forEach(v=>$("el_voice").appendChild(opt(v.voice_id, v.name+" ["+v.category+"]")));
+    $("el_model").value = st.settings.el_model;
+    $("el_voice").value = st.settings.el_voice;
+    $("el_model").onchange = e => post({el_model:e.target.value});
+    $("el_voice").onchange = e => {
+      const name = e.target.selectedOptions[0].textContent.split(" [")[0];
+      post({el_voice:e.target.value, el_voice_name:name});
+    };
+  }catch(err){
+    $("el_model").appendChild(opt("", "(fetch failed)"));
+    $("el_voice").appendChild(opt("", "(fetch failed)"));
+    addLog({type:"log",who:"system",text:"ElevenLabs list fetch failed: "+err.message});
+  }
+
+  $("personality").onclick = () => { const v=!getToggle("personality"); setToggle("personality",v); post({personality:v}); };
+  $("cancelBtn").onclick = () => fetch("/api/cancel",{method:"POST"});
+
+  connectWS();
+}
+function setToggle(id,on){$(id).classList.toggle("on",!!on);}
+function getToggle(id){return $(id).classList.contains("on");}
+
+function connectWS(){
+  const ws = new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
+  ws.onmessage = e => {
+    const ev = JSON.parse(e.data);
+    if(ev.type==="status") setStatus(ev.state, ev.extra);
+    if(ev.type==="settings"){ syncSettings(ev.settings); }
+    addLog(ev);
+  };
+  ws.onclose = () => { setStatus("Idle","disconnected"); setTimeout(connectWS, 1500); };
+}
+function syncSettings(s){
+  if(!s) return;
+  if($("model").value!==s.model) $("model").value=s.model;
+  if($("thinking").value!==s.thinking) $("thinking").value=s.thinking;
+  if($("whisper").value!==s.whisper) $("whisper").value=s.whisper;
+  if($("el_model").value!==s.el_model) $("el_model").value=s.el_model;
+  if($("el_voice").value!==s.el_voice) $("el_voice").value=s.el_voice;
+  setToggle("personality", s.personality);
+}
+init();
+</script>
+</body>
+</html>
