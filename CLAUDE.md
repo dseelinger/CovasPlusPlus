@@ -25,8 +25,10 @@ on-hardware testing.
 ## Architecture (where things live)
 - `covas/app.py` — orchestration: PTT handling, threading, cancellation, worker loop.
 - `covas/providers/` — the swappable seam. `base.py` = Protocols (LLM/TTS/STT);
-  `factory.py` builds the one named in config; cloud = `anthropic_llm`/`elevenlabs_tts`,
-  local = `ollama_llm`/`piper_tts`; `whisper_stt` wraps STT.
+  `factory.py` builds the one named in config. In-game LLM is always Anthropic
+  (`anthropic_llm`), tiered Haiku/Sonnet/Opus by the router. `ollama_llm` exists for
+  offline/out-of-game use only — NOT the in-game path (a local LLM competes with ED for
+  the GPU). TTS = `elevenlabs_tts` or local `piper_tts`; `whisper_stt` wraps STT.
 - `covas/llm.py` — Anthropic streaming (prompt caching + tools live here).
 - `covas/checklist.py` — the checklist model; tools exposed to the LLM.
 - `covas/events.py` — `EventBus` (thread-safe pub/sub). This is the spine; new inputs
@@ -58,10 +60,14 @@ on-hardware testing.
 - Don't add ship-control/keybind automation without the safety layer described in the
   design doc (allowlist, confirmation, hard abort, no-op during combat).
 
-## Cost awareness (cloud path)
-Prompt caching on system+tools is already on in `llm.py`; default model is Sonnet.
-When touching the cloud path, preserve caching, avoid re-sending large static context,
-and prefer routing routine turns to the local provider (see the router prompt).
+## Cost awareness
+Cost is handled by **cloud tiering**, not local LLMs (a useful local model fights ED for
+the GPU). Prompt caching on system+tools is on in `llm.py`; defaults are Sonnet, thinking
+off, `max_tokens=1024`, `web_search.max_uses=3`. The router (see the prompt pack) makes
+Haiku the default tier and escalates to Sonnet/Opus only when a turn earns it. When
+touching the LLM path: preserve caching, don't re-send large static context, keep replies
+short (spoken aloud), and never re-introduce an always-on thinking default. Local Piper TTS
+is the one cost cut that runs fine next to the game.
 
 ## Workflow
 One capability/change per branch; small commits; each roadmap step is independently

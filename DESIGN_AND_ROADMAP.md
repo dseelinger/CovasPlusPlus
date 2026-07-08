@@ -2,21 +2,26 @@
 
 *Working design doc. Treat the current app as a light MVP; this describes where it goes next and the principles for getting there without repainting the whole thing each time.*
 
-Priorities agreed: **modular refactor**, **cut API costs** (both quick cloud wins *and* a local/cloud hybrid), and **Elite Dangerous log monitoring**. Keybind automation is a later phase, sketched here so the architecture leaves room for it.
+Priorities agreed: **modular refactor**, **cut API costs** (quick cloud wins *and* cloud model tiering), and **Elite Dangerous log monitoring**. Keybind automation is a later phase, sketched here so the architecture leaves room for it.
+
+> **Decision (updated):** local LLMs are out. A model capable enough to be useful wants the same GPU/VRAM Elite Dangerous is already saturating, so running both starves one. Cost mitigation is therefore *cloud tiering* (Haiku → Sonnet → Opus), not a local/cloud hybrid. Local **Piper TTS** and **Whisper STT** stay viable — they're light CPU work that coexists with the game — so the one worthwhile local move is dropping ElevenLabs for Piper. The provider seam already built makes this a config/router change, not a rewrite.
 
 ---
 
 ## 1. Cost: what's already done, what's left
 
 ### Done now (safe, in-code)
-- **Prompt caching** (`covas/llm.py`): the personality system prompt and the tool schemas are now sent with an ephemeral `cache_control` breakpoint. These are static within a session, so Anthropic serves them from cache at ~90% off input price instead of re-billing ~8 KB of preamble on every turn and every tool-loop round.
-- **Cheaper default model** (`config.toml`): default switched `claude-opus-4-8` → `claude-sonnet-5`. Biggest single lever. Fully reversible in one line or via the UI dropdown; Opus is still available per-session.
-- **Fewer web searches** (`config.toml`): `web_search.max_uses` 5 → 3. Each search result is pulled into context and then persists in rolling history, so it inflates the cost of *every following turn*, not just its own.
+- **Killed the real burn:** `overrides.json` had been forcing `claude-opus-4-8` **plus High extended thinking** on every turn, silently overriding the cost-tuned config. Stripped back to just the voice preference, so model/thinking now fall back to the config defaults (Sonnet, thinking off). This was the dominant cost.
+- **Prompt caching** (`covas/llm.py`): personality system prompt + tool schemas sent with an ephemeral `cache_control` breakpoint — served from cache at ~90% off input price instead of re-billing ~8 KB of preamble every turn and every tool-loop round.
+- **Cheaper default model** (`config.toml`): `claude-opus-4-8` → `claude-sonnet-5`. (Becomes Haiku-by-default once the tiering router lands — see §4.)
+- **`max_tokens` cap** (`config.toml`): 4096 → 1024. Replies are spoken, so a few sentences is plenty; a low cap trims Claude output tokens *and* ElevenLabs characters at once.
+- **Fewer web searches** (`config.toml`): `web_search.max_uses` 5 → 3. Each result is pulled into context and persists in history, inflating *every following turn*.
 
 ### Still available (your call — knobs, not rewrites)
-- **`conversation.max_turns = 20`** means up to 40 messages are resent each turn. With the preamble now cached, history is the main variable cost. Dropping to ~10 halves it on long sessions, at the price of shorter memory.
-- **Reply brevity.** ElevenLabs bills per character and Anthropic per output token, so a "be concise unless asked to elaborate" instruction saves on *both* APIs at once. Best added as an optional toggle rather than by editing `personality.txt` (which is loaded as-is).
-- **Dev-mode mocking.** During development, a flag that returns canned LLM/TTS responses (or plays cached WAVs) stops test runs from spending real dollars. Cheap to add, big savings while iterating.
+- **1-hour prompt-cache TTL.** The default cache lives 5 minutes; in-game you may go 15–20 minutes between voice turns, so it expires and every turn pays a full (premium) cache *write* with no read benefit. The 1-hour TTL costs a bit more per write but survives the gaps — a clear win if you talk a few times an hour.
+- **`conversation.max_turns = 20`** resends up to 40 messages per turn. With the preamble cached, history is the main variable cost. Drop to ~8–10, or summarize older turns into a compact running note.
+- **Drop ElevenLabs for Piper.** The one local move that survives running next to ED (TTS is light CPU, not GPU) — takes TTS cost to zero. Keep ElevenLabs as a "premium voice" toggle. See §4.
+- **Usage logging + dev-mock.** Log the per-call token counts the API already returns (including cache hits) with a rough cost estimate, so tuning is data-driven; and a dev-mode flag that returns canned replies so iterating on code spends nothing.
 
 ---
 
@@ -41,9 +46,9 @@ Think of it as three layers over the event bus.
             └───────────────────────────────────────────────────────────────────┘
  INPUTS                    CORE / ORCHESTRATION                 PROVIDERS
  ─────────                 ────────────────────                 ─────────
- PTT + mic ──► STT ──►  Conversation loop  ──► Router ──► LLMProvider  {anthropic, ollama}
+ PTT + mic ──► STT ──►  Conversation loop  ──► Router ──► LLMProvider  {Haiku|Sonnet|Opus}
  ED journal ─► Watcher       │  (app.py)              └─► TTSProvider  {elevenlabs, piper}
- timers ─────► Scheduler     │                            STTProvider  {faster-whisper, ...}
+ timers ─────► Scheduler     │                            STTProvider  {faster-whisper}
  UI/web ─────────────────────┘
                              │
                      CapabilityRegistry
@@ -53,7 +58,7 @@ Think of it as three layers over the event bus.
 ### 3.1 Provider interfaces
 Three tiny protocols. Each has 1–2 methods; existing code becomes the first implementation of each.
 
-- **`LLMProvider.stream_reply(messages, cfg, cancel, on_event, tool_handler) -> Iterator[(kind, chunk)]`** — exactly today's `llm.stream_reply` signature. `AnthropicProvider` wraps the current file unchanged. `OllamaProvider` is new (see §4). The tool-call protocol differs per provider, so each provider owns its own tool loop and normalizes to the same `("text"|"thinking"|"search"|"tool", data)` event stream the app already consumes.
+- **`LLMProvider.stream_reply(messages, cfg, cancel, on_event, tool_handler) -> Iterator[(kind, chunk)]`** — exactly today's `llm.stream_reply` signature. `AnthropicLLM` wraps the current file; tiering (Haiku/Sonnet/Opus) is a *parameter* to it, chosen by the Router, not a separate provider. An `OllamaLLM` implementation exists in the tree for out-of-game/offline use, but is not part of the in-game path (see §4). Each provider normalizes to the same `("text"|"thinking"|"search"|"tool", data)` event stream the app already consumes.
 - **`TTSProvider.speak(text, cancel)`** and **`.synth_pcm(text) -> bytes`** — today's `tts.py` becomes `ElevenLabsTTS`; `PiperTTS` is new and runs fully local. Both emit the same 16-bit mono PCM the playback path already expects, so `audio`/cancellation code is untouched.
 - **`STTProvider.transcribe(audio) -> str`** — today's `Transcriber` implements it directly. Rarely swapped, but the seam keeps STT symmetric with the others.
 
@@ -75,38 +80,41 @@ A `Capability` is a small class exposing:
 1. Extract `LLMProvider`/`TTSProvider`/`STTProvider` protocols; make current Anthropic/ElevenLabs/Whisper code implement them. No behavior change — pure seams.
 2. Introduce the provider factory + `[llm]`/`[tts]`/`[stt]` config sections (defaulting to today's services).
 3. Move checklist tools into a `ChecklistCapability`; add a `CapabilityRegistry`. Loop behavior identical.
-4. Add the `Router` returning "always cloud" initially. Now the structure exists with zero functional change — a safe checkpoint.
-5. Land Ollama/Qwen + Piper providers and turn on real routing (§4).
+4. Add the `Router` returning a single fixed tier initially. Now the structure exists with zero functional change — a safe checkpoint.
+5. Turn on cloud tiering in the Router (Haiku default → Sonnet/Opus escalation); optionally make Piper the default TTS (§4).
 6. Add the ED journal watcher as an input + `EDContextCapability` (§5).
 
 Each step is independently shippable and testable.
 
 ---
 
-## 4. Hybrid local/cloud strategy
+## 4. Cloud model tiering strategy
 
-**Goal:** keep the cloud for what it's uniquely good at (nuanced conversation, current-events search, hard reasoning) and push everything routine to local Qwen 3.6 (Ollama) + Piper, which are effectively free after setup.
+Local LLMs are off the table (see the decision note up top): a useful model competes with Elite Dangerous for the GPU. So instead of local-vs-cloud, tier across **cloud** models — answer routine turns on the cheapest capable one, escalate only when the turn earns it.
 
-### Routing policy (first cut)
-Route **local** by default; escalate to **cloud** when any escalation trigger fires.
+### Tiers
+- **Default — Haiku 4.5.** The workhorse: in-cockpit banter, acknowledgements, checklist reads/updates, status readouts, anything answerable from ED context already in the prompt. Far cheaper than Sonnet/Opus and plenty for these.
+- **Escalate — Sonnet.** Nuance, multi-step reasoning, or turns that need web search for current data.
+- **Rare — Opus.** Reserve for explicitly hard asks; usually not worth it for a voice companion.
 
-- **Local (Qwen + Piper) handles:** short conversational replies, checklist reads/updates, status readouts ("what's my next objective," "am I docked"), acknowledgements, and anything answerable from ED context already in the prompt.
-- **Escalate to cloud (Sonnet + ElevenLabs) when:** the request needs web search (current prices, system data the app doesn't have locally); the user explicitly asks for depth/analysis; the local model returns low confidence or an ill-formed tool call; or the user says a wake phrase like "ask the big brain."
+### Routing policy (deterministic first)
+The Router (§3.2) decides per turn. Keep it rules-based and explainable to start:
 
-### How to decide, in order of preference
-1. **Cheap classifier first.** A fast local pass (Qwen with a terse routing prompt, or even keyword/intent rules) tags the request `local` vs `cloud`. Rules catch the obvious cases for free; the model handles the rest.
-2. **Local attempt with escalation.** Try Qwen; if it emits an "I need to search" signal, an invalid tool call, or a self-flagged low-confidence marker, transparently re-run on cloud. Costs latency on the fallback path only.
-3. **Explicit override.** Wake phrases and a UI toggle force a tier, so you're never at the mercy of the classifier.
+- Escalate to Sonnet when the request needs current/web data, asks for depth/analysis, or matches a wake phrase ("think hard", "ask the big brain").
+- Otherwise stay on Haiku.
+- Always allow a manual override (wake phrase / UI toggle) to pin a tier.
 
-Start with (1)+(3) — deterministic and debuggable — and add (2) once the provider seam is stable.
+Log every decision with its reason, so you can tune the rules from real transcripts. A cheap classifier (a Haiku pass that tags cheap/premium) can come later if rules aren't enough — leave the extension point, don't build it yet.
 
-### TTS routing
-Piper for everything by default (local, instant, no per-character cost). Reserve ElevenLabs for a "premium voice" toggle or specific moments. Because both providers emit the same PCM, switching is a router decision, not a code change. Note the voice character differs — Piper voices are good but not ElevenLabs-smooth; worth an A/B once wired.
+### Cost levers that stack with tiering
+- **Prompt caching** (done) on system + tools. For sporadic in-game talking, use the **1-hour cache TTL** so it survives the gaps between turns rather than expiring every 5 minutes.
+- **`max_tokens` cap** (done, 1024). The Router can raise it for an explicit "give me the full breakdown" turn.
+- **Thinking off by default** — make extended thinking opt-in per turn, never global (a High-thinking default was the original burn).
+- **Trim history** — lower `conversation.max_turns` or summarize older turns.
+- **Usage logging** — log the token counts the API returns per call (including cache reads/writes) plus a rough cost estimate; pair with a dev-mode mock for zero-cost iteration.
 
-### Practical notes
-- **Ollama** exposes an OpenAI-compatible `/api/chat` with streaming and (model-dependent) tool-calling. Qwen supports tool calls, but formatting is less reliable than Claude's — keep tool schemas small and validate/repair tool JSON in the `OllamaProvider`. This is why each provider owns its own tool loop.
-- **Model warmup:** keep Ollama's model resident (`keep_alive`) so first-token latency doesn't spike mid-flight.
-- **Context discipline:** local models have smaller effective context and get slower with history — the `max_turns` trim matters more on the local path; consider a tighter local cap.
+### TTS: the one worthwhile local move
+TTS is a light CPU burst, not a GPU hog, so **Piper runs fine alongside the game**. Defaulting TTS to Piper takes ElevenLabs cost to zero; keep ElevenLabs as a "premium voice" toggle for relaxed sessions. Because both emit the same PCM, this is a config/router choice, not a code change. Whisper STT is already local for the same reason. Note the voice character differs — Piper is good but not ElevenLabs-smooth; worth an A/B once wired.
 
 ---
 
@@ -149,20 +157,20 @@ Because it's a capability behind the registry and driven by the same event bus +
 
 ## 7. Suggested phase order
 
-1. **Bank cost wins** *(done)* + optional knobs from §1.
+1. **Bank cost wins** *(done)* — overrides fix, caching, Sonnet default, `max_tokens` cap + optional knobs from §1.
 2. **Provider seams + registry** (§3.4 steps 1–4). No behavior change; unlocks everything else. Safe checkpoint.
-3. **ED log monitoring** (§5). High value on its own, improves replies immediately, and is a prerequisite for non-blind automation.
-4. **Local hybrid** (§4). Ollama/Qwen + Piper providers, rules-based router, wake-phrase overrides. This is where the recurring cost really drops.
-5. **Proactive callouts** (§5) once monitoring + TTS routing are stable.
+3. **Cloud tiering router** (§4). Haiku default → Sonnet/Opus escalation, rules-based with wake-phrase overrides, usage logging. This is where recurring cost really drops. (Optionally flip TTS to Piper here.)
+4. **ED log monitoring** (§5). High value on its own, improves replies immediately, and is a prerequisite for non-blind automation.
+5. **Proactive callouts** (§5) once monitoring + TTS are stable.
 6. **Keybind automation** (§6), one action at a time.
 
 ---
 
 ## 8. Watch-items / risks
 
-- **Local tool-calling reliability.** Qwen's tool JSON is less consistent than Claude's — validate and repair in the provider; keep schemas minimal.
-- **Latency vs. quality feel.** Local is cheaper but the voice/reasoning feel changes. A/B Piper vs ElevenLabs and Qwen vs Sonnet on real sessions before committing defaults.
+- **Tier quality feel.** Haiku-by-default changes the companion's voice/reasoning feel vs. Sonnet/Opus. A/B on real sessions and tune the escalation rules; keep the manual override so you can force a tier when it matters.
+- **Reply truncation.** A low `max_tokens` can cut off a genuinely long answer mid-sentence — bad over TTS. Let the Router raise the cap for explicit "full breakdown" turns rather than setting it too low globally.
 - **Journal rollover & partial lines.** Tailing must handle new-file rollover and the occasional half-written final line (retry-on-parse-fail).
 - **Key injection into ED.** Expect scancode/`SendInput` work; validate with the one-action prototype.
-- **Secret hygiene.** `ElevenLabsAPIKey.txt` sits in a OneDrive-synced folder in plaintext — fine for you to decide, but worth noting; env var or a local-only path would be safer.
+- **Secret hygiene.** `ElevenLabsAPIKey.txt` is git-ignored and now outside OneDrive; keep it that way. An env var would be marginally safer still.
 - **Provider abstraction creep.** Keep the interfaces tiny (1–2 methods). The moment they grow provider-specific params, the abstraction stops paying for itself.
