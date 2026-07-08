@@ -54,6 +54,12 @@ available_models = ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5-2025
 # ElevenLabs characters. The router can raise it for an explicit "full breakdown"
 # turn. Must exceed the thinking budget below if thinking is ever enabled.
 max_tokens = 1024
+# Prompt-cache lifetime for the (static) system prompt + tool schemas. In-game
+# voice turns are sporadic — often 15-20 min apart — so the default 5-minute cache
+# expires between them and every turn pays a full cache WRITE with no read benefit.
+# "1h" survives the gaps (costs ~2x on the write, ~0.1x on the read). Use "5m" for
+# the cheaper-per-write default when talking continuously. See [pricing] below.
+cache_ttl = "1h"
 
 [anthropic.thinking]
 # Named thinking-depth tiers shown in the UI. "Off" disables thinking.
@@ -74,6 +80,34 @@ Medium = 4096
 High   = 8192
 Extra  = 16384
 Max    = 32000
+
+
+[pricing]
+# Per-model token prices in US dollars per 1,000,000 tokens, used only to turn the
+# usage counts the API returns into a rough per-turn cost estimate in the log. TUNE
+# these when Anthropic pricing changes — they don't affect what you're billed.
+#   input       = uncached input tokens (full price)
+#   output      = generated tokens
+#   cache_write = writing the prompt cache. Sized for the 1-hour TTL (~2x input);
+#                 halve toward ~1.25x input if you switch [anthropic].cache_ttl to "5m".
+#   cache_read  = reading from the cache (~0.1x input) — the whole point of caching.
+# Keys are matched to the model id exactly, then by prefix (so "claude-haiku-4-5"
+# also covers "claude-haiku-4-5-20251001"). Unknown models estimate as $0.00.
+[pricing."claude-sonnet-5"]
+input = 3.0
+output = 15.0
+cache_write = 6.0
+cache_read = 0.30
+[pricing."claude-opus-4-8"]
+input = 5.0
+output = 25.0
+cache_write = 10.0
+cache_read = 0.50
+[pricing."claude-haiku-4-5"]
+input = 1.0
+output = 5.0
+cache_write = 2.0
+cache_read = 0.10
 
 
 [web_search]
@@ -183,3 +217,11 @@ provider = "elevenlabs"
 # then set model to the resulting .onnx (its .onnx.json must sit beside it).
 # Relative paths are resolved against the project root.
 model = ""
+
+
+[dev]
+# Dev-mode mock. When ON, the LLM/TTS/STT are swapped for fakes (canned text, no
+# audio) so you can exercise the full push-to-talk loop while iterating on code
+# with ZERO API calls and zero cost. The env var COVAS_MOCK=1 overrides this for a
+# one-off run. Leave OFF for real use.
+mock = false

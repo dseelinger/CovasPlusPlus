@@ -9,7 +9,9 @@ and calls on_event(kind, data) for side channels:
     on_event("thinking", delta)   -> reasoning summary (optional)
     on_event("search",   query)   -> a web search fired (cloud only)
     on_event("tool",     name)    -> a client tool was called
-This lets app.py consume any provider identically.
+    on_event("usage",    dict)    -> per-call token counts + $ estimate (cloud only)
+`data` is a str for every kind except "usage", which passes a dict — hence the
+`object` payload type below. This lets app.py consume any provider identically.
 """
 from __future__ import annotations
 
@@ -18,7 +20,8 @@ from typing import Callable, Iterator, Optional, Protocol, runtime_checkable
 
 import numpy as np
 
-OnEvent = Callable[[str, str], None]
+# `data` is a str for text/thinking/search/tool and a dict for "usage".
+OnEvent = Callable[[str, object], None]
 ToolHandler = Callable[[str, dict], str]
 
 
