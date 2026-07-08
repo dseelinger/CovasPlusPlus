@@ -6,8 +6,9 @@ Read this first. It's the working agreement for this repo.
 COVAS++ — a local Windows **voice AI companion for Elite Dangerous**. Push-to-talk →
 local STT (faster-whisper) → LLM → TTS. It converses, tracks a markdown checklist, and
 can web-search. It does **not** fly the ship. Treat the current app as a light MVP.
-Full design and rationale: **`DESIGN_AND_ROADMAP.md`**. Sequenced build prompts:
-**`CLAUDE_CODE_PROMPTS.md`**.
+Full design and rationale: **`DESIGN_AND_ROADMAP.md`**. Sequenced build prompts live in
+**`CLAUDE_CODE_PROMPTS.md`** — start at **Prompt 1** (cost instrumentation) and do them in
+order, one per fresh session. (The prompts are in that file, not here.)
 
 ## Run / verify
 ```bash
