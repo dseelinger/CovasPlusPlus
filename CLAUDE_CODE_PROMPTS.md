@@ -15,7 +15,11 @@ Ground rules baked into every prompt (also in `CLAUDE.md`):
 - Read `CLAUDE.md` and `DESIGN_AND_ROADMAP.md` first.
 - Public repo — never commit secrets or personal data.
 - Keep provider interfaces tiny; add features as capabilities, not `app.py` branches.
-- Byte-compile + unit-test pure logic; call out what needs manual on-hardware testing.
+- **Tests: unit by default, integration opt-in.** Bare `pytest` must stay offline and free
+  (no network/API/ElevenLabs/Ollama/audio) — inject dependencies and use `tests/fakes.py`.
+  Anything hitting a real service is `@pytest.mark.integration` + `local` (free) or `paid`
+  (costs money), excluded from the default run. See `DESIGN_AND_ROADMAP.md` §9.
+- Byte-compile; call out what needs manual on-hardware testing.
 - Small commits, one increment per branch. Implement, self-review the diff, tell me
   exactly what to test by hand, and wait for my confirmation before considering it done.
 
@@ -44,13 +48,20 @@ Tasks:
    with canned text/audio so iterating on code costs nothing. Wire it in the factory.
 4. Add a startup log line summarizing effective cost settings (model, thinking, max_tokens,
    web_search uses, cache TTL, mock on/off).
-5. Keep and green the dev tooling already in the tree (tests/, pyproject.toml,
-   requirements-dev.txt): `pytest` and `ruff check` must pass.
+5. Stand up the test harness (see DESIGN §9). `tests/fakes.py` with FakeLLM/FakeTTS/FakeSTT
+   satisfying the base.py Protocols; a unit-test `conftest.py` fixture that blocks the
+   network (monkeypatch socket) so an accidental real call fails loudly. The markers +
+   default `-m "not integration"` are already in pyproject.toml — keep bare `pytest` unit-
+   only and free. The dev-mode mock from task 3 should reuse the same fakes.
+6. Keep and green the existing dev tooling (tests/, pyproject.toml, requirements-dev.txt):
+   `pytest` and `ruff check` must pass.
 
-Constraints: no change to reply behavior beyond the length cap; caching stays intact.
+Constraints: no change to reply behavior beyond the length cap; caching stays intact; the
+default `pytest` run makes ZERO network calls.
 
 Acceptance: a session log shows per-turn token counts + estimated cost; mock mode completes
-a full turn with zero API calls; pytest + ruff green. Give me manual test steps, then stop.
+a full turn with zero API calls; bare `pytest` is green and offline (the network-guard
+fixture proves it); ruff green. Give me manual test steps, then stop.
 ```
 
 ---
@@ -67,10 +78,11 @@ Goal: route app.py through covas/providers/factory instead of constructing Anthr
 ElevenLabs / Whisper directly, and move the checklist tools into a Capability.
 
 Tasks:
-1. In covas/app.py, replace direct construction with factory.make_llm/make_tts/make_stt.
-   The Anthropic and ElevenLabs providers already wrap existing code, so default behavior
-   is identical. Update _process() to call llm_provider.stream_reply(...) and
-   tts_provider.speak(...).
+1. In covas/app.py, inject the providers for testability: `App(cfg, *, llm=None, tts=None,
+   stt=None)` where None means "build the real one from config via factory.make_llm/
+   make_tts/make_stt" (the composition root), and unit tests pass fakes. The Anthropic and
+   ElevenLabs providers already wrap existing code, so default behavior is identical.
+   Update _process() to call the injected llm.stream_reply(...) and tts.speak(...).
 2. Create covas/capabilities/base.py with a Capability protocol: tools(), run_tool(name,
    input), optional on_event(event), optional system_context(). Create a
    CapabilityRegistry that aggregates tools() and dispatches run_tool().
@@ -83,7 +95,8 @@ Tasks:
 Constraints: no functional change with the shipped config. Keep the fail-soft guards.
 
 Acceptance: behaves exactly as before (verify checklist add/find/complete by voice still
-works — tell me how to test); py_compile + tests green. Stop for my review.
+works — tell me how to test); a unit test drives App with FakeLLM/FakeTTS through a full
+turn (no network); bare `pytest` green and offline. Stop for my review.
 ```
 
 ---
@@ -154,8 +167,9 @@ Tasks:
 Constraints: watchers publish events only and must never block the voice loop. Unit-test
 the pure parsing/bitfield logic with sample journal lines and Status.json fixtures.
 
-Acceptance: unit tests green on fixtures; a manual script that tails my live journal and
-prints published events. Do NOT wire proactive speech yet. Stop for review.
+Acceptance: unit tests green on fixtures (offline, default run); the live-journal tail is
+an opt-in `integration`+`local` test/script, not part of the default run. Do NOT wire
+proactive speech yet. Stop for review.
 ```
 
 ---

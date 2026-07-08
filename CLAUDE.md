@@ -17,6 +17,9 @@ order, one per fresh session. (The prompts are in that file, not here.)
 .venv\Scripts\python.exe run_covas_ui.py     # + localhost control panel
 python poc_local_loop.py                      # offline POC (Ollama + Piper + Whisper)
 python -m py_compile covas\**\*.py            # fast sanity check after edits
+pytest                                        # UNIT tests only — offline, free, run often
+pytest -m "integration and local"            # free integration (Ollama/Piper/Whisper/audio)
+pytest -m "integration and paid"             # deliberate, COSTS money (Anthropic/ElevenLabs)
 ```
 Ship-critical paths (audio devices, Ollama server, ElevenLabs) need Doug's machine —
 you generally **cannot** run the full loop in CI/sandbox. Byte-compile, add unit tests
@@ -45,6 +48,12 @@ on-hardware testing.
   shared event contract in `providers/base.py` so `app.py` consumes them identically.
 - **Capabilities over loop edits.** New features (ED context, keybinds) should be
   self-contained modules that register tools/handlers, not new branches inside `app.py`.
+- **Tests: unit by default, integration opt-in.** Bare `pytest` must stay offline and
+  free — no network, API, ElevenLabs, Ollama, or audio. Achieve that by injecting
+  dependencies (components take provider instances; the factory builds real ones only at
+  the app entry, tests pass fakes from `tests/fakes.py`). Anything hitting a real service
+  is `@pytest.mark.integration` plus `local` (free) or `paid` (costs money), and is
+  excluded from the default run. See `DESIGN_AND_ROADMAP.md` §9.
 - **Fail soft.** The voice loop must survive any provider/tool error and return to Idle;
   a dead TTS degrades to text, it doesn't crash the session. Keep the broad `except`
   guards that exist for this reason.

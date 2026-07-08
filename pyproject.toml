@@ -7,7 +7,18 @@ minversion = "7.0"
 # Let `from covas...` imports resolve without installing the project.
 pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "-q"
+# Bare `pytest` runs UNIT tests only — offline, free, run it constantly. Integration
+# tests hit real services/devices and are opt-in (see markers + commands below).
+addopts = "-q -m 'not integration'"
+markers = [
+  "integration: touches a real external service or device; excluded from the default run",
+  "local: free integration deps (Ollama, Piper, Whisper, audio)",
+  "paid: paid APIs (Anthropic, ElevenLabs) — run deliberately, costs money",
+]
+# Commands:
+#   pytest                              unit only (default; no network, no cost)
+#   pytest -m "integration and local"   free integration (Ollama/Piper/Whisper/audio)
+#   pytest -m "integration and paid"    deliberate, costs money (Anthropic/ElevenLabs)
 
 [tool.ruff]
 target-version = "py311"
