@@ -110,6 +110,34 @@ cache_write = 2.0
 cache_read = 0.10
 
 
+[router]
+# Cost router (DESIGN §4): route each turn to the cheapest capable cloud model,
+# escalating only when the turn earns it. This is where recurring cost really drops.
+#
+# DEFAULT OFF — while disabled, every turn uses the fixed [anthropic].model above
+# (currently Sonnet), so nothing changes until you flip this to true. Turn it on once
+# you've eyeballed a few sessions and are happy with Haiku-by-default.
+enabled = true
+# Tier model ids. default = the Haiku workhorse (banter, acks, checklist reads);
+# escalate = Sonnet (depth/analysis, current-data turns); premium = Opus (explicit ask).
+default_model  = "claude-haiku-4-5"
+escalate_model = "claude-sonnet-5"
+premium_model  = "claude-opus-4-8"
+# Manual tier pin (a UI toggle / "force a tier" knob). Blank = let the rules decide.
+# Set to "haiku", "sonnet", or "opus" to force every turn to that tier.
+pin = ""
+# Raised reply cap (tokens) for an explicit "full breakdown"-style request, so a long
+# answer isn't truncated mid-sentence over TTS. Normal turns use [anthropic].max_tokens.
+full_breakdown_max_tokens = 2048
+# Phrase rules (case-insensitive substring match on the spoken text). Deterministic and
+# explainable; tune these from real transcripts. A cheap-classifier pass can come later.
+escalate_phrases       = ["think hard", "ask the big brain", "big brain"]
+premium_phrases        = ["use opus", "ask opus"]
+depth_phrases          = ["analyze", "analyse", "in detail", "in depth", "deep dive", "explain why", "walk me through", "compare", "pros and cons"]
+web_phrases            = ["latest", "current", "right now", "look up", "search the web", "the news", "up to date", "how much is"]
+full_breakdown_phrases = ["full breakdown", "give me everything", "long version", "complete breakdown", "the whole rundown"]
+
+
 [web_search]
 # Native web search runs automatically whenever Claude needs current info
 # (no UI toggle — it just works under the covers). Set false to hard-disable.

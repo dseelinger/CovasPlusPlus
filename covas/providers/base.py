@@ -50,7 +50,11 @@ class LLMProvider(Protocol):
         on_event: OnEvent,
         tool_handler: Optional[ToolHandler] = None,
         tools: Optional[list[dict]] = None,
+        model: Optional[str] = None,
+        max_tokens: Optional[int] = None,
     ) -> Iterator[tuple[str, str]]:
         """Stream a reply for the given conversation. `tools` are the client-side
         tool schemas the LLM may call (from the capability registry); `tool_handler`
-        runs them. See module docstring."""
+        runs them. `model`/`max_tokens` are the cost router's per-turn choice
+        (DESIGN §4) — the tier is a *parameter*, not a provider-per-model; None means
+        use the provider's configured default. See module docstring."""

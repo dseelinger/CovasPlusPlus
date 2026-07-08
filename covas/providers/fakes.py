@@ -51,6 +51,9 @@ class FakeLLM:
     ) -> None:
         self._text = text
         self._events = list(events or [])
+        # Records the router's per-turn choice (model, max_tokens) for test assertions.
+        self.model_seen: Optional[str] = None
+        self.max_tokens_seen: Optional[int] = None
 
     def stream_reply(
         self,
@@ -59,7 +62,11 @@ class FakeLLM:
         on_event,  # noqa: ANN001 — OnEvent
         tool_handler=None,  # noqa: ANN001 — ToolHandler, accepted for parity
         tools=None,  # noqa: ANN001 — client tool schemas, accepted for parity
+        model=None,  # noqa: ANN001 — cost router's per-turn model, recorded below
+        max_tokens=None,  # noqa: ANN001 — cost router's per-turn cap, recorded below
     ) -> Iterator[tuple[str, str]]:
+        self.model_seen = model
+        self.max_tokens_seen = max_tokens
         for kind, data in self._events:
             if cancel.is_set():
                 return

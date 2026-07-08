@@ -78,7 +78,8 @@ class _CapturingLLM:
         self.handler = None
 
     def stream_reply(self, messages, cancel, on_event,
-                     tool_handler=None, tools=None) -> Iterator[tuple[str, str]]:
+                     tool_handler=None, tools=None,
+                     model=None, max_tokens=None) -> Iterator[tuple[str, str]]:
         self.tools_seen = tools
         self.handler = tool_handler
         yield ("text", "ok")
@@ -98,3 +99,40 @@ def test_turn_offers_capability_tools_to_llm(tmp_path):
     # assert on behavior).
     assert callable(cap.handler)
     assert "Scoop fuel" in cap.handler("get_next_objectives", {})
+
+
+def test_router_choice_reaches_the_llm(tmp_path):
+    """With routing ON, the per-turn model/max_tokens the router picks are the ones
+    App hands to the provider (DESIGN §4). A wake phrase escalates to Sonnet."""
+    cfg = _cfg(tmp_path)
+    cfg["router"] = {"enabled": True, "default_model": "claude-haiku-4-5",
+                     "escalate_model": "claude-sonnet-5"}
+    llm = FakeLLM(text="ok")
+    app = App(cfg, stt=FakeSTT(text="think hard about the jump plan"),
+              llm=llm, tts=FakeTTS())
+    app._process(object(), threading.Event())
+    assert llm.model_seen == "claude-sonnet-5"
+    assert llm.max_tokens_seen == 1024
+
+
+def test_control_phrase_is_stripped_from_what_the_model_sees(tmp_path):
+    """A spoken 'use opus' routes the turn to Opus but is scrubbed from the message the
+    model receives, so it answers the real question instead of pushing back on a model
+    switch it can't make. The raw utterance is still what gets logged as Commander."""
+    cfg = _cfg(tmp_path)
+    cfg["router"] = {"enabled": True, "default_model": "claude-haiku-4-5",
+                     "premium_model": "claude-opus-4-8"}
+    llm = FakeLLM(text="ok")
+    app = App(cfg, stt=FakeSTT(text="Use opus for this. What's the best weapon?"),
+              llm=llm, tts=FakeTTS())
+    app._process(object(), threading.Event())
+    assert llm.model_seen == "claude-opus-4-8"                  # routed on the raw text
+    assert app.history[0] == {"role": "user", "content": "What's the best weapon?"}
+
+
+def test_router_off_pins_the_fixed_anthropic_model(tmp_path):
+    """No [router] section -> routing off -> every turn uses [anthropic].model."""
+    llm = FakeLLM(text="ok")
+    app = App(_cfg(tmp_path), stt=FakeSTT(text="think hard"), llm=llm, tts=FakeTTS())
+    app._process(object(), threading.Event())
+    assert llm.model_seen == "claude-haiku-4-5"  # the fixed [anthropic].model in _cfg

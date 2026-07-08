@@ -88,12 +88,16 @@ EFFORT_MODELS = {
 
 
 def _build_kwargs(cfg: dict, messages: list[dict],
-                  tools: list[dict] | None = None) -> dict:
+                  tools: list[dict] | None = None,
+                  model: str | None = None,
+                  max_tokens: int | None = None) -> dict:
     a = cfg["anthropic"]
-    model = a["model"]
+    # The router picks the model + cap per turn (DESIGN §4); fall back to the
+    # [anthropic] defaults when it doesn't (routing off, or a non-router caller).
+    model = model or a["model"]
     kwargs: dict = {
         "model": model,
-        "max_tokens": int(a["max_tokens"]),
+        "max_tokens": int(max_tokens if max_tokens is not None else a["max_tokens"]),
         "messages": messages,
     }
     system = build_system(cfg)
@@ -156,12 +160,14 @@ def stream_reply(
     on_event: Callable[[str, str], None],
     tool_handler: Callable[[str, dict], str] | None = None,
     tools: list[dict] | None = None,
+    model: str | None = None,
+    max_tokens: int | None = None,
 ) -> Iterator[tuple[str, str]]:
     working = list(messages)
     # Loop to handle server-tool continuations (pause_turn) and client-tool calls
     # (tool_use). Each keeps re-sending until Claude produces a final answer.
     for _round in range(8):
-        kwargs = _build_kwargs(cfg, working, tools)
+        kwargs = _build_kwargs(cfg, working, tools, model=model, max_tokens=max_tokens)
         tool_json = ""
         final = None
         with client.messages.stream(**kwargs) as stream:

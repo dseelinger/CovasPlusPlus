@@ -23,8 +23,11 @@ class AnthropicLLM:
         on_event: OnEvent,
         tool_handler: Optional[ToolHandler] = None,
         tools: Optional[list[dict]] = None,
+        model: Optional[str] = None,
+        max_tokens: Optional[int] = None,
     ) -> Iterator[tuple[str, str]]:
         yield from llm.stream_reply(
             self.client, self.cfg, messages, cancel, on_event,
             tool_handler=tool_handler, tools=tools,
+            model=model, max_tokens=max_tokens,
         )

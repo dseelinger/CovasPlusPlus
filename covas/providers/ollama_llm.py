@@ -67,6 +67,8 @@ class OllamaLLM:
         on_event: OnEvent,
         tool_handler: Optional[ToolHandler] = None,
         tools: Optional[list[dict]] = None,  # noqa: ARG002 — parity; local tools not wired yet
+        model: Optional[str] = None,  # noqa: ARG002 — the cost router is Anthropic-only
+        max_tokens: Optional[int] = None,  # noqa: ARG002 — Ollama uses its [ollama] config
     ) -> Iterator[tuple[str, str]]:
         payload = {
             "model": self.model,
