@@ -136,3 +136,89 @@ def test_router_off_pins_the_fixed_anthropic_model(tmp_path):
     app = App(_cfg(tmp_path), stt=FakeSTT(text="think hard"), llm=llm, tts=FakeTTS())
     app._process(object(), threading.Event())
     assert llm.model_seen == "claude-haiku-4-5"  # the fixed [anthropic].model in _cfg
+
+
+def test_ed_monitoring_off_by_default(tmp_path):
+    """No [elite] section -> no watchers, no ED-context capability, no where_am_i tool."""
+    app = App(_cfg(tmp_path), stt=FakeSTT(text="hi"), llm=FakeLLM(text="ok"), tts=FakeTTS())
+    assert app.ed_ctx is None and app._ed_watchers == []
+    assert "where_am_i" not in {t["name"] for t in app.registry.tools()}
+
+
+def _elite_cfg(tmp_path) -> dict:
+    cfg = _cfg(tmp_path)
+    cfg["elite"] = {"enabled": True, "journal_dir": str(tmp_path),
+                    "journal_poll_interval": 0.05, "status_poll_interval": 0.05}
+    return cfg
+
+
+def test_ed_monitoring_wires_up_when_enabled(tmp_path):
+    """[elite].enabled -> App builds the shared context, registers the ED-context
+    capability (its read tools reach the LLM), and starts the two watcher threads
+    against the configured journal dir. Watchers are daemons; stop() cleans them up."""
+    app = App(_elite_cfg(tmp_path), stt=FakeSTT(text="hi"),
+              llm=FakeLLM(text="ok"), tts=FakeTTS())
+    try:
+        assert app.ed_ctx is not None
+        assert len(app._ed_watchers) == 2
+        assert all(w.is_alive() for w in app._ed_watchers)
+        assert {"where_am_i", "ship_status", "recent_events"} <= \
+            {t["name"] for t in app.registry.tools()}
+    finally:
+        app._stop_ed_monitoring()
+
+
+class _MsgCapturingLLM:
+    """Records the content of the last user message App hands the LLM."""
+
+    def __init__(self) -> None:
+        self.last_user: Optional[str] = None
+
+    def stream_reply(self, messages, cancel, on_event,
+                     tool_handler=None, tools=None,
+                     model=None, max_tokens=None) -> Iterator[tuple[str, str]]:
+        self.last_user = messages[-1]["content"]
+        yield ("text", "ok")
+
+
+def test_ed_context_injected_on_matching_turn(tmp_path):
+    """A turn referencing game state gets the live telemetry block prepended to what the
+    LLM sees — while stored history keeps the clean question (no stale context lingering)."""
+    llm = _MsgCapturingLLM()
+    app = App(_elite_cfg(tmp_path), stt=FakeSTT(text="where am I docked?"),
+              llm=llm, tts=FakeTTS())
+    try:
+        app.ed_ctx.update(system="Sol", docked=True, station="Abraham Lincoln")
+        app._process(object(), threading.Event())
+    finally:
+        app._stop_ed_monitoring()
+    assert "Live game telemetry" in llm.last_user and "Abraham Lincoln" in llm.last_user
+    assert app.history[0] == {"role": "user", "content": "where am I docked?"}
+
+
+def test_ed_context_not_injected_on_plain_turn(tmp_path):
+    """An off-topic turn is left completely alone — no telemetry, no extra tokens."""
+    llm = _MsgCapturingLLM()
+    app = App(_elite_cfg(tmp_path), stt=FakeSTT(text="tell me a joke, COVAS"),
+              llm=llm, tts=FakeTTS())
+    try:
+        app.ed_ctx.update(system="Sol")
+        app._process(object(), threading.Event())
+    finally:
+        app._stop_ed_monitoring()
+    assert llm.last_user == "tell me a joke, COVAS"
+
+
+def test_ed_context_wake_word_stripped_and_log_injected(tmp_path):
+    """The 'context' wake word forces a lookup, injects the recent-events log, and is
+    scrubbed from both the model's input and stored history."""
+    llm = _MsgCapturingLLM()
+    app = App(_elite_cfg(tmp_path), stt=FakeSTT(text="context what have I been up to?"),
+              llm=llm, tts=FakeTTS())
+    try:
+        app.ed_ctx.record("FSDJump", "Jumped to Sol", "2026-07-08T12:05:00Z")
+        app._process(object(), threading.Event())
+    finally:
+        app._stop_ed_monitoring()
+    assert "Jumped to Sol" in llm.last_user                 # recent-events log injected
+    assert app.history[0]["content"] == "what have I been up to?"   # wake word scrubbed
