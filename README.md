@@ -30,27 +30,29 @@ Select providers in `config.toml` under `[llm]` and `[tts]`.
 ## Quick start (from a fresh clone)
 This is a public repo; **secrets and personal data are git-ignored**, so set them up locally:
 
-```bash
+```powershell
 # 1. Python env
-python -m venv .venv && .venv\Scripts\pip install -r requirements.txt
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
 
 # 2. Secrets & personal files (copies of the .example templates)
-copy ElevenLabsAPIKey.txt.example ElevenLabsAPIKey.txt   # paste your key (cloud TTS only)
-copy personality.example.txt personality.txt             # make the character yours
+Copy-Item ElevenLabsAPIKey.txt.example ElevenLabsAPIKey.txt   # paste your key (cloud TTS only)
+Copy-Item personality.example.txt personality.txt             # make the character yours
 #   ANTHROPIC_API_KEY: set as a Windows *User* environment variable (cloud LLM only)
 
 # 3. (Optional) sound cues: drop your own .wav files in sounds/ — see config.toml
 
 # 4. Verify
-check_setup.bat        # or: .venv\Scripts\python.exe check_setup.py
+.\check_setup.bat        # or: .venv\Scripts\python.exe check_setup.py
 ```
 
 ## Local offline mode (proof of concept)
 Runs the whole loop with **no cloud and no cost** — Whisper + Qwen (Ollama) + Piper.
 
-```bash
+```powershell
 # prereqs on this machine
-ollama serve && ollama pull qwen3
+ollama serve                             # in its own terminal (this one blocks)
+ollama pull qwen3                        # then, in another terminal:
 python -m piper.download_voices en_US-lessac-medium   # then set [piper].model in config.toml
 
 # try it

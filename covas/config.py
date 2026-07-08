@@ -84,8 +84,9 @@ _TRUEISH = {"1", "true", "yes", "on"}
 
 def mock_enabled(cfg: dict) -> bool:
     """Whether dev-mode mock is on. The COVAS_MOCK env var wins if set (handy for a
-    one-off `COVAS_MOCK=1 run_covas.py` without editing config); otherwise fall back
-    to [dev].mock in config. Mock swaps in the fake providers (zero API calls/cost)."""
+    one-off `$env:COVAS_MOCK=1; python run_covas.py` in PowerShell without editing
+    config); otherwise fall back to [dev].mock in config. Mock swaps in the fake
+    providers (zero API calls/cost)."""
     env = os.environ.get("COVAS_MOCK")
     if env is not None and env.strip() != "":
         return env.strip().lower() in _TRUEISH

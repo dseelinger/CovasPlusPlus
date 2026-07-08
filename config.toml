@@ -222,6 +222,6 @@ model = ""
 [dev]
 # Dev-mode mock. When ON, the LLM/TTS/STT are swapped for fakes (canned text, no
 # audio) so you can exercise the full push-to-talk loop while iterating on code
-# with ZERO API calls and zero cost. The env var COVAS_MOCK=1 overrides this for a
-# one-off run. Leave OFF for real use.
+# with ZERO API calls and zero cost. Setting the env var overrides this for a
+# one-off run (PowerShell: $env:COVAS_MOCK=1). Leave OFF for real use.
 mock = false

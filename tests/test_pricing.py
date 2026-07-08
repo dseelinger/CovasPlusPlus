@@ -9,6 +9,7 @@ from __future__ import annotations
 import types
 
 from covas import llm
+from covas.capabilities.checklist_capability import CHECKLIST_TOOLS
 
 RATES = {
     "input": 1.0, "output": 5.0, "cache_write": 2.0, "cache_read": 0.10,
@@ -125,7 +126,9 @@ def test_system_block_is_cached_with_ttl(tmp_path):
 
 
 def test_last_tool_is_cached_with_ttl(tmp_path):
-    kwargs = llm._build_kwargs(_cfg(tmp_path), [{"role": "user", "content": "hi"}])
+    # Client tools now come from the capability registry — pass them in explicitly.
+    kwargs = llm._build_kwargs(_cfg(tmp_path), [{"role": "user", "content": "hi"}],
+                               CHECKLIST_TOOLS)
     assert kwargs["tools"][-1]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
     # Only the last tool carries the breakpoint (it caches everything before it).
     assert "cache_control" not in kwargs["tools"][0]

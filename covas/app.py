@@ -12,16 +12,16 @@ import threading
 import time
 from pathlib import Path
 
-import anthropic
 import keyboard
 
 from .config import load_config, load_overrides, save_overrides, deep_merge, mock_enabled
 from .audio import CuePlayer, Recorder
-from .stt import Transcriber
 from .events import EventBus
 from .checklist import Checklist
+from .capabilities import CapabilityRegistry
+from .capabilities.checklist_capability import ChecklistCapability
+from .providers.base import LLMProvider, STTProvider, TTSProvider
 from .providers.factory import make_llm, make_stt, make_tts
-from . import llm, tts
 
 # Claude replies can contain Unicode (arrows, em-dashes, emoji) the default Windows
 # console can't encode. Make console output lossy-safe so a stray glyph never crashes
@@ -36,29 +36,40 @@ STATES = ("Idle", "Listening", "Transcribing", "Thinking", "Searching", "Speakin
 
 
 class App:
-    def __init__(self, bus: EventBus | None = None) -> None:
-        self.cfg = load_config()
+    def __init__(
+        self,
+        cfg: dict | None = None,
+        *,
+        bus: EventBus | None = None,
+        llm: LLMProvider | None = None,
+        tts: TTSProvider | None = None,
+        stt: STTProvider | None = None,
+    ) -> None:
+        # Composition root: build the real providers from config via the factory,
+        # unless the caller injects them (unit tests pass fakes — DESIGN §9). The
+        # factory returns fakes on its own when dev-mode mock is enabled, so a
+        # single code path covers real, mock, and injected-fake runs.
+        self.cfg = cfg if cfg is not None else load_config()
         self.overrides = load_overrides()
         self.mock = mock_enabled(self.cfg)
         self.bus = bus or EventBus()
         self.cues = CuePlayer(self.cfg)
         self.recorder = Recorder(self.cfg)
-        # Dev-mode mock swaps in fake providers (via the factory) so the whole loop
-        # runs with zero API calls / zero cost. Real path is unchanged (Prompt 2 will
-        # route it through the factory too). client stays None in mock — no key needed.
         if self.mock:
             print("Dev mock ON — LLM/TTS/STT are fakes; zero API calls, zero cost.", flush=True)
-            self.stt = make_stt(self.cfg)
-            self.tts = make_tts(self.cfg)
-            self.llm = make_llm(self.cfg)
-            self.client = None
-        else:
+        elif stt is None:
             print("Loading Whisper model (first run may download it)...", flush=True)
-            self.stt = Transcriber(self.cfg)
-            self.client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY env var
-            self.tts = None
-            self.llm = None
+        self.stt = stt or make_stt(self.cfg)
+        self.tts = tts or make_tts(self.cfg)
+        self.llm = llm or make_llm(self.cfg)
+
+        # Capabilities register the tools they expose to the LLM. The checklist is
+        # one; ED-context and keybinds will be others (DESIGN §3.3). Present only
+        # when a checklist file is configured, matching the prior tool-gating.
         self.checklist = Checklist(self.cfg["checklist"]["file"])
+        self.registry = CapabilityRegistry()
+        if self.cfg.get("checklist", {}).get("file"):
+            self.registry.register(ChecklistCapability(self.checklist))
 
         self.history: list[dict] = []
         self.active_cancel: threading.Event | None = None
@@ -149,7 +160,7 @@ class App:
 
     def _reload_whisper(self) -> None:
         try:
-            self.stt = Transcriber(self.cfg)
+            self.stt = make_stt(self.cfg)
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Whisper model reloaded: {self.cfg['whisper']['model']}"})
         except Exception as e:  # noqa: BLE001
@@ -171,12 +182,8 @@ class App:
 
     # ---- local voice commands --------------------------------------------
     def _speak(self, text: str, cancel: threading.Event) -> None:
-        """Play `text` through the active TTS — the fake in mock, ElevenLabs otherwise.
-        One seam so mock and real share the same call sites."""
-        if self.mock:
-            self.tts.speak(text, cancel)
-        else:
-            tts.speak(self.cfg, text, cancel)
+        """Play `text` through the injected TTS provider (real, mock, or fake)."""
+        self.tts.speak(text, cancel)
 
     def _log_usage(self, u: dict) -> None:
         """Record a per-call token/cost usage event to the session log + EventBus."""
@@ -201,71 +208,6 @@ class App:
         The checklist is intentionally NOT here — Claude handles it via tools so it
         can understand natural phrasing. Returns True if handled. (Phase 5 wip.)"""
         return False
-
-    def _run_tool(self, name: str, inp: dict) -> str:
-        """Execute a client-side checklist tool Claude called."""
-        cl = self.checklist
-        try:
-            if name == "get_next_objectives":
-                count = max(1, min(10, int(inp.get("count") or 1)))
-                pend, done, total = cl.next_pending(count)
-                if not pend:
-                    return (f"All {total} objectives are complete."
-                            if total else "The checklist is empty.")
-                cl.current = pend[0][0]  # first pending becomes the current line
-                body = "\n".join(f"#{n}: {t}" for n, t in pend)
-                return f"Progress: {done} of {total} complete. Next pending:\n{body}"
-
-            if name == "find_objectives":
-                matches = cl.find(inp.get("query", ""))
-                if not matches:
-                    return f"No objectives match '{inp.get('query', '')}'."
-                if len(matches) == 1:
-                    cl.current = matches[0][0]  # unique match becomes current line
-                return "Matches:\n" + "\n".join(
-                    f"#{n} [{'done' if d else 'pending'}] {t}" for n, d, t in matches)
-
-            if name == "set_objective":
-                completed = bool(inp.get("completed", True))
-                verb = "completed" if completed else "reopened"
-                number, query = inp.get("number"), inp.get("query")
-                if number is None and query:
-                    matches = cl.find(query)
-                    if len(matches) > 1:
-                        listing = "\n".join(f"#{n} {t}" for n, _d, t in matches)
-                        return (f"Several objectives match '{query}'. Ask which one, or "
-                                f"call set_objective with a specific number:\n{listing}")
-                    if not matches:
-                        return f"No objective matches '{query}'."
-                    number = matches[0][0]
-                text = cl.set_number(int(number), completed) if number else \
-                    (cl.set_number(cl.current, completed) if cl.current else None)
-                n = number or cl.current
-                return (f"Done. #{n} '{text}' is now {verb}."
-                        if text else "I don't know which objective you mean.")
-
-            if name == "add_objective":
-                new_num, text = cl.add(inp.get("text", ""),
-                                       inp.get("position", "after"),
-                                       inp.get("anchor_number"))
-                return f"Added #{new_num}: '{text}' (now the current line)."
-
-            if name == "modify_objective":
-                res = cl.modify(inp.get("new_text", ""), inp.get("number"))
-                if res is None:
-                    return "I don't know which line to modify — find it first."
-                n, text = res
-                return f"Updated #{n} to: '{text}'."
-
-            if name == "delete_objective":
-                text = cl.delete(inp.get("number"))
-                if text is None:
-                    return "I don't know which line to delete — find it first."
-                return f"Deleted: '{text}'."
-
-            return f"Unknown tool: {name}"
-        except Exception as e:  # noqa: BLE001
-            return f"Tool error: {e}"
 
     # ---- worker -----------------------------------------------------------
     def _trim_history(self) -> None:
@@ -330,13 +272,9 @@ class App:
 
             reply = ""
             print("COVAS: ", end="", flush=True)
-            if self.mock:
-                stream = self.llm.stream_reply(
-                    self.history, cancel, on_event, tool_handler=self._run_tool)
-            else:
-                stream = llm.stream_reply(
-                    self.client, self.cfg, self.history, cancel, on_event,
-                    tool_handler=self._run_tool)
+            stream = self.llm.stream_reply(
+                self.history, cancel, on_event,
+                tool_handler=self.registry.run_tool, tools=self.registry.tools())
             for kind, chunk in stream:
                 if cancel.is_set():
                     break

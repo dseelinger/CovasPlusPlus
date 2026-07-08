@@ -22,8 +22,9 @@ class AnthropicLLM:
         cancel: threading.Event,
         on_event: OnEvent,
         tool_handler: Optional[ToolHandler] = None,
+        tools: Optional[list[dict]] = None,
     ) -> Iterator[tuple[str, str]]:
         yield from llm.stream_reply(
             self.client, self.cfg, messages, cancel, on_event,
-            tool_handler=tool_handler,
+            tool_handler=tool_handler, tools=tools,
         )

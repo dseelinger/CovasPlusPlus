@@ -11,12 +11,12 @@ Full design and rationale: **`DESIGN_AND_ROADMAP.md`**. Sequenced build prompts 
 order, one per fresh session. (The prompts are in that file, not here.)
 
 ## Run / verify
-```bash
+```powershell
 .venv\Scripts\python.exe check_setup.py     # environment health
 .venv\Scripts\python.exe run_covas.py        # headless voice loop
 .venv\Scripts\python.exe run_covas_ui.py     # + localhost control panel
 python poc_local_loop.py                      # offline POC (Ollama + Piper + Whisper)
-python -m py_compile covas\**\*.py            # fast sanity check after edits
+python -m compileall covas                    # fast sanity check after edits (recursive)
 pytest                                        # UNIT tests only — offline, free, run often
 pytest -m "integration and local"            # free integration (Ollama/Piper/Whisper/audio)
 pytest -m "integration and paid"             # deliberate, COSTS money (Anthropic/ElevenLabs)

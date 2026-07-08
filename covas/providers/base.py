@@ -49,5 +49,8 @@ class LLMProvider(Protocol):
         cancel: threading.Event,
         on_event: OnEvent,
         tool_handler: Optional[ToolHandler] = None,
+        tools: Optional[list[dict]] = None,
     ) -> Iterator[tuple[str, str]]:
-        """Stream a reply for the given conversation. See module docstring."""
+        """Stream a reply for the given conversation. `tools` are the client-side
+        tool schemas the LLM may call (from the capability registry); `tool_handler`
+        runs them. See module docstring."""
