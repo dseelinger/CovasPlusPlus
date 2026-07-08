@@ -22,6 +22,7 @@ from .capabilities import CapabilityRegistry
 from .capabilities.checklist_capability import ChecklistCapability
 from .providers.base import LLMProvider, STTProvider, TTSProvider
 from .providers.factory import make_llm, make_stt, make_tts
+from .router import Router
 
 # Claude replies can contain Unicode (arrows, em-dashes, emoji) the default Windows
 # console can't encode. Make console output lossy-safe so a stray glyph never crashes
@@ -235,7 +236,18 @@ class App:
                 self.set_state("Idle")
                 return
 
-            self.history.append({"role": "user", "content": text})
+            # Cost router (DESIGN §4): pick the cheapest capable model + token cap for
+            # this turn from the RAW spoken text, then strip any pure tier-control phrase
+            # ("use opus", "think hard") so the model never sees it and never comments on
+            # a model switch it can't make — it just answers the request. Built fresh from
+            # live cfg so UI overrides apply; off by default -> the fixed [anthropic] tier.
+            router = Router.from_cfg(self.cfg)
+            route = router.decide(text)
+            self._log("router", f"{route.model} max_tokens={route.max_tokens} — {route.reason}")
+            self.bus.publish({"type": "router", "model": route.model,
+                              "max_tokens": route.max_tokens, "reason": route.reason})
+
+            self.history.append({"role": "user", "content": router.strip_control(text)})
             self._trim_history()
 
             self.set_state("Thinking")
@@ -274,7 +286,8 @@ class App:
             print("COVAS: ", end="", flush=True)
             stream = self.llm.stream_reply(
                 self.history, cancel, on_event,
-                tool_handler=self.registry.run_tool, tools=self.registry.tools())
+                tool_handler=self.registry.run_tool, tools=self.registry.tools(),
+                model=route.model, max_tokens=route.max_tokens)
             for kind, chunk in stream:
                 if cancel.is_set():
                     break
@@ -376,8 +389,12 @@ def _cost_summary(cfg: dict, mock: bool) -> str:
     """One-line summary of the settings that drive cost, for the startup log."""
     a = cfg["anthropic"]
     ws = cfg.get("web_search", {})
+    rt = cfg.get("router", {})
+    router = (f"on(default={rt.get('default_model', '?')})" if rt.get("enabled")
+              else f"off(fixed={a['model']})")
     return (
         "cost settings — "
+        f"router={router} "
         f"model={a['model']} "
         f"thinking={a.get('thinking', {}).get('default', 'Off')} "
         f"max_tokens={a['max_tokens']} "
@@ -391,8 +408,12 @@ def _banner(cfg: dict) -> str:
     k = cfg["keys"]
     p = "ON" if cfg["personality"]["enabled"] else "OFF"
     mock = mock_enabled(cfg)
+    rt = cfg.get("router", {})
+    router = (f"ON (default {rt.get('default_model', '?')})" if rt.get("enabled")
+              else f"OFF (fixed {cfg['anthropic']['model']})")
     return (
         "\n================ COVAS++ (Phase 2) ================\n"
+        f"  Router     : {router}\n"
         f"  Model      : {cfg['anthropic']['model']}\n"
         f"  Voice      : {cfg['elevenlabs']['voice_name']}\n"
         f"  Whisper    : {cfg['whisper']['model']}\n"
