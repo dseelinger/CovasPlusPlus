@@ -1,0 +1,6 @@
+# COVAS++ development-only dependencies (NOT needed to run the app).
+# Install with:  .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+# ---------------------------------------------------------------------------
+-r requirements.txt        # dev env is a superset of the runtime env
+pytest>=7.4                # unit tests for the pure logic (tests/)
+ruff>=0.4                  # linter (config in pyproject.toml)
