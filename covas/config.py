@@ -1,6 +1,7 @@
 """Load config.toml and layer overrides.json on top (UI writes overrides.json)."""
 from __future__ import annotations
 import json
+import os
 import tomllib
 from pathlib import Path
 
@@ -75,3 +76,17 @@ def save_overrides(overrides: dict) -> None:
 
 def deep_merge(base: dict, over: dict) -> dict:
     return _deep_merge(base, over)
+
+
+# Values that count as "on" for the dev-mode mock env var (COVAS_MOCK).
+_TRUEISH = {"1", "true", "yes", "on"}
+
+
+def mock_enabled(cfg: dict) -> bool:
+    """Whether dev-mode mock is on. The COVAS_MOCK env var wins if set (handy for a
+    one-off `COVAS_MOCK=1 run_covas.py` without editing config); otherwise fall back
+    to [dev].mock in config. Mock swaps in the fake providers (zero API calls/cost)."""
+    env = os.environ.get("COVAS_MOCK")
+    if env is not None and env.strip() != "":
+        return env.strip().lower() in _TRUEISH
+    return bool(cfg.get("dev", {}).get("mock", False))
