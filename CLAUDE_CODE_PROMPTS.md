@@ -209,10 +209,16 @@ Branch: feature/keybinds-prototype
 Goal: prove ONE reliable action end-to-end before generalizing. No broad automation yet.
 
 Tasks:
-1. covas/keybinds/binds.py — parse the ED bindings XML
-   (%LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Bindings\*.binds),
-   mapping an action name (e.g. LandingGearToggle) to the physically bound key. Unit-test
-   the parser against a sample .binds fixture.
+1. covas/keybinds/binds.py — parse the active ED bindings file. Default to the newest
+   Custom.*.binds in %LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Bindings\
+   (currently Custom.4.2.binds — glob Custom.*.binds and pick the highest version so a
+   future ED update, e.g. 4.3 / 5.0, doesn't break it). Allow a [keybinds].binds_file
+   config override. Each control has a Primary and a Secondary binding, and either may be a
+   key OR a joystick/HOTAS button; extract the entry with Device="Keyboard" (every control
+   that matters has a keyboard bind). The executor injects keyboard scancodes, so if an
+   action somehow lacks a keyboard binding, mark it unusable and say so. Unit-test the
+   parser against a sample .binds fixture with both Primary and Secondary set and a mix of
+   keyboard and joystick devices.
 2. covas/keybinds/executor.py — send that key to Elite via scancode-level SendInput
    (ED often ignores plain virtual-key events). Support press / hold(duration) / release.
 3. A KeybindCapability exposing exactly ONE action (toggle landing gear) behind a safety

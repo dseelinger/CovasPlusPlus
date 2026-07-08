@@ -144,6 +144,15 @@ class Router:
     def from_cfg(cls, cfg: dict) -> "Router":
         return cls(RouterConfig.from_cfg(cfg))
 
+    def cheap_route(self, max_tokens: int | None = None) -> Route:
+        """The cheapest tier, for turns the app itself originates (e.g. proactive ED
+        callouts, DESIGN §5) rather than routing from spoken text. Always the default
+        (Haiku) tier regardless of the enabled flag, so proactive lines stay cheap even
+        when routing is off. `max_tokens` defaults to the base cap; callers pass a small
+        value for one-sentence callouts."""
+        cap = self.cfg.base_max_tokens if max_tokens is None else int(max_tokens)
+        return Route(self.cfg.default_model, cap, "proactive — cheap tier")
+
     def strip_control(self, text: str) -> str:
         """Remove pure tier-control phrases (the escalate/premium wake phrases) from the
         text the model will see, so it answers the real request instead of pushing back

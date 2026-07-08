@@ -241,6 +241,36 @@ log_phrases    = ["what just happened", "what happened", "recent events", "my lo
                   "what have i been", "what have i done", "recently", "my journal", "so far"]
 
 
+[proactive]
+# Proactive callouts (DESIGN §5). When ON, the companion INITIATES speech on notable ED
+# events (arriving in a system, docking, completing a mission, low fuel, overheating,
+# death) without a push-to-talk press — a short in-character line via the cheap tier.
+# Requires [elite].enabled (that's where the events come from).
+#
+# DEFAULT OFF — opt in once you're happy with it. It never talks over you: a callout only
+# fires when idle, and a PTT press cancels one mid-sentence like any other speech. Mute it
+# on the fly by voice ("COVAS, stop the callouts") — see the mute_proactive tool.
+enabled = true
+# No two callouts (of any type) fire within this many seconds — so a burst of transitions
+# (jump -> supercruise exit -> dock) yields at most one line.
+min_interval = 20
+# The same event type won't re-announce within this many seconds.
+cooldown = 120
+# Reply cap (tokens) for a callout — it's one sentence, so keep it tight and cheap.
+max_tokens = 120
+# Per-event whitelist: only events set true here are ever announced. Add ED event names
+# (journal events like FSDJump/Docked/MissionCompleted/Died, or status transitions like
+# LowFuel/Overheating) to extend; set false to silence one. This table REPLACES the
+# built-in defaults, so list every event you want.
+[proactive.events]
+FSDJump          = true   # arrived in a new system
+Docked           = true   # docked at a station
+MissionCompleted = true
+LowFuel          = true   # fuel dropped below 25%
+Overheating      = true   # ship over 100% heat
+Died             = true
+
+
 [conversation]
 # Rolling in-session history so follow-ups work. Older turns are trimmed
 # once the running message count exceeds this many (user+assistant) turns.
