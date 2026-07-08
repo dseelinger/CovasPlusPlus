@@ -1,0 +1,184 @@
+"""EDContext — the rolling "what's happening right now" snapshot (DESIGN §5).
+
+Both watchers (journal + status) write into one shared EDContext; the ED-context
+capability reads it for `system_context()` and its read tools. It is therefore touched
+from several threads (two watcher threads write, the voice-loop thread reads), so every
+read/write goes through a lock. Updates are keyed and validated so a mis-typed field
+fails loudly (DESIGN §2.5) rather than silently creating junk state.
+"""
+from __future__ import annotations
+
+import threading
+from collections import deque
+
+# How many recent notable events to retain by default (a rolling "what just happened"
+# feed for 'check my logs'-style questions). Overridable per EDContext.
+DEFAULT_RECENT_KEPT = 25
+
+# The fields that make up "current context". Kept deliberately small — the design lists
+# system, station, ship, docked?, fuel%, cargo; a few semantic flags (gear/supercruise/
+# low-fuel) ride along because the status watcher already decodes them and they make the
+# spoken context richer. fuel_pct is DERIVED (see fuel_pct()), not stored.
+_FIELDS: tuple[str, ...] = (
+    "system",         # current star system name
+    "station",        # docked station name (None when not docked)
+    "body",           # nearest body / planet name
+    "ship",           # ship type, display name (e.g. "Anaconda")
+    "ship_name",      # Commander's custom ship name (e.g. "Void Runner")
+    "docked",         # on a landing pad
+    "landing_gear",   # gear down
+    "supercruise",    # in supercruise
+    "hardpoints",     # hardpoints deployed
+    "low_fuel",       # ED's LowFuel flag (< 25%)
+    "fuel_main",      # main tank fuel, tons
+    "fuel_capacity",  # main tank capacity, tons (from the journal, not Status.json)
+    "cargo",          # cargo aboard, tons
+)
+
+
+class EDContext:
+    """Thread-safe rolling snapshot of Elite Dangerous game state."""
+
+    def __init__(self, recent_maxlen: int = DEFAULT_RECENT_KEPT) -> None:
+        self._lock = threading.Lock()
+        # Rolling feed of recent notable events (jumps, docks, missions, fuel alerts),
+        # newest last. Bounded so it can't grow without limit. Fed by both watchers.
+        self._recent: deque[dict] = deque(maxlen=max(1, int(recent_maxlen)))
+        self.system: str | None = None
+        self.station: str | None = None
+        self.body: str | None = None
+        self.ship: str | None = None
+        self.ship_name: str | None = None
+        self.docked: bool = False
+        self.landing_gear: bool = False
+        self.supercruise: bool = False
+        self.hardpoints: bool = False
+        self.low_fuel: bool = False
+        self.fuel_main: float | None = None
+        self.fuel_capacity: float | None = None
+        self.cargo: float | None = None
+
+    def update(self, **changes) -> None:
+        """Atomically set one or more fields. Unknown keys raise (fail loud) so a typo
+        in a watcher surfaces in tests instead of silently doing nothing."""
+        with self._lock:
+            for key, val in changes.items():
+                if key not in _FIELDS:
+                    raise KeyError(f"EDContext has no field {key!r}")
+                setattr(self, key, val)
+
+    def snapshot(self) -> dict:
+        """A plain-dict copy of all fields plus the derived fuel_pct, taken under lock."""
+        with self._lock:
+            snap = {k: getattr(self, k) for k in _FIELDS}
+        snap["fuel_pct"] = _fuel_pct(snap["fuel_main"], snap["fuel_capacity"])
+        return snap
+
+    def fuel_pct(self) -> float | None:
+        with self._lock:
+            return _fuel_pct(self.fuel_main, self.fuel_capacity)
+
+    # -- recent-events feed ------------------------------------------------------------
+    def record(self, event: str, description: str, ts: str | None = None) -> None:
+        """Append a notable event to the rolling feed. `description` is the short spoken
+        form ('Jumped to Sol'); `ts` is the source ISO timestamp for the 'when'."""
+        with self._lock:
+            self._recent.append({"event": event, "desc": description, "ts": ts})
+
+    def recent(self, n: int | None = None) -> list[dict]:
+        """The last `n` recent events (all of them if n is None), oldest first."""
+        with self._lock:
+            items = list(self._recent)
+        return items[-n:] if n else items
+
+    def recent_summary(self, n: int = 8) -> str | None:
+        """One-line 'Recent events: …' for injection / the recent_events tool, or None."""
+        items = self.recent(n)
+        if not items:
+            return None
+        parts = []
+        for it in items:
+            hhmm = _hhmm(it.get("ts"))
+            parts.append(f"{it['desc']} ({hhmm})" if hhmm else it["desc"])
+        return "Recent events: " + "; ".join(parts) + "."
+
+    def context_block(self, include_log: bool = True) -> str | None:
+        """The compact telemetry block prepended to a context-referencing turn (DESIGN
+        §5). Goes in the user message, NOT the cached system prompt, so live state never
+        busts the prompt cache. Returns None when nothing is known yet."""
+        parts: list[str] = []
+        summary = self.summary()
+        if summary:
+            parts.append(summary)
+        if include_log:
+            recent = self.recent_summary()
+            if recent:
+                parts.append(recent)
+        if not parts:
+            return None
+        # Parenthesized + labelled so the model treats it as reference, not something to
+        # read aloud, and grounds its answer in real state rather than guessing.
+        return "(Live game telemetry for reference — " + " ".join(parts) + ")"
+
+    def summary(self) -> str | None:
+        """One short natural-language line for the system prompt, or None when nothing is
+        known yet. Kept terse — it's spoken/cached, not a report."""
+        s = self.snapshot()
+        # "Nothing known" = every field still at its default (None / False).
+        if not any(s[k] not in (None, False) for k in _FIELDS):
+            return None
+
+        parts: list[str] = []
+        if s["system"]:
+            loc = f"in the {s['system']} system"
+            if s["docked"] and s["station"]:
+                loc += f", docked at {s['station']}"
+            elif s["body"]:
+                loc += f", near {s['body']}"
+            parts.append(loc)
+        elif s["docked"] and s["station"]:
+            parts.append(f"docked at {s['station']}")
+
+        if s["ship"]:
+            ship = f"flying a {s['ship']}"
+            if s["ship_name"]:
+                ship += f" named {s['ship_name']}"
+            parts.append(ship)
+
+        if s["fuel_pct"] is not None:
+            fuel = f"fuel {s['fuel_pct']:.0f}%"
+            if s["low_fuel"]:
+                fuel += " (low)"
+            parts.append(fuel)
+
+        if s["cargo"] is not None:
+            parts.append(f"cargo {s['cargo']:.0f}t")
+
+        flags = []
+        if s["supercruise"]:
+            flags.append("in supercruise")
+        if s["landing_gear"]:
+            flags.append("landing gear down")
+        if s["hardpoints"]:
+            flags.append("hardpoints deployed")
+        if flags:
+            parts.append(", ".join(flags))
+
+        if not parts:
+            return None
+        return "Elite Dangerous — the Commander is " + "; ".join(parts) + "."
+
+
+def _fuel_pct(fuel_main: float | None, capacity: float | None) -> float | None:
+    """Main-tank fuel as a percentage, or None if either value is unknown/zero."""
+    if fuel_main is None or not capacity:
+        return None
+    return max(0.0, min(100.0, fuel_main / capacity * 100.0))
+
+
+def _hhmm(ts: str | None) -> str | None:
+    """Pull 'HH:MM' out of an ED ISO timestamp ('2026-07-08T12:05:00Z'), best-effort."""
+    if not isinstance(ts, str) or "T" not in ts:
+        return None
+    clock = ts.split("T", 1)[1]
+    return clock[:5] if len(clock) >= 5 and clock[2] == ":" else None

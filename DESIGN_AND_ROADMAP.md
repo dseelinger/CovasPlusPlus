@@ -140,6 +140,16 @@ ED continuously writes game state to disk — the same source EDCopilot, EDMC, a
 
 Design the watcher to publish events **only**; capabilities decide what to *do* with them. That keeps monitoring reusable for both conversation grounding and future automation.
 
+### Context delivery — decided (inline injection, not the cached system prompt)
+The "feed it into the system prompt (cached!)" note above turned out to be a cache **anti**-pattern: the prompt cache breakpoints sit on the personality block *and* the last tool, so anything added to `system` lives inside the cached prefix — a context line that changes as you fly would bust the tools cache every turn (the exact re-send cost we're trying to kill). Two things resolve it:
+
+- **`EDContextCapability` exposes read tools** (`where_am_i`, `ship_status`, `recent_events`) — cache-safe, and the model calls them on demand. These are also the "cheap local answers" above (answered from context, no game knowledge needed).
+- **A rules-based `ContextDetector`** (mirrors the cost Router) classifies each turn: does it reference current status or recent activity? When it does, `app.py` prepends a compact **`context_block()`** — current status, plus the recent-events feed for a "what just happened" turn — to **that turn's user message only**. It's uncached by design (tiny, ~30–60 tokens, only on matched turns) and never stored in history, so stale telemetry can't accumulate. An explicit **"context" wake word** forces a lookup and is scrubbed from what the model sees.
+
+Net: the model answers from real state in one shot (no tool round-trip) on the common "where am I / how's my fuel / check my logs" turns, the prompt cache stays intact, and off-topic turns pay nothing. The `system_context()` hook remains on the capability for a future carefully-cached use, but is not wired into the request.
+
+The **recent-events feed** is a small rolling buffer on `EDContext` (bounded, `[elite].recent_events_kept`), fed by both watchers via curated describers — narrative events from the journal (jumps, docks, missions, deaths), fuel/heat alerts from Status flags — with journal-spam (auto-scans, fuel-scoop ticks, bounties) filtered out. Priming warms it from the tail of the current journal so "what did I just do" works right after launch.
+
 ---
 
 ## 6. Keybind automation (future phase — sketch)

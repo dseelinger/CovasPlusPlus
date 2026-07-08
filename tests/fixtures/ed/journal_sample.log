@@ -1,0 +1,7 @@
+{"timestamp":"2026-07-08T12:00:00Z","event":"LoadGame","Commander":"Redacted","Ship":"anaconda","Ship_Localised":"Anaconda","ShipName":"Void Runner","FuelLevel":24.0,"FuelCapacity":32.0}
+{"timestamp":"2026-07-08T12:00:05Z","event":"Location","StarSystem":"Shinrarta Dezhra","Docked":true,"StationName":"Jameson Memorial","Body":"Founders World"}
+{"timestamp":"2026-07-08T12:01:00Z","event":"Undocked","StationName":"Jameson Memorial"}
+{"timestamp":"2026-07-08T12:01:30Z","event":"SupercruiseEntry","StarSystem":"Shinrarta Dezhra"}
+{"timestamp":"2026-07-08T12:05:00Z","event":"FSDJump","StarSystem":"Sol","FuelUsed":3.5,"FuelLevel":20.5}
+{"timestamp":"2026-07-08T12:06:00Z","event":"FuelScoop","Scooped":2.0,"Total":22.5}
+{"timestamp":"2026-07-08T12:07:00Z","event":"Docked","StationName":"Abraham Lincoln","StarSystem":"Sol"}

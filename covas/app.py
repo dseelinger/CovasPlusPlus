@@ -23,6 +23,7 @@ from .capabilities.checklist_capability import ChecklistCapability
 from .providers.base import LLMProvider, STTProvider, TTSProvider
 from .providers.factory import make_llm, make_stt, make_tts
 from .router import Router
+from .ed import ContextDetector
 
 # Claude replies can contain Unicode (arrows, em-dashes, emoji) the default Windows
 # console can't encode. Make console output lossy-safe so a stray glyph never crashes
@@ -72,6 +73,15 @@ class App:
         if self.cfg.get("checklist", {}).get("file"):
             self.registry.register(ChecklistCapability(self.checklist))
 
+        # Elite Dangerous monitoring (DESIGN §5). Opt-in ([elite].enabled, off by
+        # default). When on, two daemon watchers tail ED's journal + Status.json,
+        # publishing events on the bus and updating a shared context the ED-context
+        # capability references. Watchers publish only; they never drive the loop.
+        self.ed_ctx = None
+        self._ed_watchers: list = []
+        if self.cfg.get("elite", {}).get("enabled"):
+            self._start_ed_monitoring()
+
         self.history: list[dict] = []
         self.active_cancel: threading.Event | None = None
         self.worker: threading.Thread | None = None
@@ -81,6 +91,48 @@ class App:
         self._quit = threading.Event()
         self._logf = self._open_log()
         self._log("system", _cost_summary(self.cfg, self.mock))
+
+    # ---- Elite Dangerous monitoring (DESIGN §5) ---------------------------
+    def _start_ed_monitoring(self) -> None:
+        """Build the shared context + ED-context capability and start the journal/status
+        watchers. Fail soft: a missing directory or import problem must not stop the app
+        from starting — ED monitoring just stays dark until the next run."""
+        try:
+            from .ed import (EDContext, JournalWatcher, StatusWatcher,
+                             resolve_journal_dir, status_path)
+            from .capabilities.ed_context_capability import EDContextCapability
+
+            el = self.cfg.get("elite", {})
+            jdir = resolve_journal_dir(self.cfg)
+            self.ed_ctx = EDContext(recent_maxlen=int(el.get("recent_events_kept", 25)))
+            self.registry.register(EDContextCapability(self.ed_ctx))
+
+            def _err(e: Exception) -> None:  # watcher-thread errors -> log, don't crash
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"ED watcher error: {e}"})
+
+            self._ed_watchers = [
+                JournalWatcher(jdir, self.bus, self.ed_ctx,
+                               poll_interval=float(el.get("journal_poll_interval", 0.5)),
+                               on_error=_err),
+                StatusWatcher(status_path(jdir), self.bus, self.ed_ctx,
+                              poll_interval=float(el.get("status_poll_interval", 1.0)),
+                              on_error=_err),
+            ]
+            for w in self._ed_watchers:
+                w.start()
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"ED monitoring ON — watching {jdir}"})
+        except Exception as e:  # noqa: BLE001 — monitoring is optional; never block startup
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"ED monitoring failed to start: {e}"})
+
+    def _stop_ed_monitoring(self) -> None:
+        for w in self._ed_watchers:
+            try:
+                w.stop()
+            except Exception:  # noqa: BLE001
+                pass
 
     # ---- logging & status -------------------------------------------------
     def _open_log(self):
@@ -247,8 +299,34 @@ class App:
             self.bus.publish({"type": "router", "model": route.model,
                               "max_tokens": route.max_tokens, "reason": route.reason})
 
-            self.history.append({"role": "user", "content": router.strip_control(text)})
+            # ED context (DESIGN §5): if monitoring is on and the turn references game
+            # state ("where am I", "check my logs"), inject the live telemetry block into
+            # THIS call's message only. Stored history keeps the clean text so the (soon
+            # stale) telemetry never lingers across turns, and it goes in the user message
+            # rather than the cached system prompt so it can't bust the prompt cache.
+            user_text = router.strip_control(text)
+            llm_text = user_text
+            if self.ed_ctx is not None:
+                detector = ContextDetector.from_cfg(self.cfg)
+                ref = detector.decide(text)
+                user_text = detector.strip(user_text)
+                llm_text = user_text
+                if ref.matched:
+                    block = self.ed_ctx.context_block(include_log=ref.wants_log)
+                    if block:
+                        llm_text = f"{block}\n\n{user_text}"
+                    note = ref.reason if block else f"{ref.reason} (no telemetry yet)"
+                    self._log("ed-context", note)
+                    self.bus.publish({"type": "ed_context", "matched": True,
+                                      "wants_log": ref.wants_log, "injected": bool(block),
+                                      "reason": ref.reason})
+
+            self.history.append({"role": "user", "content": user_text})
             self._trim_history()
+            # For this call only, swap the last user turn for its context-augmented form.
+            messages = self.history
+            if llm_text != user_text:
+                messages = self.history[:-1] + [{"role": "user", "content": llm_text}]
 
             self.set_state("Thinking")
 
@@ -285,7 +363,7 @@ class App:
             reply = ""
             print("COVAS: ", end="", flush=True)
             stream = self.llm.stream_reply(
-                self.history, cancel, on_event,
+                messages, cancel, on_event,
                 tool_handler=self.registry.run_tool, tools=self.registry.tools(),
                 model=route.model, max_tokens=route.max_tokens)
             for kind, chunk in stream:
@@ -361,6 +439,7 @@ class App:
         except KeyboardInterrupt:
             pass
         finally:
+            self._stop_ed_monitoring()
             self._logf.close()
             print("\nCOVAS++ shutting down. o7")
 

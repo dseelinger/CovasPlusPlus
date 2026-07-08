@@ -201,6 +201,46 @@ failed = ["sounds/inputfailed1.wav"]
 file = "ultimate_checklist.md"
 
 
+[elite]
+# Elite Dangerous game-state monitoring (DESIGN §5). When ON, two watcher threads tail
+# the Journal.*.log + Status.json that ED writes to disk and publish semantic events on
+# the EventBus, keeping a rolling "current context" (system, station, ship, fuel, cargo)
+# the companion can reference via where_am_i / ship_status. No memory reading, no API keys.
+#
+# DEFAULT OFF — opt in once you want it. The watchers only publish events and update
+# context; they never initiate speech (proactive callouts are a later phase).
+enabled = true
+# Journal directory. Blank = the standard location, resolved per machine:
+#   %USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous
+# Status.json is read from this same directory. Set an absolute path only if yours differs
+# (e.g. a non-default Saved Games location).
+journal_dir = ""
+# How often (seconds) to re-scan the journal for appended lines / a rolled-over file.
+journal_poll_interval = 0.5
+# How often (seconds) to poll Status.json for flag transitions.
+status_poll_interval = 1.0
+# How many recent notable events (jumps, docks, missions, fuel alerts) to keep in the
+# rolling feed that answers "what just happened / check my logs".
+recent_events_kept = 25
+# Context detection (DESIGN §5). When a spoken turn references live game state, the current
+# status (+ recent events for a log question) is prepended to THAT turn so the companion
+# answers from real telemetry instead of guessing — it never touches the cached system
+# prompt. Case-insensitive substring phrases; tune these from real transcripts.
+#   context_wake   = force a context lookup for this turn (manual override; word is scrubbed
+#                    from what the model sees). Also injects the recent-events log.
+#   status_phrases = "where am I", "my fuel", "my ship"… -> inject current status.
+#   log_phrases    = "what just happened", "check my logs"… -> also inject recent events.
+context_wake   = ["context"]
+status_phrases = ["where am i", "where are we", "what system", "current system", "which system",
+                  "am i docked", "docked at", "my fuel", "how much fuel", "fuel level",
+                  "how's my fuel", "my ship", "what ship", "my cargo", "how much cargo",
+                  "landing gear", "hardpoints", "supercruise", "am i in", "my location",
+                  "my status", "ship status"]
+log_phrases    = ["what just happened", "what happened", "recent events", "my log", "my logs",
+                  "check the log", "check my log", "last jump", "what did i just",
+                  "what have i been", "what have i done", "recently", "my journal", "so far"]
+
+
 [conversation]
 # Rolling in-session history so follow-ups work. Older turns are trimmed
 # once the running message count exceeds this many (user+assistant) turns.
