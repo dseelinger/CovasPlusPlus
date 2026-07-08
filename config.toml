@@ -49,8 +49,11 @@ language    = "en"       # force English; set "" to auto-detect
 model = "claude-sonnet-5"
 # Available models the UI dropdown will offer:
 available_models = ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5-20251001"]
-# Hard cap on reply length (tokens). Must exceed the thinking budget below.
-max_tokens = 4096
+# Hard cap on reply length (tokens). Kept short: replies are spoken aloud, so a
+# few sentences is plenty, and a low cap trims BOTH Claude output tokens and
+# ElevenLabs characters. The router can raise it for an explicit "full breakdown"
+# turn. Must exceed the thinking budget below if thinking is ever enabled.
+max_tokens = 1024
 
 [anthropic.thinking]
 # Named thinking-depth tiers shown in the UI. "Off" disables thinking.
