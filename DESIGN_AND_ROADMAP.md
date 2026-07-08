@@ -33,6 +33,7 @@ Priorities agreed: **modular refactor**, **cut API costs** (quick cloud wins *an
 4. **Event bus as the spine.** You already have `EventBus`. Make it the one-way nervous system: inputs (voice, ED journal, timers) publish events; capabilities and the UI subscribe. This is what keeps new features additive.
 5. **Typed settings over raw dicts.** Every module currently reaches into `cfg["section"]["key"]`. Introduce small typed settings objects so a mis-key fails loudly at load, and providers receive only their slice.
 6. **Fail soft, stay live.** The current code already swallows errors to keep the loop alive — preserve that. A dead TTS provider should degrade to text, not crash the session.
+7. **Inject dependencies; keep the default test run free.** Build real providers only at the composition root; everything downstream receives them as arguments so tests can pass fakes. Unit tests hit no network, API, or hardware; anything that does is an opt-in integration test (see §9). This is what lets you run tests constantly without draining accounts.
 
 ---
 
@@ -174,3 +175,25 @@ Because it's a capability behind the registry and driven by the same event bus +
 - **Key injection into ED.** Expect scancode/`SendInput` work; validate with the one-action prototype.
 - **Secret hygiene.** `ElevenLabsAPIKey.txt` is git-ignored and now outside OneDrive; keep it that way. An env var would be marginally safer still.
 - **Provider abstraction creep.** Keep the interfaces tiny (1–2 methods). The moment they grow provider-specific params, the abstraction stops paying for itself.
+
+---
+
+## 9. Testing strategy — fast unit tests, opt-in integration
+
+The rule: **the default test run is free and hermetic.** `pytest` runs *unit tests only* — no network, no API calls, no ElevenLabs, no Ollama, no audio hardware — so you can run it on every save without touching your accounts. Anything that talks to a real service is an *integration* test, marked and excluded from the default run.
+
+### Layers
+- **Unit (default — run constantly).** Pure logic and wiring with all I/O faked: router decisions, journal/`Status.json` parsing + `Flags` decode, checklist ops, config resolution, tool-JSON validation/repair, `_build_kwargs`/cache-control construction, event-stream normalization. Fast (<1s), deterministic, offline.
+- **Integration — local (opt-in, free).** Real but no-cost dependencies: Ollama, Piper, Whisper, audio devices. Marked `@pytest.mark.integration` + `@pytest.mark.local`. Run when you touch those paths.
+- **Integration — paid (opt-in, deliberate).** Real Anthropic / ElevenLabs calls. Marked `@pytest.mark.integration` + `@pytest.mark.paid`. Run rarely and on purpose — cheapest model, one-line prompt. Never in the default run or a pre-commit hook.
+
+### How the seam makes this cheap
+The provider seam *is* the dependency-injection boundary. Build real providers only at the composition root (app entry, via `factory`); everything downstream receives providers as arguments:
+- `App(cfg, *, llm=None, tts=None, stt=None)` — `None` means "build the real one from config via the factory"; unit tests pass **fakes** instead.
+- `tests/fakes.py` provides `FakeLLM` (yields scripted `("text", …)` chunks and optional tool calls), `FakeTTS` (records calls, plays nothing), `FakeSTT` (returns canned text). They satisfy the same Protocols in `providers/base.py`, so nothing else changes.
+- The same fakes power the **dev-mode mock** (§1) for running the app by hand for free.
+
+### Guardrails
+- `pyproject.toml` registers the `integration` / `local` / `paid` markers and sets `addopts = "-m 'not integration'"`, so a bare `pytest` is unit-only. *(Done.)*
+- A unit-test `conftest.py` fixture blocks the network (monkeypatch `socket.socket`) so an accidental real call fails loudly instead of billing you.
+- Commands: `pytest` (unit) · `pytest -m "integration and local"` (free) · `pytest -m "integration and paid"` (costs money). Pre-commit/CI, if added, runs unit only.
