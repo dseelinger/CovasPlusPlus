@@ -1,0 +1,20 @@
+# Tooling config for COVAS++ (dev only). Runtime deps live in requirements.txt;
+# dev tools (pytest, ruff) live in requirements-dev.txt. This file configures how
+# those tools run — it does NOT declare the project as a package to install.
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+# Let `from covas...` imports resolve without installing the project.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [".venv", "logs", "voicelines", "sounds"]
+
+# Ruff runs its default lint rule set (pyflakes `F` + a pycodestyle `E` subset):
+# unused imports, undefined names, and real errors. E501 (line-too-long) is not
+# in the default set and is left off on purpose — this codebase uses long
+# explanatory comment lines by design.
