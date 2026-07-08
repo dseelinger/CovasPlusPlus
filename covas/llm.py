@@ -9,9 +9,10 @@ Breaking out of the generator (or the caller setting `cancel`) aborts the HTTP c
 from __future__ import annotations
 import threading
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import TYPE_CHECKING, Callable, Iterator
 
-import anthropic
+if TYPE_CHECKING:  # only for type hints — keep the offline stack importable without the SDK
+    import anthropic
 
 
 def build_system(cfg: dict) -> str | None:
@@ -21,6 +22,61 @@ def build_system(cfg: dict) -> str | None:
         if p.exists():
             return p.read_text(encoding="utf-8")
     return None
+
+
+def _cache_control(cfg: dict) -> dict:
+    """cache_control breakpoint for the static prefix (system + tools). The TTL comes
+    from [anthropic].cache_ttl: "1h" adds the extended-TTL flag so the cache survives
+    the long gaps between in-game voice turns; "5m" (or blank) is the API default."""
+    ttl = str(cfg.get("anthropic", {}).get("cache_ttl", "1h")).strip()
+    cc: dict = {"type": "ephemeral"}
+    if ttl and ttl not in ("5m", "default"):
+        cc["ttl"] = ttl
+    return cc
+
+
+def _rates_for(model: str, pricing: dict) -> dict | None:
+    """Look up per-Mtok rates for `model` in the [pricing] table: exact id first, then
+    a prefix match so a bare 'claude-haiku-4-5' entry covers date-suffixed ids."""
+    rates = pricing.get(model)
+    if isinstance(rates, dict):
+        return rates
+    for key, val in pricing.items():
+        if isinstance(val, dict) and model.startswith(key):
+            return val
+    return None
+
+
+def estimate_cost(model: str, usage: dict, pricing: dict) -> float:
+    """Rough USD estimate for one API call from its token counts and the [pricing]
+    table. Unknown models (no matching rate) estimate as 0.0."""
+    rates = _rates_for(model, pricing)
+    if not rates:
+        return 0.0
+    dollars = (
+        usage.get("input_tokens", 0) * float(rates.get("input", 0.0))
+        + usage.get("output_tokens", 0) * float(rates.get("output", 0.0))
+        + usage.get("cache_creation_input_tokens", 0) * float(rates.get("cache_write", 0.0))
+        + usage.get("cache_read_input_tokens", 0) * float(rates.get("cache_read", 0.0))
+    )
+    return dollars / 1_000_000.0
+
+
+def usage_event(cfg: dict, model: str, usage) -> dict:
+    """Normalize an Anthropic response `usage` object into a plain dict (token counts
+    + estimated cost) suitable for logging and publishing on the EventBus."""
+    def g(name: str) -> int:
+        return int(getattr(usage, name, 0) or 0)
+
+    ev = {
+        "model": model,
+        "input_tokens": g("input_tokens"),
+        "output_tokens": g("output_tokens"),
+        "cache_creation_input_tokens": g("cache_creation_input_tokens"),
+        "cache_read_input_tokens": g("cache_read_input_tokens"),
+    }
+    ev["cost_usd"] = estimate_cost(model, ev, cfg.get("pricing", {}))
+    return ev
 
 
 # Current-gen models use the effort parameter for thinking depth;
@@ -150,12 +206,12 @@ def _build_kwargs(cfg: dict, messages: list[dict]) -> dict:
     system = build_system(cfg)
     if system:
         # Send the (static) personality system prompt as a cacheable block. The
-        # ephemeral cache_control breakpoint lets Anthropic reuse it across turns
-        # for ~90% off the input price instead of re-billing ~5.8KB every call.
+        # cache_control breakpoint lets Anthropic reuse it across turns for ~90% off
+        # the input price instead of re-billing ~5.8KB every call. TTL from config.
         kwargs["system"] = [{
             "type": "text",
             "text": system,
-            "cache_control": {"type": "ephemeral"},
+            "cache_control": _cache_control(cfg),
         }]
 
     # Thinking depth. Newer models: adaptive thinking + effort. Older: budget_tokens.
@@ -192,8 +248,8 @@ def _build_kwargs(cfg: dict, messages: list[dict]) -> dict:
     if tools:
         # Cache the tool definitions too. A cache_control breakpoint on the LAST
         # tool caches every tool up to it, so the (verbose, static) checklist +
-        # web-search schemas aren't re-sent at full price each turn.
-        tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}
+        # web-search schemas aren't re-sent at full price each turn. Same TTL.
+        tools[-1] = {**tools[-1], "cache_control": _cache_control(cfg)}
         kwargs["tools"] = tools
     return kwargs
 
@@ -238,6 +294,11 @@ def stream_reply(
             final = stream.get_final_message()
         if cancel.is_set():
             return
+
+        # Report token usage + a rough cost for this API call (one per round, so a
+        # tool-loop turn logs each round). The app logs it and puts it on the bus.
+        if final is not None and getattr(final, "usage", None) is not None:
+            on_event("usage", usage_event(cfg, kwargs["model"], final.usage))
 
         stop = final.stop_reason if final else None
         if stop == "pause_turn":  # server tool needs another round

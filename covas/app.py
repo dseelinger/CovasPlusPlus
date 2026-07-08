@@ -7,7 +7,6 @@ also interrupts current speech.
 """
 from __future__ import annotations
 import datetime as _dt
-import re
 import sys
 import threading
 import time
@@ -16,11 +15,12 @@ from pathlib import Path
 import anthropic
 import keyboard
 
-from .config import load_config, load_overrides, save_overrides, deep_merge
+from .config import load_config, load_overrides, save_overrides, deep_merge, mock_enabled
 from .audio import CuePlayer, Recorder
 from .stt import Transcriber
 from .events import EventBus
 from .checklist import Checklist
+from .providers.factory import make_llm, make_stt, make_tts
 from . import llm, tts
 
 # Claude replies can contain Unicode (arrows, em-dashes, emoji) the default Windows
@@ -39,12 +39,25 @@ class App:
     def __init__(self, bus: EventBus | None = None) -> None:
         self.cfg = load_config()
         self.overrides = load_overrides()
+        self.mock = mock_enabled(self.cfg)
         self.bus = bus or EventBus()
         self.cues = CuePlayer(self.cfg)
         self.recorder = Recorder(self.cfg)
-        print("Loading Whisper model (first run may download it)...", flush=True)
-        self.stt = Transcriber(self.cfg)
-        self.client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY env var
+        # Dev-mode mock swaps in fake providers (via the factory) so the whole loop
+        # runs with zero API calls / zero cost. Real path is unchanged (Prompt 2 will
+        # route it through the factory too). client stays None in mock — no key needed.
+        if self.mock:
+            print("Dev mock ON — LLM/TTS/STT are fakes; zero API calls, zero cost.", flush=True)
+            self.stt = make_stt(self.cfg)
+            self.tts = make_tts(self.cfg)
+            self.llm = make_llm(self.cfg)
+            self.client = None
+        else:
+            print("Loading Whisper model (first run may download it)...", flush=True)
+            self.stt = Transcriber(self.cfg)
+            self.client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY env var
+            self.tts = None
+            self.llm = None
         self.checklist = Checklist(self.cfg["checklist"]["file"])
 
         self.history: list[dict] = []
@@ -55,6 +68,7 @@ class App:
         self.state = "Idle"
         self._quit = threading.Event()
         self._logf = self._open_log()
+        self._log("system", _cost_summary(self.cfg, self.mock))
 
     # ---- logging & status -------------------------------------------------
     def _open_log(self):
@@ -156,12 +170,29 @@ class App:
         }
 
     # ---- local voice commands --------------------------------------------
+    def _speak(self, text: str, cancel: threading.Event) -> None:
+        """Play `text` through the active TTS — the fake in mock, ElevenLabs otherwise.
+        One seam so mock and real share the same call sites."""
+        if self.mock:
+            self.tts.speak(text, cancel)
+        else:
+            tts.speak(self.cfg, text, cancel)
+
+    def _log_usage(self, u: dict) -> None:
+        """Record a per-call token/cost usage event to the session log + EventBus."""
+        line = (f"in={u['input_tokens']} out={u['output_tokens']} "
+                f"cache_write={u['cache_creation_input_tokens']} "
+                f"cache_read={u['cache_read_input_tokens']} "
+                f"~${u['cost_usd']:.4f} [{u['model']}]")
+        self._log("usage", line)
+        self.bus.publish({"type": "usage", **u})
+
     def _say(self, text: str, cancel: threading.Event) -> None:
         """Speak a locally-generated response (not from Claude) and log it."""
         self._log("COVAS", text)
         self.set_state("Speaking")
         try:
-            tts.speak(self.cfg, text, cancel)
+            self._speak(text, cancel)
         except Exception as e:  # noqa: BLE001
             self.bus.publish({"type": "log", "who": "system", "text": f"TTS error: {e}"})
 
@@ -286,6 +317,8 @@ class App:
                         self.set_state("Thinking", "checklist")
                         self.bus.publish({"type": "log", "who": "system",
                                           "text": "Consulting the ultimate checklist"})
+                elif kind == "usage":
+                    self._log_usage(data)
 
             def flush_thinking() -> None:
                 if think["buf"].strip() and not think["shown"]:
@@ -297,10 +330,14 @@ class App:
 
             reply = ""
             print("COVAS: ", end="", flush=True)
-            for kind, chunk in llm.stream_reply(
-                self.client, self.cfg, self.history, cancel, on_event,
-                tool_handler=self._run_tool,
-            ):
+            if self.mock:
+                stream = self.llm.stream_reply(
+                    self.history, cancel, on_event, tool_handler=self._run_tool)
+            else:
+                stream = llm.stream_reply(
+                    self.client, self.cfg, self.history, cancel, on_event,
+                    tool_handler=self._run_tool)
+            for kind, chunk in stream:
                 if cancel.is_set():
                     break
                 if kind == "text":
@@ -330,7 +367,7 @@ class App:
                 return
 
             self.set_state("Speaking")
-            tts.speak(self.cfg, reply, cancel)
+            self._speak(reply, cancel)
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — keep the loop alive on any failure
             self.cues.play("failed")
@@ -397,15 +434,33 @@ def _resolve_codes(name: str) -> set[int]:
     return codes
 
 
+def _cost_summary(cfg: dict, mock: bool) -> str:
+    """One-line summary of the settings that drive cost, for the startup log."""
+    a = cfg["anthropic"]
+    ws = cfg.get("web_search", {})
+    return (
+        "cost settings — "
+        f"model={a['model']} "
+        f"thinking={a.get('thinking', {}).get('default', 'Off')} "
+        f"max_tokens={a['max_tokens']} "
+        f"web_search={'on' if ws.get('enabled') else 'off'}(max_uses={ws.get('max_uses', '?')}) "
+        f"cache_ttl={a.get('cache_ttl', '1h')} "
+        f"mock={'on' if mock else 'off'}"
+    )
+
+
 def _banner(cfg: dict) -> str:
     k = cfg["keys"]
     p = "ON" if cfg["personality"]["enabled"] else "OFF"
+    mock = mock_enabled(cfg)
     return (
         "\n================ COVAS++ (Phase 2) ================\n"
         f"  Model      : {cfg['anthropic']['model']}\n"
         f"  Voice      : {cfg['elevenlabs']['voice_name']}\n"
         f"  Whisper    : {cfg['whisper']['model']}\n"
         f"  Personality: {p}\n"
+        f"  Cache TTL  : {cfg['anthropic'].get('cache_ttl', '1h')}\n"
+        f"  Dev mock   : {'ON' if mock else 'OFF'}\n"
         f"  TALK        : hold  [{k['push_to_talk']}]\n"
         f"  CANCEL      : tap   [{k['push_to_talk']}] briefly\n"
         f"  QUIT        : Ctrl+Alt+Q (or close this window)\n"
