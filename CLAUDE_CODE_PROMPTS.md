@@ -235,6 +235,98 @@ in-game. Report reliability quirks. Stop for a go/no-go before adding more actio
 
 ---
 
+## Prompt 7 — Feature: find the closest station selling a module (voice, multi-turn)
+
+```
+Read CLAUDE.md and DESIGN_AND_ROADMAP.md (§3 capabilities, §9 testing). New feature.
+Depends on ED monitoring for current system (fallback: latest journal FSDJump/Location).
+
+Branch: feature/find-closest-module
+
+Goal: by voice, "find the closest station that sells module X" — resolve the module
+CONVERSATIONALLY over multiple turns, confirm, then speak the result and copy the SYSTEM
+name to the clipboard.
+
+Multi-turn flow (state lives in the conversation history; the tool stays STATELESS):
+1. Commander asks for the closest <module>.
+2. The LLM interprets the (possibly misheard) name against the module taxonomy, then states
+   its interpretation and asks to CONFIRM — and if required attributes (size, mount) are
+   missing, asks for those in the same breath. It NEVER guesses a missing attribute and
+   NEVER searches yet.
+3. Commander narrows, confirms, or cancels.
+4. If confirmed AND complete -> step 5. If still incomplete/ambiguous -> the LLM asks again
+   (loop back to step 2), re-calling the tool with the accumulated info. If the commander
+   cancels ("cancel" / "never mind" / "forget it") -> acknowledge and drop the request;
+   NO search runs.
+5. With a RESOLVED + confirmed module, run the Spansh search (this fires exactly once).
+6. Speak the system + station + distance; copy the SYSTEM name to the clipboard.
+7. Done.
+
+Notes on the flow:
+- The tool is a pure function of its arguments. The dialogue state IS the message history,
+  so each re-call just passes more-complete args — no pending-state object to manage.
+- Verbal cancel is an LLM-recognized intent, separate from the existing hard PTT-cancel
+  (which still aborts any in-flight turn).
+- The real, rate-limited Spansh query must NEVER run during disambiguation — only after
+  confirmation.
+
+Disambiguation (the LLM drives it; the tool validates and guides):
+- The LLM maps loose/misheard names to the taxonomy: "multiple cannon", "multicannon" ->
+  Multi-Cannon. It does the fuzzy understanding; the tool validates.
+- The tool returns structured guidance the LLM turns into speech: what's missing and the
+  valid options (sizes, mounts), or candidates when ambiguous.
+- Runs fine on the default Haiku tier — it's mapping plus a clarifying question.
+
+Data-source split:
+- Module TAXONOMY (names, sizes, mounts, ratings) — bundle a static table (EDCD outfitting
+  data / Spansh module reference) so validation + the whole ask/confirm/cancel dialog are
+  OFFLINE, fast, unit-testable. No network for disambiguation.
+- Station LOCATION — Spansh station search only (filter by module, sort by distance from
+  current system). Before coding, fetch current Spansh API docs + one real sample response
+  and parse what you actually see (may be job/poll based). EDSM fallback. Proper
+  User-Agent; respect rate limits.
+
+Tasks:
+1. covas/nav/modules.py — bundled taxonomy + resolve(query, size?, mount?) returning one of:
+   RESOLVED(id, label) | NEED_ATTRS(module, missing=[...], options={...}) |
+   AMBIGUOUS(candidates=[...]) | UNKNOWN(suggestions=[...]). Pure/offline. Maps ED size
+   words (small/medium/large/huge -> 1-4) and mounts (fixed/gimballed/turreted).
+2. covas/nav/closest.py — find_closest_module(resolved_module, current_system, http, *,
+   pad_size=None) -> nearest (system, station, distance_ly, pad, extra) via Spansh. http
+   injected.
+3. covas/nav/clipboard.py — copy(text), injected (Windows: pyperclip or Set-Clipboard via
+   subprocess; note the choice in the PR).
+4. covas/capabilities/find_closest_capability.py — FindClosestCapability with tool
+   find_closest_module(module, size?, mount?, pad_size?, confirmed?). The tool DESCRIPTION
+   tells the LLM to normalize the name, ask for any missing size/mount, CONFIRM before
+   searching, and treat "cancel/never mind" as an abort. On RESOLVED + confirmed: read
+   current system (ED context; fallback journal), query Spansh, copy the SYSTEM name to the
+   clipboard, return a short spoken line. On NEED_ATTRS/AMBIGUOUS/UNKNOWN: return the
+   structured guidance so the LLM can ask; on a cancel intent: return without searching.
+5. Config [nav]: base URL(s), default pad_size (my main ships need Large — configurable),
+   enable flag.
+
+Tests (§9):
+- Unit (default, offline): modules.resolve for exact, misheard ("multiple cannon"),
+  missing-attrs ("multi-cannon" -> NEED_ATTRS size+mount), ambiguous, unknown; Spansh
+  parsing + nearest-by-distance from a RECORDED fixture; clipboard via fake copy().
+- Unit — the multi-turn flow with a scripted FakeLLM + fake http + fake clipboard:
+  (a) ask -> narrow -> confirm -> asserts the search fires exactly ONCE and the system is
+  copied; (b) a CANCEL mid-dialog asserts NO search and NO clipboard write; (c) a second
+  ambiguous answer loops (asks again) before resolving.
+- Integration+local (opt-in): one live Spansh query behind @pytest.mark.integration+local.
+
+Constraints: no real network or clipboard in the default pytest run (inject both). Fail
+soft — unknown module or failed lookup: say so, don't crash the loop.
+
+Acceptance: bare pytest green and offline; manual tests: (a) "find the closest multicannon"
+-> asks size + mount, confirms, then finds it; (b) "find the closest multiple cannon" ->
+resolves to Multi-Cannon and confirms; (c) cancelling mid-dialog runs no search; all land
+the right system on the clipboard. Report Spansh quirks. Stop for review.
+```
+
+---
+
 ### Tips for running these
 - Keep `CLAUDE.md` current — Claude Code reads it every session.
 - If a step balloons, ask Claude Code to split it and update this file.
