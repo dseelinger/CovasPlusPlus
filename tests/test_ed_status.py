@@ -23,6 +23,31 @@ def _flags(*names: str) -> int:
     return v
 
 
+# --- bit positions (regression guard) --------------------------------------
+
+def test_flag_bit_positions_match_ed_spec():
+    """Absolute bit positions per Frontier's Status File spec. Pinned because the symbolic
+    _flags() helper is self-consistent with whatever the table says, so it can't catch an
+    off-by-one. Regression: FsdCooldown (bit 18, set on every supercruise exit) was once
+    mislabeled LowFuel, firing a bogus 'fuel below 25%' callout."""
+    assert FLAGS["Supercruise"] == 1 << 4
+    assert FLAGS["ScoopingFuel"] == 1 << 11
+    assert FLAGS["FsdCooldown"] == 1 << 18
+    assert FLAGS["LowFuel"] == 1 << 19
+    assert FLAGS["Overheating"] == 1 << 20
+    assert FLAGS["IsInDanger"] == 1 << 22
+    assert FLAGS["BeingInterdicted"] == 1 << 23
+    assert FLAGS["SrvHighBeam"] == 1 << 31
+
+
+def test_supercruise_exit_cooldown_is_not_low_fuel():
+    """Dropping out of supercruise clears the Supercruise bit and sets FSD-cooldown; that
+    must read as SupercruiseExited, never LowFuel (the false-callout regression)."""
+    events = flag_transitions(_flags("Supercruise"), _flags("FsdCooldown"))
+    assert "LowFuel" not in events
+    assert events == ["SupercruiseExited"]   # FsdCooldown isn't a published transition
+
+
 # --- decode_flags ----------------------------------------------------------
 
 def test_decode_flags_zero_is_all_false():

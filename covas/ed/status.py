@@ -19,7 +19,11 @@ from .context import EDContext
 
 STATUS_FILE = "Status.json"
 
-# ED's Status.json Flags bitfield. Names are ours (used for context fields + transitions).
+# ED's Status.json Flags bitfield, per Frontier's Status File spec. Bit positions are
+# ABSOLUTE and must match the spec exactly — an off-by-one silently mislabels flags. (It
+# did: this table once omitted bit 14 "Srv Turret retracted", shifting bits 15-31 down one,
+# so the FSD-cooldown bit that sets on every supercruise exit read as LowFuel and fired a
+# bogus "fuel below 25%" callout. test_ed_status pins the key bits to guard against this.)
 FLAGS: dict[str, int] = {
     "Docked": 1 << 0,
     "Landed": 1 << 1,               # on a planet surface
@@ -34,24 +38,25 @@ FLAGS: dict[str, int] = {
     "SilentRunning": 1 << 10,
     "ScoopingFuel": 1 << 11,
     "SrvHandbrake": 1 << 12,
-    "SrvTurret": 1 << 13,
-    "SrvDriveAssist": 1 << 14,
-    "FsdMassLocked": 1 << 15,
-    "FsdCharging": 1 << 16,
-    "FsdCooldown": 1 << 17,
-    "LowFuel": 1 << 18,             # < 25%
-    "Overheating": 1 << 19,         # > 100%
-    "HasLatLong": 1 << 20,
-    "IsInDanger": 1 << 21,
-    "BeingInterdicted": 1 << 22,
-    "InMainShip": 1 << 23,
-    "InFighter": 1 << 24,
-    "InSRV": 1 << 25,
-    "HudAnalysisMode": 1 << 26,
-    "NightVision": 1 << 27,
-    "AltitudeFromAverageRadius": 1 << 28,
-    "FsdJump": 1 << 29,
-    "SrvHighBeam": 1 << 30,
+    "SrvTurret": 1 << 13,           # SRV using turret view
+    "SrvTurretRetracted": 1 << 14,  # SRV turret retracted (close to ship)
+    "SrvDriveAssist": 1 << 15,
+    "FsdMassLocked": 1 << 16,
+    "FsdCharging": 1 << 17,
+    "FsdCooldown": 1 << 18,         # set on dropping out of supercruise — NOT low fuel
+    "LowFuel": 1 << 19,             # < 25%
+    "Overheating": 1 << 20,         # > 100%
+    "HasLatLong": 1 << 21,
+    "IsInDanger": 1 << 22,
+    "BeingInterdicted": 1 << 23,
+    "InMainShip": 1 << 24,
+    "InFighter": 1 << 25,
+    "InSRV": 1 << 26,
+    "HudAnalysisMode": 1 << 27,
+    "NightVision": 1 << 28,
+    "AltitudeFromAverageRadius": 1 << 29,
+    "FsdJump": 1 << 30,
+    "SrvHighBeam": 1 << 31,
 }
 
 # Flags whose flip is worth announcing, mapped to (name-when-set, name-when-cleared).
