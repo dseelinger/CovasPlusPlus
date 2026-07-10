@@ -97,6 +97,8 @@ The outfitting search (§5) generalizes into a six-category Spansh voice-search 
 
 The prompts are in `CLAUDE_CODE_PROMPTS.md` (Search Prompts 1–6). The shared Spansh client is extracted from the existing `nav/closest.py`; `nav/modules.py` is reused as the outfitting resolver.
 
+**Implemented** (`covas/search/` + `help_capability.py` + the `*_search_capability.py` set): `HelpCapability` (templated idle + failure-recovery, deterministic phrasing rotation); the registry-contract test that fails when a capability ships without complete help metadata; the shared typed `search/spansh.py` client with per-category builders/parsers (`categories.py`, `stations.py`, `systems.py`, `factions.py`) and offline fuzzy `faction_index.py` / `vocab.py`; and five LLM-native category capabilities (star systems, stations, minor factions, signals, misc) built on the outfitting pattern. Outfitting is refactored onto the shared client.
+
 ---
 
 ## 4. Cloud model tiering strategy
@@ -264,11 +266,11 @@ The original seven-phase plan is done and tested:
 5. **Proactive callouts** — `ProactiveCapability` (§5).
 6. **Keybind automation** — one-action prototype behind the safety layer (§6).
 7. **Outfitting voice search** — `find-closest-module` (§5, §3.5).
+8. **Voice search & help subsystem** — templated `HelpCapability` (idle + failure-recovery) on one unified registry with a structural help-metadata contract; a shared typed Spansh client (`search/spansh.py`, outfitting refactored onto it); and five LLM-native category capabilities — star systems, stations, minor factions, signals, misc — with offline fuzzy resolution for factions/systems (§3.5). *(Search Prompts 1–5 merged; the Prompt 6 voice-polish pass — refinement re-query, error-mode wiring, low-confidence confirmation — folded in or pending per below.)*
 
 ### Backlog (specced as Claude Code prompts, not yet built)
 Each is a prompt in `CLAUDE_CODE_PROMPTS.md`, LLM-native + offline-tested per §3.5 / §9:
 
-- **Voice search & help subsystem** (Search Prompts 1–6): help registry + templated help; registry-contract test; generalized Spansh client (extracted from `nav/closest.py`); star systems as the LLM-native reference; the remaining categories (stations, minor factions, signals, misc); voice polish + refinement + error-mode help.
 - **N1 — Settings schema + web page.** One settings schema as source of truth; a clean web settings page writing `overrides.json`.
 - **N2 — Voice-settable settings.** The same schema projected to a voice capability.
 - **N3 — Location & carriers.** Copy current system; personal carrier (journal); squadron carrier (journal name + configured callsign + galaxy-DB location); "already there → don't copy" fix.
