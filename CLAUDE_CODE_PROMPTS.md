@@ -558,6 +558,204 @@ Acceptance: bare pytest green and offline; manual voice checklist. Stop for revi
 
 ---
 
+## Navigation, Settings & Automation (Prompts N1–N5)
+
+Features layered on the existing subsystems. Order matters where noted (N2 depends on N1's
+schema). Same conventions throughout — LLM-native capabilities, dependency injection, and
+unit-default / integration-opt-in tests (§9). These are NOT Spansh-search categories, so the
+search-subsystem boilerplate doesn't apply, but validate-before-speak and fail-soft do.
+
+### N1 — Settings schema + web settings page
+
+```
+Read CLAUDE.md, covas/config.py, covas/web.py, covas/templates/index.html.
+
+Branch: feature/settings-schema-web
+
+Goal: ONE settings schema as the source of truth, plus a genuinely nice web settings page that
+renders from it and writes overrides.json. (N2's voice layer projects from the SAME schema, so
+they can't drift.)
+
+Tasks:
+1. covas/settings_schema.py — declare every user-facing setting ONCE: path (into config.toml
+   sections), type (bool/int/float/enum/string/path), label, group, help text, range/options,
+   default, plus spoken phrasings + example (for the voice layer). Cover the existing sections
+   (anthropic, whisper, elevenlabs, web_search, conversation, nav, router, proactive,
+   elite/ed, keybinds, ui…).
+2. Web settings page (Flask, web.py + template): grouped sections, the RIGHT control per type
+   (toggle, dropdown, number/slider, text/path), inline help, per-setting reset-to-default,
+   client-side validation against the schema, a search/filter box, and a save that writes
+   overrides.json via the existing mechanism. Reload the running config where already
+   supported (Whisper). Bar to clear: cleaner and calmer than EDCopilot's settings.
+3. Server-side: validate every POSTed setting against the schema; reject unknown keys/values
+   LOUDLY — never write unvalidated data into overrides.json.
+
+Tests: unit (offline) — schema covers all overridable keys; validation accepts good values and
+rejects out-of-range/unknown; a POST round-trips into overrides.json.
+
+Acceptance: bare pytest green; manual: change a setting in the panel, confirm it persists and
+takes effect. Stop for review.
+```
+
+### N2 — Voice-settable settings
+
+```
+Read CLAUDE.md and covas/settings_schema.py (the shared schema from N1).
+
+Branch: feature/settings-voice
+
+Goal: change any setting by voice, projecting from the SAME schema.
+
+Tasks:
+1. A SettingsCapability (LLM-native, like find-closest): tools to GET and SET a setting by its
+   spoken phrasings, validated against the schema (type/range/options), writing overrides.json
+   via config.py. Confirm the change back ("Whisper model set to small").
+2. Accept natural values ("turn personality off", "use the George voice", "set thinking to
+   high"). Reject invalid values WITH the valid options — never guess.
+3. Register help metadata so "what can I change" works and the error mode fires on an unknown
+   setting/value.
+
+Tests: unit (offline) — set a bool/enum/number by phrasing round-trips to overrides.json;
+invalid value refused with options; unknown setting routes to help.
+
+Acceptance: bare pytest green; manual voice test. Stop.
+```
+
+### N3 — Location & carrier commands
+
+```
+Read CLAUDE.md, covas/ed (monitoring/context), covas/nav/location.py, covas/nav/clipboard.py,
+find_closest_capability.py.
+
+Branch: feature/location-carriers
+
+Goal: quick location/carrier voice commands + the "already there -> don't copy" fix.
+
+Tasks:
+1. "Copy my current system" -> put the current system on the clipboard.
+2. Personal fleet carrier: track its current system LIVE from the journal (CarrierJump /
+   CarrierJumpRequest / CarrierLocation; CarrierStats for name+callsign). "Where's my fleet
+   carrier" -> speak its system + copy it. Local and reliable.
+3. Squadron carrier: auto-discover the SQUADRON NAME from the journal (SquadronStartup) and
+   confirm it. The squadron's CARRIER can't be auto-resolved from public APIs, so config the
+   carrier's name/callsign. "Where's my squadron carrier" -> look up its last-reported system
+   by callsign via a galaxy DB (Spansh/EDSM/EDDN carrier tracking), speak + copy it, and note
+   it may be stale ("as of its last reported jump").
+4. Fix across ALL search/nav/carrier results: if the answer IS the current system, say so and
+   do NOT copy to the clipboard (you're already there).
+
+Tests: unit (offline) — carrier system from a fixture journal; squadron name from a fixture;
+carrier location from a recorded galaxy-DB fixture (fake http); a "current system" result skips
+the clipboard (fake clipboard asserts no call).
+
+Acceptance: bare pytest green and offline; manual. Stop.
+```
+
+### N4 — Route callouts (proactive)
+
+```
+Read CLAUDE.md, covas/ed (journal/status + the proactive capability), DESIGN §5.
+
+Branch: feature/route-callouts
+
+Goal: proactive callouts while flying a plotted route.
+
+Tasks:
+1. Read the plotted route from NavRoute.json (full jump list with star classes); track progress
+   via FSDJump. Handle replot and route completion.
+2. On approach to the next system (FSDTarget, or on jump) announce whether the star is
+   SCOOPABLE — classes K, G, B, F, O, A, M are scoopable; anything else isn't. Keep it terse.
+3. Every Nth jump (N configurable, default 5) announce jumps remaining to the destination; and
+   announce arrival at the final system.
+4. Route everything through the proactive path (respect cancel/mute/cooldown; never talk over
+   the Commander). Config [route]: enable + N + per-callout toggles. Off by default.
+
+Tests: unit (offline) — scoopable classification over KGBFOAM vs non-scoopable; jumps-remaining
+math from a NavRoute fixture; every-Nth cadence; replot handled.
+
+Acceptance: bare pytest green and offline; manual in-game. Stop.
+```
+
+### N5 — Auto-honk (keybind automation)
+
+```
+Read CLAUDE.md, DESIGN §6, covas/keybinds (binds parser + executor), covas/ed (Status/journal).
+
+Branch: feature/auto-honk
+
+Goal: auto-"honk" (fire the Discovery Scanner) shortly after arriving in a new system. OPT-IN,
+off by default, safety-gated.
+
+Tasks:
+1. Config [honk]: enabled (default false), the scanner's fire group index + trigger
+   (primary/secondary), hold duration (default ~6s).
+2. On arrival in a NEW system (FSDJump into normal space), if enabled:
+   - If the scanner group + trigger are configured: read the CURRENT fire group from
+     Status.json ("FireGroup"), cycle to the scanner group via the CycleFireGroupNext/Prev
+     keybinds (from the binds parser) — deterministic, no guessing — then HOLD the configured
+     primary/secondary fire key for the duration to complete the honk, then cycle back.
+   - If NOT configured: just hold the primary fire key for the duration (the accepted
+     "hope for the best" fallback).
+3. Safety (reuse the keybind safety layer): never act during combat/interdiction (Status
+   flags), honor the hard global abort, strictly opt-in. Log every honk.
+
+Tests: unit (offline) — fire-group delta math (current vs target -> N cycles + direction) from a
+Status fixture; arrival triggers the honk sequence via a FAKE executor (assert key sequence +
+hold duration); combat guard suppresses it; disabled = no-op.
+
+Acceptance: binds + sequencing unit-tested; manual: arrive in a system and confirm it honks (and
+does NOT fire weapons). Report reliability. Stop for go/no-go.
+```
+
+### N6 — Community Goals
+
+```
+Read CLAUDE.md, covas/ed (journal/context), covas/nav/clipboard.py, find_closest_capability.py.
+
+Branch: feature/community-goals
+
+Goal: voice Community-Goal (CG) queries. Journal-primary — the ED journal `CommunityGoal`
+event is authoritative for the player's own standing and carries the current CG array.
+
+Journal source: the most recent `CommunityGoal` event lists active CGs, each with CGID, Title,
+SystemName, MarketName, Expiry, CurrentTotal, TierReached/TopTier, PlayerContribution,
+PlayerPercentileBand, PlayerInTopRank, TopRankSize, IsComplete. It's written when the Commander
+interacts with a CG board, so it's "as of last board visit."
+
+Tasks:
+1. Track the latest CommunityGoal event from the journal into a small CG state object.
+2. LLM-native CGCapability with tools:
+   - list current CGs (title + system + expiry), MERGING the external feed (complete current
+     list) with the journal (which ones you're contributing to). Call OUT the ones NEW to you —
+     active CGs not in your journal ("and there's one in <system> you haven't visited yet").
+     LLM-workable: fuzzy phrasing is fine.
+   - "what system is CG X in" -> resolve X to a CG by title (fuzzy), speak the system, and
+     copy it to the clipboard — applying the N3 rule: if it's your current system, say so and
+     DON'T copy.
+   - "what's my standing in CG X" -> PlayerInTopRank -> "Top 10 Commanders"; else
+     "top {PlayerPercentileBand}%" (map to 100/75/50/25). Flag it's as of your last board
+     visit; if the CG isn't in your journal, say so ("I don't have your standing — visit the
+     board").
+3. External CG feed — the completeness source, so CGs you HAVEN'T visited surface (the point
+   of this feature). Pull-based (on request), no polling. Default to EDSM's community-goals API
+   (no key required); Inara's getCommunityGoalsRecent (needs the generic API key) is the richer
+   alternative — verify the current endpoints at build time. It's the PRIMARY source for the
+   list + systems; the journal supplements it with your engagement and is the ONLY source of
+   your own standing. Fail soft: if the feed is unreachable, fall back to journal-known CGs and
+   say you can't see ones you haven't visited right now. Config [cg]: source (edsm|inara),
+   optional key. Validate every CG/system name before speaking.
+4. Register help metadata.
+
+Tests: unit (offline) — parse a CommunityGoal journal fixture; percentile/top-rank -> phrasing
+mapping (incl. Top 10); fuzzy CG-title match incl. ambiguity; system lookup copies (fake
+clipboard) and skips copy when it's the current system; external list from a recorded fixture
+(fake http); "no standing" path when a CG is absent.
+
+Acceptance: bare pytest green and offline; manual. Stop for review.
+```
+
+---
+
 ### Tips for running these
 - Keep `CLAUDE.md` current — Claude Code reads it every session.
 - If a step balloons, ask Claude Code to split it and update this file.
