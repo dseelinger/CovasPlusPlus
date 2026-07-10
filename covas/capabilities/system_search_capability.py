@@ -33,6 +33,7 @@ from ..nav import copy as _default_copy
 from ..search import NavError, RequestsHttp, build_query, category, execute_search, parse_systems
 from ..search.spansh import Http, _DEFAULT_UA
 from ..search.systems import VOCAB, nearest_enum, resolve_enum
+from . import _search_support as sup
 from .base import HelpMeta, Slot
 
 _TOOL_NAME = "search_star_systems"
@@ -253,6 +254,7 @@ class SystemSearchCapability:
     # -- dialog -----------------------------------------------------------------------
     def _handle(self, inp: dict) -> str:
         slots: dict[str, object] = {}
+        caught: list[str] = []          # values understood so far, echoed on a later bad slot
 
         # Enum slots: resolve each spoken value to a canonical Spansh one, or speak a
         # correction and stop (no search on an unvalidated value).
@@ -262,8 +264,10 @@ class SystemSearchCapability:
                 continue
             value = resolve_enum(param, raw)
             if value is None:
-                return self._say_bad_value(arg, param, raw)
+                kind = arg.replace("_", " ")
+                return sup.recovery(raw, kind, nearest_enum(param, raw), caught=caught)
             slots[param] = value
+            caught.append(f"{value} {arg.replace('_', ' ')}")
 
         # Boolean slots: only set when actually provided.
         for arg, param in _BOOL_ARGS.items():
@@ -333,16 +337,6 @@ class SystemSearchCapability:
                  else f" (Couldn't copy to the clipboard — the system is {rec.name}.)")
         return line
 
-    def _say_bad_value(self, arg: str, param: str, raw) -> str:
-        """Templated failure-recovery: name the miss + the nearest VALID value (from the
-        canonical vocab), never the raw term as if it were real."""
-        sugg = nearest_enum(param, raw)
-        kind = arg.replace("_", " ")
-        self._logline(f"unresolved {kind} '{raw}' -> {sugg or 'no match'}")
-        if sugg:
-            return f"I didn't recognize '{raw}' as {_a(kind)} — did you mean {sugg}?"
-        return (f"I didn't recognize '{raw}' as {_a(kind)}. Try naming the {kind} another way.")
-
     # -- helpers ----------------------------------------------------------------------
     def _reference_system(self, inp: dict) -> str | None:
         near = inp.get("near")
@@ -361,8 +355,3 @@ class SystemSearchCapability:
     def _logline(self, msg: str) -> None:
         if self._log is not None:
             self._log(msg)
-
-
-def _a(word: str) -> str:
-    """'a'/'an' for a spoken kind word ('an allegiance', 'a government')."""
-    return f"an {word}" if word[:1].lower() in "aeiou" else f"a {word}"

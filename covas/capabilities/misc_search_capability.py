@@ -37,8 +37,9 @@ _DESC = (
     "'mining missions' aren't a state Spansh can filter, so say so rather than guessing. "
     "Stateless and LLM-native: fill only what was said (state, and optionally a faction name, "
     "allegiance, or Powerplay state), validate — relay any suggested correction — and search. "
-    "Report the system and its state, and ALWAYS say the system name was copied to the "
-    "clipboard."
+    "Refine by re-calling with the accumulated slots (each call RE-QUERIES); on 'cancel' / "
+    "'never mind', drop it and do NOT call this tool. Report the system and its state, and "
+    "ALWAYS say the system name was copied to the clipboard."
 )
 
 _SCHEMA_PROPS = {
@@ -125,39 +126,45 @@ class MiscSearchCapability:
 
     def _handle(self, inp: dict) -> str:
         slots: dict[str, object] = {}
+        caught: list[str] = []          # values understood so far, echoed on a later bad slot
 
         state = inp.get("state")
         if state not in (None, ""):
             val = resolve_state(state)
             if val is None:
-                return self._bad("faction state", nearest_state(state), state)
+                return sup.recovery(state, "faction state", nearest_state(state), caught=caught)
             slots["controlling_minor_faction_state"] = val
+            caught.append(val)
 
         power_state = inp.get("power_state")
         if power_state not in (None, ""):
             val = resolve_enum("power_state", power_state)
             if val is None:
-                return self._bad("Powerplay state", nearest_enum("power_state", power_state),
-                                 power_state)
+                return sup.recovery(power_state, "Powerplay state",
+                                    nearest_enum("power_state", power_state), caught=caught)
             slots["power_state"] = val
+            caught.append(f"{val} power state")
 
         alleg = inp.get("allegiance")
         if alleg not in (None, ""):
             val = resolve_enum("allegiance", alleg)
             if val is None:
-                return self._bad("allegiance", nearest_enum("allegiance", alleg), alleg)
+                return sup.recovery(alleg, "allegiance", nearest_enum("allegiance", alleg),
+                                    caught=caught)
             slots["allegiance"] = val
+            caught.append(f"{val} allegiance")
 
         faction = inp.get("faction")
         if faction and str(faction).strip():
-            canon, recovery = sup.faction_or_recovery(self._factions, faction)
-            if recovery:
-                return recovery
+            canon, recover_msg = sup.faction_or_recovery(self._factions, faction)
+            if recover_msg:
+                return recover_msg
             slots["controlling_minor_faction"] = canon
 
         if not slots:
             return ("Tell me the state to look for — war, civil war, boom, election, "
-                    "infrastructure failure — or the kind of missions you want.")
+                    "infrastructure failure — or the kind of missions you want. (Say 'never "
+                    "mind' to drop it.)")
 
         return self._search(slots, inp)
 
@@ -186,12 +193,6 @@ class MiscSearchCapability:
         if best.controlling_minor_faction:
             line += f" Controlled by {best.controlling_minor_faction}."
         return line + sup.clipboard_note(best.name, copied)
-
-    def _bad(self, kind: str, sugg, raw) -> str:
-        self._logline(f"unresolved {kind} '{raw}' -> {sugg or 'no match'}")
-        if sugg:
-            return f"I didn't recognize '{raw}' as {sup.a_an(kind)} — did you mean {sugg}?"
-        return f"I didn't recognize '{raw}' as {sup.a_an(kind)}. Try naming it another way."
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:

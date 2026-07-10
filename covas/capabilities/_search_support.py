@@ -110,6 +110,22 @@ def a_an(word: str) -> str:
     return f"an {word}" if word[:1].lower() in "aeiou" else f"a {word}"
 
 
+def recovery(term, kind: str, suggestion: str | None = None, *, caught=None) -> str:
+    """The shared templated failure-recovery line — the search-side mirror of the help
+    subsystem's error mode (Search Prompt 6). Names what wasn't recognized and, when there is
+    one, the nearest REAL value; it never emits the unresolved term as if it were valid.
+
+    `caught` (the values already understood THIS turn) is echoed first, so a single bad slot
+    doesn't throw away the rest of the request — "I've got Empire, but I didn't recognize
+    'zombie' as a faction state — did you mean War?" (the "echo what was caught, ask for what's
+    missing" behavior)."""
+    lead = f"I've got {or_list(caught)}, but " if caught else ""
+    verb = "didn't recognize" if lead else "I didn't recognize"
+    base = f"{lead}{verb} '{term}' as {a_an(kind)}"
+    return f"{base} — did you mean {suggestion}?" if suggestion else \
+           f"{base}. Try saying it another way."
+
+
 def or_list(items) -> str:
     """Join options for speech: 'A', 'A or B', 'A, B, or C'."""
     items = [str(i) for i in items if i]
@@ -124,4 +140,4 @@ def or_list(items) -> str:
 
 # Re-export so capability modules import their exception from one place.
 __all__ = ["NavError", "SearchConfig", "reference_system", "run_query", "faction_or_recovery",
-           "copy_system", "clipboard_note", "distance_phrase", "a_an", "or_list"]
+           "copy_system", "clipboard_note", "distance_phrase", "a_an", "or_list", "recovery"]
