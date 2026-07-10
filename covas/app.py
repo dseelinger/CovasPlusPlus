@@ -38,6 +38,25 @@ for _stream in (sys.stdout, sys.stderr):
 STATES = ("Idle", "Listening", "Transcribing", "Thinking", "Searching", "Speaking")
 
 
+def _pop_path(d: dict, path: tuple) -> None:
+    """Remove the nested key at `path` from `d`, if present (no-op otherwise)."""
+    if not path:
+        return
+    for p in path[:-1]:
+        d = d.get(p)  # type: ignore[assignment]
+        if not isinstance(d, dict):
+            return
+    d.pop(path[-1], None)
+
+
+def _prune_empty(d: dict) -> None:
+    """Drop now-empty sub-dicts so overrides.json doesn't accumulate {} husks."""
+    for k in [k for k, v in d.items() if isinstance(v, dict)]:
+        _prune_empty(d[k])
+        if not d[k]:
+            del d[k]
+
+
 class App:
     def __init__(
         self,
@@ -519,9 +538,28 @@ class App:
         deep_merge(self.cfg, patch)
         deep_merge(self.overrides, patch)
         save_overrides(self.overrides)
-        self.bus.publish({"type": "settings", "settings": self.public_settings()})
+        self._after_settings_change(old_whisper)
 
-        # reload Whisper in the background if its model/device changed
+    def reset_setting(self, path) -> None:
+        """Reset ONE setting to its config.toml default by dropping it from
+        overrides.json (the file's own reset mechanism) and reloading config.
+        Reloads Whisper too if that's the setting that changed."""
+        old_whisper = dict(self.cfg["whisper"])
+        _pop_path(self.overrides, tuple(path))
+        _prune_empty(self.overrides)
+        save_overrides(self.overrides)
+        # Re-derive the effective config from config.toml + the remaining
+        # overrides (paths re-resolved), keeping the same dict identity so any
+        # holder of self.cfg sees the update.
+        fresh = load_config()
+        self.cfg.clear()
+        self.cfg.update(fresh)
+        self._after_settings_change(old_whisper)
+
+    def _after_settings_change(self, old_whisper: dict) -> None:
+        """Shared tail for update/reset: broadcast the new settings and reload
+        Whisper in the background if its model/device/compute changed."""
+        self.bus.publish({"type": "settings", "settings": self.public_settings()})
         w = self.cfg["whisper"]
         if (w["model"], w["device"], w["compute_type"]) != (
             old_whisper["model"], old_whisper["device"], old_whisper["compute_type"]

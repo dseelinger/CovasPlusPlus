@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COVAS++ Settings</title>
+<style>
+  :root{
+    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
+    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff; --ok:#39d353; --err:#ff9d9d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
+  a{color:var(--accent2);text-decoration:none} a:hover{text-decoration:underline}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);
+         background:linear-gradient(90deg,#12181f,#0a0d12);position:sticky;top:0;z-index:5}
+  header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
+  header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
+  header .spacer{margin-left:auto}
+  .search{background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:6px;
+          padding:8px 12px;font-family:inherit;min-width:240px;font-size:13px}
+  .wrap{display:grid;grid-template-columns:200px 1fr;gap:20px;padding:20px;max-width:1080px;margin:0 auto}
+  nav.groups{position:sticky;top:78px;align-self:start;display:flex;flex-direction:column;gap:4px}
+  nav.groups a{color:var(--muted);font-size:12px;letter-spacing:1px;padding:4px 8px;border-radius:5px;text-transform:uppercase}
+  nav.groups a:hover{color:var(--text);background:var(--panel);text-decoration:none}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:8px 20px 16px;margin-bottom:18px}
+  .card h2{font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin:14px 0 6px}
+  .setting{padding:14px 0;border-top:1px solid #1b2330}
+  .setting:first-of-type{border-top:none}
+  .setting.hidden{display:none}
+  .setting .top{display:flex;align-items:center;gap:12px}
+  .setting .label{font-size:14px;flex:0 0 240px}
+  .setting.dirty .label{color:var(--accent)}
+  .setting .control{flex:1;display:flex;align-items:center;gap:10px;justify-content:flex-end}
+  .setting .help{color:var(--muted);font-size:12px;margin-top:6px;line-height:1.5;max-width:640px}
+  .setting .example{color:#5c6b7d;font-style:italic}
+  .setting .err{color:var(--err);font-size:12px;margin-top:6px;display:none}
+  .setting.invalid .err{display:block}
+  .reset{color:#5c6b7d;font-size:11px;letter-spacing:1px;cursor:pointer;visibility:hidden;white-space:nowrap}
+  .reset:hover{color:var(--accent2)}
+  .setting.overridden .reset{visibility:visible}
+  select,input[type=text],input[type=number]{background:#0c1119;color:var(--text);border:1px solid var(--edge);
+    border-radius:5px;padding:7px 9px;font-family:inherit;font-size:13px;min-width:200px}
+  input[type=number]{min-width:120px;text-align:right}
+  input.invalid,select.invalid{border-color:var(--err)}
+  .unit{color:var(--muted);font-size:12px;min-width:52px}
+  .toggle{position:relative;width:50px;height:26px;background:#222c38;border-radius:20px;cursor:pointer;
+    border:1px solid var(--edge);transition:.15s;flex:0 0 auto}
+  .toggle.on{background:var(--accent)}
+  .toggle .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#e8eef6;transition:.15s}
+  .toggle.on .knob{left:26px}
+  .savebar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;
+    padding:12px 22px;background:#0c1119;border-top:1px solid var(--accent);transform:translateY(120%);transition:.18s}
+  .savebar.show{transform:translateY(0)}
+  .savebar .count{color:var(--muted);font-size:13px;margin-right:auto}
+  .savebar button{padding:10px 20px;border-radius:6px;font-family:inherit;letter-spacing:1px;cursor:pointer;font-size:13px}
+  .btn-save{background:var(--accent);color:#120a04;border:1px solid var(--accent)}
+  .btn-save:hover{filter:brightness(1.1)}
+  .btn-revert{background:transparent;color:var(--muted);border:1px solid var(--edge)}
+  .btn-revert:hover{color:var(--text)}
+  .toast{position:fixed;top:74px;right:20px;background:#10321a;color:var(--ok);border:1px solid #1f6b34;
+    padding:10px 16px;border-radius:6px;font-size:13px;opacity:0;transform:translateY(-8px);transition:.2s;pointer-events:none;z-index:9}
+  .toast.show{opacity:1;transform:translateY(0)}
+  .toast.bad{background:#3a1414;color:var(--err);border-color:#7a2a2a}
+  .empty{color:var(--muted);padding:40px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>COVAS++</h1>
+  <span class="sub">SETTINGS</span>
+  <a href="/" class="sub" style="color:var(--accent2)">← control panel</a>
+  <span class="spacer"></span>
+  <input class="search" id="search" placeholder="Filter settings…" autocomplete="off">
+</header>
+
+<div class="wrap">
+  <nav class="groups" id="groupNav"></nav>
+  <main id="main"><div class="empty">Loading settings…</div></main>
+</div>
+
+<div class="savebar" id="savebar">
+  <span class="count" id="dirtyCount"></span>
+  <button class="btn-revert" id="revertBtn">REVERT</button>
+  <button class="btn-save" id="saveBtn">SAVE CHANGES</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let GROUPS = [];                 // schema groups from the server
+const ORIG = {};                 // key -> current (saved) value
+const EDITS = {};                // key -> pending new value
+let EL = null;                   // {models:[...], voices:[...]} once fetched
+
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function slug(name){return "g-"+name.toLowerCase().replace(/[^a-z0-9]+/g,"-");}
+
+async function load(){
+  const data = await (await fetch("/api/schema")).json();
+  GROUPS = data.groups;
+  // Fill ElevenLabs option lists (may fail offline — settings still render).
+  try{
+    const r = await (await fetch("/api/elevenlabs")).json();
+    if(!r.error) EL = r;
+  }catch(e){ /* leave EL null; those selects show the current value only */ }
+  render();
+}
+
+function optionsFor(s){
+  if(s.options) return s.options.map(v=>({value:v,label:v||"(none)"}));
+  if(s.options_source==="@elevenlabs_models" && EL)
+    return EL.models.map(m=>({value:m.model_id,label:m.name||m.model_id}));
+  if(s.options_source==="@elevenlabs_voices" && EL)
+    return EL.voices.map(v=>({value:v.voice_id,label:v.name+(v.category?" ["+v.category+"]":"")}));
+  // Dynamic list we couldn't resolve — offer at least the current value.
+  return [{value:s.value,label:(s.value===""?"(none)":s.value)}];
+}
+
+function render(){
+  const nav = $("groupNav"); nav.innerHTML="";
+  const main = $("main"); main.innerHTML="";
+  for(const g of GROUPS){
+    nav.appendChild(Object.assign(document.createElement("a"),
+      {href:"#"+slug(g.name), textContent:g.name}));
+    const card = document.createElement("section");
+    card.className="card"; card.id=slug(g.name);
+    card.innerHTML = '<h2>'+esc(g.name)+'</h2>';
+    for(const s of g.settings){ ORIG[s.key]=s.value; card.appendChild(row(s)); }
+    main.appendChild(card);
+  }
+  syncSaveBar();
+}
+
+function row(s){
+  const wrap = document.createElement("div");
+  wrap.className = "setting" + (s.overridden ? " overridden":"");
+  wrap.dataset.key = s.key;
+  wrap.dataset.search = (s.label+" "+s.help+" "+s.key).toLowerCase();
+
+  const top = document.createElement("div"); top.className="top";
+  const label = document.createElement("div"); label.className="label"; label.textContent=s.label;
+  const control = document.createElement("div"); control.className="control";
+  buildControl(control, s);
+  const reset = document.createElement("span"); reset.className="reset"; reset.textContent="RESET";
+  reset.title="Reset to default"; reset.onclick=()=>resetOne(s.key);
+
+  top.appendChild(label); top.appendChild(control); top.appendChild(reset);
+  wrap.appendChild(top);
+
+  const help = document.createElement("div"); help.className="help";
+  help.innerHTML = esc(s.help) + (s.example ? ' <span class="example">e.g. “'+esc(s.example)+'”</span>':'');
+  wrap.appendChild(help);
+  const err = document.createElement("div"); err.className="err";
+  wrap.appendChild(err);
+  return wrap;
+}
+
+function buildControl(control, s){
+  if(s.type==="bool"){
+    const t = document.createElement("div");
+    t.className="toggle"+(s.value?" on":""); t.innerHTML='<div class="knob"></div>';
+    t.onclick=()=>{ const v=!t.classList.contains("on"); t.classList.toggle("on",v); edit(s.key,v); };
+    control.appendChild(t); return;
+  }
+  if(s.type==="enum"){
+    const sel = document.createElement("select");
+    for(const o of optionsFor(s)) sel.appendChild(new Option(o.label,o.value));
+    sel.value = s.value; if(sel.value!==String(s.value)) sel.appendChild(new Option(s.value,s.value)), sel.value=s.value;
+    sel.onchange=()=>edit(s.key, sel.value);
+    control.appendChild(sel); return;
+  }
+  if(s.type==="int"||s.type==="float"){
+    const inp = document.createElement("input"); inp.type="number";
+    if(s.min!=null) inp.min=s.min; if(s.max!=null) inp.max=s.max;
+    if(s.type==="int") inp.step=1; else inp.step="any";
+    inp.value = s.value;
+    inp.oninput=()=>edit(s.key, inp.value);
+    control.appendChild(inp);
+    if(s.unit){ const u=document.createElement("span"); u.className="unit"; u.textContent=s.unit; control.appendChild(u); }
+    return;
+  }
+  // string / path
+  const inp = document.createElement("input"); inp.type="text"; inp.value=s.value;
+  inp.placeholder = s.type==="path" ? "(default location)" : "";
+  inp.oninput=()=>edit(s.key, inp.value);
+  control.appendChild(inp);
+}
+
+function findSetting(key){
+  for(const g of GROUPS) for(const s of g.settings) if(s.key===key) return s;
+  return null;
+}
+
+function edit(key, raw){
+  const s = findSetting(key);
+  const val = coerce(s, raw);
+  const same = String(val)===String(ORIG[key]);
+  const el = document.querySelector('.setting[data-key="'+CSS.escape(key)+'"]');
+  if(same){ delete EDITS[key]; el.classList.remove("dirty"); }
+  else { EDITS[key]=val; el.classList.add("dirty"); }
+  clientValidate(s, val, el);
+  syncSaveBar();
+}
+
+function coerce(s, raw){
+  if(s.type==="bool") return !!raw;
+  if(s.type==="int"){ const n=parseInt(raw,10); return isNaN(n)?raw:n; }
+  if(s.type==="float"){ const n=parseFloat(raw); return isNaN(n)?raw:n; }
+  return raw;
+}
+
+function clientValidate(s, val, el){
+  let msg = "";
+  if(s.type==="int"||s.type==="float"){
+    if(typeof val!=="number" || isNaN(val)) msg=s.label+" must be a number";
+    else if(s.min!=null && val<s.min) msg=s.label+" must be at least "+s.min;
+    else if(s.max!=null && val>s.max) msg=s.label+" must be at most "+s.max;
+  }
+  el.classList.toggle("invalid", !!msg);
+  el.querySelector(".err").textContent = msg;
+  const c = el.querySelector("input,select"); if(c) c.classList.toggle("invalid", !!msg);
+  return !msg;
+}
+
+function anyInvalid(){ return !!document.querySelector(".setting.invalid"); }
+
+function syncSaveBar(){
+  const n = Object.keys(EDITS).length;
+  $("savebar").classList.toggle("show", n>0);
+  $("dirtyCount").textContent = n+" unsaved change"+(n===1?"":"s");
+  $("saveBtn").disabled = anyInvalid();
+}
+
+async function save(){
+  if(anyInvalid()) return toast("Fix the highlighted values first.", true);
+  const r = await fetch("/api/settings/update",{method:"POST",
+    headers:{"content-type":"application/json"}, body:JSON.stringify({updates:EDITS})});
+  const data = await r.json();
+  if(!r.ok){
+    for(const [key,msg] of Object.entries(data.errors||{})){
+      const el=document.querySelector('.setting[data-key="'+CSS.escape(key)+'"]');
+      if(el){ el.classList.add("invalid"); el.querySelector(".err").textContent=msg; }
+    }
+    return toast("Some settings were rejected.", true);
+  }
+  applyGroups(data.groups);
+  toast("Settings saved.");
+}
+
+async function resetOne(key){
+  const r = await fetch("/api/settings/reset",{method:"POST",
+    headers:{"content-type":"application/json"}, body:JSON.stringify({key})});
+  const data = await r.json();
+  if(!r.ok) return toast("Reset failed.", true);
+  delete EDITS[key];
+  applyGroups(data.groups);
+  toast("Reset to default.");
+}
+
+function applyGroups(groups){
+  GROUPS = groups;
+  for(const k of Object.keys(EDITS)) delete EDITS[k];
+  const q = $("search").value;
+  render();
+  $("search").value = q; filter();
+}
+
+function toast(msg, bad){
+  const t=$("toast"); t.textContent=msg; t.className="toast show"+(bad?" bad":"");
+  clearTimeout(t._h); t._h=setTimeout(()=>t.className="toast"+(bad?" bad":""), 2200);
+}
+
+function filter(){
+  const q=$("search").value.trim().toLowerCase();
+  for(const el of document.querySelectorAll(".setting"))
+    el.classList.toggle("hidden", q && !el.dataset.search.includes(q));
+  for(const card of document.querySelectorAll(".card")){
+    const any=[...card.querySelectorAll(".setting")].some(e=>!e.classList.contains("hidden"));
+    card.style.display = any?"":"none";
+  }
+}
+
+$("saveBtn").onclick=save;
+$("revertBtn").onclick=()=>{ for(const k of Object.keys(EDITS)) delete EDITS[k]; render(); filter(); };
+$("search").oninput=filter;
+load();
+</script>
+</body>
+</html>
