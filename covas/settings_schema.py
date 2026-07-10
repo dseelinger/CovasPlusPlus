@@ -242,6 +242,31 @@ SCHEMA: list[Setting] = [
             default=120, min=32, max=512, unit="tokens",
             phrasings=("callout length",)),
 
+    # --- Route callouts ----------------------------------------------------
+    Setting("route.enabled", ("route", "enabled"), "bool",
+            "Route callouts", "Route callouts",
+            "Proactive heads-ups while flying a plotted route (scoopable star, jumps "
+            "remaining, arrival). Needs ED monitoring.",
+            default=False, phrasings=("route callouts", "jump callouts"),
+            example="turn route callouts on"),
+    Setting("route.every_n", ("route", "every_n"), "int",
+            "Jumps-remaining cadence", "Route callouts",
+            "Announce jumps remaining every Nth jump. Lower is chattier.",
+            default=5, min=1, max=50, unit="jumps",
+            phrasings=("route callout cadence", "jumps remaining cadence")),
+    Setting("route.callout_scoopable", ("route", "callout_scoopable"), "bool",
+            "Announce scoopable star", "Route callouts",
+            "Call out whether the next star can be fuel-scooped as you lock each jump.",
+            default=True, phrasings=("scoopable callouts", "scoopable star callout")),
+    Setting("route.callout_jumps_remaining", ("route", "callout_jumps_remaining"), "bool",
+            "Announce jumps remaining", "Route callouts",
+            "Call out jumps remaining to the destination, every Nth jump.",
+            default=True, phrasings=("jumps remaining callouts",)),
+    Setting("route.callout_arrival", ("route", "callout_arrival"), "bool",
+            "Announce arrival", "Route callouts",
+            "Call out arrival at the final system when the route completes.",
+            default=True, phrasings=("arrival callouts",)),
+
     # --- Keybinds ----------------------------------------------------------
     Setting("keybinds.enabled", ("keybinds", "enabled"), "bool",
             "Keybind automation", "Keybinds",

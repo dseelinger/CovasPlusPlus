@@ -271,6 +271,27 @@ Overheating      = true   # ship over 100% heat
 Died             = true
 
 
+[route]
+# Route callouts (N4) — proactive heads-ups while flying a plotted galaxy-map route. Reads the
+# jump list (with star classes) from NavRoute.json and follows progress via FSDJump. Announces:
+#   * whether the NEXT star is SCOOPABLE (KGBFOAM) as you lock each jump — so you don't arrive
+#     low on fuel at an unscoopable star;
+#   * jumps remaining to the destination, every Nth jump;
+#   * arrival at the final system.
+# These go through the proactive path: spoken only when idle (never over you), a push-to-talk
+# tap cancels one, and the proactive mute ("stop the callouts") silences them too. Requires
+# [elite].enabled (that's where the events come from).
+#
+# DEFAULT OFF — opt in once you want it.
+enabled = false
+# Announce jumps-remaining every Nth jump. Lower = chattier. Scoopable + arrival are separate.
+every_n = 5
+# Per-callout toggles — silence any one kind without turning the whole feature off.
+callout_scoopable       = true
+callout_jumps_remaining = true
+callout_arrival         = true
+
+
 [keybinds]
 # Keybind automation (DESIGN §6) — the companion presses ONE ship control (toggle landing
 # gear) on request, behind a hard safety layer. This is the prototype: prove one reliable

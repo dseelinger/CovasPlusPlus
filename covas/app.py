@@ -147,6 +147,9 @@ class App:
         # find the nearest station selling it via Spansh + copy the system to the clipboard.
         # Opt-in ([nav].enabled, off by default).
         self.nav = None
+        # Route callouts (N4): proactive heads-ups while flying a plotted route (scoopable
+        # star, jumps remaining, arrival). Opt-in ([route].enabled, off by default).
+        self.route = None
         self._proactive_lock = threading.Lock()
         self._pump: threading.Thread | None = None
         self._pump_q: queue.Queue | None = None
@@ -156,6 +159,8 @@ class App:
         self._log("system", _cost_summary(self.cfg, self.mock))
         if self.cfg.get("proactive", {}).get("enabled"):
             self._start_proactive()
+        if self.cfg.get("route", {}).get("enabled"):
+            self._start_route()
         if self.cfg.get("keybinds", {}).get("enabled"):
             self._start_keybinds()
         if self.cfg.get("nav", {}).get("enabled"):
@@ -272,7 +277,10 @@ class App:
         """Subscribe to the bus (live-only, no backlog replay) and fan each event out to
         capability on_event hooks on a dedicated daemon thread. A thread — not inline in
         the publisher — so slow handler work (a proactive LLM call) never blocks a watcher,
-        and replay=False so stale startup events aren't delivered to a handler."""
+        and replay=False so stale startup events aren't delivered to a handler. Idempotent:
+        proactive and route callouts both need the pump but there's only ever one."""
+        if self._pump is not None:
+            return
         self._pump_q = self.bus.subscribe(replay=False)
         self._pump = threading.Thread(target=self._pump_events, name="event-pump",
                                       daemon=True)
@@ -360,6 +368,77 @@ class App:
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — a proactive failure must never crash the app
             self.set_state("Idle", f"proactive error: {e}")
+
+    def _speak_proactive_line(self, text: str) -> bool:
+        """Speak a PREDETERMINED proactive line (e.g. a route callout) through the same
+        never-interrupt/cancel machinery as `_speak_proactive`, but WITHOUT the LLM — the
+        text is deterministic and factual, so there's no reason to pay for or risk generation.
+        Returns True only if we actually started (Idle, no active worker), so the caller can
+        tell a spoken line from one skipped because the Commander had the floor."""
+        text = (text or "").strip()
+        if not text:
+            return False
+        with self._proactive_lock:
+            if self.state != "Idle":
+                return False
+            if self.worker is not None and self.worker.is_alive():
+                return False
+            cancel = threading.Event()
+            self.active_cancel = cancel
+            self.set_state("Speaking", "route")
+            self.worker = threading.Thread(
+                target=self._proactive_line_worker, args=(text, cancel), daemon=True)
+            self.worker.start()
+        return True
+
+    def _proactive_line_worker(self, text: str, cancel: threading.Event) -> None:
+        try:
+            if cancel.is_set():
+                self.set_state("Idle")
+                return
+            # Ambient, like proactive callouts — logged + spoken but NOT added to history.
+            self._log("COVAS", f"(route) {text}")
+            print(f"\n>> [route] {text}")
+            self._speak(text, cancel)
+            self.set_state("Idle")
+        except Exception as e:  # noqa: BLE001 — a route callout must never crash the app
+            self.set_state("Idle", f"route error: {e}")
+
+    # ---- Route callouts (DESIGN §5, N4) -----------------------------------
+    def _start_route(self) -> None:
+        """Build + register the route-callout capability and ensure the event pump is running.
+        Fail soft: a startup problem just leaves route callouts off. Needs ED monitoring for
+        its events (warn, don't fail, if that's off — the two are independently toggled)."""
+        try:
+            from .capabilities.route_capability import RouteCalloutCapability, RouteConfig
+            from .ed import read_navroute, resolve_journal_dir
+
+            rcfg = RouteConfig.from_cfg(self.cfg)
+            jdir = resolve_journal_dir(self.cfg)
+            # Route callouts honour the shared proactive mute ('stop the callouts') when
+            # proactive is enabled; otherwise there's nothing muting them.
+            is_muted = ((lambda: self.proactive.policy.muted) if self.proactive is not None
+                        else (lambda: False))
+            self.route = RouteCalloutCapability(
+                rcfg,
+                speak_line=self._speak_proactive_line,
+                load_navroute=lambda: read_navroute(jdir),
+                is_muted=is_muted,
+                log=lambda m: self._log("route", m))
+            self.route.prime()
+            self.registry.register(self.route)
+            self._start_event_pump()
+            every = rcfg.every_n
+            if self.ed_ctx is None:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    "Route callouts ON, but ED monitoring is OFF — no route events to react to."})
+            else:
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"Route callouts ON (jumps-remaining every {every})."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.route = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Route callouts failed to start: {e}"})
 
     # ---- Keybind automation (DESIGN §6) -----------------------------------
     def _start_keybinds(self) -> None:
