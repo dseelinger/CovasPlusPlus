@@ -24,6 +24,9 @@ def _deep_merge(base: dict, over: dict) -> dict:
 # and free of the local username, while consumers still receive absolute paths.
 _PATH_FIELDS = (
     ("personality", "file"),
+    ("personality", "presets_file"),
+    ("personality", "campaign_file"),
+    ("personality", "custom_dir"),
     ("elevenlabs", "api_key_file"),
     ("checklist", "file"),
     ("logging", "dir"),

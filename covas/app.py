@@ -779,6 +779,7 @@ class App:
             "el_model": c["elevenlabs"]["model"],
             "el_voice": c["elevenlabs"]["voice_id"],
             "el_voice_name": c["elevenlabs"].get("voice_name", ""),
+            "speed": c["elevenlabs"].get("speed", 1.0),
             "whisper": c["whisper"]["model"],
         }
 

@@ -149,12 +149,23 @@ max_uses = 3
 
 
 [personality]
-# When ON, personality.txt is loaded as the system prompt.
-# When OFF, no system prompt is sent — replies are plain/neutral
-# (and the "Commander" address + campaign context go away, as expected).
+# When ON, the system prompt is composed as Base + selected Persona + your Campaign (N7).
+# When OFF, no system prompt is sent — replies are plain/neutral (and the "Commander" address
+# + campaign context go away, as expected).
 enabled = true
-# Relative to the project root. Your private personality.txt is git-ignored;
-# copy personality.example.txt to personality.txt and edit.
+# The selected PERSONA (voice/register), by name from the presets file below (or a Custom one
+# you saved via the Personality tab). "Classic" is the default voice.
+persona = "Classic"
+# Shipped, committed presets (Base + selectable personas). No personal data — safe to share.
+presets_file = "personalities/presets.md"
+# Custom personas you save (git-ignored). One file per persona.
+custom_dir = "personalities/custom"
+# Your CAMPAIGN — personal facts about your Commander (name, ranks, holdings, ongoing goals).
+# Git-ignored, kept SEPARATE from the persona so switching voice never wipes it.
+campaign_file = "campaign.txt"
+# Legacy monolithic prompt. Until campaign.txt exists, this is used as the campaign
+# (back-compat) — paste your personal facts into the Campaign editor and you can retire it.
+# Copy personality.example.txt to personality.txt to start from the shipped default.
 file    = "personality.txt"
 
 
@@ -166,6 +177,9 @@ api_key_file = "ElevenLabsAPIKey.txt"
 model      = "eleven_flash_v2_5"
 voice_id   = "EXAVITQu4vr4xnSDxMaL"
 voice_name = "Sarah"
+# Speaking speed (ElevenLabs native voice `speed`). 1.0 = normal; exposed range is 1.0–1.2
+# (clamped). Only sent when > 1.0, so the default request is unchanged.
+speed = 1.0
 # Audio format streamed back for playback. pcm_16000 = low-latency, cancellable.
 output_format = "pcm_16000"
 

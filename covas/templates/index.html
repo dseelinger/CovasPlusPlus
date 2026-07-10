@@ -38,6 +38,24 @@
   .keys{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.7}
   .keys kbd{background:#0c1119;border:1px solid var(--edge);border-radius:4px;padding:1px 6px;color:var(--text)}
   .err{color:#ff9d9d}
+  .leftcol{display:flex;flex-direction:column;gap:16px}
+  input[type=range]{flex:1;min-width:120px;accent-color:var(--accent)}
+  .speedval{color:var(--text);font-size:13px;min-width:34px;text-align:right}
+  .pv{color:var(--muted);font-size:12px;font-style:italic;line-height:1.5;margin:2px 0 8px;
+      border-left:2px solid var(--edge);padding-left:10px;min-height:1em}
+  .pbox{width:100%;background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:6px;
+        padding:8px;font-family:inherit;font-size:12px;line-height:1.5;resize:vertical}
+  #personaBody{height:90px} #campaign{height:110px}
+  .plabel{display:block;color:var(--muted);font-size:12px;margin:12px 0 4px}
+  .prow{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .prow button{padding:7px 12px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+        border-radius:6px;font-family:inherit;font-size:12px;letter-spacing:1px;cursor:pointer}
+  .prow button:hover{background:#162836}
+  .pmsg{color:var(--ok,#39d353);font-size:12px}
+  .logfilter{float:right;font-size:11px;letter-spacing:1px;font-weight:normal}
+  .logfilter a{color:var(--muted);cursor:pointer;text-transform:none}
+  .logfilter a.active{color:var(--accent)}
+  .log.conv-only .line:not(.conv){display:none}
 </style>
 </head>
 <body>
@@ -52,20 +70,34 @@
 </header>
 
 <div class="wrap">
-  <div class="card">
-    <h2>Configuration</h2>
-    <div class="row"><label>Claude model</label><select id="model"></select></div>
-    <div class="row"><label>Thinking depth</label><select id="thinking"></select></div>
-    <div class="row"><label>Whisper model</label><select id="whisper"></select></div>
-    <div class="row"><label>ElevenLabs model</label><select id="el_model"></select></div>
-    <div class="row"><label>ElevenLabs voice</label><select id="el_voice"></select></div>
-    <div class="row"><label>Personality</label><div class="toggle" id="personality"><div class="knob"></div></div></div>
-    <button class="cancel" id="cancelBtn">■ CANCEL / STOP</button>
-    <div class="keys" id="keys"></div>
+  <div class="leftcol">
+    <div class="card">
+      <h2>Configuration</h2>
+      <div class="row"><label>Claude model</label><select id="model"></select></div>
+      <div class="row"><label>Thinking depth</label><select id="thinking"></select></div>
+      <div class="row"><label>Whisper model</label><select id="whisper"></select></div>
+      <div class="row"><label>ElevenLabs model</label><select id="el_model"></select></div>
+      <div class="row"><label>ElevenLabs voice</label><select id="el_voice"></select></div>
+      <div class="row"><label>Voice speed</label><input type="range" id="speed" min="1.0" max="1.2" step="0.05"><span class="speedval" id="speedVal">1.0×</span></div>
+      <div class="row"><label>Personality</label><div class="toggle" id="personality"><div class="knob"></div></div></div>
+      <button class="cancel" id="cancelBtn">■ CANCEL / STOP</button>
+      <div class="keys" id="keys"></div>
+    </div>
+
+    <div class="card">
+      <h2>Personality</h2>
+      <div class="row"><label>Persona</label><select id="persona"></select></div>
+      <div class="pv" id="personaPreview"></div>
+      <textarea id="personaBody" class="pbox" spellcheck="false"></textarea>
+      <div class="prow"><button id="saveCustom">SAVE AS CUSTOM</button><span class="pmsg" id="personaMsg"></span></div>
+      <label class="plabel">Campaign — your Commander's personal facts (kept when you switch persona)</label>
+      <textarea id="campaign" class="pbox" spellcheck="false" placeholder="e.g. I'm CMDR …, Elite in exploration, I fly an Anaconda named …"></textarea>
+      <div class="prow"><button id="saveCampaign">SAVE CAMPAIGN</button><span class="pmsg" id="campaignMsg"></span></div>
+    </div>
   </div>
 
   <div class="card">
-    <h2>Live Log</h2>
+    <h2>Live Log <span class="logfilter"><a id="fConv">Conversation</a> · <a id="fAll">All</a></span></h2>
     <div class="log" id="log"></div>
   </div>
 </div>
@@ -92,6 +124,8 @@ function addLog(ev){
   const div = document.createElement("div");
   div.className = "line";
   if(ev.type === "log"){
+    // "Conversation" filter keeps only Commander utterances and COVAS replies.
+    if(ev.who === "Commander" || ev.who === "COVAS") div.classList.add("conv");
     div.innerHTML = '<span class="ts">'+tstr(ev.ts)+'</span> ' +
       '<span class="who-'+ev.who+'">'+ev.who+':</span> ' +
       escapeHtml(ev.text);
@@ -153,7 +187,77 @@ async function init(){
   $("personality").onclick = () => { const v=!getToggle("personality"); setToggle("personality",v); post({personality:v}); };
   $("cancelBtn").onclick = () => fetch("/api/cancel",{method:"POST"});
 
+  // Voice speed (ElevenLabs native speed, clamped 1.0–1.2 server-side).
+  const spd = st.settings.speed || 1.0;
+  $("speed").value = spd; $("speedVal").textContent = (+spd).toFixed(2)+"×";
+  $("speed").oninput = e => $("speedVal").textContent = (+e.target.value).toFixed(2)+"×";
+  $("speed").onchange = e => post({speed: +e.target.value});
+
+  initPersonality();
+  initLogFilter();
   connectWS();
+}
+
+// ---- Personality tab ----
+let PERSONAS = [];
+async function initPersonality(){
+  try{
+    const p = await (await fetch("/api/personality")).json();
+    PERSONAS = p.personas || [];
+    const sel = $("persona"); sel.innerHTML = "";
+    PERSONAS.forEach(x => sel.appendChild(opt(x.name, x.name + (x.source==="custom"?" (custom)":""))));
+    sel.value = p.selected;
+    $("campaign").value = p.campaign || "";
+    showPersona(p.selected);
+    sel.onchange = async e => {
+      showPersona(e.target.value);
+      await fetch("/api/personality/select",{method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({persona:e.target.value})});
+      flash("personaMsg","Applied.");
+    };
+    $("saveCustom").onclick = saveCustom;
+    $("saveCampaign").onclick = async () => {
+      await fetch("/api/personality/campaign",{method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({campaign:$("campaign").value})});
+      flash("campaignMsg","Saved.");
+    };
+  }catch(err){ addLog({type:"log",who:"system",text:"Personality load failed: "+err.message}); }
+}
+function personaByName(n){ return PERSONAS.find(x=>x.name===n); }
+function showPersona(name){
+  const x = personaByName(name) || {};
+  $("personaPreview").textContent = x.preview || "";
+  $("personaBody").value = x.body || "";
+}
+async function saveCustom(){
+  const base = $("persona").value;
+  const name = (window.prompt("Name for this custom persona:", base + " (custom)") || "").trim();
+  if(!name) return;
+  const r = await fetch("/api/personality/custom",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({name, body:$("personaBody").value})});
+  const data = await r.json();
+  if(!r.ok){ flash("personaMsg", data.error||"Save failed"); return; }
+  PERSONAS = data.personas || PERSONAS;
+  const sel = $("persona"); sel.innerHTML="";
+  PERSONAS.forEach(x => sel.appendChild(opt(x.name, x.name + (x.source==="custom"?" (custom)":""))));
+  sel.value = data.selected; showPersona(data.selected);
+  flash("personaMsg","Saved & applied.");
+}
+function flash(id,msg){ const el=$(id); el.textContent=msg; clearTimeout(el._t); el._t=setTimeout(()=>el.textContent="",2000); }
+
+// ---- Live-log filter (Conversation default, persisted) ----
+function initLogFilter(){
+  const apply = mode => {
+    $("log").classList.toggle("conv-only", mode !== "all");
+    $("fConv").classList.toggle("active", mode !== "all");
+    $("fAll").classList.toggle("active", mode === "all");
+    try{ localStorage.setItem("logFilter", mode); }catch(e){}
+  };
+  $("fConv").onclick = () => apply("conversation");
+  $("fAll").onclick = () => apply("all");
+  let saved = "conversation";
+  try{ saved = localStorage.getItem("logFilter") || "conversation"; }catch(e){}
+  apply(saved);
 }
 function setToggle(id,on){$(id).classList.toggle("on",!!on);}
 function getToggle(id){return $(id).classList.contains("on");}
@@ -175,6 +279,7 @@ function syncSettings(s){
   if($("whisper").value!==s.whisper) $("whisper").value=s.whisper;
   if($("el_model").value!==s.el_model) $("el_model").value=s.el_model;
   if($("el_voice").value!==s.el_voice) $("el_voice").value=s.el_voice;
+  if(s.speed!=null && +$("speed").value!==+s.speed){ $("speed").value=s.speed; $("speedVal").textContent=(+s.speed).toFixed(2)+"×"; }
   setToggle("personality", s.personality);
 }
 init();
