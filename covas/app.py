@@ -16,6 +16,7 @@ from pathlib import Path
 import keyboard
 
 from .config import load_config, load_overrides, save_overrides, deep_merge, mock_enabled
+from . import settings_schema as schema
 from .audio import CuePlayer, Recorder
 from .events import EventBus
 from .checklist import Checklist
@@ -100,6 +101,17 @@ class App:
         self.registry.register(self.help)
         if self.cfg.get("checklist", {}).get("file"):
             self.registry.register(ChecklistCapability(self.checklist))
+
+        # Settings-by-voice (Prompt N2): change any setting spoken aloud, projected from the
+        # SAME schema the web page uses so the two can't drift. Always on, like help — it
+        # reads/writes the live config through update_settings, validating against the schema.
+        from .capabilities.settings_capability import SettingsCapability
+        self.settings_cap = SettingsCapability(
+            get_value=lambda s: schema.get_value(self.cfg, s),
+            apply_patch=self.update_settings,
+            options_for=self._settings_option_pairs,
+            log=lambda m: self._log("settings", m))
+        self.registry.register(self.settings_cap)
 
         # Elite Dangerous monitoring (DESIGN §5). Opt-in ([elite].enabled, off by
         # default). When on, two daemon watchers tail ED's journal + Status.json,
@@ -575,6 +587,30 @@ class App:
         except Exception as e:  # noqa: BLE001
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Whisper reload failed: {e}"})
+
+    def _settings_option_pairs(self, setting) -> list | None:
+        """Resolve a DYNAMIC enum's (value, label) options for the voice settings layer:
+        Claude models from config; ElevenLabs voices/models from the live API (best-effort —
+        None on failure so the capability can say so instead of guessing). Static enums are
+        read straight from the schema and never reach here."""
+        src = getattr(setting, "options_source", None)
+        if src == schema.OPT_MODELS:
+            return [(m, m) for m in self.cfg["anthropic"].get("available_models", [])]
+        if src in (schema.OPT_EL_MODELS, schema.OPT_EL_VOICES):
+            try:
+                from . import elevenlabs as el
+                if src == schema.OPT_EL_MODELS:
+                    return [(m["model_id"], m.get("name") or m["model_id"])
+                            for m in el.list_models(self.cfg)]
+                pairs = []
+                for v in el.list_voices(self.cfg):
+                    cat = v.get("category", "")
+                    label = (v.get("name", "") + (f" [{cat}]" if cat else "")) or v["voice_id"]
+                    pairs.append((v["voice_id"], label))
+                return pairs
+            except Exception:  # noqa: BLE001 — offline/API failure: caller handles None
+                return None
+        return None
 
     def public_settings(self) -> dict:
         c = self.cfg
