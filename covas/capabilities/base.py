@@ -49,7 +49,11 @@ class Capability(Protocol):
 class Slot:
     """One refinement a capability accepts (a Spansh filter / tool arg), described for help.
 
-      * `param`     — the tool argument / canonical Spansh parameter name.
+      * `param`     — the tool argument, which IS the canonical Spansh parameter name for the
+                      refinement (Search Prompt 2/3): query builders map slot -> `param`
+                      directly, so the field the LLM fills, the field help advertises, and the
+                      field Spansh receives are one string and cannot drift. Read it back via
+                      `CapabilityRegistry.spansh_params_for` / `slot_for_param`.
       * `phrasings` — how a Commander might say it aloud (used as recovery vocabulary too).
       * `example`   — a real utterance that sets this slot.
       * `help_text` — one spoken sentence explaining the refinement.
@@ -81,23 +85,41 @@ _REQUIRED_META_FIELDS = ("category", "one_liner", "example")
 _REQUIRED_SLOT_FIELDS = ("param", "example", "help_text")
 
 
-def validate_help_meta(meta: HelpMeta) -> HelpMeta:
-    """Reject help metadata missing any required field, so the registry never carries a
-    half-described capability (the contract the later prompts harden). Raises ValueError
-    with a specific message; returns the meta unchanged when complete."""
+def help_meta_problems(meta: object) -> list[str]:
+    """Every reason `meta` is not COMPLETE help metadata, as human-readable strings (an empty
+    list means complete). This is the *single* structural definition of the contract every
+    registered category must satisfy — "one_liner, example, and a phrasing + help_text for
+    every slot it introduces." Everything else that enforces the policy is built on this one
+    function so it can't drift:
+
+      * `validate_help_meta` raises on the first problem (wiring-time guard);
+      * `CapabilityRegistry.contract_violations` collects problems across capabilities so a
+        test can assert the REAL registry is clean — the guard every future category inherits.
+    """
     if not isinstance(meta, HelpMeta):
-        raise ValueError(f"help metadata must be a HelpMeta, got {type(meta).__name__}")
+        return [f"help metadata must be a HelpMeta, got {type(meta).__name__}"]
+    problems: list[str] = []
+    label = (str(meta.category or "").strip() or "?")
     for f in _REQUIRED_META_FIELDS:
         if not str(getattr(meta, f, "") or "").strip():
-            raise ValueError(f"help metadata for '{meta.category or '?'}' is missing '{f}'")
+            problems.append(f"help metadata for '{label}' is missing '{f}'")
     for i, slot in enumerate(meta.slots):
         for f in _REQUIRED_SLOT_FIELDS:
             if not str(getattr(slot, f, "") or "").strip():
-                raise ValueError(
-                    f"help metadata for '{meta.category}' slot #{i} is missing '{f}'")
+                problems.append(f"help metadata for '{label}' slot #{i} is missing '{f}'")
         if not tuple(slot.phrasings):
-            raise ValueError(
-                f"help metadata for '{meta.category}' slot '{slot.param}' has no phrasings")
+            problems.append(
+                f"help metadata for '{label}' slot '{slot.param}' has no phrasings")
+    return problems
+
+
+def validate_help_meta(meta: HelpMeta) -> HelpMeta:
+    """Reject help metadata missing any required field, so the registry never carries a
+    half-described capability (the contract the later prompts harden). Raises ValueError
+    with the first specific problem; returns the meta unchanged when complete."""
+    problems = help_meta_problems(meta)
+    if problems:
+        raise ValueError(problems[0])
     return meta
 
 
@@ -147,6 +169,24 @@ class CapabilityRegistry:
                 return cap.run_tool(name, inp)
         return f"Unknown tool: {name}"
 
+    # -- contract enforcement (Search Prompt 2) ---------------------------------
+    def contract_violations(self) -> list[str]:
+        """Every registered capability's help-metadata contract problems, flattened (an empty
+        list means every registered category is completely described).
+
+        `register()` already refuses a capability whose help metadata is incomplete, so on a
+        registry the app actually built this is normally empty. It exists so a test can assert
+        the REAL registry satisfies the policy *structurally* — the guard every future category
+        inherits: add a category with a slot missing its help_text and this stops returning []
+        (and `register` stops accepting it), rather than the omission surviving in prose a
+        future author skims."""
+        out: list[str] = []
+        for cap in self._caps:
+            meta = _capability_help(cap)
+            if meta is not None:
+                out.extend(help_meta_problems(meta))
+        return out
+
     # -- help projection (Search Prompt 1) --------------------------------------
     def help_entries(self, *, exclude: Optional["Capability"] = None) -> list[HelpMeta]:
         """Every registered capability's HelpMeta, ranked most-used first (ties keep
@@ -177,6 +217,45 @@ class CapabilityRegistry:
         for m in self.help_entries(exclude=exclude):
             if m.category.strip().lower() == want:
                 return m
+        return None
+
+    # -- pure read helpers help consumes (Search Prompt 2) ----------------------
+    # Read-only projections over registered metadata. Every value returned came from a
+    # registered capability, so a consumer built on these can never speak a category, slot,
+    # example, or Spansh field the registry doesn't actually carry.
+    def examples(self, *, exclude: Optional["Capability"] = None) -> list[tuple[str, str]]:
+        """`(category, example)` for every category carrying help metadata, ranked by use.
+        The canonical example utterances help offers — each is a registered string, never
+        generated."""
+        return [(m.category, m.example) for m in self.help_entries(exclude=exclude)]
+
+    def slots_for(self, category: str,
+                  *, exclude: Optional["Capability"] = None) -> tuple[Slot, ...]:
+        """The refinements (`Slot`s) a category accepts, in declared order — the data behind a
+        "what can I add to this search?" answer. Empty tuple for an unknown category or one
+        with no slots. Never invents a slot."""
+        meta = self.help_entry_for(category, exclude=exclude)
+        return tuple(meta.slots) if meta is not None else ()
+
+    def spansh_params_for(self, category: str,
+                          *, exclude: Optional["Capability"] = None) -> list[str]:
+        """The canonical Spansh parameter names a category's slots map to, in declared order
+        (`slot.param` IS that name — see `Slot`). This is the registry->Spansh field mapping in
+        one place, so a query builder (Search Prompt 3) reads the fields straight from here and
+        can't drift from what help advertises. Empty for an unknown category."""
+        return [slot.param for slot in self.slots_for(category, exclude=exclude)]
+
+    def slot_for_param(self, category: str, param: str,
+                       *, exclude: Optional["Capability"] = None) -> Optional[Slot]:
+        """The `Slot` in `category` whose canonical Spansh param is `param` (case-insensitive),
+        or None — lets a query builder resolve a Spansh field back to its spoken phrasings and
+        help text."""
+        want = str(param or "").strip().lower()
+        if not want:
+            return None
+        for slot in self.slots_for(category, exclude=exclude):
+            if slot.param.strip().lower() == want:
+                return slot
         return None
 
     def vocabulary(self) -> dict[str, list[str]]:
