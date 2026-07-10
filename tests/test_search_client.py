@@ -71,15 +71,24 @@ def test_enum_param_accepts_a_list_value():
     assert q["filters"]["government"] == {"value": ["Anarchy", "Democracy"]}
 
 
-def test_range_param_renders_min_max_as_strings():
+def test_range_with_both_bounds_renders_inclusive_comparison():
+    # Spansh numeric filters use {"value", "comparison"} — NOT {min,max} (silently ignored).
     q = build_query(category("star_systems"),
                     {"population": {"min": 1_000_000, "max": 1_000_000_000}}, "Sol")
-    assert q["filters"]["population"] == {"min": "1000000", "max": "1000000000"}
+    assert q["filters"]["population"] == {"value": [1_000_000, 1_000_000_000],
+                                          "comparison": "<=>"}
 
 
-def test_range_param_accepts_a_pair():
-    q = build_query(category("stations"), {"distance_to_arrival": (0, 1000)}, "Sol")
-    assert q["filters"]["distance_to_arrival"] == {"min": "0", "max": "1000"}
+def test_range_one_sided_renders_a_comparison():
+    lo = build_query(category("star_systems"), {"population": {"min": 1_000_000_000}}, "Sol")
+    assert lo["filters"]["population"] == {"value": 1_000_000_000, "comparison": ">="}
+    hi = build_query(category("stations"), {"distance_to_arrival": {"max": 1000}}, "Sol")
+    assert hi["filters"]["distance_to_arrival"] == {"value": 1000, "comparison": "<="}
+
+
+def test_services_renders_as_list_of_name_objects():
+    q = build_query(category("stations"), {"services": ["Shipyard", "Outfitting"]}, "Sol")
+    assert q["filters"]["services"] == [{"name": "Shipyard"}, {"name": "Outfitting"}]
 
 
 def test_bool_param_renders_as_value_bool():

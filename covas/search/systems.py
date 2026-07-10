@@ -13,13 +13,13 @@ took the Federation power), and Arissa Lavigny-Duval appears as "A. Lavigny-Duva
 read straight off Spansh result fields, not assumed.
 
 `resolve_enum` does the loose spoken -> canonical mapping (exact-after-normalization, then a
-short alias table for the way a Commander/Whisper actually says it, then fuzzy). Pure and
-offline — the LLM does the fuzzy *understanding*; this VALIDATES it against the real vocab.
+short alias table for the way a Commander/Whisper actually says it, then fuzzy) via the shared
+`vocab` matcher. Pure and offline — the LLM does the fuzzy *understanding*; this VALIDATES it
+against the real vocab.
 """
 from __future__ import annotations
 
-import difflib
-import re
+from . import vocab
 
 # --- canonical value sets (Spansh param name -> its accepted values) -----------------------
 # Enum slots. Keyed by the exact Spansh filter param (== the registry slot.param), so the
@@ -83,49 +83,17 @@ _ALIASES: dict[str, dict[str, str]] = {
 }
 
 
-_NON_ALNUM = re.compile(r"[^a-z0-9]+")
-
-
-def _norm(text: str) -> str:
-    """Fold a spoken/typed value to a comparison key: lowercase, drop punctuation/spaces."""
-    return _NON_ALNUM.sub("", str(text).lower())
-
-
-def _lookup_for(param: str) -> dict[str, str]:
-    """Normalized key -> canonical value, from the canonical names plus the alias table."""
-    lut: dict[str, str] = {}
-    for value in VOCAB.get(param, ()):    # names win over aliases (added first)
-        lut[_norm(value)] = value
-    for spoken, value in _ALIASES.get(param, {}).items():
-        lut.setdefault(_norm(spoken), value)
-    return lut
-
-
 def resolve_enum(param: str, spoken) -> str | None:
     """Map a loose spoken value to the canonical Spansh value for `param`, or None if it isn't
-    one. Exact-after-normalization (incl. aliases) first, then fuzzy for Whisper mishears."""
-    if spoken is None or param not in VOCAB:
+    one (strict — for building a query)."""
+    if param not in VOCAB:
         return None
-    lut = _lookup_for(param)
-    key = _norm(spoken)
-    if not key:
-        return None
-    if key in lut:
-        return lut[key]
-    match = difflib.get_close_matches(key, list(lut), n=1, cutoff=0.72)
-    return lut[match[0]] if match else None
+    return vocab.resolve(VOCAB[param], spoken, aliases=_ALIASES.get(param))
 
 
 def nearest_enum(param: str, spoken) -> str | None:
-    """The closest canonical value to an UNRESOLVED spoken term (looser cutoff) — for a spoken
-    'did you mean…' correction. Always returns a real value from `VOCAB` or None."""
+    """The closest canonical value to an UNRESOLVED spoken term (lenient) — for a spoken 'did
+    you mean…' correction. Always a real value from `VOCAB` or None."""
     if param not in VOCAB:
         return None
-    key = _norm(spoken)
-    if not key:
-        return None
-    lut = _lookup_for(param)
-    if key in lut:
-        return lut[key]
-    match = difflib.get_close_matches(key, list(lut), n=1, cutoff=0.5)
-    return lut[match[0]] if match else None
+    return vocab.nearest(VOCAB[param], spoken, aliases=_ALIASES.get(param))

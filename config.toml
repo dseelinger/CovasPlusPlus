@@ -342,6 +342,27 @@ user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
 search_size = 50
 
 
+[search]
+# The remaining LLM-native voice search categories, enabled as a group (they share this
+# section). Same stateless, conversational shape as [star_systems], over the shared Spansh
+# client, each copying the primary system to the clipboard:
+#   * stations       — nearest station by service, type, landing pad, distance, or faction
+#                      ("nearest station with a shipyard and a large pad"). Says "no carriers"
+#                      to exclude fleet carriers; "close to the star" means within ~1000 Ls.
+#   * minor factions — nearest system where a faction is present or in control, or by
+#                      allegiance / government / state ("where the Dark Wheel is present").
+#   * signals        — nearest structure by type: megaship, settlement, outpost, starport.
+#   * faction states — nearest system by controlling-faction state: wars, civil wars, boom,
+#                      election, infrastructure failure (and the missions those generate).
+# Spoken values are validated against bundled canonical vocabularies (from the live Spansh
+# API) before any query. Needs [elite].enabled for the live current-system.
+enabled = true
+# Sent as the HTTP User-Agent — be a polite API citizen and identify the app.
+user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
+# How many nearest matches to fetch per search; the closest is the answer.
+search_size = 50
+
+
 [conversation]
 # Rolling in-session history so follow-ups work. Older turns are trimmed
 # once the running message count exceeds this many (user+assistant) turns.

@@ -127,6 +127,8 @@ class App:
             self._start_nav()
         if self.cfg.get("star_systems", {}).get("enabled"):
             self._start_system_search()
+        if self.cfg.get("search", {}).get("enabled"):
+            self._start_searches()
 
     # ---- Elite Dangerous monitoring (DESIGN §5) ---------------------------
     def _start_ed_monitoring(self) -> None:
@@ -393,6 +395,44 @@ class App:
             self.system_search = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Star-system search failed to start: {e}"})
+
+    # ---- Remaining Spansh search categories (stations/factions/signals/misc) --
+    def _start_searches(self) -> None:
+        """Build + register the four remaining LLM-native Spansh search capabilities. Fail
+        soft: a startup problem just leaves them off. One [search] toggle enables the group;
+        each shares the injected HTTP client + current-system seam."""
+        try:
+            from .search import RequestsHttp
+            from .search.faction_index import FactionIndex
+            from .capabilities._search_support import SearchConfig
+            from .capabilities.station_search_capability import StationSearchCapability
+            from .capabilities.minor_faction_search_capability import MinorFactionSearchCapability
+            from .capabilities.signal_search_capability import SignalSearchCapability
+            from .capabilities.misc_search_capability import MiscSearchCapability
+
+            scfg = SearchConfig.from_cfg(self.cfg, "search")
+            http = RequestsHttp()
+            # One faction-name index shared by the faction-using capabilities (lazily fetched
+            # from Spansh on first use, then cached) so a mistranscribed faction name resolves
+            # to its exact string instead of returning zero systems.
+            factions = FactionIndex()
+            common = dict(http=http, get_current_system=self._current_system,
+                          log=lambda msg: self._log("search", msg))
+            self.searches = [
+                StationSearchCapability(scfg, factions=factions, **common),
+                MinorFactionSearchCapability(scfg, factions=factions, **common),
+                SignalSearchCapability(scfg, **common),
+                MiscSearchCapability(scfg, factions=factions, **common),
+            ]
+            for cap in self.searches:
+                self.registry.register(cap)
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": "Search categories ON (stations, minor factions, "
+                                      "signals, faction states)."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.searches = []
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Search categories failed to start: {e}"})
 
     def _current_system(self) -> str | None:
         """The Commander's current star system: live ED context first, else the newest

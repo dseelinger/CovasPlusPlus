@@ -30,7 +30,12 @@ from .spansh import (BODIES_URL, STATIONS_URL, SYSTEMS_URL, distance_sort, is_fl
 
 # Spansh filter "kinds" — how a slot value is rendered into the request. Each maps a plain
 # Python value (what a capability fills a slot with) to the structured shape Spansh accepts.
-_KINDS = frozenset({"enum", "range", "bool", "pad"})
+#   enum     -> {"value": [strings]}
+#   bool     -> {"value": true|false}
+#   range    -> {"value": N | [lo, hi], "comparison": op}   (Spansh's numeric shape; see below)
+#   services -> [{"name": s}, ...]                           (station services list)
+#   pad      -> the has_<size>_pad boolean, from a pad size (S/M/L)
+_KINDS = frozenset({"enum", "range", "bool", "pad", "services"})
 
 
 class UnknownParamError(ValueError):
@@ -108,8 +113,11 @@ def _render(param: ParamSpec, value) -> dict:
     if param.kind == "bool":
         return {param.name: {"value": bool(value)}}
     if param.kind == "range":
-        lo, hi = _range_bounds(value)
-        return {param.name: {"min": str(lo), "max": str(hi)}}
+        frag = _numeric_filter(*_range_bounds(value))
+        return {param.name: frag} if frag else {}
+    if param.kind == "services":
+        vals = value if isinstance(value, (list, tuple)) else [value]
+        return {param.name: [{"name": str(v)} for v in vals]}
     if param.kind == "pad":
         key = pad_filter_key(value)
         return {key: {"value": True}} if key else {}
@@ -117,12 +125,35 @@ def _render(param: ParamSpec, value) -> dict:
 
 
 def _range_bounds(value):
-    """Accept a range as {"min","max"} or a (min, max)/[min, max] pair — else raise."""
+    """Accept a range as {"min","max"}, a (min, max)/[min, max] pair, or a bare scalar (a
+    lower bound). Either bound may be None (a one-sided range)."""
     if isinstance(value, dict):
         return value.get("min"), value.get("max")
     if isinstance(value, (list, tuple)) and len(value) == 2:
         return value[0], value[1]
-    raise ValueError(f"range value must be a 'min/max' dict or a (min, max) pair, got {value!r}")
+    if isinstance(value, (int, float)):
+        return value, None
+    raise ValueError(f"range value must be a 'min/max' dict, a (min, max) pair, or a number, "
+                     f"got {value!r}")
+
+
+def _numeric_filter(lo, hi) -> dict:
+    """Spansh's numeric-filter shape — `{"value": N, "comparison": op}`, NOT `{min,max}`
+    (that form is silently ignored). Both bounds -> an inclusive range ('<=>'); one bound -> a
+    one-sided comparison; neither -> empty (the slot renders to nothing)."""
+    if lo is not None and hi is not None:
+        return {"value": [_num(lo), _num(hi)], "comparison": "<=>"}
+    if lo is not None:
+        return {"value": _num(lo), "comparison": ">="}
+    if hi is not None:
+        return {"value": _num(hi), "comparison": "<="}
+    return {}
+
+
+def _num(x):
+    """A JSON number for Spansh: an int when integral (populations, light-seconds), else float."""
+    f = float(x)
+    return int(f) if f.is_integer() else f
 
 
 def build_filters(spec: CategorySpec, slots: dict) -> dict:
@@ -219,12 +250,14 @@ def parse_systems(results: list[dict]) -> list[SystemRecord]:
     return out
 
 
-def parse_stations(results: list[dict]) -> list[StationRecord]:
-    """Map raw Spansh station results to `StationRecord`s, dropping transient fleet carriers
-    (they jump, so they're a poor 'nearest station' answer)."""
+def parse_stations(results: list[dict], *, include_carriers: bool = False) -> list[StationRecord]:
+    """Map raw Spansh station results to `StationRecord`s. Fleet carriers are dropped by
+    default (they jump, so they're a poor 'nearest station' answer); a caller that genuinely
+    wants them — the stations category includes them unless the Commander says 'no carriers' —
+    passes `include_carriers=True`."""
     out: list[StationRecord] = []
     for r in results:
-        if is_fleet_carrier(r):
+        if not include_carriers and is_fleet_carrier(r):
             continue
         extra = {k: r.get(k) for k in ("distance_to_arrival", "is_planetary") if r.get(k) is not None}
         out.append(StationRecord(
@@ -258,19 +291,18 @@ _SYSTEM_SUBJECT = ("the systems database", "system lookup")
 
 
 def _stations_spec() -> CategorySpec:
-    """Nearest station by services / type / pad / faction (NOT module — that's outfitting)."""
+    """Nearest station by services / type / pad / distance / faction (NOT module — that's
+    outfitting). Params verified accepted against the live API; note `services` is a
+    list-of-objects filter and `distance_to_arrival` a numeric comparison, not min/max."""
     return CategorySpec(
         key="stations", endpoint=STATIONS_URL, result_kind="station",
         subject=_STATION_SUBJECT[0], lookup_name=_STATION_SUBJECT[1],
         params=(
             ParamSpec("type", "enum"),                       # Coriolis Starport, Outpost, …
-            ParamSpec("services", "enum"),                   # Outfitting, Shipyard, …
-            ParamSpec("economy", "enum"),
-            ParamSpec("allegiance", "enum"),
-            ParamSpec("government", "enum"),
-            ParamSpec("controlling_minor_faction", "enum"),
+            ParamSpec("services", "services"),               # [{"name": "Shipyard"}, …]
+            ParamSpec("controlling_minor_faction", "enum"),  # free-text faction name
             ParamSpec("has_large_pad", "pad"),               # rendered from a pad size (S/M/L)
-            ParamSpec("distance_to_arrival", "range"),
+            ParamSpec("distance_to_arrival", "range"),       # light-seconds from the star
         ),
     )
 
@@ -318,23 +350,24 @@ def _minor_factions_spec() -> CategorySpec:
         key="minor_factions", endpoint=SYSTEMS_URL, result_kind="system",
         subject=_SYSTEM_SUBJECT[0], lookup_name=_SYSTEM_SUBJECT[1],
         params=(
-            ParamSpec("controlling_minor_faction", "enum"),  # "controls"
-            ParamSpec("minor_faction_presences", "enum"),    # "is present"
+            ParamSpec("controlling_minor_faction", "enum"),   # "controls" (free-text name)
+            ParamSpec("minor_faction_presences", "enum"),     # "is present" (free-text name)
             ParamSpec("allegiance", "enum"),
             ParamSpec("government", "enum"),
-            ParamSpec("state", "enum"),
+            ParamSpec("controlling_minor_faction_state", "enum"),  # War, Boom, Election, …
         ),
     )
 
 
 def _signals_spec() -> CategorySpec:
-    """Nearest signal source (beacon / installation / …) — mapped to the station `type`
-    filter, the Spansh key that carries these signal-source structures."""
+    """Nearest dockable STRUCTURE by type (megaship / settlement / …) — the station `type`
+    filter. Keyed 'signals' for continuity with the category set; there is no separate
+    signal-source data in Spansh, so this is structure-by-type."""
     return CategorySpec(
         key="signals", endpoint=STATIONS_URL, result_kind="station",
         subject=_STATION_SUBJECT[0], lookup_name=_STATION_SUBJECT[1],
         params=(
-            ParamSpec("type", "enum"),                       # Nav Beacon, Installation, …
+            ParamSpec("type", "enum"),                       # Mega ship, Settlement, Outpost, …
             ParamSpec("has_large_pad", "pad"),
         ),
     )
@@ -347,7 +380,7 @@ def _misc_spec() -> CategorySpec:
         key="misc", endpoint=SYSTEMS_URL, result_kind="system",
         subject=_SYSTEM_SUBJECT[0], lookup_name=_SYSTEM_SUBJECT[1],
         params=(
-            ParamSpec("state", "enum"),
+            ParamSpec("controlling_minor_faction_state", "enum"),  # War, Civil War, Boom, …
             ParamSpec("controlling_minor_faction", "enum"),
             ParamSpec("minor_faction_presences", "enum"),
             ParamSpec("power_state", "enum"),
