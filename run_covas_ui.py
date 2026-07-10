@@ -1,4 +1,5 @@
 """Entry point: COVAS++ voice loop + local web control panel (Phase 3)."""
+import os
 import threading
 import webbrowser
 
@@ -13,6 +14,17 @@ def main() -> None:
     except ValueError as e:
         print(f"Bad key name in config [keys]: {e}")
         return
+
+    # Ctrl+Alt+Q (registered in core.start()) sets the quit event, but here the Flask dev
+    # server blocks the main thread and never watches it. Bridge the two: a daemon waits on
+    # the quit signal, cleans up the watchers/log, and force-exits — werkzeug's dev server
+    # has no clean cross-thread shutdown, so os._exit is the pragmatic stop for a desktop app.
+    def _await_quit() -> None:
+        core.wait_for_quit()
+        print("\nCOVAS++ shutting down. o7")
+        core.shutdown()
+        os._exit(0)
+    threading.Thread(target=_await_quit, name="quit-watch", daemon=True).start()
 
     flask_app = create_app(core)
     host = core.cfg["ui"]["host"]
