@@ -48,9 +48,10 @@ _DESC = (
     "'Close to the star' means within about a thousand light-seconds.\n"
     "2. If a service or station type is unclear, ask or relay the tool's suggested "
     "correction — don't invent one.\n"
-    "3. Refine by re-calling with the accumulated slots; a fresh search is just new slots. "
-    "Report the station, its system, pad, and distance, and ALWAYS say the system name was "
-    "copied to the clipboard."
+    "3. Refine by re-calling with the accumulated slots (each call RE-QUERIES — a new "
+    "constraint can change which station is nearest); a fresh search is just new slots. On "
+    "'cancel' / 'never mind', drop it and do NOT call this tool. Report the station, its "
+    "system, pad, and distance, and ALWAYS say the system name was copied to the clipboard."
 )
 
 _SCHEMA_PROPS = {
@@ -145,13 +146,15 @@ class StationSearchCapability:
 
     def _handle(self, inp: dict) -> str:
         slots: dict[str, object] = {}
+        caught: list[str] = []          # values understood so far, echoed on a later bad slot
 
         stype = inp.get("station_type")
         if stype not in (None, ""):
             val = resolve_type(stype)
             if val is None:
-                return self._bad("station type", nearest_type(stype), stype)
+                return sup.recovery(stype, "station type", nearest_type(stype), caught=caught)
             slots["type"] = val
+            caught.append(val)
 
         raw_services = inp.get("services")
         if raw_services:
@@ -160,17 +163,19 @@ class StationSearchCapability:
             for s in wanted:
                 v = resolve_service(s)
                 if v is None:
-                    return self._bad("service", nearest_service(s), s)
+                    return sup.recovery(s, "service", nearest_service(s), caught=caught)
                 resolved.append(v)
             if resolved:
                 slots["services"] = resolved
+                caught.extend(resolved)
 
         faction = inp.get("faction")
         if faction and str(faction).strip():
-            canon, recovery = sup.faction_or_recovery(self._factions, faction)
-            if recovery:
-                return recovery
+            canon, recover_msg = sup.faction_or_recovery(self._factions, faction)
+            if recover_msg:
+                return recover_msg
             slots["controlling_minor_faction"] = canon
+            caught.append(canon)
 
         pad = inp.get("pad_size")
         if pad not in (None, ""):
@@ -187,7 +192,8 @@ class StationSearchCapability:
 
         if not slots:
             return ("Tell me what the station needs — a service like a shipyard, a station "
-                    "type, a landing-pad size, or how close to the star.")
+                    "type, a landing-pad size, or how close to the star. (Say 'never mind' to "
+                    "drop it.)")
 
         return self._search(slots, inp)
 
@@ -224,12 +230,6 @@ class StationSearchCapability:
         if isinstance(arrival, (int, float)) and arrival >= 1:
             line += f" About {arrival:,.0f} light-seconds from the star."
         return line + sup.clipboard_note(rec.system, copied)
-
-    def _bad(self, kind: str, sugg, raw) -> str:
-        self._logline(f"unresolved {kind} '{raw}' -> {sugg or 'no match'}")
-        if sugg:
-            return f"I didn't recognize '{raw}' as {sup.a_an(kind)} — did you mean {sugg}?"
-        return f"I didn't recognize '{raw}' as {sup.a_an(kind)}. Try naming it another way."
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:

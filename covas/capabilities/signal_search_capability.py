@@ -29,8 +29,9 @@ _DESC = (
     "starport, planetary port, or asteroid base — from the Commander's current system, and "
     "copy its SYSTEM name to the clipboard. Stateless and LLM-native: fill the type the "
     "Commander named. If they ask for a type that isn't one of these, offer the closest type "
-    "you CAN find rather than inventing a result. Report the structure, its system, and "
-    "distance, and ALWAYS say the system name was copied to the clipboard."
+    "you CAN find rather than inventing a result. On 'cancel' / 'never mind', drop it and do "
+    "NOT call this tool. Report the structure, its system, and distance, and ALWAYS say the "
+    "system name was copied to the clipboard."
 )
 
 _SCHEMA_PROPS = {

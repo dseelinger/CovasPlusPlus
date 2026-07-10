@@ -37,8 +37,9 @@ _DESC = (
     "spoken (free text); don't invent one.\n"
     "2. Allegiance, government, and state are validated — if one isn't recognized, relay the "
     "tool's suggested correction. Fill only what was said; unspoken means Any.\n"
-    "3. Refine by re-calling with the accumulated slots. Report the system and why it matched, "
-    "and ALWAYS say the system name was copied to the clipboard."
+    "3. Refine by re-calling with the accumulated slots (each call RE-QUERIES). If the "
+    "Commander says 'cancel' / 'never mind', drop it and do NOT call this tool. Report the "
+    "system and why it matched, and ALWAYS say the system name was copied to the clipboard."
 )
 
 _SCHEMA_PROPS = {
@@ -132,39 +133,41 @@ class MinorFactionSearchCapability:
 
     def _handle(self, inp: dict) -> str:
         slots: dict[str, object] = {}
+        caught: list[str] = []          # values understood so far, echoed on a later bad slot
 
         faction = inp.get("faction")
         if faction and str(faction).strip():
             # Resolve the spoken name to Spansh's exact string (mishears -> 0 systems otherwise);
             # an unresolved name offers real corrections rather than searching on nothing.
-            canon, recovery = sup.faction_or_recovery(self._factions, faction)
-            if recovery:
+            canon, recover_msg = sup.faction_or_recovery(self._factions, faction)
+            if recover_msg:
                 self._logline(f"unresolved faction '{faction}'")
-                return recovery
+                return recover_msg
             # Polarity is a slot value, not a mode: controls -> controlling_minor_faction,
             # else the default 'is present' -> minor_faction_presences.
-            param = ("controlling_minor_faction" if bool(inp.get("controls"))
-                     else "minor_faction_presences")
-            slots[param] = canon
+            controls = bool(inp.get("controls"))
+            slots["controlling_minor_faction" if controls else "minor_faction_presences"] = canon
+            caught.append(f"{canon} ({'controls' if controls else 'present'})")
 
         for arg in ("allegiance", "government"):
             raw = inp.get(arg)
             if raw not in (None, ""):
                 val = resolve_enum(arg, raw)
                 if val is None:
-                    return self._bad(arg, nearest_enum(arg, raw), raw)
+                    return sup.recovery(raw, arg, nearest_enum(arg, raw), caught=caught)
                 slots[arg] = val
+                caught.append(f"{val} {arg}")
 
         state = inp.get("state")
         if state not in (None, ""):
             val = resolve_state(state)
             if val is None:
-                return self._bad("faction state", nearest_state(state), state)
+                return sup.recovery(state, "faction state", nearest_state(state), caught=caught)
             slots["controlling_minor_faction_state"] = val
 
         if not slots:
             return ("Name the minor faction, or give me an allegiance, government, or state to "
-                    "look for.")
+                    "look for. (Say 'never mind' to drop it.)")
 
         return self._search(slots, inp)
 
@@ -207,12 +210,6 @@ class MinorFactionSearchCapability:
             if rec.controlling_minor_faction:
                 line += f" Controlled by {rec.controlling_minor_faction}."
         return line + sup.clipboard_note(rec.name, copied)
-
-    def _bad(self, kind: str, sugg, raw) -> str:
-        self._logline(f"unresolved {kind} '{raw}' -> {sugg or 'no match'}")
-        if sugg:
-            return f"I didn't recognize '{raw}' as {sup.a_an(kind)} — did you mean {sugg}?"
-        return f"I didn't recognize '{raw}' as {sup.a_an(kind)}. Try naming it another way."
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:
