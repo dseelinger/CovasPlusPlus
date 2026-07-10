@@ -1,6 +1,6 @@
 # COVAS++ — Design & Roadmap
 
-*Working design doc. Treat the current app as a light MVP; this describes where it goes next and the principles for getting there without repainting the whole thing each time.*
+*Working design doc, kept in sync as features land. §1–§6 plus §3.5 describe the architecture as built; §7 tracks build status and the backlog; §9 is the testing strategy. The app is well past its MVP — the core voice loop, provider seam, cloud-tiering router, ED monitoring, proactive callouts, the keybind prototype, and outfitting voice search are all built and merged to `main`.*
 
 Priorities agreed: **modular refactor**, **cut API costs** (quick cloud wins *and* cloud model tiering), and **Elite Dangerous log monitoring**. Keybind automation is a later phase, sketched here so the architecture leaves room for it.
 
@@ -85,7 +85,17 @@ A `Capability` is a small class exposing:
 5. Turn on cloud tiering in the Router (Haiku default → Sonnet/Opus escalation); optionally make Piper the default TTS (§4).
 6. Add the ED journal watcher as an input + `EDContextCapability` (§5).
 
-Each step is independently shippable and testable.
+Each step is independently shippable and testable. *(All six steps are complete — the seam, factory, `[llm]`/`[tts]`/`[stt]` config, `CapabilityRegistry`, the tiering Router, and the checklist capability are on `main`.)*
+
+### 3.5 Voice search & help (LLM-native) — design decision
+
+The outfitting search (§5) generalizes into a six-category Spansh voice-search surface — stations, outfitting, minor factions, star systems, signals, misc (**bodies out of scope**, seam only) — plus a first-class help subsystem. Three decisions shape it:
+
+- **LLM-native, not an explicit state machine.** Each category is a *stateless* tool whose description steers the model through conversational slot-filling and disambiguation; conversation history *is* the state, and multi-turn refinement is just the model re-calling with accumulated constraints. We deliberately did **not** build a separate intent-classifier or query-state machine — natural language beats a rigid script for a voice-only UI, and it's already how the working outfitting capability behaves. The one stations-vs-outfitting routing rule lives in the tool descriptions (if a module/ship is named, use outfitting), not a classifier.
+- **Help is a templated projection of the registry — no LLM in help *generation*.** The existing `CapabilityRegistry` is *extended* with help metadata (one_liner, example, per-slot phrasings + help_text) — ONE registry, not a parallel one, so the drift that kills help systems is prevented structurally (a registry test fails if a capability ships without complete help metadata). Help composes registered strings; it never generates prose. Modes that matter: `idle` ("what can I ask") and — the important one — *failure recovery* ("I didn't recognize 'power distributer' — did you mean Power Distributor?"). An unresolved utterance is a help request in disguise.
+- **Anti-hallucination is structural.** Any capability/slot/module/system name in spoken output must resolve against the registry or a canonical source (Spansh, the journal) before it's spoken; on failure, fall back to a templated error. Never invent a filter or capability. This is why the module taxonomy is bundled and validated offline, and why the LLM is used to *understand* messy speech, not to assert facts.
+
+The prompts are in `CLAUDE_CODE_PROMPTS.md` (Search Prompts 1–6). The shared Spansh client is extracted from the existing `nav/closest.py`; `nav/modules.py` is reused as the outfitting resolver.
 
 ---
 
@@ -242,14 +252,32 @@ Next actions stay gated behind a go/no-go after on-hardware validation of this o
 
 ---
 
-## 7. Suggested phase order
+## 7. Build status & roadmap
 
-1. **Bank cost wins** *(done)* — overrides fix, caching, Sonnet default, `max_tokens` cap + optional knobs from §1.
-2. **Provider seams + registry** (§3.4 steps 1–4). No behavior change; unlocks everything else. Safe checkpoint.
-3. **Cloud tiering router** (§4). Haiku default → Sonnet/Opus escalation, rules-based with wake-phrase overrides, usage logging. This is where recurring cost really drops. (Optionally flip TTS to Piper here.)
-4. **ED log monitoring** (§5). High value on its own, improves replies immediately, and is a prerequisite for non-blind automation.
-5. **Proactive callouts** (§5) once monitoring + TTS are stable.
-6. **Keybind automation** (§6), one action at a time.
+### Built and merged (on `main`)
+The original seven-phase plan is done and tested:
+
+1. **Cost instrumentation & guardrails** — overrides fix, prompt caching (+1h TTL), Sonnet default, `max_tokens` cap, per-turn usage/cost logging, dev-mock, the unit/integration test harness (§9).
+2. **Provider seam + capability registry** — `providers/` (Anthropic/ElevenLabs/Whisper behind Protocols; Ollama offline-only), `CapabilityRegistry`, checklist relocated to a capability.
+3. **Cloud tiering router** (§4).
+4. **ED monitoring** — journal + Status watchers, `EDContext`, read-tool + inline context delivery (§5).
+5. **Proactive callouts** — `ProactiveCapability` (§5).
+6. **Keybind automation** — one-action prototype behind the safety layer (§6).
+7. **Outfitting voice search** — `find-closest-module` (§5, §3.5).
+
+### Backlog (specced as Claude Code prompts, not yet built)
+Each is a prompt in `CLAUDE_CODE_PROMPTS.md`, LLM-native + offline-tested per §3.5 / §9:
+
+- **Voice search & help subsystem** (Search Prompts 1–6): help registry + templated help; registry-contract test; generalized Spansh client (extracted from `nav/closest.py`); star systems as the LLM-native reference; the remaining categories (stations, minor factions, signals, misc); voice polish + refinement + error-mode help.
+- **N1 — Settings schema + web page.** One settings schema as source of truth; a clean web settings page writing `overrides.json`.
+- **N2 — Voice-settable settings.** The same schema projected to a voice capability.
+- **N3 — Location & carriers.** Copy current system; personal carrier (journal); squadron carrier (journal name + configured callsign + galaxy-DB location); "already there → don't copy" fix.
+- **N4 — Route callouts.** Scoopable star (K G B F O A M) on approach + jumps-remaining every Nth, from `NavRoute.json` + `FSDTarget`, via the proactive path.
+- **N5 — Auto-honk.** Fire the Discovery Scanner on arrival: read the current fire group from Status, cycle to the configured scanner group, hold fire; combat-gated, opt-in.
+- **N6 — Community Goals.** List current CGs (external feed merged with the journal, surfacing ones you haven't visited), CG system (copy), and your standing (journal-only: Top 10 / top 100-75-50-25%).
+
+### Sequencing
+N2 needs N1 (shared schema); the Search Prompts run in order (help first, client before categories, the reference category before replicating); N4/N5 lean on the ED monitoring + keybind executor already merged. One branch per prompt, one fresh Claude Code session each. **The prompt pack carries the live worklist; this doc carries the architecture.**
 
 ---
 
