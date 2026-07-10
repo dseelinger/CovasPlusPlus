@@ -125,6 +125,8 @@ class App:
             self._start_keybinds()
         if self.cfg.get("nav", {}).get("enabled"):
             self._start_nav()
+        if self.cfg.get("star_systems", {}).get("enabled"):
+            self._start_system_search()
 
     # ---- Elite Dangerous monitoring (DESIGN §5) ---------------------------
     def _start_ed_monitoring(self) -> None:
@@ -369,6 +371,28 @@ class App:
             self.nav = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Find-closest-module failed to start: {e}"})
+
+    # ---- Star-system search -----------------------------------------------
+    def _start_system_search(self) -> None:
+        """Build + register the star-system search capability. Fail soft: a startup problem
+        just leaves the feature off. The Spansh HTTP client is built here (composition root)
+        so tests never need it; current-system is read live from ED context with a journal
+        fallback (same seam as find-closest)."""
+        try:
+            from .search import RequestsHttp
+            from .capabilities.system_search_capability import (SystemSearchCapability,
+                                                                SystemSearchConfig)
+            scfg = SystemSearchConfig.from_cfg(self.cfg)
+            self.system_search = SystemSearchCapability(
+                scfg, http=RequestsHttp(),
+                get_current_system=self._current_system,
+                log=lambda msg: self._log("systems", msg))
+            self.registry.register(self.system_search)
+            self.bus.publish({"type": "log", "who": "system", "text": "Star-system search ON."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.system_search = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Star-system search failed to start: {e}"})
 
     def _current_system(self) -> str | None:
         """The Commander's current star system: live ED context first, else the newest
