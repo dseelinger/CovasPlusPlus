@@ -109,8 +109,10 @@ def test_spoken_values_normalized_before_query():
 def test_population_min_becomes_a_range():
     cap, http, _ = _cap()
     cap.run_tool("search_star_systems", {"min_population": 1_000_000_000})
+    # Spansh numeric filters are {"value", "comparison"}; a floor+ceil pair -> an inclusive range.
     f = _filters(http)["population"]
-    assert f["min"] == "1000000000" and int(f["max"]) >= 1_000_000_000
+    assert f["comparison"] == "<=>"
+    assert f["value"][0] == 1_000_000_000 and f["value"][1] >= 1_000_000_000
 
 
 def test_boolean_colonization_slot():

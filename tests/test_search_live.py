@@ -20,11 +20,11 @@ pytestmark = [pytest.mark.integration, pytest.mark.local]
 
 # category -> a valid, minimal slot set to exercise its query builder live.
 _LIVE_SLOTS = {
-    "stations": {"has_large_pad": "L"},
-    "star_systems": {"allegiance": "Federation"},
+    "stations": {"has_large_pad": "L", "services": ["Shipyard"], "distance_to_arrival": {"max": 1000}},
+    "star_systems": {"allegiance": "Federation", "population": {"min": 1_000_000_000}},
     "minor_factions": {"minor_faction_presences": "Mother Gaia"},
     "signals": {"type": "Coriolis Starport"},
-    "misc": {"state": "War"},
+    "misc": {"controlling_minor_faction_state": "War"},
 }
 _RECORD = {"station": StationRecord, "system": SystemRecord}
 
@@ -49,6 +49,29 @@ def test_live_outfitting_still_round_trips():
     r = resolve("Multi-Cannon", "medium", "fixed")
     result = find_closest_module(r, "Sol", NavHttp(), pad_size="L")
     assert result.system and result.station and result.pad in ("S", "M", "L")
+
+
+def test_live_faction_index_resolves_a_mistranscription():
+    """The reported-bug canary: a real faction name Whisper mangled ('Formadine' for
+    'Formidine') must resolve to Spansh's exact string via the live faction index."""
+    from covas.search.faction_index import FactionIndex
+    idx = FactionIndex()
+    assert idx.loaded                                    # fetched the canonical list
+    assert idx.resolve("Formadine Greybeard Guild") == "Formidine Greybeard Guild"
+
+
+def test_live_minor_faction_capability_finds_a_mistranscribed_faction():
+    """End-to-end: the exact failure from the bug report now returns a real system."""
+    from covas.capabilities._search_support import SearchConfig
+    from covas.capabilities.minor_faction_search_capability import MinorFactionSearchCapability
+    from covas.search.faction_index import FactionIndex
+    copied: list[str] = []
+    cap = MinorFactionSearchCapability(
+        SearchConfig(enabled=True), http=RequestsHttp(),
+        get_current_system=lambda: "Sol", clipboard=copied.append, factions=FactionIndex())
+    out = cap.run_tool("search_minor_factions", {"faction": "Formadine Greybeard Guild"})
+    assert copied and copied[0] in out                   # found a system + copied it
+    assert "couldn't find" not in out.lower()
 
 
 def test_live_star_system_capability_round_trips():
