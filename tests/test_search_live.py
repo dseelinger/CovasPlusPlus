@@ -49,3 +49,18 @@ def test_live_outfitting_still_round_trips():
     r = resolve("Multi-Cannon", "medium", "fixed")
     result = find_closest_module(r, "Sol", NavHttp(), pad_size="L")
     assert result.system and result.station and result.pad in ("S", "M", "L")
+
+
+def test_live_star_system_capability_round_trips():
+    """The star-systems capability end-to-end against real Spansh: a spoken slot -> canonical
+    value -> live query -> parsed result -> clipboard. The canary if Spansh's systems response
+    or vocabulary shifts."""
+    from covas.capabilities.system_search_capability import (SystemSearchCapability,
+                                                             SystemSearchConfig)
+    copied: list[str] = []
+    cap = SystemSearchCapability(
+        SystemSearchConfig(enabled=True), http=RequestsHttp(),
+        get_current_system=lambda: "Sol", clipboard=copied.append)
+    out = cap.run_tool("search_star_systems", {"allegiance": "imperial", "security": "High"})
+    assert copied and copied[0] in out          # nearest system name spoken + copied
+    assert "clipboard" in out.lower()

@@ -327,6 +327,21 @@ search_size = 50
 require_confirmation = false
 
 
+[star_systems]
+# Star-system voice search (voice: "find the nearest Empire system with high security").
+# LLM-native, stateless conversational slot-filling over the shared Spansh client: filter by
+# allegiance, government, economy, security, population, Powerplay, or colonization state,
+# nearest first from your current system, and copy the system name to the clipboard. Spoken
+# values are validated against a bundled canonical vocabulary (from the live Spansh API)
+# before any query, so a misheard filter is corrected, not silently widened. Needs
+# [elite].enabled for the live current-system (else it falls back to the newest journal).
+enabled = true
+# Sent as the HTTP User-Agent — be a polite API citizen and identify the app.
+user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
+# How many nearest matching systems to fetch per search; the closest is the answer.
+search_size = 50
+
+
 [conversation]
 # Rolling in-session history so follow-ups work. Older turns are trimmed
 # once the running message count exceeds this many (user+assistant) turns.

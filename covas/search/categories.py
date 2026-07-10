@@ -305,6 +305,8 @@ def _star_systems_spec() -> CategorySpec:
             ParamSpec("power", "enum"),
             ParamSpec("power_state", "enum"),
             ParamSpec("needs_permit", "bool"),
+            ParamSpec("is_colonised", "bool"),        # colonization: already colonised
+            ParamSpec("is_being_colonised", "bool"),  # colonization: open / in progress
         ),
     )
 
