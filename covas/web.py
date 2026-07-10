@@ -13,6 +13,7 @@ from flask import Flask, jsonify, render_template, request
 from flask_sock import Sock
 
 from . import elevenlabs as el
+from . import personality as persona
 from . import settings_schema as schema
 
 THINKING_TIERS = schema.THINKING_TIERS
@@ -29,6 +30,7 @@ _LEGACY_MAP = {
     "el_voice": "elevenlabs.voice_id",
     "el_voice_name": "elevenlabs.voice_name",
     "whisper": "whisper.model",
+    "speed": "elevenlabs.speed",
 }
 
 _EL_SOURCES = (schema.OPT_EL_MODELS, schema.OPT_EL_VOICES)
@@ -162,6 +164,44 @@ def create_app(core) -> Flask:
         return jsonify({"ok": True, "groups": schema.public_schema(
             core.cfg, core.overrides,
             {schema.OPT_MODELS: core.cfg["anthropic"]["available_models"]})})
+
+    # ---- Personality tab (N7) -------------------------------------------------
+    @flask_app.route("/api/personality")
+    def personality_state():
+        return jsonify({
+            "personas": persona.list_personas(core.cfg),
+            "selected": core.cfg.get("personality", {}).get("persona", "Classic"),
+            "campaign": persona.read_campaign(core.cfg),
+            "enabled": bool(core.cfg.get("personality", {}).get("enabled")),
+        })
+
+    @flask_app.route("/api/personality/select", methods=["POST"])
+    def personality_select():
+        b = request.get_json(force=True) or {}
+        name = str(b.get("persona") or "").strip()
+        known = {p["name"].strip().lower() for p in persona.list_personas(core.cfg)}
+        if not name or name.lower() not in known:
+            return jsonify({"ok": False, "error": f"unknown persona {name!r}"}), 400
+        core.update_settings({"personality": {"persona": name}})
+        return jsonify({"ok": True, "selected": name})
+
+    @flask_app.route("/api/personality/campaign", methods=["POST"])
+    def personality_campaign():
+        b = request.get_json(force=True) or {}
+        persona.save_campaign(core.cfg, str(b.get("campaign") or ""))
+        return jsonify({"ok": True})
+
+    @flask_app.route("/api/personality/custom", methods=["POST"])
+    def personality_custom():
+        b = request.get_json(force=True) or {}
+        name = str(b.get("name") or "").strip()
+        body = str(b.get("body") or "").strip()
+        if not name or not body:
+            return jsonify({"ok": False, "error": "name and body are required"}), 400
+        saved = persona.save_custom_persona(core.cfg, name, body)
+        core.update_settings({"personality": {"persona": saved}})   # select it immediately
+        return jsonify({"ok": True, "selected": saved,
+                        "personas": persona.list_personas(core.cfg)})
 
     @flask_app.route("/api/cancel", methods=["POST"])
     def cancel():

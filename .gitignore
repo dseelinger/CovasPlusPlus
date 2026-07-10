@@ -13,6 +13,10 @@ ElevenLabsAPIKey.txt
 # --- Personal / per-user data ---
 # private character + campaign (use personality.example.txt instead)
 personality.txt
+# campaign = the Commander's personal facts (N7), kept separate from the shareable persona
+campaign.txt
+# custom personas saved from the Personality tab (may contain personal flavor)
+personalities/custom/
 # local UI / runtime settings
 overrides.json
 # per-session conversation transcripts (personal)

@@ -16,12 +16,10 @@ if TYPE_CHECKING:  # only for type hints — keep the offline stack importable w
 
 
 def build_system(cfg: dict) -> str | None:
-    """personality.txt as system prompt when personality is ON; else None (neutral)."""
-    if cfg["personality"]["enabled"]:
-        p = Path(cfg["personality"]["file"])
-        if p.exists():
-            return p.read_text(encoding="utf-8")
-    return None
+    """The composed system prompt when personality is ON; else None (neutral). Composition
+    (Base + selected Persona + Campaign) lives in `personality.compose_system` (N7)."""
+    from .personality import compose_system
+    return compose_system(cfg)
 
 
 def _cache_control(cfg: dict) -> dict:

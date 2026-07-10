@@ -53,7 +53,8 @@ def test_missing_sections_do_not_crash():
 
 def test_all_path_fields_resolved():
     cfg = {
-        "personality": {"file": "personality.txt"},
+        "personality": {"file": "personality.txt", "presets_file": "personalities/presets.md",
+                        "campaign_file": "campaign.txt", "custom_dir": "personalities/custom"},
         "elevenlabs": {"api_key_file": "ElevenLabsAPIKey.txt"},
         "checklist": {"file": "ultimate_checklist.md"},
         "logging": {"dir": "logs"},
