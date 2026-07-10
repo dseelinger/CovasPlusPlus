@@ -741,13 +741,15 @@ Tasks:
      visit; if the CG isn't in your journal, say so ("I don't have your standing — visit the
      board").
 3. External CG feed — the completeness source, so CGs you HAVEN'T visited surface (the point
-   of this feature). Pull-based (on request), no polling. Default to EDSM's community-goals API
-   (no key required); Inara's getCommunityGoalsRecent (needs the generic API key) is the richer
-   alternative — verify the current endpoints at build time. It's the PRIMARY source for the
-   list + systems; the journal supplements it with your engagement and is the ONLY source of
-   your own standing. Fail soft: if the feed is unreachable, fall back to journal-known CGs and
-   say you can't see ones you haven't visited right now. Config [cg]: source (edsm|inara),
-   optional key. Validate every CG/system name before speaking.
+   of this feature). Pull-based (on request), no polling. BUILD-TIME FINDING: EDSM has no
+   public community-goals API anymore (every candidate endpoint 404s), so the supported feed
+   is Inara's getCommunityGoalsRecent (POST inara.cz/inapi/v1/), which needs a free generic
+   Inara API key. It's the source for the complete list + systems; the journal supplements it
+   with your engagement and is the ONLY source of your own standing. Fail soft: no key ->
+   journal-only with a note to add one; feed unreachable -> journal-only, say you can't see
+   unvisited ones right now. Config [cg]: source (inara|none) + inara_api_key. The key is a
+   restart-level setting and NOT exposed in the settings panel (it's a credential). Validate
+   every CG/system name before speaking.
 4. Register help metadata.
 
 Tests: unit (offline) — parse a CommunityGoal journal fixture; percentile/top-rank -> phrasing

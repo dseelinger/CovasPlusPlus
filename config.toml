@@ -392,6 +392,20 @@ search_size = 50
 # points you at the in-game Carrier Management tab — nothing to configure.
 
 
+[cg]
+# Community-Goal voice queries (N6). Journal-primary: "what's my standing in <CG>" and the CGs
+# you've VISITED come from your journal — no config, works offline. To also surface CGs you
+# HAVEN'T visited (the complete active list), configure an external feed.
+#
+# EDSM has no public community-goals API (verified at build time — every endpoint 404s), so the
+# supported feed is Inara's getCommunityGoalsRecent, which needs a free generic Inara API key
+# (inara.cz -> Settings -> 3rd party APIs -> generate an app key). Without a key it stays
+# journal-only. Changing the key takes effect on restart. The key can also live in
+# overrides.json (git-ignored); it's low-risk (read-only public CG data) but don't commit it.
+source = "inara"       # "inara" (external feed) or "none" (journal-only)
+inara_api_key = ""     # blank = journal-only
+
+
 [conversation]
 # Rolling in-session history so follow-ups work. Older turns are trimmed
 # once the running message count exceeds this many (user+assistant) turns.

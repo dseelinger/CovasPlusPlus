@@ -123,6 +123,8 @@ class App:
         # journal), so this must be set BEFORE _start_ed_monitoring, not in the later
         # capability block — otherwise it would clobber the assignment back to None.
         self.carriers = None
+        # Community Goals (N6) — also registered by ED monitoring (journal-primary).
+        self.cg = None
         if self.cfg.get("elite", {}).get("enabled"):
             self._start_ed_monitoring()
 
@@ -185,6 +187,7 @@ class App:
             self.ed_ctx = EDContext(recent_maxlen=int(el.get("recent_events_kept", 25)))
             self.registry.register(EDContextCapability(self.ed_ctx))
             self._start_carriers(jdir)
+            self._start_cg(jdir)
 
             def _err(e: Exception) -> None:  # watcher-thread errors -> log, don't crash
                 self.bus.publish({"type": "log", "who": "system",
@@ -247,6 +250,41 @@ class App:
             self.carriers = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Location & carrier commands failed to start: {e}"})
+
+    # ---- Community Goals (N6) ---------------------------------------------
+    def _start_cg(self, jdir) -> None:
+        """Register the Community-Goals capability. Journal-primary (works offline); an
+        external Inara feed is added only when a key is configured. Fail soft — never blocks
+        startup. The Inara key is a restart-level setting, so config is snapshotted here."""
+        try:
+            from .capabilities.cg_capability import CGCapability
+            from .cg import CGConfig, cg_from_journals, fetch_inara_goals
+            from .nav import copy as _nav_copy
+            from .search import RequestsHttp
+
+            ccfg = CGConfig.from_cfg(self.cfg)
+            fetch_external = None
+            if ccfg.external_enabled:
+                http = RequestsHttp()
+
+                def fetch_external():   # stamp the Inara envelope timestamp per call
+                    return fetch_inara_goals(http, api_key=ccfg.inara_api_key,
+                                             timestamp=_dt.datetime.now().isoformat())
+
+            self.cg = CGCapability(
+                get_journal_goals=lambda: cg_from_journals(jdir),
+                get_current_system=self._current_system,
+                clipboard=_nav_copy,
+                fetch_external=fetch_external,
+                log=lambda m: self._log("cg", m))
+            self.registry.register(self.cg)
+            src = "feed: Inara" if ccfg.external_enabled else "journal-only (no Inara key)"
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Community Goals ON ({src})."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.cg = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Community Goals failed to start: {e}"})
 
     # ---- Proactive callouts (DESIGN §5) -----------------------------------
     def _start_proactive(self) -> None:
