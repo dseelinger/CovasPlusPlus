@@ -327,6 +327,237 @@ the right system on the clipboard. Report Spansh quirks. Stop for review.
 
 ---
 
+## Voice Search & Help Subsystem — LLM-native (Search Prompts 1–6)
+
+Extends the working outfitting feature (`find_closest_capability.py`) to five more Spansh
+search categories, plus a first-class, templated help subsystem.
+
+**Direction: LLM-native.** Copy the outfitting pattern — a stateless tool whose description
+steers the model through conversational slot-filling and disambiguation; conversation
+history IS the state. Do NOT build an explicit intent-classifier or query-state machine.
+
+**Kept from the design brief (architecture-independent):** help is first-class and
+TEMPLATED — no LLM in help *generation* (the category dialogs are LLM-native, help output
+is not); validate every user-facing capability/slot/module/system name against the registry
+or Spansh before speaking; the registry structurally prevents drift; failure-recovery IS
+help; never speak >3 options; answer with an example utterance, not a schema.
+
+**Backend: Spansh** (its field names are canonical). **Bodies/planets: OUT OF SCOPE** —
+leave a seam, don't implement.
+
+**Reuse map:** `nav/modules.py` (module resolution — done, reuse); `nav/closest.py` (Spansh
+plumbing to generalize); `capabilities/base.py` (registry to extend with help metadata);
+`find_closest_capability.py` (the LLM-native pattern to replicate); `nav/clipboard.py`,
+`nav/location.py`, and the ED context (current-system default). Depends on the capability
+registry and ED monitoring, both already merged.
+
+**Boilerplate — paste this block at the top of Search Prompts 2–6 when you run them:**
+
+> **Help requirement.** This feature must register with the capability registry, providing:
+> a one-line description, at least one example utterance, spoken phrasings for every slot it
+> introduces, and help text for each refinement it supports. The registry test must pass.
+> Help output for this feature is templated from registry data — do not generate help prose
+> with an LLM.
+>
+> **Hallucination constraints.** Any capability, slot, module, or system name in user-facing
+> output must resolve against the registry or a canonical data source. Validate before
+> speaking; on validation failure, fall back to the templated error response rather than
+> emitting unvalidated text. Never invent a filter, parameter, or capability that does not
+> exist in the registry.
+
+---
+
+### Search Prompt 1 — Help registry + templated help (idle + error)
+
+```
+Read CLAUDE.md, DESIGN_AND_ROADMAP.md (§3), covas/capabilities/base.py, and
+find_closest_capability.py. Build help FIRST — every later capability registers with it.
+
+Branch: feature/help-subsystem
+
+Direction: help is a first-class, TEMPLATED projection of the registry — NO LLM in the help
+generation path. (Category search dialogs are LLM-native; help OUTPUT is not.)
+
+Tasks:
+1. Extend the existing Capability protocol / CapabilityRegistry (base.py) with help metadata:
+   one_liner, example (a real utterance), slots [{param, phrasings[], example, help_text}],
+   help_when_active. Additive — existing capabilities keep working.
+2. A HelpCapability, templated string assembly only:
+   - idle: categories + one example each. Rank by usage; speak at most 3, then "there are
+     others — ask about X, Y, Z."
+   - error / failure-recovery (the important mode): on an unresolved term, say the specific
+     failure + nearest valid phrasing ("I didn't recognize 'power distributer' as a module —
+     did you mean Power Distributor?"). Never recite the capability list.
+   - Answer with an EXAMPLE utterance, not a schema. Three phrasing variants per template,
+     rotated DETERMINISTICALLY (random makes tests flaky).
+3. Help registers ITSELF as a capability so "what can you do" always has one honest answer.
+   Invocation is an intent, not a command word: explicit ("help", "what can you do"), meta
+   ("how do I…", "can you…"), implicit (anything that fails to resolve — echo what WAS caught
+   + what's missing, never "I didn't understand").
+4. Retrofit the outfitting (find-closest) capability with its help metadata, so the registry
+   is exercised by a real capability from day one.
+
+Tests (unit, offline): registry rejects entries missing required help fields; idle with 0
+caps -> empty-state that reads correctly now AND once capabilities exist; idle with 5 -> 3 +
+tail; a template referencing an unregistered name hits the fallback WITHOUT raising and
+WITHOUT emitting the unresolved name; rotation deterministic across a fixed call sequence;
+error mode produces the specific recovery line, validated against the registry.
+
+Acceptance: bare pytest green and offline. Stop for review.
+```
+
+### Search Prompt 2 — Registry contract enforcement
+
+```
+[Prepend the Boilerplate block above.]
+Read CLAUDE.md. Make the "every capability carries complete help metadata" policy enforce
+itself structurally, not in prose a future author skims.
+
+Branch: feature/registry-contract
+
+Tasks:
+1. Finalize the help-metadata contract on Capability; a registry test that FAILS when any
+   registered capability is missing complete metadata (one_liner, example, and a phrasing +
+   help_text for every slot it introduces). This test guards every future category.
+2. Pure read helpers help consumes: enumerate categories, a category's slots (for "what can
+   I add"), examples.
+3. Spansh field mapping: slot.param is the canonical Spansh parameter name.
+
+Tests: contract test flags an incomplete capability and passes a complete one; helpers return
+correct data over a fixture registry.
+
+Acceptance: bare pytest green; this test gates the later prompts. Stop.
+```
+
+### Search Prompt 3 — Generalize the Spansh client
+
+```
+[Prepend the Boilerplate block above.]
+Read CLAUDE.md, DESIGN §9, and covas/nav/closest.py — its plumbing is the base.
+
+Branch: feature/spansh-client
+
+Goal: extract a shared, typed Spansh client the six in-scope categories use; refactor
+outfitting onto it. Bodies: leave a seam, do NOT implement.
+
+Tasks:
+1. covas/search/spansh.py — lift the reusable transport from closest.py: the injected Http
+   Protocol + RequestsHttp, POST/parse, error handling (400 / unreachable -> spoken NavError),
+   distance-sort assumption, fleet-carrier exclusion, pad logic. Category-agnostic.
+2. Per-category query builders/parsers: stations, outfitting, minor factions, star systems,
+   signals, misc. Reuse closest.py's existing build_payload/parse as the OUTFITTING one.
+   BEFORE coding each, fetch current Spansh docs + one real sample response and parse what
+   you actually see.
+3. Derive each category's slot schema from Spansh's ACTUALLY accepted params where possible
+   so the registry can't drift; fail LOUD on unknown params.
+4. Refactor find_closest_capability + nav/closest.py onto the shared client — outfitting
+   behavior and its existing tests unchanged.
+5. Bodies: a clearly-marked unimplemented seam.
+
+Tests: unit (offline) parse + query-build per category from RECORDED fixtures; unknown param
+raises; outfitting's existing tests still pass; @pytest.mark.integration+local, one live query
+per category.
+
+Acceptance: bare pytest green and offline; outfitting unaffected. Stop.
+```
+
+### Search Prompt 4 — First new category, LLM-native (the reference)
+
+```
+[Prepend the Boilerplate block above.]
+Read CLAUDE.md and covas/capabilities/find_closest_capability.py — copy its SHAPE (stateless
+tool + conversation history as state; the model drives disambiguation; no classifier, no
+state machine).
+
+Branch: feature/search-star-systems
+
+Goal: build the STAR SYSTEMS category as the LLM-native reference the others will follow.
+
+Tasks:
+1. covas/capabilities/system_search_capability.py — a stateless tool "search_star_systems"
+   whose DESCRIPTION guides the LLM to fill slots conversationally (allegiance, government,
+   economy, population, security, powerplay, colonization), ask when unclear, and confirm
+   loosely. Every slot defaults to Any unless spoken. Near-system defaults to the Commander's
+   current system (ED context; journal fallback via location.py).
+2. Slot values validated against the registry/Spansh vocab before the query; query via the
+   shared client; results validated before speaking; copy the primary SYSTEM name to the
+   clipboard (nav/clipboard.py). Register full help metadata.
+3. Refinement is natural multi-turn: re-call with accumulated slots; "new search" is just a
+   fresh call. Do NOT build a state machine.
+
+Tests: unit (offline) with fake http + fake clipboard + stubbed current system: slot-filling
+across turns; Any-defaults; a result copies the system; an invalid slot value is caught (not
+spoken as-is).
+
+Acceptance: bare pytest green and offline; manual voice test. Stop — this is the pattern;
+I'll confirm before you replicate it.
+```
+
+### Search Prompt 5 — Remaining categories in the reference shape
+
+```
+[Prepend the Boilerplate block above.]
+Read CLAUDE.md, the star-systems capability (the reference), and find_closest (outfitting).
+
+Branch: feature/search-remaining-categories
+
+Goal: build the rest as LLM-native capabilities in the SAME shape: stations, minor factions,
+signals, misc (nearest wars/civil wars, restore/mining/massacre missions, multistate factions).
+
+Tasks:
+1. One capability per category — a stateless conversational tool + registered help:
+   - stations: landing pad, services, station type, distance, faction. Routing rule: if the
+     utterance names a MODULE or SHIP, use the OUTFITTING tool instead (outfitting returns
+     stations anyway) — state this in BOTH tools' descriptions so the model routes correctly
+     (no separate classifier).
+   - minor factions: allegiance, government, faction state, player faction; "is present"
+     default; tri/quad-state controls are just slot values, spoken polarity flips them.
+   - signals: signal type (beacon, etc.).
+   - misc: the mission/war finders above.
+2. Hardcoded defaults across categories: surface stations = yes (incl. Odyssey settlements);
+   carriers included but "no carriers" is a one-word toggle; "close to the star" -> max
+   station distance 1000 Ls.
+3. Validate-before-speak everywhere; each copies the primary system to the clipboard; each
+   registers help.
+
+Tests: unit (offline) per category — slot-filling, defaults, polarity flip, result copies
+system, invalid value caught. Stations-vs-outfitting routing exercised.
+
+Acceptance: bare pytest green and offline; manual voice tests per category. Stop.
+```
+
+### Search Prompt 6 — Voice polish, refinement, error-help wiring
+
+```
+[Prepend the Boilerplate block above.]
+Read CLAUDE.md. Final wiring — much is already in place from outfitting.
+
+Branch: feature/search-voice-polish
+
+Goal: make the whole surface feel right by voice, and make failure-recovery help fire.
+
+Tasks:
+1. Natural-language refinement across categories: confirm the tools accept a GROWING set of
+   constraints turn to turn (add/"with", replace/"actually", remove/"never mind the",
+   reset/"new search" are just the model re-calling with updated args). A refinement must
+   RE-QUERY — never filter a cached result set (a new constraint can change which result is
+   nearest). Speak the prior result while the new query is in flight if there's latency.
+2. Wire HelpCapability's error mode: any unresolved term (module, system, slot value) routes
+   to failure-recovery help ("I didn't recognize X — did you mean Y?"), not a dead end.
+   Implicit help on low confidence: echo what WAS caught, ask for what's missing.
+3. Low-confidence confirmation reusing the outfitting pattern (state best guess, offer
+   alternatives, accept/narrow/cancel; verbal cancel drops it — no query runs).
+
+Tests: unit (offline) — a refinement RE-QUERIES not cache-filters (assert fake-http call
+count); error-mode help produces the validated recovery line and never emits an unresolved
+name; cancel mid-dialog runs no query and no clipboard write. Manual: end-to-end voice across
+categories.
+
+Acceptance: bare pytest green and offline; manual voice checklist. Stop for review.
+```
+
+---
+
 ### Tips for running these
 - Keep `CLAUDE.md` current — Claude Code reads it every session.
 - If a step balloons, ask Claude Code to split it and update this file.
