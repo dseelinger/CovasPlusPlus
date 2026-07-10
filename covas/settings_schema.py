@@ -1,0 +1,479 @@
+"""Single source of truth for every user-facing setting (Prompt N1).
+
+Both the web settings page (`web.py` + `templates/settings.html`) and the voice
+settings layer (Prompt N2) project from THIS schema, so the two can never drift:
+add a setting here once and both surfaces gain it. Each `Setting` declares
+
+  * where it lives in `config.toml` (`path` into the nested config dict),
+  * its `type` + constraints (`options` / `min` / `max`) for validation,
+  * display metadata (`label`, `group`, `help`, `unit`) for the web page, and
+  * `phrasings` + `example` for the spoken layer.
+
+Defaults mirror `config.toml` (a unit test asserts they stay in lock-step, so a
+value changed in one place fails loudly until the other matches). This module is
+PURE — it never reads config or the network; callers pass values in. That keeps
+`pytest` offline and lets the same validator serve web POSTs and voice commands.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Optional
+
+# --- static option vocabularies (shared with the UI) -----------------------
+WHISPER_SIZES = ["tiny", "base", "small", "medium", "large-v3"]
+WHISPER_DEVICES = ["cpu", "cuda"]
+WHISPER_COMPUTE = ["int8", "float16", "float32"]
+THINKING_TIERS = ["Off", "Low", "Medium", "High", "Extra", "Max"]
+CACHE_TTLS = ["5m", "1h"]
+ROUTER_PINS = ["", "haiku", "sonnet", "opus"]
+PAD_SIZES = ["S", "M", "L", "any"]
+EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
+LLM_PROVIDERS = ["anthropic", "ollama"]
+TTS_PROVIDERS = ["elevenlabs", "piper"]
+
+# Sentinels for enum options that can only be resolved at runtime (from config
+# or a live API). The web/voice layer supplies the concrete list; when it can't
+# (offline), validation falls back to a plain type check rather than guessing.
+OPT_MODELS = "@anthropic_models"        # cfg[anthropic][available_models]
+OPT_EL_MODELS = "@elevenlabs_models"    # live ElevenLabs model ids
+OPT_EL_VOICES = "@elevenlabs_voices"    # live ElevenLabs voice ids
+
+
+@dataclass(frozen=True)
+class Setting:
+    """One user-facing setting, declared once for every surface."""
+    key: str                          # unique dotted id ("anthropic.model")
+    path: tuple                       # location in the config dict
+    type: str                         # bool | int | float | enum | string | path
+    label: str                        # short display name
+    group: str                        # UI section
+    help: str                         # one-line inline explanation
+    default: Any                      # mirrors config.toml (drift-tested)
+    options: Optional[list] = None    # static enum options
+    options_source: Optional[str] = None  # dynamic enum options (sentinel above)
+    min: Optional[float] = None       # numeric lower bound (inclusive)
+    max: Optional[float] = None       # numeric upper bound (inclusive)
+    unit: str = ""                    # display suffix (ms, s, tokens)
+    phrasings: tuple = ()             # spoken names for the voice layer
+    example: str = ""                 # example spoken command
+    hidden: bool = False              # tracked + settable, but not shown as a row
+
+
+# The schema. Order here is the order groups first appear in the web page.
+SCHEMA: list[Setting] = [
+    # --- Voice input -------------------------------------------------------
+    Setting("keys.push_to_talk", ("keys", "push_to_talk"), "string",
+            "Push-to-talk key", "Voice input",
+            "Keyboard key you HOLD to speak; a brief tap of it cancels.",
+            default="[", phrasings=("push to talk key", "talk key"),
+            example="set the talk key to right control"),
+    Setting("keys.tap_cancel_ms", ("keys", "tap_cancel_ms"), "int",
+            "Tap-cancel threshold", "Voice input",
+            "A press shorter than this counts as a cancel tap, not speech.",
+            default=400, min=50, max=2000, unit="ms",
+            phrasings=("tap cancel time", "cancel tap threshold"),
+            example="set the tap cancel time to 300 milliseconds"),
+    Setting("keys.cancel", ("keys", "cancel"), "string",
+            "Separate cancel key", "Voice input",
+            "Optional dedicated cancel key. Blank = cancel via a tap of the talk key.",
+            default="", phrasings=("cancel key",),
+            example="set the cancel key to escape"),
+
+    # --- Speech-to-text ----------------------------------------------------
+    Setting("whisper.model", ("whisper", "model"), "enum",
+            "Whisper model", "Speech-to-text",
+            "Local STT model. Bigger = more accurate but slower.",
+            default="small", options=WHISPER_SIZES,
+            phrasings=("whisper model", "transcription model", "speech model"),
+            example="set the whisper model to medium"),
+    Setting("whisper.device", ("whisper", "device"), "enum",
+            "Whisper device", "Speech-to-text",
+            "cpu is safe everywhere; cuda needs an NVIDIA GPU.",
+            default="cpu", options=WHISPER_DEVICES,
+            phrasings=("whisper device",),
+            example="set the whisper device to cpu"),
+    Setting("whisper.compute_type", ("whisper", "compute_type"), "enum",
+            "Whisper compute type", "Speech-to-text",
+            "int8 = fast + low memory on CPU; float16 for cuda.",
+            default="int8", options=WHISPER_COMPUTE,
+            phrasings=("whisper compute type",)),
+    Setting("whisper.language", ("whisper", "language"), "string",
+            "Whisper language", "Speech-to-text",
+            "Force a language code (en), or blank to auto-detect.",
+            default="en", phrasings=("whisper language", "transcription language"),
+            example="set the whisper language to auto"),
+
+    # --- Language model ----------------------------------------------------
+    Setting("anthropic.model", ("anthropic", "model"), "enum",
+            "Claude model", "Language model",
+            "Model used when the cost router is OFF (or as the pinned tier).",
+            default="claude-sonnet-5", options_source=OPT_MODELS,
+            phrasings=("claude model", "language model", "the model"),
+            example="switch to opus"),
+    Setting("anthropic.max_tokens", ("anthropic", "max_tokens"), "int",
+            "Max reply tokens", "Language model",
+            "Hard cap on reply length. Replies are spoken, so short is good.",
+            default=1024, min=128, max=8192, unit="tokens",
+            phrasings=("max tokens", "reply length cap"),
+            example="set max tokens to 2000"),
+    Setting("anthropic.cache_ttl", ("anthropic", "cache_ttl"), "enum",
+            "Prompt cache lifetime", "Language model",
+            "1h survives long gaps between voice turns; 5m is cheaper when chatting steadily.",
+            default="1h", options=CACHE_TTLS,
+            phrasings=("cache lifetime", "prompt cache")),
+    Setting("anthropic.thinking.default", ("anthropic", "thinking", "default"), "enum",
+            "Thinking depth", "Language model",
+            "Extended-thinking tier. Off is the cheap, fast default.",
+            default="Off", options=THINKING_TIERS,
+            phrasings=("thinking", "thinking depth", "reasoning effort"),
+            example="set thinking to high"),
+
+    # --- Cost router -------------------------------------------------------
+    Setting("router.enabled", ("router", "enabled"), "bool",
+            "Cost router", "Cost router",
+            "Route each turn to the cheapest capable model, escalating only when earned.",
+            default=True, phrasings=("cost router", "the router"),
+            example="turn the router on"),
+    Setting("router.pin", ("router", "pin"), "enum",
+            "Force a tier", "Cost router",
+            "Pin every turn to one tier. Blank = let the rules decide.",
+            default="", options=ROUTER_PINS,
+            phrasings=("tier pin", "force a tier", "pin the tier"),
+            example="pin the tier to sonnet"),
+    Setting("router.full_breakdown_max_tokens", ("router", "full_breakdown_max_tokens"), "int",
+            "Full-breakdown tokens", "Cost router",
+            "Raised reply cap for an explicit 'full breakdown' request.",
+            default=2048, min=256, max=8192, unit="tokens",
+            phrasings=("full breakdown tokens",)),
+
+    # --- Web search --------------------------------------------------------
+    Setting("web_search.enabled", ("web_search", "enabled"), "bool",
+            "Web search", "Web search",
+            "Let Claude search the web when it needs current info.",
+            default=True, phrasings=("web search", "internet search"),
+            example="turn web search off"),
+    Setting("web_search.max_uses", ("web_search", "max_uses"), "int",
+            "Max searches per reply", "Web search",
+            "Each search inflates the cost of every later turn too — keep it low.",
+            default=3, min=0, max=10, unit="searches",
+            phrasings=("max searches", "web search limit")),
+
+    # --- Personality -------------------------------------------------------
+    Setting("personality.enabled", ("personality", "enabled"), "bool",
+            "Personality", "Personality",
+            "Load personality.txt as the system prompt (Commander address + campaign context).",
+            default=True, phrasings=("personality", "character"),
+            example="turn personality off"),
+
+    # --- Text-to-speech ----------------------------------------------------
+    Setting("elevenlabs.model", ("elevenlabs", "model"), "enum",
+            "ElevenLabs model", "Text-to-speech",
+            "TTS model. flash is the low-latency default.",
+            default="eleven_flash_v2_5", options_source=OPT_EL_MODELS,
+            phrasings=("voice model", "tts model", "elevenlabs model")),
+    Setting("elevenlabs.voice_id", ("elevenlabs", "voice_id"), "enum",
+            "ElevenLabs voice", "Text-to-speech",
+            "Which voice speaks. Pick from your ElevenLabs library.",
+            default="EXAVITQu4vr4xnSDxMaL", options_source=OPT_EL_VOICES,
+            phrasings=("voice", "the voice", "tts voice"),
+            example="use the George voice"),
+    Setting("elevenlabs.voice_name", ("elevenlabs", "voice_name"), "string",
+            "ElevenLabs voice name", "Text-to-speech",
+            "Display name paired with the selected voice id.",
+            default="Sarah", hidden=True),
+    Setting("elevenlabs.output_format", ("elevenlabs", "output_format"), "enum",
+            "Audio format", "Text-to-speech",
+            "pcm_16000 = low-latency, cancellable. Change only if you know why.",
+            default="pcm_16000", options=EL_FORMATS,
+            phrasings=("audio format", "output format")),
+
+    # --- Conversation ------------------------------------------------------
+    Setting("conversation.max_turns", ("conversation", "max_turns"), "int",
+            "History turns kept", "Conversation",
+            "Rolling in-session history so follow-ups work; older turns are trimmed.",
+            default=20, min=2, max=100, unit="turns",
+            phrasings=("history turns", "conversation memory", "how many turns")),
+
+    # --- Elite Dangerous ---------------------------------------------------
+    Setting("elite.enabled", ("elite", "enabled"), "bool",
+            "ED game-state monitoring", "Elite Dangerous",
+            "Tail ED's journal + Status.json for live context (where am I, ship status).",
+            default=True, phrasings=("game monitoring", "elite monitoring", "game state"),
+            example="turn game monitoring on"),
+    Setting("elite.journal_dir", ("elite", "journal_dir"), "path",
+            "Journal directory", "Elite Dangerous",
+            "Blank = the standard Saved Games location. Set only if yours differs.",
+            default="", phrasings=("journal directory", "journal folder")),
+    Setting("elite.journal_poll_interval", ("elite", "journal_poll_interval"), "float",
+            "Journal poll interval", "Elite Dangerous",
+            "How often to re-scan the journal for new lines.",
+            default=0.5, min=0.1, max=10.0, unit="s",
+            phrasings=("journal poll interval",)),
+    Setting("elite.status_poll_interval", ("elite", "status_poll_interval"), "float",
+            "Status poll interval", "Elite Dangerous",
+            "How often to poll Status.json for flag transitions.",
+            default=1.0, min=0.1, max=10.0, unit="s",
+            phrasings=("status poll interval",)),
+    Setting("elite.recent_events_kept", ("elite", "recent_events_kept"), "int",
+            "Recent events kept", "Elite Dangerous",
+            "How many recent notable events feed 'what just happened'.",
+            default=25, min=1, max=200, unit="events",
+            phrasings=("recent events kept", "event history")),
+
+    # --- Proactive callouts ------------------------------------------------
+    Setting("proactive.enabled", ("proactive", "enabled"), "bool",
+            "Proactive callouts", "Proactive callouts",
+            "Let the companion initiate short lines on notable ED events. Needs ED monitoring.",
+            default=True, phrasings=("proactive callouts", "callouts"),
+            example="turn callouts off"),
+    Setting("proactive.min_interval", ("proactive", "min_interval"), "int",
+            "Min interval between callouts", "Proactive callouts",
+            "No two callouts fire within this many seconds.",
+            default=20, min=0, max=600, unit="s",
+            phrasings=("callout interval", "minimum callout interval")),
+    Setting("proactive.cooldown", ("proactive", "cooldown"), "int",
+            "Same-event cooldown", "Proactive callouts",
+            "The same event type won't re-announce within this many seconds.",
+            default=120, min=0, max=3600, unit="s",
+            phrasings=("callout cooldown",)),
+    Setting("proactive.max_tokens", ("proactive", "max_tokens"), "int",
+            "Callout token cap", "Proactive callouts",
+            "A callout is one sentence — keep it tight and cheap.",
+            default=120, min=32, max=512, unit="tokens",
+            phrasings=("callout length",)),
+
+    # --- Keybinds ----------------------------------------------------------
+    Setting("keybinds.enabled", ("keybinds", "enabled"), "bool",
+            "Keybind automation", "Keybinds",
+            "Let the companion press ONE ship control (landing gear) behind a safety layer.",
+            default=False, phrasings=("keybind automation", "ship controls"),
+            example="turn keybind automation on"),
+    Setting("keybinds.require_confirmation", ("keybinds", "require_confirmation"), "bool",
+            "Require confirmation", "Keybinds",
+            "Arming an action needs a SEPARATE spoken confirm before it fires. Leave ON.",
+            default=True, phrasings=("keybind confirmation",)),
+    Setting("keybinds.combat_guard", ("keybinds", "combat_guard"), "bool",
+            "Combat guard", "Keybinds",
+            "Refuse to touch controls during danger/interdiction (or unknown status). Leave ON.",
+            default=True, phrasings=("combat guard",)),
+    Setting("keybinds.confirm_window", ("keybinds", "confirm_window"), "int",
+            "Confirm window", "Keybinds",
+            "Seconds an armed action stays confirmable before it expires.",
+            default=60, min=5, max=300, unit="s",
+            phrasings=("confirm window",)),
+
+    # --- Navigation & search ----------------------------------------------
+    Setting("nav.enabled", ("nav", "enabled"), "bool",
+            "Find closest module", "Navigation & search",
+            "Voice: 'find the closest station that sells module X'.",
+            default=True, phrasings=("find closest module", "module search")),
+    Setting("nav.default_pad_size", ("nav", "default_pad_size"), "enum",
+            "Default landing pad", "Navigation & search",
+            "Pad size your ship needs; a voice request can override per search.",
+            default="L", options=PAD_SIZES,
+            phrasings=("landing pad size", "pad size"),
+            example="set the pad size to medium"),
+    Setting("nav.search_size", ("nav", "search_size"), "int",
+            "Module search size", "Navigation & search",
+            "How many nearest stations to fetch before filtering to the closest match.",
+            default=50, min=1, max=500, unit="results",
+            phrasings=("module search size",)),
+    Setting("nav.require_confirmation", ("nav", "require_confirmation"), "bool",
+            "Confirm before module search", "Navigation & search",
+            "Gate the (read-only) search behind a separate confirm turn.",
+            default=False, phrasings=("module search confirmation",)),
+    Setting("star_systems.enabled", ("star_systems", "enabled"), "bool",
+            "Star-system search", "Navigation & search",
+            "Voice: 'find the nearest Empire system with high security'.",
+            default=True, phrasings=("system search", "star system search")),
+    Setting("star_systems.search_size", ("star_systems", "search_size"), "int",
+            "System search size", "Navigation & search",
+            "How many nearest matching systems to fetch; the closest is the answer.",
+            default=50, min=1, max=500, unit="results",
+            phrasings=("system search size",)),
+    Setting("search.enabled", ("search", "enabled"), "bool",
+            "Station/faction/signal search", "Navigation & search",
+            "The remaining voice search categories (stations, factions, signals, states).",
+            default=True, phrasings=("station search", "faction search", "signal search")),
+    Setting("search.search_size", ("search", "search_size"), "int",
+            "Category search size", "Navigation & search",
+            "How many nearest matches to fetch; the closest is the answer.",
+            default=50, min=1, max=500, unit="results",
+            phrasings=("category search size",)),
+
+    # --- Providers ---------------------------------------------------------
+    Setting("llm.provider", ("llm", "provider"), "enum",
+            "LLM provider", "Providers",
+            "Which LLM answers. anthropic (cloud) or ollama (local, out-of-game only).",
+            default="anthropic", options=LLM_PROVIDERS,
+            phrasings=("llm provider",)),
+    Setting("tts.provider", ("tts", "provider"), "enum",
+            "TTS provider", "Providers",
+            "Which voice speaks. elevenlabs (cloud) or piper (local, offline, free).",
+            default="elevenlabs", options=TTS_PROVIDERS,
+            phrasings=("tts provider", "voice provider")),
+
+    # --- Control panel -----------------------------------------------------
+    Setting("ui.host", ("ui", "host"), "string",
+            "Control panel host", "Control panel",
+            "Interface the local control panel binds to. Restart to apply.",
+            default="127.0.0.1", phrasings=("control panel host",)),
+    Setting("ui.port", ("ui", "port"), "int",
+            "Control panel port", "Control panel",
+            "Port the local control panel serves on. Restart to apply.",
+            default=8765, min=1, max=65535, phrasings=("control panel port",)),
+
+    # --- Developer ---------------------------------------------------------
+    Setting("dev.mock", ("dev", "mock"), "bool",
+            "Dev mock mode", "Developer",
+            "Swap LLM/TTS/STT for fakes: exercise the loop with zero API calls. Restart to apply.",
+            default=False, phrasings=("dev mock", "mock mode"),
+            example="turn mock mode on"),
+]
+
+# Fast lookup by dotted key. Also guards against a duplicate key slipping in.
+by_key: dict[str, Setting] = {}
+for _s in SCHEMA:
+    if _s.key in by_key:  # pragma: no cover - authoring guard
+        raise ValueError(f"duplicate setting key in schema: {_s.key}")
+    by_key[_s.key] = _s
+
+
+# --- value helpers ---------------------------------------------------------
+def get_value(cfg: dict, setting: Setting) -> Any:
+    """Read a setting's current value out of a config dict (None if absent)."""
+    node: Any = cfg
+    for p in setting.path:
+        if not isinstance(node, dict):
+            return None
+        node = node.get(p)
+    return node
+
+
+def set_value(patch: dict, setting: Setting, value: Any) -> dict:
+    """Write `value` into `patch` at the setting's nested path, creating dicts."""
+    node = patch
+    for p in setting.path[:-1]:
+        node = node.setdefault(p, {})
+    node[setting.path[-1]] = value
+    return patch
+
+
+def is_overridden(overrides: dict, setting: Setting) -> bool:
+    """Whether the setting currently has an entry in overrides.json."""
+    node: Any = overrides
+    for p in setting.path[:-1]:
+        if not isinstance(node, dict) or p not in node:
+            return False
+        node = node[p]
+    return isinstance(node, dict) and setting.path[-1] in node
+
+
+def resolve_options(setting: Setting, dynamic: Optional[dict] = None) -> Optional[list]:
+    """The concrete option list for an enum: static options, or a dynamic list
+    supplied by the caller for an `options_source`. None when a dynamic source
+    is declared but unavailable (offline) — validation then type-checks only."""
+    if setting.options is not None:
+        return list(setting.options)
+    if setting.options_source:
+        if dynamic and setting.options_source in dynamic:
+            return list(dynamic[setting.options_source])
+        return None
+    return None
+
+
+# Values accepted (case-insensitively) as booleans from string/JSON input.
+_TRUE = {"true", "on", "yes", "1"}
+_FALSE = {"false", "off", "no", "0"}
+
+
+def validate_value(setting: Setting, value: Any,
+                   options: Optional[list] = None) -> tuple[Any, Optional[str]]:
+    """Validate + coerce a proposed value against a setting.
+
+    Returns ``(coerced_value, None)`` on success, or ``(None, error_message)``
+    on failure. The message names the setting and (for enums/ranges) the valid
+    inputs, so both the web page and the voice layer can echo *why* it was
+    rejected instead of silently widening or guessing. Pure — no I/O.
+    """
+    t = setting.type
+
+    if t == "bool":
+        if isinstance(value, bool):
+            return value, None
+        if isinstance(value, str):
+            s = value.strip().lower()
+            if s in _TRUE:
+                return True, None
+            if s in _FALSE:
+                return False, None
+        return None, f"{setting.label} must be true or false"
+
+    if t in ("int", "float"):
+        if isinstance(value, bool):  # bool is an int subclass — reject explicitly
+            return None, f"{setting.label} must be a number"
+        try:
+            num = int(value) if t == "int" else float(value)
+        except (TypeError, ValueError):
+            return None, f"{setting.label} must be a{'n integer' if t == 'int' else ' number'}"
+        if setting.min is not None and num < setting.min:
+            return None, f"{setting.label} must be at least {_fmt(setting.min)}"
+        if setting.max is not None and num > setting.max:
+            return None, f"{setting.label} must be at most {_fmt(setting.max)}"
+        return num, None
+
+    if t == "enum":
+        opts = options if options is not None else resolve_options(setting)
+        sval = value if isinstance(value, str) else str(value)
+        if opts is None:
+            # Dynamic options unavailable (e.g. offline ElevenLabs) — accept as a
+            # string rather than reject a value we simply can't check right now.
+            return sval, None
+        if sval not in opts:
+            shown = ", ".join(repr(o) for o in opts)
+            return None, f"{setting.label}: '{sval}' is not one of [{shown}]"
+        return sval, None
+
+    if t in ("string", "path"):
+        if not isinstance(value, str):
+            return None, f"{setting.label} must be text"
+        return value, None
+
+    return None, f"{setting.label}: unknown setting type {t!r}"  # pragma: no cover
+
+
+def _fmt(n: float) -> str:
+    """Trim a whole-number float to an int for tidy messages (400.0 -> 400)."""
+    return str(int(n)) if float(n).is_integer() else str(n)
+
+
+def public_schema(cfg: dict, overrides: dict,
+                  dynamic: Optional[dict] = None) -> list[dict]:
+    """Serialize the (visible) schema into groups for the web page, folding in
+    each setting's current value, resolved options, and overridden flag."""
+    groups: list[dict] = []
+    index: dict[str, dict] = {}
+    for s in SCHEMA:
+        if s.hidden:
+            continue
+        grp = index.get(s.group)
+        if grp is None:
+            grp = {"name": s.group, "settings": []}
+            index[s.group] = grp
+            groups.append(grp)
+        grp["settings"].append({
+            "key": s.key,
+            "type": s.type,
+            "label": s.label,
+            "help": s.help,
+            "options": resolve_options(s, dynamic),
+            "options_source": s.options_source,
+            "min": s.min,
+            "max": s.max,
+            "unit": s.unit,
+            "value": get_value(cfg, s),
+            "default": s.default,
+            "overridden": is_overridden(overrides, s),
+            "example": s.example,
+        })
+    return groups
