@@ -150,6 +150,54 @@ Net: the model answers from real state in one shot (no tool round-trip) on the c
 
 The **recent-events feed** is a small rolling buffer on `EDContext` (bounded, `[elite].recent_events_kept`), fed by both watchers via curated describers — narrative events from the journal (jumps, docks, missions, deaths), fuel/heat alerts from Status flags — with journal-spam (auto-scans, fuel-scoop ticks, bounties) filtered out. Priming warms it from the tail of the current journal so "what did I just do" works right after launch.
 
+### Implemented — find-closest-module (`[nav]`, default off)
+Voice outfitting search: "find the closest station that sells module X." A capability
+(`covas/nav/` + `FindClosestCapability`) that resolves the module **conversationally** over
+multiple turns, then finds the nearest station selling it and copies the SYSTEM name to the
+clipboard. The tool is **stateless** — the dialogue state *is* the message history, so each
+re-call just passes more-complete args (module → +size/mount → +confirmed); there's no
+pending-request object.
+
+- **Two data sources, split on purpose.** Module *taxonomy* (names/sizes/mounts/ratings) is a
+  bundled static table (`modules.py`, baked from real EDCD/Spansh outfitting data), so the whole
+  ask/confirm/cancel disambiguation is **offline, fast, unit-testable — no network**. Only
+  *station location* touches the wire (`closest.py`, Spansh), and only after confirmation.
+- **`resolve(query, size?, mount?)`** is pure and returns one of `Resolved` /
+  `NeedAttrs(missing, options)` / `Ambiguous(candidates)` / `Unknown(suggestions)`. The LLM does
+  the fuzzy *understanding* (mishears like "multiple cannon" → Multi-Cannon); the tool
+  *validates* and guides the next question. It never guesses a missing attribute — but a module
+  sold in exactly one size or mount has that value *determined*, not asked.
+- **Confirmation is configurable (`[nav].require_confirmation`, default OFF).** By default a
+  fully-resolved module searches immediately — this is a read-only lookup, so the extra
+  "confirm" turn is friction (on-hardware testing showed Haiku just self-confirms it anyway).
+  When turned ON, a real **turn-gate** (mirroring the keybind safety layer — `new_turn()`
+  driven by `app.py`) enforces it: a `confirmed=true` call is refused unless it arrives on a
+  Commander turn *after* the resolve, so the model can't arm-and-confirm in one turn. The tool
+  schema + description are generated per mode so the model's instructions match the behavior.
+  Verbal "cancel/never mind" is an LLM-recognized intent (the model just stops calling the
+  tool) — separate from the hard PTT-cancel.
+- **Spansh quirks (verified live 2026-07, cross-checked against EDDiscovery / corenting-ED-API /
+  RatherRude-ED-AI)** — drove the request/parsing design: the station-search POST is
+  *synchronous* (returns `results` directly, no job/poll despite the shareable `/search/<uuid>`
+  URLs and the separate `search/save`+`search/recall` variant; EDDiscovery reads `results`
+  straight off the POST too). The module filter honours only `name`/`class`/`rating` —
+  `ed_symbol`, `weapon_mode`/`mount`, and the top-level `landing_pad` key are **silently ignored**
+  (a bogus value returns everything). So **mount** can't be server-filtered and is post-filtered
+  from each result's full `modules` list (`weapon_mode`). **Pad**, however, *is* filterable via the
+  boolean `has_large_pad`/`has_medium_pad`/`has_small_pad` filters (`{"value": true}` — the form
+  EDDiscovery uses), so the pad constraint is pushed server-side (client check kept as a backstop).
+  **Fleet carriers** ("Drake-Class Carrier") are dropped from results — they sell modules but jump
+  around, so they're a stale "nearest station" answer (both EDDiscovery and RatherRude exclude them;
+  in one live sample 11 of 30 nearby results were carriers). `distance` is ly from `reference_system`;
+  results are pre-sorted ascending, so the first surviving result is the nearest. An unknown
+  `reference_system` → HTTP 400 (generic body).
+- **Current system**: live `EDContext.system`, falling back to the newest journal's last
+  jump/location when monitoring is off. **Clipboard**: `clip.exe` (built-in; no `pyperclip`
+  dep — payload is an ASCII system name). Both, plus the HTTP poster, are **injected** so the
+  default `pytest` stays hermetic; a recorded Spansh fixture drives the parse/nearest tests.
+- **EDSM fallback** (design note) is stubbed via config intent but not yet wired — Spansh is the
+  sole live source for now; a lookup failure fails soft (spoken, never crashes the loop).
+
 ---
 
 ## 6. Keybind automation (future phase — sketch)

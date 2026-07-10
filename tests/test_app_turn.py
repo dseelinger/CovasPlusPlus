@@ -61,6 +61,18 @@ def test_full_turn_transcribes_streams_and_speaks(tmp_path):
     assert app.state == "Idle"
 
 
+def test_quit_signal_wiring(tmp_path):
+    """Ctrl+Alt+Q -> request_quit() sets the event; wait_for_quit() unblocks on it and
+    shutdown() cleans up without raising. The web UI relies on this bridge because Flask
+    blocks the main thread instead of calling run() (see run_covas_ui.py)."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=FakeLLM(), tts=FakeTTS())
+    assert not app._quit.is_set()
+    app.request_quit()
+    assert app._quit.is_set()
+    app.wait_for_quit()          # returns immediately once set (would hang if unwired)
+    app.shutdown()               # no watchers running -> closes the log, no error
+
+
 def test_cancel_before_speaking_skips_tts(tmp_path):
     app = _make_app(tmp_path, stt=FakeSTT(text="hello"),
                     llm=FakeLLM(text="hi"), tts=FakeTTS())

@@ -100,6 +100,10 @@ class App:
         # landing gear) on request, behind a safety layer (confirmation, allowlist, combat
         # guard, hard abort). Opt-in ([keybinds].enabled, off by default).
         self.keybinds = None
+        # Find-closest-module: resolve a module by voice (offline taxonomy), confirm, then
+        # find the nearest station selling it via Spansh + copy the system to the clipboard.
+        # Opt-in ([nav].enabled, off by default).
+        self.nav = None
         self._proactive_lock = threading.Lock()
         self._pump: threading.Thread | None = None
         self._pump_q: queue.Queue | None = None
@@ -111,6 +115,8 @@ class App:
             self._start_proactive()
         if self.cfg.get("keybinds", {}).get("enabled"):
             self._start_keybinds()
+        if self.cfg.get("nav", {}).get("enabled"):
+            self._start_nav()
 
     # ---- Elite Dangerous monitoring (DESIGN §5) ---------------------------
     def _start_ed_monitoring(self) -> None:
@@ -327,6 +333,49 @@ class App:
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Keybinds failed to start: {e}"})
 
+    # ---- Find-closest-module ----------------------------------------------
+    def _start_nav(self) -> None:
+        """Build + register the find-closest-module capability. Fail soft: a startup problem
+        just leaves the feature off. The Spansh HTTP client is built here (composition root)
+        so tests never need it; current-system is read live from ED context with a journal
+        fallback."""
+        try:
+            from .nav import RequestsHttp
+            from .capabilities.find_closest_capability import NavConfig, FindClosestCapability
+
+            ncfg = NavConfig.from_cfg(self.cfg)
+            self.nav = FindClosestCapability(
+                ncfg, http=RequestsHttp(),
+                get_current_system=self._current_system,
+                log=lambda msg: self._log("nav", msg))
+            self.registry.register(self.nav)
+            if self.ed_ctx is None:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    f"Find-closest-module ON (pad {ncfg.default_pad_size or 'any'}); ED "
+                    "monitoring is OFF, so current system falls back to the newest journal."})
+            else:
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"Find-closest-module ON "
+                                          f"(pad {ncfg.default_pad_size or 'any'})."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.nav = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Find-closest-module failed to start: {e}"})
+
+    def _current_system(self) -> str | None:
+        """The Commander's current star system: live ED context first, else the newest
+        journal's last jump/location. None when nothing is available."""
+        if self.ed_ctx is not None:
+            s = self.ed_ctx.snapshot().get("system")
+            if s:
+                return s
+        try:
+            from .ed import resolve_journal_dir
+            from .nav import current_system_from_journal
+            return current_system_from_journal(resolve_journal_dir(self.cfg))
+        except Exception:  # noqa: BLE001 — a fallback failure just means "unknown"
+            return None
+
     # ---- logging & status -------------------------------------------------
     def _open_log(self):
         d = Path(self.cfg["logging"]["dir"])
@@ -482,9 +531,12 @@ class App:
 
             # New Commander utterance -> advance the keybind confirmation gate, so an armed
             # ship action can only be confirmed on a genuinely separate command (the model
-            # can't arm-and-confirm within one turn). DESIGN §6 safety layer.
+            # can't arm-and-confirm within one turn). DESIGN §6 safety layer. The find-closest
+            # capability uses the same gate when [nav].require_confirmation is on.
             if self.keybinds is not None:
                 self.keybinds.new_turn()
+            if self.nav is not None:
+                self.nav.new_turn()
 
             # Local voice commands (checklist, etc.) — handled without calling Claude
             if self._handle_command(text, cancel):
@@ -627,8 +679,27 @@ class App:
                 self.on_cancel()
 
         keyboard.hook(on_key)
-        keyboard.add_hotkey("ctrl+alt+q", lambda: self._quit.set())
+        keyboard.add_hotkey("ctrl+alt+q", self.request_quit)
         self.set_state("Idle")
+
+    def wait_for_quit(self) -> None:
+        """Block until a quit is requested (Ctrl+Alt+Q sets the event). Used by both entry
+        points — the headless loop waits on it directly, and the web UI bridges it on a
+        thread since Flask blocks the main thread itself (see run_covas_ui.py)."""
+        self._quit.wait()
+
+    def request_quit(self) -> None:
+        """Signal the app to shut down (wired to the Ctrl+Alt+Q hotkey)."""
+        self._quit.set()
+
+    def shutdown(self) -> None:
+        """Stop the watchers/pump and close the log. Safe to call once on the way out."""
+        self._stop_event_pump()
+        self._stop_ed_monitoring()
+        try:
+            self._logf.close()
+        except Exception:  # noqa: BLE001 — never let cleanup raise on exit
+            pass
 
     def run(self) -> None:
         try:
@@ -638,13 +709,11 @@ class App:
             return
         print(_banner(self.cfg))
         try:
-            self._quit.wait()
+            self.wait_for_quit()
         except KeyboardInterrupt:
             pass
         finally:
-            self._stop_event_pump()
-            self._stop_ed_monitoring()
-            self._logf.close()
+            self.shutdown()
             print("\nCOVAS++ shutting down. o7")
 
 
@@ -697,6 +766,7 @@ def _banner(cfg: dict) -> str:
     ed = "ON" if cfg.get("elite", {}).get("enabled") else "OFF"
     pro = "ON" if cfg.get("proactive", {}).get("enabled") else "OFF"
     kb = "ON" if cfg.get("keybinds", {}).get("enabled") else "OFF"
+    nav = "ON" if cfg.get("nav", {}).get("enabled") else "OFF"
     return (
         "\n================ COVAS++ (Phase 2) ================\n"
         f"  Router     : {router}\n"
@@ -706,6 +776,7 @@ def _banner(cfg: dict) -> str:
         f"  ED monitor : {ed}\n"
         f"  Proactive  : {pro}\n"
         f"  Keybinds   : {kb}\n"
+        f"  Find module: {nav}\n"
         f"  Personality: {p}\n"
         f"  Cache TTL  : {cfg['anthropic'].get('cache_ttl', '1h')}\n"
         f"  Dev mock   : {'ON' if mock else 'OFF'}\n"
