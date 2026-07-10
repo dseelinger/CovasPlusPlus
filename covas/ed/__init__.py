@@ -17,6 +17,7 @@ from .detector import ContextDetector, ContextRef
 from .journal import (JournalWatcher, apply_carrier_event, apply_journal_event,
                       default_journal_dir, describe_journal_event, parse_journal_line,
                       resolve_journal_dir)
+from .route import RouteStep, RouteTracker, is_scoopable, read_navroute
 from .status import (StatusWatcher, apply_status, decode_flags, describe_transition,
                      flag_transitions, status_path)
 
@@ -34,7 +35,11 @@ __all__ = [
     "describe_journal_event",
     "describe_transition",
     "flag_transitions",
+    "is_scoopable",
     "parse_journal_line",
+    "read_navroute",
     "resolve_journal_dir",
+    "RouteStep",
+    "RouteTracker",
     "status_path",
 ]
