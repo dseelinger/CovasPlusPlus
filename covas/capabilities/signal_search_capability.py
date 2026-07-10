@@ -120,12 +120,13 @@ class SignalSearchCapability:
         if not stations:
             return f"I couldn't find {stype} near you — try a different structure or system."
         best = stations[0]
-        copied = sup.copy_system(self._clipboard, best.system, self._log)
+        copied, here = sup.deliver_system(self._clipboard, best.system, best.distance_ly, self._log)
         self._logline(f"nearest {stype}: {best.station} in {best.system} "
-                      f"({best.distance_ly:.1f} ly), clipboard={'ok' if copied else 'failed'}")
+                      f"({best.distance_ly:.1f} ly), "
+                      f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
         line = (f"Closest {stype}: {best.station} in {best.system}, "
                 f"{sup.distance_phrase(best.distance_ly)}.")
-        return line + sup.clipboard_note(best.system, copied)
+        return line + sup.clipboard_note(best.system, copied, here)
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:

@@ -363,6 +363,14 @@ user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
 search_size = 50
 
 
+# Location & carrier voice commands (N3) — "copy my current system" and "where's my fleet
+# carrier" — need no configuration: the PERSONAL (owned) carrier is auto-tracked from the
+# journal (name, callsign, current system via CarrierStats / CarrierLocation), pinned to the
+# owned carrier's id so a squadron carrier can't be mistaken for it. Requires [elite].enabled.
+# Squadron-carrier location isn't queryable from any public database, so that command just
+# points you at the in-game Carrier Management tab — nothing to configure.
+
+
 [conversation]
 # Rolling in-session history so follow-ups work. Older turns are trimmed
 # once the running message count exceeds this many (user+assistant) turns.

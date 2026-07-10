@@ -176,6 +176,71 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     return patch
 
 
+# --- carrier event -> carrier state (N3) ----------------------------------------------
+# The Commander's PERSONAL (owned) fleet carrier is tracked separately from "current
+# context". CRUCIAL subtlety: a Commander's journal contains carrier events for carriers they
+# DON'T own — most importantly `CarrierJump`, which fires whenever the Commander is aboard ANY
+# carrier as it jumps (e.g. a squadron carrier). Trusting those would report the wrong
+# carrier's location. So we PIN to the owned carrier's identity:
+#
+#   * `CarrierStats` (emitted only for the carrier you OWN) establishes carrier_id + name +
+#     callsign — the identity everything else is matched against.
+#   * `CarrierLocation` sets the current system, but ONLY when its CarrierID matches ours.
+#   * `CarrierJumpRequest` sets a pending destination, again id-matched.
+#   * `CarrierJump` is deliberately IGNORED for carrier tracking — it's a "Commander aboard a
+#     carrier jump" event that may be someone else's carrier. (It still updates the
+#     Commander's own location via the _FIELDS handler.)
+
+_CARRIER_IDENTITY_EVENTS = ("CarrierStats", "CarrierBuy")
+_CARRIER_LOCATED_EVENTS = ("CarrierLocation",)
+_CARRIER_PENDING_EVENTS = ("CarrierJumpRequest",)
+
+
+def _own_carrier_event(ctx: EDContext, event: dict) -> bool:
+    """Whether a location/pending carrier event is about the Commander's OWN carrier: we must
+    know our carrier_id (from CarrierStats) and the event's CarrierID must match it. Unknown
+    id, missing event id, or a mismatch -> not ours, ignore (this is what stops a squadron
+    carrier's events from hijacking the tracked location)."""
+    own = ctx.carrier_snapshot().get("carrier_id")
+    ev_id = event.get("CarrierID")
+    return own is not None and ev_id is not None and ev_id == own
+
+
+def apply_carrier_event(ctx: EDContext, event: dict) -> dict:
+    """Fold one parsed journal event into the OWNED carrier's state. Returns the applied patch
+    (empty when the event isn't a relevant carrier event, or is a different carrier's)."""
+    name = event.get("event", "")
+
+    if name in _CARRIER_IDENTITY_EVENTS:
+        patch: dict = {}
+        if event.get("CarrierID") is not None:
+            patch["carrier_id"] = event["CarrierID"]
+        if event.get("Name"):
+            patch["carrier_name"] = event["Name"]
+        if event.get("Callsign"):
+            patch["carrier_callsign"] = event["Callsign"]
+        if patch:
+            ctx.update_carrier(**patch)
+        return patch
+
+    if name in _CARRIER_LOCATED_EVENTS:
+        if not event.get("StarSystem") or not _own_carrier_event(ctx, event):
+            return {}
+        patch = {"carrier_system": event["StarSystem"], "carrier_pending_system": None}
+        ctx.update_carrier(**patch)
+        return patch
+
+    if name in _CARRIER_PENDING_EVENTS:
+        dest = event.get("SystemName") or event.get("StarSystem")
+        if not dest or not _own_carrier_event(ctx, event):
+            return {}
+        patch = {"carrier_pending_system": dest}
+        ctx.update_carrier(**patch)
+        return patch
+
+    return {}
+
+
 # --- journal event -> recent-log description ------------------------------------------
 # A curated whitelist of narrative events worth surfacing for 'what just happened / check
 # my logs'. Deliberately excludes high-frequency spam (Scan auto-pings, FuelScoop ticks,
@@ -271,6 +336,7 @@ class JournalWatcher(threading.Thread):
                 ev = parse_journal_line(line)
                 if ev:
                     apply_journal_event(self.ctx, ev)
+                    apply_carrier_event(self.ctx, ev)   # warm carrier state too
                     self._record(ev)   # warm the recent feed too, but don't publish stale
 
     def _close(self) -> None:
@@ -297,6 +363,7 @@ class JournalWatcher(threading.Thread):
             if ev is None:
                 continue
             apply_journal_event(self.ctx, ev)
+            apply_carrier_event(self.ctx, ev)
             self._record(ev)
             self._publish(ev)
 

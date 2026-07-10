@@ -316,12 +316,16 @@ class SystemSearchCapability:
             return ("I couldn't find a system matching that near you — try relaxing one of the "
                     "filters.")
         best = records[0]
-        copied = self._copy(best.name)
+        # Don't copy when the nearest match IS the reference/current system (distance ~0) —
+        # you're already there, so copying your own system just clobbers the clipboard.
+        here = best.distance_ly < 0.05
+        copied = False if here else self._copy(best.name)
         self._logline(f"nearest match: {best.name} ({best.distance_ly:.1f} ly), "
-                      f"filters={sorted(slots)}, clipboard={'ok' if copied else 'failed'}")
-        return self._say_result(best, copied)
+                      f"filters={sorted(slots)}, "
+                      f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+        return self._say_result(best, copied, here)
 
-    def _say_result(self, rec, copied: bool) -> str:
+    def _say_result(self, rec, copied: bool, here: bool = False) -> str:
         dist = ("your current system" if rec.distance_ly < 0.05
                 else f"{rec.distance_ly:.1f} light-years away")
         traits: list[str] = []
@@ -333,8 +337,11 @@ class SystemSearchCapability:
             traits.append(f"{rec.security} security")
         trait_note = f" — {', '.join(traits)}" if traits else ""
         line = f"Closest match: {rec.name}, {dist}{trait_note}."
-        line += (f" I've copied {rec.name} to your clipboard." if copied
-                 else f" (Couldn't copy to the clipboard — the system is {rec.name}.)")
+        if here:
+            line += " You're already there, so I haven't copied anything."
+        else:
+            line += (f" I've copied {rec.name} to your clipboard." if copied
+                     else f" (Couldn't copy to the clipboard — the system is {rec.name}.)")
         return line
 
     # -- helpers ----------------------------------------------------------------------

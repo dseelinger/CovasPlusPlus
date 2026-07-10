@@ -62,13 +62,23 @@ def _filters(http) -> dict:
 # --- happy path: a slot search returns the nearest match + copies it -----------------------
 
 def test_single_slot_search_returns_and_copies_nearest():
-    cap, http, clip = _cap()
+    # Nearest match is a few ly away (not the current system) -> spoken AND copied.
+    body = {"results": [{"name": "Wolf 359", "distance": 7.78, "allegiance": "Federation",
+                         "government": "Democracy", "security": "High"}]}
+    cap, http, clip = _cap(http=FakeHttp(body=body))
     out = cap.run_tool("search_star_systems", {"allegiance": "Federation"})
     assert len(http.calls) == 1
     assert _filters(http) == {"allegiance": {"value": ["Federation"]}}
-    # Nearest system in the fixture is Sol (distance 0.0) -> spoken + copied.
-    assert "Sol" in out and clip.copied == ["Sol"]
+    assert "Wolf 359" in out and clip.copied == ["Wolf 359"]
     assert "clipboard" in out.lower()
+
+
+def test_result_that_is_current_system_is_not_copied():
+    # Task 4: the nearest match in the fixture is Sol (distance 0.0), the current system ->
+    # spoken as such, and NOT copied (you're already there).
+    cap, http, clip = _cap()
+    out = cap.run_tool("search_star_systems", {"allegiance": "Federation"})
+    assert clip.copied == [] and "already there" in out.lower()
 
 
 def test_any_defaults_only_spoken_slots_appear():

@@ -349,15 +349,17 @@ class FindClosestCapability:
         # Search done — clear any confirmation arm so a later request starts fresh.
         with self._lock:
             self._armed_turn = None
-        # Copy the SYSTEM name (what you paste into the galaxy map). Non-fatal on failure —
-        # the answer is still spoken.
-        copied = self._copy(result.system)
+        # Copy the SYSTEM name (what you paste into the galaxy map) — UNLESS the station is in
+        # the Commander's current system (distance ~0): you're already there, so copying your
+        # own system just clobbers the clipboard. Non-fatal on failure — answer still spoken.
+        here = result.distance_ly < 0.05
+        copied = False if here else self._copy(result.system)
         self._logline(f"nearest {resolved.label}: {result.station} in {result.system} "
                       f"({result.distance_ly:.1f} ly), pad {result.pad}, "
-                      f"clipboard={'ok' if copied else 'failed'}")
-        return self._say_result(resolved, result, copied)
+                      f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+        return self._say_result(resolved, result, copied, here)
 
-    def _say_result(self, resolved: Resolved, result, copied: bool) -> str:
+    def _say_result(self, resolved: Resolved, result, copied: bool, here: bool = False) -> str:
         dist = ("in your current system" if result.distance_ly < 0.05
                 else f"{result.distance_ly:.1f} light-years away")
         line = (f"Closest {resolved.label}: {result.station} in {result.system}, {dist}. "
@@ -365,8 +367,11 @@ class FindClosestCapability:
         arrival = result.extra.get("distance_to_arrival")
         if isinstance(arrival, (int, float)) and arrival >= 1:
             line += f" About {arrival:,.0f} light-seconds from the star."
-        line += (f" I've copied {result.system} to your clipboard." if copied
-                 else f" (Couldn't copy to the clipboard — the system is {result.system}.)")
+        if here:
+            line += " You're already there, so I haven't copied anything."
+        else:
+            line += (f" I've copied {result.system} to your clipboard." if copied
+                     else f" (Couldn't copy to the clipboard — the system is {result.system}.)")
         return line
 
     # -- helpers ----------------------------------------------------------------------

@@ -633,20 +633,24 @@ Goal: quick location/carrier voice commands + the "already there -> don't copy" 
 
 Tasks:
 1. "Copy my current system" -> put the current system on the clipboard.
-2. Personal fleet carrier: track its current system LIVE from the journal (CarrierJump /
-   CarrierJumpRequest / CarrierLocation; CarrierStats for name+callsign). "Where's my fleet
+2. Personal fleet carrier: track its current system LIVE from the journal. PIN to the OWNED
+   carrier's identity — CarrierStats gives CarrierID + name + callsign; CarrierLocation (id-
+   matched) gives the system; CarrierJumpRequest (id-matched) gives a pending jump. IGNORE
+   CarrierJump for tracking — it fires when the Commander is aboard ANY carrier (e.g. a
+   squadron carrier), so trusting it reports the wrong carrier's location (observed live:
+   returned a squadron carrier's system instead of the owned carrier's). "Where's my fleet
    carrier" -> speak its system + copy it. Local and reliable.
-3. Squadron carrier: auto-discover the SQUADRON NAME from the journal (SquadronStartup) and
-   confirm it. The squadron's CARRIER can't be auto-resolved from public APIs, so config the
-   carrier's name/callsign. "Where's my squadron carrier" -> look up its last-reported system
-   by callsign via a galaxy DB (Spansh/EDSM/EDDN carrier tracking), speak + copy it, and note
-   it may be stale ("as of its last reported jump").
+3. Squadron carrier: DO NOT look it up remotely. Verified against the live sites — no public
+   database (Spansh/EDSM/Inara) resolves a carrier by callsign reliably (likely a deliberate
+   BGS/PvP measure). "Where's my squadron carrier" -> explain the location is only available
+   in-game, on the Squadron menu's Carrier Management tab (optionally naming the squadron,
+   auto-discovered from SquadronStartup). No config, no galaxy-DB call.
 4. Fix across ALL search/nav/carrier results: if the answer IS the current system, say so and
    do NOT copy to the clipboard (you're already there).
 
-Tests: unit (offline) — carrier system from a fixture journal; squadron name from a fixture;
-carrier location from a recorded galaxy-DB fixture (fake http); a "current system" result skips
-the clipboard (fake clipboard asserts no call).
+Tests: unit (offline) — owned carrier system from a fixture journal (and a different carrier's
+events IGNORED); squadron name from a fixture; the squadron command returns the in-game pointer
+and never copies; a "current system" result skips the clipboard (fake clipboard asserts no call).
 
 Acceptance: bare pytest green and offline; manual. Stop.
 ```
