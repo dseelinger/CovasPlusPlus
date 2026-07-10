@@ -558,7 +558,7 @@ Acceptance: bare pytest green and offline; manual voice checklist. Stop for revi
 
 ---
 
-## Navigation, Settings & Automation (Prompts N1–N5)
+## Navigation, Settings & Automation (Prompts N1–N7)
 
 Features layered on the existing subsystems. Order matters where noted (N2 depends on N1's
 schema). Same conventions throughout — LLM-native capabilities, dependency injection, and
@@ -752,6 +752,48 @@ clipboard) and skips copy when it's the current system; external list from a rec
 (fake http); "no standing" path when a CG is absent.
 
 Acceptance: bare pytest green and offline; manual. Stop for review.
+```
+
+### N7 — Personality tab, voice speed & log filter
+
+```
+Read CLAUDE.md, covas/config.py, covas/web.py + templates/index.html, covas/llm.py
+(build_system reads personality.txt), covas/tts.py, and personalities/presets.md.
+
+Branch: feature/personality-voice-log
+
+Goal: three web-panel additions — a Personality tab, a voice-speed slider, and a Log filter.
+
+--- Personality tab (no voice editing of it) ---
+Separate PERSONA (voice) from CAMPAIGN (the Commander's personal facts) so switching persona
+never wipes the campaign:
+- personalities/presets.md ships a shared "Base" block + 10 selectable "Persona" blocks (parse
+  it). Presets are read-only + committed (no personal data).
+- Campaign = the Commander's personal facts, persisted git-ignored (like personality.txt today).
+- build_system() returns Base + selected Persona + Campaign, composed at load. Migrate the
+  current personality.txt: its voice -> the "Classic" persona (or a "Custom (current)"), its
+  campaign section -> the Campaign field.
+Tab UI: a persona picker (list + preview + select), an editable box with "Save as custom"
+(writes a git-ignored custom persona, also listed), and a separate Campaign editor. Save applies
+immediately. Add personalities/custom/ to .gitignore.
+
+--- Voice speed ---
+A slider 1.0-1.2x wired to ElevenLabs' native voice `speed` setting (its supported range — clamp
+to [1.0, 1.2], don't exceed). Add [elevenlabs].speed to config + the settings schema/page and
+pass it in the TTS request.
+
+--- Log filter ---
+Add a filter to the live Log window: two modes, "Conversation" (DEFAULT) and "All". Conversation
+shows only Commander utterances and COVAS replies; All shows everything (status, thinking, search,
+system, usage/cost). Client-side filter over the existing event stream (by event type / who);
+default to Conversation since that's the normal case, and persist the choice.
+
+Tests: unit (offline) — build_system composes Base+Persona+Campaign; preset parsing; save-as-
+custom round-trips to the git-ignored path; speed clamped to [1.0,1.2] and passed to the TTS
+payload (fake). (Log filter is client-side; a light template/JS assertion is enough.)
+
+Acceptance: bare pytest green; manual: switch persona (campaign persists), save a custom, nudge
+speed and hear it, toggle the log to Conversation and confirm stats/thinking hide. Stop for review.
 ```
 
 ---
