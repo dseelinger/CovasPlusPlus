@@ -1,0 +1,327 @@
+{
+  "count": 10000,
+  "from": 0,
+  "reference": {
+    "id64": 10477373803,
+    "name": "Sol",
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "results": [
+    {
+      "allegiance": "Federation",
+      "bodies": [
+        {
+          "distance_to_arrival": 0.0,
+          "is_main_star": true,
+          "name": "Sol",
+          "subtype": "G (White-Yellow) Star",
+          "type": "Star"
+        },
+        {
+          "distance_to_arrival": 232.851472,
+          "is_main_star": null,
+          "name": "Mercury",
+          "subtype": "Metal-rich body",
+          "type": "Planet"
+        }
+      ],
+      "body_count": 40,
+      "controlling_minor_faction": "Mother Gaia",
+      "controlling_minor_faction_state": "None",
+      "controlling_power": "Jerome Archer",
+      "distance": 0.0,
+      "estimated_mapping_value": 2213988,
+      "estimated_scan_value": 605861,
+      "government": "Democracy",
+      "id": "10477373803",
+      "id64": 10477373803,
+      "is_being_colonised": false,
+      "is_colonised": false,
+      "known_permit": true,
+      "landmark_value": 0,
+      "minor_faction_presences": [
+        {
+          "name": "Aegis Core",
+          "influence": 0.01005,
+          "state": "None"
+        },
+        {
+          "name": "Federal Congress",
+          "influence": 0.163819,
+          "state": "None"
+        },
+        {
+          "name": "Mother Gaia",
+          "influence": 0.323618,
+          "state": "None"
+        }
+      ],
+      "name": "Sol",
+      "needs_permit": true,
+      "population": 18320926115,
+      "power": [
+        "Aisling Duval",
+        "Edmund Mahon",
+        "Li Yong-Rui",
+        "Yuri Grom",
+        "Zemina Torval",
+        "Jerome Archer"
+      ],
+      "power_state": "Stronghold",
+      "power_state_control_progress": 0.657414,
+      "power_state_reinforcement": 55838,
+      "power_state_undermining": 117424,
+      "primary_economy": "Refinery",
+      "region": "Inner Orion Spur",
+      "secondary_economy": "Service",
+      "security": "High",
+      "stations": [
+        {
+          "name": "Daedalus",
+          "type": "Orbis Starport",
+          "distance_to_arrival": 232.910696
+        },
+        {
+          "name": "Galileo",
+          "type": "Ocellus Starport",
+          "distance_to_arrival": 492.105335
+        }
+      ],
+      "thargoid_war_failure_state": "None",
+      "thargoid_war_state": "None",
+      "thargoid_war_success_state": "None",
+      "updated_at": "2026-07-10 13:22:36+00",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    {
+      "allegiance": "Federation",
+      "bodies": [
+        {
+          "distance_to_arrival": 0.0,
+          "is_main_star": true,
+          "name": "Luhman 16",
+          "subtype": "L (Brown dwarf) Star",
+          "type": "Star"
+        },
+        {
+          "distance_to_arrival": 1641.200695,
+          "is_main_star": null,
+          "name": "Luhman 16 B",
+          "subtype": "L (Brown dwarf) Star",
+          "type": "Star"
+        }
+      ],
+      "body_count": 15,
+      "controlling_minor_faction": "Earth Defense Fleet",
+      "controlling_minor_faction_state": "None",
+      "distance": 6.56919301550807,
+      "estimated_mapping_value": 159745,
+      "estimated_scan_value": 42754,
+      "government": "Corporate",
+      "id": "22960358574928",
+      "id64": 22960358574928,
+      "is_being_colonised": false,
+      "is_colonised": false,
+      "known_permit": false,
+      "landmark_value": 10859500,
+      "minor_faction_presences": [
+        {
+          "name": "Collective of Independent Agents",
+          "influence": 0.187251,
+          "state": "Boom"
+        },
+        {
+          "name": "Earth Defense Fleet",
+          "influence": 0.433267,
+          "state": "None"
+        },
+        {
+          "name": "Luhman 16 Central & Co",
+          "influence": 0.121514,
+          "state": "None"
+        }
+      ],
+      "name": "Luhman 16",
+      "needs_permit": false,
+      "population": 193793,
+      "power": [
+        "Aisling Duval",
+        "Edmund Mahon",
+        "Li Yong-Rui",
+        "Yuri Grom",
+        "Zemina Torval",
+        "Jerome Archer"
+      ],
+      "power_conflict_progress": [
+        {
+          "power": "Aisling Duval",
+          "progress": 0.0
+        },
+        {
+          "power": "Edmund Mahon",
+          "progress": 0.0
+        },
+        {
+          "power": "Li Yong-Rui",
+          "progress": 0.0
+        },
+        {
+          "power": "Yuri Grom",
+          "progress": 0.0
+        },
+        {
+          "power": "Zemina Torval",
+          "progress": 0.0
+        },
+        {
+          "power": "Jerome Archer",
+          "progress": 0.0
+        }
+      ],
+      "power_state": "Unoccupied",
+      "primary_economy": "Military",
+      "region": "Inner Orion Spur",
+      "secondary_economy": "Refinery",
+      "security": "Medium",
+      "stations": [
+        {
+          "name": "Jenner Orbital",
+          "type": "Outpost",
+          "distance_to_arrival": 10.070623
+        },
+        {
+          "name": "Heisenberg Colony",
+          "type": "Outpost",
+          "distance_to_arrival": 13.877628
+        }
+      ],
+      "thargoid_war_failure_state": "None",
+      "thargoid_war_state": "None",
+      "thargoid_war_success_state": "None",
+      "updated_at": "2026-07-10 12:39:20+00",
+      "x": 6.3125,
+      "y": 0.59375,
+      "z": 1.71875
+    },
+    {
+      "allegiance": "Federation",
+      "bodies": [
+        {
+          "distance_to_arrival": 0.0,
+          "is_main_star": true,
+          "name": "Lalande 21185 A",
+          "subtype": "M (Red dwarf) Star",
+          "type": "Star"
+        },
+        {
+          "distance_to_arrival": 5762.869592,
+          "is_main_star": null,
+          "name": "Lalande 21185 B",
+          "subtype": "M (Red dwarf) Star",
+          "type": "Star"
+        }
+      ],
+      "body_count": 3,
+      "controlling_minor_faction": "Earth Defense Fleet",
+      "controlling_minor_faction_state": "None",
+      "controlling_power": "Jerome Archer",
+      "distance": 8.28732088795891,
+      "estimated_mapping_value": 13696,
+      "estimated_scan_value": 3610,
+      "government": "Corporate",
+      "id": "9467047519657",
+      "id64": 9467047519657,
+      "is_being_colonised": true,
+      "is_colonised": true,
+      "known_permit": false,
+      "landmark_value": 0,
+      "minor_faction_presences": [
+        {
+          "name": "Earth Defense Fleet",
+          "influence": 0.405594,
+          "state": "None"
+        },
+        {
+          "name": "Gendalla Free",
+          "influence": 0.126873,
+          "state": "None"
+        },
+        {
+          "name": "Green Party of WISE 1506+7027",
+          "influence": 0.130869,
+          "state": "None"
+        }
+      ],
+      "name": "Lalande 21185",
+      "needs_permit": false,
+      "population": 48113145,
+      "power": [
+        "Aisling Duval",
+        "Edmund Mahon",
+        "Li Yong-Rui",
+        "Yuri Grom",
+        "Zemina Torval",
+        "Jerome Archer"
+      ],
+      "power_state": "Exploited",
+      "power_state_control_progress": 0.282744,
+      "power_state_reinforcement": 48,
+      "power_state_undermining": 1087,
+      "primary_economy": "Military",
+      "region": "Inner Orion Spur",
+      "secondary_economy": "High Tech",
+      "security": "Low",
+      "stations": [
+        {
+          "name": "Q6L-87L",
+          "type": "Drake-Class Carrier",
+          "distance_to_arrival": 24199.816726
+        },
+        {
+          "name": "X6Z-04K",
+          "type": "Drake-Class Carrier",
+          "distance_to_arrival": 0.0
+        }
+      ],
+      "thargoid_war_failure_state": "None",
+      "thargoid_war_state": "None",
+      "thargoid_war_success_state": "None",
+      "updated_at": "2026-07-10 07:31:50+00",
+      "x": 0.3125,
+      "y": 7.5625,
+      "z": -3.375
+    }
+  ],
+  "search": {
+    "filters": {
+      "allegiance": {
+        "value": [
+          "Federation"
+        ]
+      }
+    },
+    "page": 0,
+    "reference_system": "Sol",
+    "reference_system_details": {
+      "id64": 10477373803,
+      "name": "Sol",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "size": 3,
+    "sort": [
+      {
+        "distance": {
+          "direction": "asc"
+        }
+      }
+    ]
+  },
+  "search_reference": "7676B36A-7C67-11F1-9514-860341FBAFFC",
+  "size": 3
+}

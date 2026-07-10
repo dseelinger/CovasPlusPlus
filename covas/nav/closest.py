@@ -1,68 +1,41 @@
-"""Station location via Spansh's live station search (the ONE networked step).
+"""Station location for OUTFITTING — the nearest station SELLING a resolved module.
 
-Only ever called with a RESOLVED + confirmed module (see the capability): find the nearest
-station selling it, sorted by distance from the Commander's current system.
+This is the outfitting category's query builder + parser. The reusable Spansh transport it
+used to own (the injected `Http` seam, `RequestsHttp`, POST/parse, 400 / unreachable ->
+spoken `NavError`, the distance-sort assumption, fleet-carrier exclusion, and the pad logic)
+now lives in `covas/search/spansh.py`, shared with the other five search categories (Search
+Prompt 3). This module keeps only what is specific to buying a module:
 
-Spansh quirks, verified against the live API (2026-07) and cross-checked against how the
-established tools call it (EDDiscovery's `SpanshClassStation`, corenting/ED-API,
-RatherRude/Elite-Dangerous-AI-Integration) — this is why the request/parsing look the way
-they do:
-  * POST https://spansh.co.uk/api/stations/search is SYNCHRONOUS — it returns the results
-    array directly (no job-id/poll step, despite the shareable /search/<uuid> result URLs;
-    the job/poll `search/save` + `search/recall/<ref>/<page>` variant exists but isn't
-    needed here). EDDiscovery reads `json["results"]` straight off the POST — same as us.
-  * The module filter only honours `name`, `class`, `rating`. `ed_symbol`, `weapon_mode` /
-    `mount`, and the top-level `landing_pad` key are SILENTLY IGNORED (a bogus value returns
-    everything, not nothing). So MOUNT can't be filtered server-side — we send name+class,
-    then POST-FILTER results by `weapon_mode` (each result carries the station's full
-    `modules` list). PAD, however, IS filterable via the boolean `has_large_pad` /
-    `has_medium_pad` / `has_small_pad` filters (`{"value": true}`) — the form EDDiscovery
-    uses — so we push the pad constraint server-side and keep a client check as a backstop.
-  * Fleet carriers ("Drake-Class Carrier") show up in results and often dominate near busy
-    systems, but their location is TRANSIENT (they jump) — a stale answer. EDDiscovery and
-    RatherRude both exclude them; we drop them from results so "nearest station" means a
-    fixed one you can actually fly to.
-  * An unrecognised `reference_system` → HTTP 400 {"error":"Invalid request"} (generic body,
-    so we can't distinguish it from other 400s — we message it as an unknown-system likely).
-  * `distance` is light-years from the reference system; results come pre-sorted ascending
-    when we ask, so the first post-filter survivor is the nearest.
+  * the module-name/class request filter + the server-side pad filter (`build_payload`),
+  * the MOUNT post-filter — Spansh's module filter honours only `name`/`class`/`rating`; the
+    top-level mount key is SILENTLY IGNORED, so each result carries the station's full
+    `modules` list and we filter `weapon_mode` ourselves (`_sells_mount`),
+  * picking the nearest fixed station that fits mount + pad (`_nearest_match`, `_to_result`).
 
-`http` is injected (a `RequestsHttp` in the app, a fake in tests) so the default test run
-never hits the network.
+Behaviour and this module's public surface are unchanged from before the refactor — the
+outfitting capability and `tests/test_nav_closest.py` import the same names and see the same
+spoken lines. `http` is injected so the default test run never hits the network (DESIGN §9).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+
+# The reusable transport + pad logic now live in the shared Spansh client. Re-exported here
+# (Http / RequestsHttp / NavError / _DEFAULT_UA) so the outfitting capability's existing
+# imports from `nav.closest` keep working unchanged.
+from ..search.spansh import (Http, NavError, RequestsHttp, STATIONS_URL, _DEFAULT_UA,
+                             execute_search, is_fleet_carrier, largest_pad as _largest_pad,
+                             pad_filter_key as _pad_filter_key, pad_ok as _pad_ok)
 
 # Nearest-station search window. We fetch this many nearest stations that sell the module
 # (name+class, pad filtered server-side), then post-filter locally by mount + carrier. Amply
 # covers the case where the very nearest station stocks the module but not the wanted mount.
 _SEARCH_SIZE = 50
-_DEFAULT_BASE_URL = "https://spansh.co.uk/api/stations/search"
-_DEFAULT_UA = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion; +https://github.com/)"
+_DEFAULT_BASE_URL = STATIONS_URL
 
-# Station types dropped from results: a fleet carrier can sell a module but it jumps around,
-# so it's a poor "nearest station to go buy X" answer (EDDiscovery/RatherRude exclude them too).
-_EXCLUDED_STATION_TYPES = frozenset({"Drake-Class Carrier"})
-
-# pad size -> the Spansh boolean pad filter that means "has a pad at least this big". A large
-# starport also has medium/small pads, so has_medium_pad true correctly includes it.
-_PAD_FILTER_KEY = {"L": "has_large_pad", "M": "has_medium_pad", "S": "has_small_pad"}
-
-
-class NavError(Exception):
-    """A lookup that couldn't produce an answer. `str(e)` is a short, spoken-friendly line —
-    the capability returns it to the LLM verbatim (fail soft; the voice loop stays alive)."""
-
-
-class Http(Protocol):
-    """Tiny injected HTTP seam — one method, so tests pass a fake and the default run is
-    hermetic (DESIGN §9)."""
-    def post_json(self, url: str, payload: dict, *, headers: dict | None = None,
-                  timeout: float = 20.0) -> tuple[int, object]:
-        """POST `payload` as JSON; return (status_code, parsed_json_or_None)."""
-        ...
+# Kept for the outfitting-specific error wording (execute_search names itself via these).
+_STATION_SUBJECT = "the station database"
+_STATION_LOOKUP = "station lookup"
 
 
 @dataclass(frozen=True)
@@ -76,34 +49,7 @@ class ClosestResult:
     extra: dict = field(default_factory=dict)
 
 
-# ---- pad logic (pure) ---------------------------------------------------------------------
-
-_PAD_RANK = {"S": 1, "M": 2, "L": 3}
-
-
-def _largest_pad(result: dict) -> str | None:
-    """The biggest landing pad a station has, from Spansh's pad fields."""
-    if result.get("has_large_pad") or (result.get("large_pads") or 0) > 0:
-        return "L"
-    if (result.get("medium_pads") or 0) > 0:
-        return "M"
-    if (result.get("small_pads") or 0) > 0:
-        return "S"
-    return None
-
-
-def _pad_ok(result: dict, need: str | None) -> bool:
-    """Does the station have a pad big enough for a ship that needs `need` (S/M/L)? A larger
-    pad accommodates a smaller ship, so 'need M' is satisfied by an M or L pad. `need` None
-    (or unknown) means don't care."""
-    if not need:
-        return True
-    want = _PAD_RANK.get(str(need).strip().upper()[:1])
-    if want is None:
-        return True
-    have = _largest_pad(result)
-    return have is not None and _PAD_RANK[have] >= want
-
+# ---- outfitting-specific filtering (pure) -------------------------------------------------
 
 def _sells_mount(result: dict, module_name: str, size: int | None, mount: str | None) -> bool:
     """Does this station's outfitting actually include the wanted module VARIANT? Confirms
@@ -121,13 +67,6 @@ def _sells_mount(result: dict, module_name: str, size: int | None, mount: str | 
 
 
 # ---- query build + parse ------------------------------------------------------------------
-
-def _pad_filter_key(pad_size: str | None) -> str | None:
-    """The Spansh boolean pad-filter key for a required pad size (S/M/L), or None."""
-    if not pad_size:
-        return None
-    return _PAD_FILTER_KEY.get(str(pad_size).strip().upper()[:1])
-
 
 def build_payload(resolved, current_system: str, *, pad_size: str | None = None,
                   size: int = _SEARCH_SIZE) -> dict:
@@ -155,7 +94,7 @@ def _nearest_match(results: list[dict], resolved, pad_size: str | None) -> dict 
     mount variant and has a big-enough pad. Pad is already filtered server-side; the
     `_pad_ok` check is a backstop, and fleet carriers are dropped as transient."""
     for r in results:
-        if r.get("type") in _EXCLUDED_STATION_TYPES:
+        if is_fleet_carrier(r):
             continue
         if not _sells_mount(r, resolved.name, resolved.size, resolved.mount):
             continue
@@ -195,20 +134,10 @@ def find_closest_module(resolved, current_system: str, http: Http, *,
                        "with monitoring on? Jump somewhere and I'll have it.")
 
     payload = build_payload(resolved, current_system, pad_size=pad_size, size=search_size)
-    headers = {"Content-Type": "application/json", "User-Agent": user_agent}
-    try:
-        status, body = http.post_json(base_url, payload, headers=headers, timeout=20.0)
-    except Exception as e:  # noqa: BLE001 — any transport failure degrades to a spoken note
-        raise NavError(f"I couldn't reach the station database just now ({e}). Try again in "
-                       "a moment.") from e
+    results = execute_search(base_url, payload, http, user_agent=user_agent, timeout=20.0,
+                             reference_system=current_system,
+                             subject=_STATION_SUBJECT, lookup_name=_STATION_LOOKUP)
 
-    if status == 400:
-        raise NavError(f"The station database didn't recognise your current system "
-                       f"'{current_system}'. If you just jumped, give it a second.")
-    if status != 200 or not isinstance(body, dict):
-        raise NavError(f"The station lookup failed (HTTP {status}). Try again shortly.")
-
-    results = body.get("results") or []
     if not results:
         # Pad is filtered server-side, so an empty result under a pad constraint usually means
         # "none with a big-enough pad" rather than "the module doesn't exist".
@@ -225,20 +154,3 @@ def find_closest_module(resolved, current_system: str, http: Http, *,
         raise NavError(f"I found stations selling that module, but none nearby stock the "
                        f"{resolved.label}{pad_note}. Try relaxing the pad size or mount.")
     return _to_result(match)
-
-
-# ---- real HTTP (used by the app; never in the default test run) ---------------------------
-
-class RequestsHttp:
-    """Production Http: a thin `requests` wrapper. Built only at the app composition root, so
-    unit tests inject a fake instead and the default `pytest` never imports/needs the network."""
-
-    def post_json(self, url: str, payload: dict, *, headers: dict | None = None,
-                  timeout: float = 20.0) -> tuple[int, object]:
-        import requests  # local import: keeps the offline stack importable without hitting it
-        resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
-        try:
-            body: object = resp.json()
-        except ValueError:
-            body = None
-        return resp.status_code, body

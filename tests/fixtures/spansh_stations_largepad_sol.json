@@ -1,0 +1,482 @@
+{
+  "count": 10000,
+  "from": 0,
+  "reference": {
+    "id64": 10477373803,
+    "name": "Sol",
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "results": [
+    {
+      "allegiance": "Federation",
+      "body_gravity": 0.375546038543897,
+      "body_has_atmosphere": false,
+      "body_has_rings": false,
+      "body_id64": 36028807496337771,
+      "body_name": "Mercury",
+      "body_subtype": "Metal-rich body",
+      "body_type": "Planet",
+      "controlling_minor_faction": "Sol Workers' Party",
+      "controlling_minor_faction_influence": 0.2,
+      "distance": 0.0,
+      "distance_to_arrival": 232.857892,
+      "economies": [
+        {
+          "name": "Industrial",
+          "share": 100.0
+        }
+      ],
+      "export_commodities": [
+        {
+          "name": "Crop Harvesters"
+        },
+        {
+          "name": "Food Cartridges"
+        }
+      ],
+      "government": "Democracy",
+      "has_large_pad": true,
+      "has_market": true,
+      "has_outfitting": true,
+      "has_shipyard": true,
+      "id": "3534389760",
+      "import_commodities": [
+        {
+          "name": "Natural Fabrics"
+        },
+        {
+          "name": "Polymers"
+        }
+      ],
+      "is_planetary": true,
+      "large_pads": 2,
+      "latitude": -50.540871,
+      "longitude": -41.765411,
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Medicines",
+          "commodity": "Advanced Medicines",
+          "demand": 5175,
+          "sell_price": 1727,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Chemicals",
+          "commodity": "Agronomic Treatment",
+          "demand": 21,
+          "sell_price": 3519,
+          "supply": 0
+        }
+      ],
+      "market_id": 3534389760,
+      "market_updated_at": "2026-06-27 08:53:35+00",
+      "medium_pads": 2,
+      "modules": [
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Asp_Armour_Grade1",
+          "name": "Lightweight Alloy",
+          "rating": "I",
+          "ship": "Asp Explorer"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Asp_Armour_Grade2",
+          "name": "Reinforced Alloy",
+          "price": 2664460,
+          "rating": "I",
+          "ship": "Asp Explorer"
+        }
+      ],
+      "name": "Walz Depot",
+      "outfitting_updated_at": "2026-07-08 22:01:52+00",
+      "primary_economy": "Industrial",
+      "prohibited_commodities": [
+        {
+          "name": "Narcotics"
+        },
+        {
+          "name": "Tobacco"
+        }
+      ],
+      "services": [
+        {
+          "name": "Dock"
+        },
+        {
+          "name": "Autodock"
+        },
+        {
+          "name": "Market"
+        },
+        {
+          "name": "Contacts"
+        }
+      ],
+      "ships": [
+        {
+          "name": "Asp Explorer",
+          "price": 6661150,
+          "symbol": "Asp"
+        },
+        {
+          "name": "Beluga Liner",
+          "price": 84532780,
+          "symbol": "BelugaLiner"
+        }
+      ],
+      "shipyard_updated_at": "2026-06-27 08:53:35+00",
+      "small_pads": 4,
+      "state": "UnderRepairs",
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 10477373803,
+      "system_is_being_colonised": false,
+      "system_is_colonised": false,
+      "system_name": "Sol",
+      "system_population": 18320926115,
+      "system_power": [
+        "Aisling Duval",
+        "Edmund Mahon",
+        "Li Yong-Rui",
+        "Yuri Grom",
+        "Zemina Torval",
+        "Jerome Archer"
+      ],
+      "system_power_state": "Stronghold",
+      "system_primary_economy": "Refinery",
+      "system_secondary_economy": "Service",
+      "system_x": 0.0,
+      "system_y": 0.0,
+      "system_z": 0.0,
+      "type": "Planetary Outpost",
+      "updated_at": "2026-07-09 18:22:19+00"
+    },
+    {
+      "allegiance": "Federation",
+      "body_gravity": 0.375546038543897,
+      "body_has_atmosphere": false,
+      "body_has_rings": false,
+      "body_id64": 36028807496337771,
+      "body_name": "Mercury",
+      "body_subtype": "Metal-rich body",
+      "body_type": "Planet",
+      "controlling_minor_faction": "Sol Workers' Party",
+      "controlling_minor_faction_influence": 0.2,
+      "distance": 0.0,
+      "distance_to_arrival": 232.858242,
+      "economies": [
+        {
+          "name": "Industrial",
+          "share": 100.0
+        }
+      ],
+      "export_commodities": [
+        {
+          "name": "Crop Harvesters"
+        },
+        {
+          "name": "Food Cartridges"
+        }
+      ],
+      "government": "Democracy",
+      "has_large_pad": true,
+      "has_market": true,
+      "has_outfitting": true,
+      "has_shipyard": true,
+      "id": "3534390016",
+      "import_commodities": [
+        {
+          "name": "Natural Fabrics"
+        },
+        {
+          "name": "Copper"
+        }
+      ],
+      "is_planetary": true,
+      "large_pads": 8,
+      "latitude": -53.810898,
+      "longitude": -123.199539,
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Medicines",
+          "commodity": "Advanced Medicines",
+          "demand": 5230,
+          "sell_price": 1727,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Chemicals",
+          "commodity": "Agronomic Treatment",
+          "demand": 50,
+          "sell_price": 3519,
+          "supply": 0
+        }
+      ],
+      "market_id": 3534390016,
+      "market_updated_at": "2026-07-07 15:00:55+00",
+      "medium_pads": 8,
+      "modules": [
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Asp_Armour_Grade1",
+          "name": "Lightweight Alloy",
+          "rating": "I",
+          "ship": "Asp Explorer"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "Asp_Armour_Grade2",
+          "name": "Reinforced Alloy",
+          "price": 2664460,
+          "rating": "I",
+          "ship": "Asp Explorer"
+        }
+      ],
+      "name": "Ehrlich City",
+      "outfitting_updated_at": "2026-07-07 15:37:03+00",
+      "primary_economy": "Industrial",
+      "prohibited_commodities": [
+        {
+          "name": "Narcotics"
+        },
+        {
+          "name": "Battle Weapons"
+        }
+      ],
+      "services": [
+        {
+          "name": "Dock"
+        },
+        {
+          "name": "Autodock"
+        },
+        {
+          "name": "Market"
+        },
+        {
+          "name": "Contacts"
+        }
+      ],
+      "ships": [
+        {
+          "name": "Asp Explorer",
+          "price": 6661150,
+          "symbol": "Asp"
+        },
+        {
+          "name": "Beluga Liner",
+          "price": 84532780,
+          "symbol": "BelugaLiner"
+        }
+      ],
+      "shipyard_updated_at": "2026-07-07 15:00:55+00",
+      "small_pads": 8,
+      "state": "UnderRepairs",
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 10477373803,
+      "system_is_being_colonised": false,
+      "system_is_colonised": false,
+      "system_name": "Sol",
+      "system_population": 18320926115,
+      "system_power": [
+        "Aisling Duval",
+        "Edmund Mahon",
+        "Li Yong-Rui",
+        "Yuri Grom",
+        "Zemina Torval",
+        "Jerome Archer"
+      ],
+      "system_power_state": "Stronghold",
+      "system_primary_economy": "Refinery",
+      "system_secondary_economy": "Service",
+      "system_x": 0.0,
+      "system_y": 0.0,
+      "system_z": 0.0,
+      "type": "Planetary Port",
+      "updated_at": "2026-07-09 18:29:01+00"
+    },
+    {
+      "allegiance": "Federation",
+      "body_gravity": 0.133461405118793,
+      "body_has_atmosphere": false,
+      "body_has_rings": false,
+      "body_id64": 360287980667013483,
+      "body_name": "Europa",
+      "body_subtype": "Icy body",
+      "body_type": "Planet",
+      "controlling_minor_faction": "Sol Workers' Party",
+      "controlling_minor_faction_influence": 0.2,
+      "distance": 0.0,
+      "distance_to_arrival": 2631.015958,
+      "economies": [
+        {
+          "name": "Military",
+          "share": 100.0
+        }
+      ],
+      "export_commodities": [
+        {
+          "name": "Hydrogen Fuel"
+        },
+        {
+          "name": "Scrap"
+        }
+      ],
+      "government": "Democracy",
+      "has_large_pad": true,
+      "has_market": true,
+      "has_outfitting": true,
+      "id": "3534390272",
+      "import_commodities": [
+        {
+          "name": "Polymers"
+        },
+        {
+          "name": "H.E. Suits"
+        }
+      ],
+      "is_planetary": true,
+      "large_pads": 4,
+      "latitude": 4.171216,
+      "longitude": 45.113422,
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Medicines",
+          "commodity": "Advanced Medicines",
+          "demand": 1505,
+          "sell_price": 1727,
+          "supply": 0
+        },
+        {
+          "buy_price": 0,
+          "category": "Chemicals",
+          "commodity": "Agronomic Treatment",
+          "demand": 15,
+          "sell_price": 3519,
+          "supply": 0
+        }
+      ],
+      "market_id": 3534390272,
+      "market_updated_at": "2026-07-09 01:14:29+00",
+      "medium_pads": 4,
+      "modules": [
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "DiamondBack_Armour_Grade1",
+          "name": "Lightweight Alloy",
+          "rating": "I",
+          "ship": "Diamondback Scout"
+        },
+        {
+          "category": "standard",
+          "class": 1,
+          "ed_symbol": "DiamondBack_Armour_Grade2",
+          "name": "Reinforced Alloy",
+          "price": 225730,
+          "rating": "I",
+          "ship": "Diamondback Scout"
+        }
+      ],
+      "name": "Haberlandt Survey",
+      "outfitting_updated_at": "2026-07-09 01:15:16+00",
+      "primary_economy": "Military",
+      "prohibited_commodities": [
+        {
+          "name": "Narcotics"
+        },
+        {
+          "name": "Battle Weapons"
+        }
+      ],
+      "services": [
+        {
+          "name": "Dock"
+        },
+        {
+          "name": "Autodock"
+        },
+        {
+          "name": "Market"
+        },
+        {
+          "name": "Contacts"
+        }
+      ],
+      "ships": [
+        {
+          "name": "Beluga Liner",
+          "price": 84532780,
+          "symbol": "BelugaLiner"
+        },
+        {
+          "name": "Dolphin",
+          "price": 1337330,
+          "symbol": "Dolphin"
+        }
+      ],
+      "shipyard_updated_at": "2021-05-29 01:16:41+00",
+      "small_pads": 4,
+      "state": "UnderRepairs",
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 10477373803,
+      "system_is_being_colonised": false,
+      "system_is_colonised": false,
+      "system_name": "Sol",
+      "system_population": 18320926115,
+      "system_power": [
+        "Aisling Duval",
+        "Edmund Mahon",
+        "Li Yong-Rui",
+        "Yuri Grom",
+        "Zemina Torval",
+        "Jerome Archer"
+      ],
+      "system_power_state": "Stronghold",
+      "system_primary_economy": "Refinery",
+      "system_secondary_economy": "Service",
+      "system_x": 0.0,
+      "system_y": 0.0,
+      "system_z": 0.0,
+      "type": "Planetary Outpost",
+      "updated_at": "2026-07-09 01:15:16+00"
+    }
+  ],
+  "search": {
+    "filters": {
+      "has_large_pad": {
+        "value": true
+      }
+    },
+    "page": 0,
+    "reference_system": "Sol",
+    "reference_system_details": {
+      "id64": 10477373803,
+      "name": "Sol",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "size": 3,
+    "sort": [
+      {
+        "distance": {
+          "direction": "asc"
+        }
+      }
+    ]
+  },
+  "search_reference": "77473AE4-7C67-11F1-9F9E-A6BD4F93BDDF",
+  "size": 3
+}

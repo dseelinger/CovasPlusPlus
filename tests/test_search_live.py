@@ -1,0 +1,51 @@
+"""Opt-in integration tests for the shared Spansh client (DESIGN §9).
+
+Excluded from the default run — these hit the real (free) Spansh API. Run deliberately with:
+    pytest -m "integration and local"
+
+One live query per in-scope category proves the built payload is ACCEPTED by Spansh (a wrong
+filter structure returns HTTP 400) and that the real response parses into typed records — the
+canary if Spansh changes its request shape or field names. Each query is small (size=3) and
+filtered near Sol, and it's fine for a filtered category to return zero rows: we assert the
+request/parse round-trips, not that a particular system exists today.
+"""
+from __future__ import annotations
+
+import pytest
+
+from covas.search import (RequestsHttp, StationRecord, SystemRecord, build_query, category,
+                          execute_search, parse_results)
+
+pytestmark = [pytest.mark.integration, pytest.mark.local]
+
+# category -> a valid, minimal slot set to exercise its query builder live.
+_LIVE_SLOTS = {
+    "stations": {"has_large_pad": "L"},
+    "star_systems": {"allegiance": "Federation"},
+    "minor_factions": {"minor_faction_presences": "Mother Gaia"},
+    "signals": {"type": "Coriolis Starport"},
+    "misc": {"state": "War"},
+}
+_RECORD = {"station": StationRecord, "system": SystemRecord}
+
+
+@pytest.mark.parametrize("cat_key", sorted(_LIVE_SLOTS))
+def test_live_query_per_category(cat_key):
+    spec = category(cat_key)
+    payload = build_query(spec, _LIVE_SLOTS[cat_key], "Sol", size=3)
+    results = execute_search(spec.endpoint, payload, RequestsHttp(),
+                             reference_system="Sol", subject=spec.subject,
+                             lookup_name=spec.lookup_name)
+    records = parse_results(spec, results)              # must not raise on a real response
+    assert isinstance(records, list)
+    for r in records:
+        assert isinstance(r, _RECORD[spec.result_kind])
+        assert r.distance_ly >= 0.0
+
+
+def test_live_outfitting_still_round_trips():
+    """Outfitting keeps its bespoke path (nav/closest.py) on top of the shared transport."""
+    from covas.nav import RequestsHttp as NavHttp, find_closest_module, resolve
+    r = resolve("Multi-Cannon", "medium", "fixed")
+    result = find_closest_module(r, "Sol", NavHttp(), pad_size="L")
+    assert result.system and result.station and result.pad in ("S", "M", "L")
