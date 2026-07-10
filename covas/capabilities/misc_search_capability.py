@@ -185,14 +185,15 @@ class MiscSearchCapability:
             return ("I couldn't find a system in that state near you — try a different state "
                     "or relax the other filters.")
         best = systems[0]
-        copied = sup.copy_system(self._clipboard, best.name, self._log)
+        copied, here = sup.deliver_system(self._clipboard, best.name, best.distance_ly, self._log)
         self._logline(f"nearest state match: {best.name} ({best.distance_ly:.1f} ly), "
-                      f"filters={sorted(slots)}, clipboard={'ok' if copied else 'failed'}")
+                      f"filters={sorted(slots)}, "
+                      f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
         state_note = f" — {best.extra['state']}" if best.extra.get("state") else ""
         line = f"Closest match: {best.name}, {sup.distance_phrase(best.distance_ly)}{state_note}."
         if best.controlling_minor_faction:
             line += f" Controlled by {best.controlling_minor_faction}."
-        return line + sup.clipboard_note(best.name, copied)
+        return line + sup.clipboard_note(best.name, copied, here)
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:

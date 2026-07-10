@@ -273,7 +273,7 @@ Each is a prompt in `CLAUDE_CODE_PROMPTS.md`, LLM-native + offline-tested per §
 
 - **N1 — Settings schema + web page.** One settings schema as source of truth; a clean web settings page writing `overrides.json`.
 - **N2 — Voice-settable settings.** The same schema projected to a voice capability.
-- **N3 — Location & carriers.** Copy current system; personal carrier (journal); squadron carrier (journal name + configured callsign + galaxy-DB location); "already there → don't copy" fix.
+- **N3 — Location & carriers.** Copy current system; personal (owned) carrier tracked from the journal, pinned to the owned carrier's `CarrierID` so a squadron carrier the Commander is aboard can't be mistaken for it; "already there → don't copy" fix. (Squadron-carrier *location* is deliberately NOT looked up remotely — no public database resolves a carrier by callsign reliably, so that command just points to the in-game Carrier Management tab.)
 - **N4 — Route callouts.** Scoopable star (K G B F O A M) on approach + jumps-remaining every Nth, from `NavRoute.json` + `FSDTarget`, via the proactive path.
 - **N5 — Auto-honk.** Fire the Discovery Scanner on arrival: read the current fire group from Status, cycle to the configured scanner group, hold fire; combat-gated, opt-in.
 - **N6 — Community Goals.** List current CGs (external feed merged with the journal, surfacing ones you haven't visited), CG system (copy), and your standing (journal-only: Top 10 / top 100-75-50-25%).

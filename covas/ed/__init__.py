@@ -14,8 +14,9 @@ later phase — nothing here initiates a reply.
 """
 from .context import EDContext
 from .detector import ContextDetector, ContextRef
-from .journal import (JournalWatcher, apply_journal_event, default_journal_dir,
-                      describe_journal_event, parse_journal_line, resolve_journal_dir)
+from .journal import (JournalWatcher, apply_carrier_event, apply_journal_event,
+                      default_journal_dir, describe_journal_event, parse_journal_line,
+                      resolve_journal_dir)
 from .status import (StatusWatcher, apply_status, decode_flags, describe_transition,
                      flag_transitions, status_path)
 
@@ -25,6 +26,7 @@ __all__ = [
     "EDContext",
     "JournalWatcher",
     "StatusWatcher",
+    "apply_carrier_event",
     "apply_journal_event",
     "apply_status",
     "decode_flags",

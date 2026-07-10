@@ -93,8 +93,25 @@ def copy_system(clipboard: Callable[[str], None], name: str,
         return False
 
 
-def clipboard_note(name: str, copied: bool) -> str:
-    """The trailing 'copied to clipboard' sentence both outcomes share."""
+def deliver_system(clipboard: Callable[[str], None], name: str, distance_ly: float,
+                   log: Callable[[str], None] | None = None) -> tuple[bool, bool]:
+    """Copy the result system to the clipboard UNLESS it IS the reference/current system.
+
+    A distance of ~0 ly means the nearest match is the system we measured from — the
+    Commander is already there, so there's nothing to navigate to and nothing worth copying
+    (copying your own system just clobbers the clipboard). Returns ``(copied, already_here)``:
+    exactly one is ever true. (The reference is the current system on the common path; an
+    explicit 'near X' override makes it X, which is the sensible thing to compare against.)"""
+    if distance_ly < 0.05:
+        return False, True
+    return copy_system(clipboard, name, log), False
+
+
+def clipboard_note(name: str, copied: bool, already_here: bool = False) -> str:
+    """The trailing clipboard sentence. When the answer is the current system, say so and
+    note that nothing was copied (paired with `deliver_system`)."""
+    if already_here:
+        return " You're already there, so I haven't copied anything."
     return (f" I've copied {name} to your clipboard." if copied
             else f" (Couldn't copy to the clipboard — the system is {name}.)")
 
@@ -140,4 +157,5 @@ def or_list(items) -> str:
 
 # Re-export so capability modules import their exception from one place.
 __all__ = ["NavError", "SearchConfig", "reference_system", "run_query", "faction_or_recovery",
-           "copy_system", "clipboard_note", "distance_phrase", "a_an", "or_list", "recovery"]
+           "copy_system", "deliver_system", "clipboard_note", "distance_phrase", "a_an",
+           "or_list", "recovery"]

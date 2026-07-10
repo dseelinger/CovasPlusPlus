@@ -37,6 +37,18 @@ _FIELDS: tuple[str, ...] = (
     "cargo",          # cargo aboard, tons
 )
 
+# The Commander's PERSONAL fleet carrier, tracked live from journal carrier events. Kept
+# separate from _FIELDS (and out of the "current context" summary) because it's about the
+# carrier's whereabouts, not the Commander's — "where's my carrier" is its own question.
+_CARRIER_FIELDS: tuple[str, ...] = (
+    "carrier_id",         # the OWNED carrier's id (CarrierStats) — the identity we pin to, so
+                          # a squadron / other carrier's events (a different id) can't hijack it
+    "carrier_name",       # the carrier's given name (CarrierStats)
+    "carrier_callsign",   # its callsign, e.g. "K7X-B0X" (CarrierStats)
+    "carrier_system",     # its current star system (CarrierLocation, id-matched)
+    "carrier_pending_system",  # a scheduled-but-not-yet-made jump destination (CarrierJumpRequest)
+)
+
 
 class EDContext:
     """Thread-safe rolling snapshot of Elite Dangerous game state."""
@@ -61,6 +73,12 @@ class EDContext:
         self.fuel_main: float | None = None
         self.fuel_capacity: float | None = None
         self.cargo: float | None = None
+        # Fleet-carrier state (see _CARRIER_FIELDS).
+        self.carrier_id: int | None = None
+        self.carrier_name: str | None = None
+        self.carrier_callsign: str | None = None
+        self.carrier_system: str | None = None
+        self.carrier_pending_system: str | None = None
 
     def update(self, **changes) -> None:
         """Atomically set one or more fields. Unknown keys raise (fail loud) so a typo
@@ -77,6 +95,21 @@ class EDContext:
             snap = {k: getattr(self, k) for k in _FIELDS}
         snap["fuel_pct"] = _fuel_pct(snap["fuel_main"], snap["fuel_capacity"])
         return snap
+
+    # -- fleet carrier -----------------------------------------------------------------
+    def update_carrier(self, **changes) -> None:
+        """Atomically set one or more carrier fields. Unknown keys raise (fail loud), same
+        contract as update()."""
+        with self._lock:
+            for key, val in changes.items():
+                if key not in _CARRIER_FIELDS:
+                    raise KeyError(f"EDContext has no carrier field {key!r}")
+                setattr(self, key, val)
+
+    def carrier_snapshot(self) -> dict:
+        """A plain-dict copy of the carrier fields, taken under lock."""
+        with self._lock:
+            return {k: getattr(self, k) for k in _CARRIER_FIELDS}
 
     def fuel_pct(self) -> float | None:
         with self._lock:

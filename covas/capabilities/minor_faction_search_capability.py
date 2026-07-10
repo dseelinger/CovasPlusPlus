@@ -188,12 +188,13 @@ class MinorFactionSearchCapability:
             return ("I couldn't find a system matching that near you — try relaxing one of the "
                     "filters, or check the faction name.")
         best = systems[0]
-        copied = sup.copy_system(self._clipboard, best.name, self._log)
+        copied, here = sup.deliver_system(self._clipboard, best.name, best.distance_ly, self._log)
         self._logline(f"nearest faction match: {best.name} ({best.distance_ly:.1f} ly), "
-                      f"filters={sorted(slots)}, clipboard={'ok' if copied else 'failed'}")
-        return self._say(best, slots, copied)
+                      f"filters={sorted(slots)}, "
+                      f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+        return self._say(best, slots, copied, here)
 
-    def _say(self, rec, slots: dict, copied: bool) -> str:
+    def _say(self, rec, slots: dict, copied: bool, here: bool = False) -> str:
         dist = sup.distance_phrase(rec.distance_ly)
         faction = slots.get("controlling_minor_faction") or slots.get("minor_faction_presences")
         if faction:
@@ -209,7 +210,7 @@ class MinorFactionSearchCapability:
             line = f"Closest match: {rec.name}, {dist}."
             if rec.controlling_minor_faction:
                 line += f" Controlled by {rec.controlling_minor_faction}."
-        return line + sup.clipboard_note(rec.name, copied)
+        return line + sup.clipboard_note(rec.name, copied, here)
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:

@@ -75,7 +75,8 @@ def test_stations_slot_filling_and_structures():
     assert f["services"] == [{"name": "Shipyard"}, {"name": "Outfitting"}]  # list-of-objects
     assert f["has_large_pad"] == {"value": True}
     assert f["distance_to_arrival"] == {"value": 1000, "comparison": "<="}  # numeric comparison
-    assert clip.copied and clip.copied[0] in out and "clipboard" in out.lower()
+    # Nearest station is in Sol, the current system -> spoken, but not copied (already there).
+    assert clip.copied == [] and "already there" in out.lower()
 
 
 def test_stations_close_to_star_and_faction_resolved():
@@ -133,7 +134,7 @@ def test_minor_faction_present_is_the_default_polarity():
     cap, http, clip = _mk(MinorFactionSearchCapability, _SYSTEMS)
     cap.run_tool("search_minor_factions", {"faction": "Mother Gaia"})
     assert _filters(http) == {"minor_faction_presences": {"value": ["Mother Gaia"]}}
-    assert clip.copied == ["Sol"]                          # nearest system copied
+    assert clip.copied == []              # nearest IS the current system -> not copied
 
 
 def test_minor_faction_presence_result_names_the_queried_faction():
@@ -170,7 +171,7 @@ def test_minor_faction_mishear_resolves_to_canonical_name():
     cap, http, clip = _mk(MinorFactionSearchCapability, _SYSTEMS)
     cap.run_tool("search_minor_factions", {"faction": "Formadine Greybeard Guild"})
     assert _filters(http) == {"minor_faction_presences": {"value": ["Formidine Greybeard Guild"]}}
-    assert clip.copied == ["Sol"]
+    assert clip.copied == []              # nearest IS the current system -> not copied
 
 
 def test_minor_faction_unknown_name_offers_correction_and_does_not_query():
@@ -218,10 +219,13 @@ def test_minor_faction_no_slots_asks():
 # ============================ signals ============================
 
 def test_signals_resolve_type_and_copy():
-    cap, http, clip = _mk(SignalSearchCapability, _STATIONS)
+    # A megaship a few ly away (not the current system) -> spoken AND copied.
+    body = {"results": [{"system_name": "Wolf 359", "name": "Damascus", "type": "Mega ship",
+                         "distance": 12.3, "has_large_pad": True}]}
+    cap, http, clip = _mk(SignalSearchCapability, body)
     out = cap.run_tool("search_signals", {"signal_type": "megaship"})
     assert _filters(http) == {"type": {"value": ["Mega ship"]}}
-    assert clip.copied and clip.copied[0] in out
+    assert clip.copied == ["Wolf 359"] and "Wolf 359" in out
 
 
 def test_signals_unfindable_type_is_corrected_not_invented():
@@ -243,10 +247,21 @@ def test_signals_no_type_asks():
 # ============================= misc =============================
 
 def test_misc_state_search_and_copy():
-    cap, http, clip = _mk(MiscSearchCapability, _SYSTEMS)
+    # A matching system a few ly away (not the current system) -> spoken AND copied.
+    body = {"results": [{"name": "Wolf 359", "distance": 7.8,
+                         "controlling_minor_faction_state": "Civil War"}]}
+    cap, http, clip = _mk(MiscSearchCapability, body)
     out = cap.run_tool("search_faction_states", {"state": "civil war"})
     assert _filters(http) == {"controlling_minor_faction_state": {"value": ["Civil War"]}}
-    assert clip.copied == ["Sol"] and clip.copied[0] in out
+    assert clip.copied == ["Wolf 359"] and clip.copied[0] in out
+
+
+def test_result_that_is_current_system_is_not_copied():
+    # Task 4: when the nearest match IS the current system (distance ~0), say so and DON'T
+    # copy it — you're already there. Sol is the top result in the systems fixture.
+    cap, http, clip = _mk(MiscSearchCapability, _SYSTEMS)
+    out = cap.run_tool("search_faction_states", {"state": "civil war"})
+    assert clip.copied == [] and "already there" in out.lower()
 
 
 def test_misc_combines_state_allegiance_power_state():

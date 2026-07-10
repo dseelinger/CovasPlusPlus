@@ -119,6 +119,10 @@ class App:
         # capability references. Watchers publish only; they never drive the loop.
         self.ed_ctx = None
         self._ed_watchers: list = []
+        # Location & carrier commands (N3) are registered by ED monitoring (they read the
+        # journal), so this must be set BEFORE _start_ed_monitoring, not in the later
+        # capability block — otherwise it would clobber the assignment back to None.
+        self.carriers = None
         if self.cfg.get("elite", {}).get("enabled"):
             self._start_ed_monitoring()
 
@@ -175,6 +179,7 @@ class App:
             jdir = resolve_journal_dir(self.cfg)
             self.ed_ctx = EDContext(recent_maxlen=int(el.get("recent_events_kept", 25)))
             self.registry.register(EDContextCapability(self.ed_ctx))
+            self._start_carriers(jdir)
 
             def _err(e: Exception) -> None:  # watcher-thread errors -> log, don't crash
                 self.bus.publish({"type": "log", "who": "system",
@@ -202,6 +207,41 @@ class App:
                 w.stop()
             except Exception:  # noqa: BLE001
                 pass
+
+    # ---- Location & carrier commands (N3) ---------------------------------
+    def _start_carriers(self, jdir) -> None:
+        """Register the location/carrier capability (copy current system, where's my fleet /
+        squadron carrier). Called from ED monitoring since it reads the journal; fleet-carrier
+        state is the live EDContext with a journal-scan fallback, and the squadron lookup goes
+        through Spansh by the configured callsign. Fail soft — never blocks startup."""
+        try:
+            from .capabilities.location_capability import LocationCarrierCapability
+            from .nav import (CarrierInfo, carrier_from_journals, copy as _nav_copy,
+                              squadron_name_from_journals)
+
+            def _fleet_carrier():
+                # Prefer the live watcher state; fall back to a journal scan for a carrier the
+                # current session hasn't seen jump yet.
+                if self.ed_ctx is not None:
+                    snap = self.ed_ctx.carrier_snapshot()
+                    if snap["carrier_name"] or snap["carrier_callsign"] or snap["carrier_system"]:
+                        return CarrierInfo(snap["carrier_name"], snap["carrier_callsign"],
+                                           snap["carrier_system"], snap["carrier_pending_system"])
+                return carrier_from_journals(jdir)
+
+            self.carriers = LocationCarrierCapability(
+                get_current_system=self._current_system,
+                clipboard=_nav_copy,
+                get_fleet_carrier=_fleet_carrier,
+                get_squadron_name=lambda: squadron_name_from_journals(jdir),
+                log=lambda m: self._log("carrier", m))
+            self.registry.register(self.carriers)
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": "Location & carrier commands ON."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.carriers = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Location & carrier commands failed to start: {e}"})
 
     # ---- Proactive callouts (DESIGN §5) -----------------------------------
     def _start_proactive(self) -> None:

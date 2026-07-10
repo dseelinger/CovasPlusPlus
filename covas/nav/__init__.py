@@ -16,17 +16,21 @@ from .modules import (Ambiguous, NeedAttrs, Resolved, Unknown, resolve)
 from .closest import (ClosestResult, NavError, RequestsHttp, find_closest_module)
 from .clipboard import copy
 from .location import current_system_from_journal
+from .carrier import (CarrierInfo, carrier_from_journals, squadron_name_from_journals)
 
 __all__ = [
     "Ambiguous",
+    "CarrierInfo",
     "ClosestResult",
     "NavError",
     "NeedAttrs",
     "RequestsHttp",
     "Resolved",
     "Unknown",
+    "carrier_from_journals",
     "copy",
     "current_system_from_journal",
     "find_closest_module",
     "resolve",
+    "squadron_name_from_journals",
 ]
