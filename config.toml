@@ -298,6 +298,35 @@ confirm_window = 60
 allowlist = ["landing_gear"]
 
 
+[nav]
+# Find-closest-module (voice: "find the closest station that sells module X"). Resolves the
+# module conversationally against a BUNDLED offline outfitting taxonomy (ask/confirm/cancel,
+# no network), then — only after confirmation — runs ONE Spansh station search for the nearest
+# station selling it, sorted by distance from your current system, and copies the SYSTEM name
+# to the clipboard. Needs [elite].enabled for the live current-system (else it falls back to
+# the newest journal's last jump/location).
+#
+# DEFAULT OFF — opt in once you want it.
+enabled = true
+# Spansh station-search endpoint. Synchronous JSON POST; the module filter honours name/class
+# only, so mount + landing pad are filtered client-side from the results (Spansh quirk).
+base_url = "https://spansh.co.uk/api/stations/search"
+# Sent as the HTTP User-Agent — be a polite API citizen and identify the app.
+user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
+# Default landing-pad size your ship needs (S/M/L). My main ships need Large. The voice
+# request can override per-search; set "any" to not filter by pad.
+default_pad_size = "L"
+# How many nearest module-selling stations to fetch per search before client-side
+# mount filtering picks the closest match. 50 comfortably covers the common cases.
+search_size = 50
+# Require an explicit, SEPARATE-turn confirmation ("yes" / "confirm") before the search runs.
+# DEFAULT OFF — as soon as the module is fully resolved (name + any needed size/mount) it
+# searches immediately; this is a read-only lookup, so the extra confirm turn is just friction.
+# Turn ON to gate it: a hard turn-counter (like the keybind safety layer) then requires a new
+# command to confirm, so the model can't resolve-and-confirm in a single turn.
+require_confirmation = false
+
+
 [conversation]
 # Rolling in-session history so follow-ups work. Older turns are trimmed
 # once the running message count exceeds this many (user+assistant) turns.

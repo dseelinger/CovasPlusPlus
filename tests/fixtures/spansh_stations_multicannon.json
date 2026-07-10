@@ -1,0 +1,220 @@
+{
+  "count": 10000,
+  "from": 0,
+  "size": 5,
+  "reference": {
+    "id64": 10477373803,
+    "name": "Sol",
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "results": [
+    {
+      "name": "Walz Depot",
+      "system_name": "Sol",
+      "distance": 0.0,
+      "distance_to_arrival": 232.857892,
+      "has_large_pad": true,
+      "large_pads": 2,
+      "medium_pads": 2,
+      "small_pads": 4,
+      "type": "Planetary Outpost",
+      "is_planetary": true,
+      "system_x": 0.0,
+      "system_y": 0.0,
+      "system_z": 0.0,
+      "modules": [
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Fixed"
+        },
+        {
+          "category": "standard",
+          "class": 5,
+          "rating": "A",
+          "name": "Frame Shift Drive"
+        }
+      ]
+    },
+    {
+      "name": "Haller City",
+      "system_name": "Barnard's Star",
+      "distance": 5.95466269510709,
+      "distance_to_arrival": 37.425386,
+      "has_large_pad": true,
+      "large_pads": 12,
+      "medium_pads": 8,
+      "small_pads": 4,
+      "type": "Planetary Port",
+      "is_planetary": true,
+      "system_x": -3.03125,
+      "system_y": 1.375,
+      "system_z": 4.9375,
+      "modules": [
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Fixed"
+        },
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Gimbal"
+        },
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Turret"
+        },
+        {
+          "category": "standard",
+          "class": 5,
+          "rating": "A",
+          "name": "Frame Shift Drive"
+        }
+      ]
+    },
+    {
+      "name": "Edison Hub",
+      "system_name": "Luhman 16",
+      "distance": 6.56919301550807,
+      "distance_to_arrival": 13.866056,
+      "has_large_pad": true,
+      "large_pads": 2,
+      "medium_pads": 2,
+      "small_pads": 4,
+      "type": "Planetary Outpost",
+      "is_planetary": true,
+      "system_x": 6.3125,
+      "system_y": 0.59375,
+      "system_z": 1.71875,
+      "modules": [
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Fixed"
+        },
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Gimbal"
+        },
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Turret"
+        },
+        {
+          "category": "standard",
+          "class": 5,
+          "rating": "A",
+          "name": "Frame Shift Drive"
+        }
+      ]
+    },
+    {
+      "name": "Lomas Orbiter",
+      "system_name": "Wolf 359",
+      "distance": 7.77779792904136,
+      "distance_to_arrival": 52.780254,
+      "has_large_pad": true,
+      "large_pads": 9,
+      "medium_pads": 18,
+      "small_pads": 17,
+      "type": "Orbis Starport",
+      "is_planetary": false,
+      "system_x": 3.875,
+      "system_y": 6.46875,
+      "system_z": -1.90625,
+      "modules": [
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Fixed"
+        },
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Gimbal"
+        },
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Turret"
+        },
+        {
+          "category": "standard",
+          "class": 5,
+          "rating": "A",
+          "name": "Frame Shift Drive"
+        }
+      ]
+    },
+    {
+      "name": "Beveridge Enterprise",
+      "system_name": "Lalande 21185",
+      "distance": 8.28732088795891,
+      "distance_to_arrival": 5.059203,
+      "has_large_pad": true,
+      "large_pads": 7,
+      "medium_pads": 11,
+      "small_pads": 7,
+      "type": "Orbis Starport",
+      "is_planetary": false,
+      "system_x": 0.3125,
+      "system_y": 7.5625,
+      "system_z": -3.375,
+      "modules": [
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Fixed"
+        },
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Gimbal"
+        },
+        {
+          "category": "hardpoint",
+          "class": 2,
+          "rating": "E",
+          "name": "Multi-Cannon",
+          "weapon_mode": "Turret"
+        },
+        {
+          "category": "standard",
+          "class": 5,
+          "rating": "A",
+          "name": "Frame Shift Drive"
+        }
+      ]
+    }
+  ]
+}
