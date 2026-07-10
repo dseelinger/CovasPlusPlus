@@ -5,6 +5,13 @@ A capability exposes tool schemas the LLM may call, a handler to run them, and
 optional hooks to react to bus events / inject system-prompt context. The
 CapabilityRegistry aggregates them so app.py talks to one object.
 """
-from .base import Capability, CapabilityRegistry
+from .base import (Capability, CapabilityRegistry, HelpMeta, Slot,
+                   validate_help_meta)
 
-__all__ = ["Capability", "CapabilityRegistry"]
+__all__ = [
+    "Capability",
+    "CapabilityRegistry",
+    "HelpMeta",
+    "Slot",
+    "validate_help_meta",
+]
