@@ -71,6 +71,14 @@ class App:
         # when a checklist file is configured, matching the prior tool-gating.
         self.checklist = Checklist(self.cfg["checklist"]["file"])
         self.registry = CapabilityRegistry()
+        # Help is first-class and always on: it registers ITSELF so "what can you do" always
+        # has one honest answer, and it projects the other capabilities' help metadata (it
+        # holds the registry live, so capabilities registered later still show up). Templated
+        # only — no LLM in the help path (Search Prompt 1).
+        from .capabilities.help_capability import HelpCapability
+        self.help = HelpCapability(self.registry,
+                                   log=lambda m: self._log("help", m))
+        self.registry.register(self.help)
         if self.cfg.get("checklist", {}).get("file"):
             self.registry.register(ChecklistCapability(self.checklist))
 
