@@ -24,9 +24,10 @@ from datetime import date, datetime, timezone
 # The reusable transport + pad logic now live in the shared Spansh client. Re-exported here
 # (Http / RequestsHttp / NavError / _DEFAULT_UA) so the outfitting capability's existing
 # imports from `nav.closest` keep working unchanged.
-from ..search.spansh import (Http, NavError, RequestsHttp, STATIONS_URL, STOCK_MAX_AGE_DAYS,
-                             _DEFAULT_UA, data_age_days, execute_search, freshness_filter,
-                             is_fleet_carrier, is_fresh, largest_pad as _largest_pad,
+from ..search.spansh import (Http, NavError, RequestsHttp as RequestsHttp, STATIONS_URL,
+                             STOCK_MAX_AGE_DAYS, _DEFAULT_UA, data_age_days, execute_search,
+                             freshness_filter, is_fleet_carrier, is_fresh,
+                             largest_pad as _largest_pad,
                              pad_filter_key as _pad_filter_key, pad_ok as _pad_ok)
 
 # Nearest-station search window. We fetch this many nearest stations that sell the module

@@ -6,8 +6,6 @@ dir, the TTS speed clamp/payload, and the web personality endpoints.
 """
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from covas import config

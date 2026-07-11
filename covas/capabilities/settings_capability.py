@@ -191,10 +191,10 @@ class SettingsCapability:
                                   "now — try again in a moment.")
             value, ambiguous = _resolve_option(pairs, str(raw))
             if ambiguous:
-                return None, "", (f"Did you mean {_or_list([_pretty(l) for _v, l in ambiguous])}? "
+                return None, "", (f"Did you mean {_or_list([_pretty(label) for _v, label in ambiguous])}? "
                                   "Tell me which one.")
             if value is None:
-                opts = _or_list([_pretty(l) for _v, l in pairs][:10])
+                opts = _or_list([_pretty(label) for _v, label in pairs][:10])
                 return None, "", f"'{raw}' isn't a valid {s.label.lower()}. Options: {opts}."
             return value, _pretty(_label_for(pairs, value)), None
 

@@ -8,7 +8,6 @@ Breaking out of the generator (or the caller setting `cancel`) aborts the HTTP c
 """
 from __future__ import annotations
 import threading
-from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Iterator
 
 if TYPE_CHECKING:  # only for type hints — keep the offline stack importable without the SDK
