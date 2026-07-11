@@ -13,11 +13,13 @@ Prompt-5 categories share these.)
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Callable
 
 from ..search import NavError, build_query, execute_search
 from ..search.categories import CategorySpec
-from ..search.spansh import _DEFAULT_UA
+from ..search.spansh import (BGS_MAX_AGE_DAYS, _DEFAULT_UA, data_age_days, freshness_filter,
+                             is_fresh)
 
 
 @dataclass(frozen=True)
@@ -58,6 +60,30 @@ def run_query(spec: CategorySpec, slots: dict, http, reference: str, *,
     return execute_search(spec.endpoint, payload, http, user_agent=user_agent,
                           reference_system=reference, subject=spec.subject,
                           lookup_name=spec.lookup_name)
+
+
+def run_query_fresh(spec: CategorySpec, slots: dict, http, reference: str, *,
+                    user_agent: str, size: int, fresh_field: str,
+                    fresh_within_days: int = BGS_MAX_AGE_DAYS,
+                    now: datetime | None = None) -> tuple[list[dict], float | None]:
+    """`run_query` with the staleness policy for VOLATILE facts (BGS states tick daily; see
+    `spansh.py`): constrain `fresh_field` server-side (with a client backstop), and when
+    nothing fresh matches, ONE retry without the window answers from stale data. Returns
+    `(results, stale_age_days)` — the age is the nearest stale result's, None on the fresh
+    path, so the capability knows whether to speak the caveat. `now` is injectable for tests."""
+    today = now.astimezone(timezone.utc).date() if now is not None else None
+    payload = build_query(spec, slots, reference, size=size)
+    payload["filters"].update(freshness_filter(fresh_field, fresh_within_days, today=today))
+    results = execute_search(spec.endpoint, payload, http, user_agent=user_agent,
+                             reference_system=reference, subject=spec.subject,
+                             lookup_name=spec.lookup_name)
+    results = [r for r in results if is_fresh(r, fresh_field, fresh_within_days, today=today)]
+    if results:
+        return results, None
+
+    results = run_query(spec, slots, http, reference, user_agent=user_agent, size=size)
+    age = data_age_days(results[0], fresh_field, now=now) if results else None
+    return results, age
 
 
 def faction_or_recovery(index, spoken) -> tuple[str | None, str | None]:
@@ -122,6 +148,18 @@ def distance_phrase(distance_ly: float) -> str:
             else f"{distance_ly:.1f} light-years away")
 
 
+def stale_note(age_days: float | None, *, what: str = "that data",
+               risk: str = "it may have changed since") -> str:
+    """The trailing caveat for a stale-fallback answer ("Fair warning — that listing is 5 days
+    old, so stock may have rotated."). Empty for the fresh path (`age_days` None), so callers
+    can append it unconditionally."""
+    if age_days is None:
+        return ""
+    days = max(1, round(age_days))
+    unit = "day" if days == 1 else "days"
+    return f" Fair warning — {what} is {days} {unit} old, so {risk}."
+
+
 def a_an(word: str) -> str:
     """'a'/'an' for a spoken kind word ('an allegiance', 'a station type')."""
     return f"an {word}" if word[:1].lower() in "aeiou" else f"a {word}"
@@ -156,6 +194,6 @@ def or_list(items) -> str:
 
 
 # Re-export so capability modules import their exception from one place.
-__all__ = ["NavError", "SearchConfig", "reference_system", "run_query", "faction_or_recovery",
-           "copy_system", "deliver_system", "clipboard_note", "distance_phrase", "a_an",
-           "or_list", "recovery"]
+__all__ = ["NavError", "SearchConfig", "reference_system", "run_query", "run_query_fresh",
+           "faction_or_recovery", "copy_system", "deliver_system", "clipboard_note",
+           "distance_phrase", "stale_note", "a_an", "or_list", "recovery"]

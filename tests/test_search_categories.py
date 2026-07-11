@@ -252,7 +252,10 @@ def test_misc_state_search_and_copy():
                          "controlling_minor_faction_state": "Civil War"}]}
     cap, http, clip = _mk(MiscSearchCapability, body)
     out = cap.run_tool("search_faction_states", {"state": "civil war"})
-    assert _filters(http) == {"controlling_minor_faction_state": {"value": ["Civil War"]}}
+    f = _filters(http)
+    assert f["controlling_minor_faction_state"] == {"value": ["Civil War"]}
+    # States tick daily, so a state search constrains data freshness server-side.
+    assert "updated_at" in f
     assert clip.copied == ["Wolf 359"] and clip.copied[0] in out
 
 

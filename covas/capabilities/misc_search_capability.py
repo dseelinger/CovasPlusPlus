@@ -175,8 +175,18 @@ class MiscSearchCapability:
             return ("I don't know your current system yet — is Elite Dangerous running with "
                     "monitoring on? Jump somewhere, or tell me a system to search near.")
         try:
-            results = sup.run_query(self._spec, slots, self._http, system,
-                                    user_agent=self._cfg.user_agent, size=self._cfg.search_size)
+            # Faction and Powerplay states tick daily, so a state-filtered search constrains
+            # data freshness (with a stale fallback + spoken caveat). This category exists FOR
+            # states, so in practice that's nearly every call.
+            if "controlling_minor_faction_state" in slots or "power_state" in slots:
+                results, stale_age = sup.run_query_fresh(
+                    self._spec, slots, self._http, system, user_agent=self._cfg.user_agent,
+                    size=self._cfg.search_size, fresh_field="updated_at")
+            else:
+                results = sup.run_query(self._spec, slots, self._http, system,
+                                        user_agent=self._cfg.user_agent,
+                                        size=self._cfg.search_size)
+                stale_age = None
         except sup.NavError as e:
             self._logline(f"search failed: {e}")
             return str(e)
@@ -188,12 +198,15 @@ class MiscSearchCapability:
         best = systems[0]
         copied, here = sup.deliver_system(self._clipboard, best.name, best.distance_ly, self._log)
         self._logline(f"nearest state match: {best.name} ({best.distance_ly:.1f} ly), "
-                      f"filters={sorted(slots)}, "
+                      f"filters={sorted(slots)}, stale_age={stale_age}, "
                       f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
         state_note = f" — {best.extra['state']}" if best.extra.get("state") else ""
         line = f"Closest match: {best.name}, {sup.distance_phrase(best.distance_ly)}{state_note}."
         if best.controlling_minor_faction:
             line += f" Controlled by {best.controlling_minor_faction}."
+        # Present only when a state-filtered search answered from the stale fallback.
+        line += sup.stale_note(stale_age, what="that report",
+                               risk="the state may have changed")
         return line + sup.clipboard_note(best.name, copied, here)
 
     def _logline(self, msg: str) -> None:

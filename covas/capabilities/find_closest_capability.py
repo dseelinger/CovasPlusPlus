@@ -36,6 +36,7 @@ from ..nav import (Ambiguous, NavError, NeedAttrs, Resolved, Unknown,
                    copy as _default_copy, find_closest_module, resolve as _default_resolve)
 from ..nav.closest import Http, RequestsHttp, _DEFAULT_BASE_URL, _DEFAULT_UA, _SEARCH_SIZE
 from ..nav.modules import TAXONOMY
+from ._search_support import stale_note
 from .base import HelpMeta, Slot
 
 
@@ -370,6 +371,9 @@ class FindClosestCapability:
         arrival = result.extra.get("distance_to_arrival")
         if isinstance(arrival, (int, float)) and arrival >= 1:
             line += f" About {arrival:,.0f} light-seconds from the star."
+        # Present only when the answer came from the stale fallback (nothing fresh matched).
+        line += stale_note(result.extra.get("stock_age_days"), what="that listing",
+                           risk="outfitting stock rotates and it may be gone")
         if here:
             line += " You're already there, so I haven't copied anything."
         else:

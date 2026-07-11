@@ -27,6 +27,7 @@ never hits the network (DESIGN §9).
 """
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta, timezone
 from typing import Protocol
 
 # Spansh search endpoints (the three real POST /search targets; bodies is a seam for now).
@@ -100,6 +101,64 @@ def execute_search(url: str, payload: dict, http: Http, *,
 
     results = body.get("results")
     return results if isinstance(results, list) else []
+
+
+# ---- data freshness -------------------------------------------------------------------------
+# Spansh's crowdsourced records go stale: a station's data updates only when someone running an
+# EDDN uploader docks there. That's harmless for STRUCTURE (a Coriolis doesn't stop existing)
+# but wrong for VOLATILE facts — shipyard/outfitting stock ROTATES in current ED (observed live
+# 2026-07: a 5-day-old listing offered a ship the vendor no longer stocked), and BGS faction
+# states change on daily ticks. So volatile searches constrain the matching `*_updated_at`
+# server-side, with a client-side backstop, and fall back to unfiltered results (spoken WITH an
+# age caveat) only when nothing fresh matches. Hardcoded policy, deliberately not configurable.
+
+STOCK_MAX_AGE_DAYS = 2   # shipyard / outfitting stock (rotates on a ~days cadence)
+BGS_MAX_AGE_DAYS = 7     # faction / Powerplay states (tick daily, persist days-weeks)
+
+
+def freshness_filter(field: str, max_age_days: int, *, today: date | None = None) -> dict:
+    """A server-side "recently updated" filter fragment for `field` (`shipyard_updated_at`,
+    `outfitting_updated_at`, `updated_at` — all verified honoured live 2026-07). Spansh accepts
+    DATE-ONLY strings here — a datetime is rejected with HTTP 400 — so the window is whole
+    days: `max_age_days` ago through tomorrow (upper bound padded so "today" is always inside
+    the window regardless of timezone). `today` is injectable for tests."""
+    today = today if today is not None else datetime.now(timezone.utc).date()
+    lo = today - timedelta(days=int(max_age_days))
+    hi = today + timedelta(days=1)
+    return {field: {"comparison": "<=>", "value": [lo.isoformat(), hi.isoformat()]}}
+
+
+def _parse_updated_at(raw) -> datetime | None:
+    """Spansh's `*_updated_at` value ("2026-07-06 17:37:41+00") as an aware datetime, or None
+    when absent/unparseable."""
+    if not raw:
+        return None
+    try:
+        ts = datetime.fromisoformat(str(raw))
+    except ValueError:
+        return None
+    return ts if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
+
+
+def is_fresh(result: dict, field: str, max_age_days: int, *, today: date | None = None) -> bool:
+    """Client-side backstop mirroring `freshness_filter`'s DATE window (never stricter than
+    the server filter, so the two can't disagree). A missing/unparseable timestamp counts as
+    fresh — the server filter is the primary gate, and a format drift must not drop results."""
+    ts = _parse_updated_at(result.get(field))
+    if ts is None:
+        return True
+    today = today if today is not None else datetime.now(timezone.utc).date()
+    return ts.astimezone(timezone.utc).date() >= today - timedelta(days=int(max_age_days))
+
+
+def data_age_days(result: dict, field: str, *, now: datetime | None = None) -> float | None:
+    """Age of a result's `field` timestamp in days (>= 0.0), or None when absent/unparseable.
+    Powers the spoken "that listing is N days old" caveat on a stale-fallback answer."""
+    ts = _parse_updated_at(result.get(field))
+    if ts is None:
+        return None
+    now = now if now is not None else datetime.now(timezone.utc)
+    return max(0.0, (now - ts).total_seconds() / 86400.0)
 
 
 # ---- landing-pad logic (pure) -------------------------------------------------------------
