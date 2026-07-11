@@ -172,6 +172,7 @@ class SystemSearchCapability:
         refinement, each with spoken phrasings + help text (the registry contract)."""
         return HelpMeta(
             category="star systems",
+            group="navigation and search",
             one_liner=("I find the nearest star system matching an allegiance, government, "
                        "economy, security, population, Powerplay, or colonization state, and "
                        "copy its name to your clipboard."),

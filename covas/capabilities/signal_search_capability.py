@@ -66,6 +66,7 @@ class SignalSearchCapability:
     def help_meta(self) -> HelpMeta:
         return HelpMeta(
             category="signals",
+            group="navigation and search",
             one_liner=("I find the nearest structure — a megaship, settlement, outpost, or "
                        "starport — and copy its system to your clipboard."),
             example="find the nearest megaship",

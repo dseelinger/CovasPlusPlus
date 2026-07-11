@@ -25,9 +25,9 @@ class _Cap:
     """A minimal capability carrying help metadata (and optionally a vocabulary)."""
 
     def __init__(self, category, *, one_liner="It does a thing.", example="do a thing",
-                 slots=(), vocab=None, tool=None):
+                 group="", slots=(), vocab=None, tool=None):
         self._meta = HelpMeta(category=category, one_liner=one_liner, example=example,
-                              slots=tuple(slots))
+                              group=group, slots=tuple(slots))
         self._vocab = vocab
         self._tool = tool or f"tool_{category}"
 
@@ -131,27 +131,36 @@ def test_idle_empty_state_when_only_help_registered():
     assert "for " not in out.lower()
 
 
-def test_idle_empty_state_reads_right_once_capabilities_exist():
-    # Same registry object, now with a capability: idle switches to the real listing and no
-    # longer speaks the empty-state.
+def test_idle_names_groups_once_capabilities_exist():
+    # Same registry object, now with a capability: idle switches to the grouped listing and no
+    # longer speaks the empty-state. Idle names the GROUP, not the capability's example.
     reg, help_cap = _registry_with()
-    reg.register(_Cap("outfitting", example="find the closest multi-cannon"))
+    reg.register(_Cap("outfitting", group="navigation and search",
+                      example="find the closest multi-cannon"))
     out = _idle(help_cap)
     assert out not in _IDLE_EMPTY
-    assert "outfitting" in out and "find the closest multi-cannon" in out
+    assert "navigation and search" in out                    # the GROUP is named
+    assert "find the closest multi-cannon" not in out        # the example is a drill-in, not here
 
 
-def test_idle_lists_at_most_three_plus_tail():
-    caps = [_Cap(f"cat{i}", example=f"do thing {i}") for i in range(1, 6)]  # 5 categories
+def test_idle_lists_all_groups_without_examples():
+    # Groups are the manageable overview tier — every distinct group is named, but no
+    # capability example is read at the overview level (that would grow unbounded).
+    caps = [_Cap(f"cat{i}", group=f"grp{i}", example=f"do thing {i}") for i in range(1, 6)]
     reg, help_cap = _registry_with(*caps)
     out = _idle(help_cap)
-    # First three appear with their examples...
-    for i in (1, 2, 3):
-        assert f"cat{i}" in out and f"do thing {i}" in out
-    # ...the rest only in the "there are others" tail (no example spoken for them).
-    assert "There are others too" in out
-    assert "cat4" in out and "cat5" in out
-    assert "do thing 4" not in out and "do thing 5" not in out
+    for i in range(1, 6):
+        assert f"grp{i}" in out
+        assert f"do thing {i}" not in out
+
+
+def test_idle_deduplicates_a_shared_group():
+    # Several capabilities in one group collapse to a single group name in the overview.
+    caps = [_Cap(f"cat{i}", group="navigation and search") for i in range(1, 4)]
+    reg, help_cap = _registry_with(*caps)
+    out = _idle(help_cap)
+    overview = out.split(" Ask about")[0]        # the group list, before the drill-in example
+    assert overview.count("navigation and search") == 1
 
 
 def test_idle_ranks_by_usage():
@@ -178,6 +187,46 @@ def test_topic_detail_names_example_and_refinements():
     assert "a size" in out  # the slot phrasing is offered
 
 
+def test_group_topic_lists_members_three_plus_tail():
+    # Asking about a GROUP lists its capabilities (with examples) — the ≤3+tail cap lives here
+    # now, so a big group stays readable.
+    caps = [_Cap(f"cat{i}", group="navigation and search", example=f"do thing {i}")
+            for i in range(1, 6)]
+    reg, help_cap = _registry_with(*caps)
+    out = help_cap.run_tool("help", {"topic": "navigation and search"})
+    for i in (1, 2, 3):
+        assert f"cat{i}" in out and f"do thing {i}" in out
+    assert "There are others too" in out
+    assert "cat4" in out and "cat5" in out
+    assert "do thing 4" not in out and "do thing 5" not in out
+
+
+def test_group_topic_is_case_insensitive():
+    caps = [_Cap(f"cat{i}", group="navigation and search") for i in range(1, 3)]
+    reg, help_cap = _registry_with(*caps)
+    out = help_cap.run_tool("help", {"topic": "Navigation And Search"})
+    assert "cat1" in out and "cat2" in out
+
+
+def test_singleton_group_topic_gives_capability_detail():
+    # A group with one member drops straight to that capability's detail (no one-item list).
+    reg, help_cap = _registry_with(_Cap("settings", group="settings",
+                                        example="turn personality off"))
+    out = help_cap.run_tool("help", {"topic": "settings"})
+    assert "turn personality off" in out
+
+
+def test_capability_topic_beats_group_when_names_would_overlap():
+    # "outfitting" is a capability inside the "navigation and search" group; asking for the
+    # capability by name gives its detail, not the group list.
+    reg, help_cap = _registry_with(
+        _Cap("outfitting", group="navigation and search", example="find the closest scoop"),
+        _Cap("stations", group="navigation and search", example="find a station"))
+    out = help_cap.run_tool("help", {"topic": "outfitting"})
+    assert "find the closest scoop" in out
+    assert "find a station" not in out       # not the whole group
+
+
 def test_unregistered_topic_hits_fallback_without_raising_or_echoing_the_name():
     reg, help_cap = _registry_with(_Cap("outfitting"))
     out = help_cap.run_tool("help", {"topic": "teleportation"})
@@ -198,11 +247,13 @@ def test_rotation_is_deterministic_across_a_fixed_call_sequence():
 
 
 def test_rotation_matches_the_frame_table():
+    # Ungrouped cap -> its group falls back to the category, so the overview body is just
+    # "outfitting". The rotating frame prefixes the (constant) drill-in invitation.
     reg, help_cap = _registry_with(_Cap("outfitting", example="find the closest scoop"))
-    body = 'for outfitting, say "find the closest scoop"'
     for i in range(len(_IDLE_FRAMES)):
         out = _idle(help_cap)
-        assert out == _IDLE_FRAMES[i].format(body=body)
+        assert out.startswith(_IDLE_FRAMES[i].format(body="outfitting"))
+        assert "tell me about outfitting" in out
 
 
 # --- 5. failure-recovery (the important mode) ------------------------------

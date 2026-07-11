@@ -28,9 +28,9 @@ class _Cap:
     """A minimal capability carrying help metadata."""
 
     def __init__(self, category, *, one_liner="It does a thing.", example="do a thing",
-                 slots=(), tool=None):
+                 group="", slots=(), tool=None):
         self._meta = HelpMeta(category=category, one_liner=one_liner, example=example,
-                              slots=tuple(slots))
+                              group=group, slots=tuple(slots))
         self._tool = tool or f"tool_{category}"
 
     def tools(self):
@@ -143,6 +143,66 @@ def test_real_capabilities_satisfy_the_contract():
     # And every category it exposes is individually complete.
     for cat in reg.categories():
         assert help_meta_problems(reg.help_entry_for(cat)) == []
+
+
+# --- 1e. group projection (the help hierarchy) -----------------------------
+
+def _grouped_registry():
+    reg = CapabilityRegistry()
+    reg.register(_Cap("outfitting", group="navigation and search", tool="t_out"))
+    reg.register(_Cap("stations", group="navigation and search", tool="t_sta"))
+    reg.register(_Cap("settings", group="settings", tool="t_set"))
+    reg.register(_Cap("carriers", tool="t_car"))          # ungrouped -> singleton group
+    return reg
+
+
+def test_groups_are_distinct_and_ordered():
+    # navigation and search first (two members), then settings, then the ungrouped singleton
+    # (falls back to its own category name).
+    assert _grouped_registry().groups() == ["navigation and search", "settings", "carriers"]
+
+
+def test_help_entries_in_group_returns_members():
+    cats = [m.category for m in _grouped_registry().help_entries_in_group("navigation and search")]
+    assert cats == ["outfitting", "stations"]
+
+
+def test_help_entries_in_group_is_case_insensitive():
+    reg = _grouped_registry()
+    assert len(reg.help_entries_in_group("SETTINGS")) == 1
+
+
+def test_help_entries_in_group_unknown_is_empty():
+    assert _grouped_registry().help_entries_in_group("teleportation") == []
+
+
+def test_group_for_resolves_canonical_name_or_none():
+    reg = _grouped_registry()
+    assert reg.group_for("navigation AND search") == "navigation and search"
+    assert reg.group_for("nope") is None
+
+
+def test_ungrouped_capability_is_its_own_group():
+    assert _grouped_registry().help_entries_in_group("carriers")[0].category == "carriers"
+
+
+def test_real_registry_groups_cover_every_capability():
+    # Build the real app registry (offline) and assert every capability lands in a group and
+    # every group resolves back — the guard that a new capability can't silently escape the
+    # grouped "what can you do" overview.
+    from covas.capabilities.help_capability import HelpCapability
+    from covas.capabilities.find_closest_capability import (FindClosestCapability, NavConfig)
+    reg = CapabilityRegistry()
+    help_cap = HelpCapability(reg)
+    reg.register(help_cap)
+    reg.register(FindClosestCapability(NavConfig(enabled=True), get_current_system=lambda: "Sol"))
+    groups = reg.groups(exclude=help_cap)
+    assert groups                                   # at least one group
+    # every listed capability belongs to exactly one resolvable group
+    for cat in reg.categories(exclude=help_cap):
+        meta = reg.help_entry_for(cat, exclude=help_cap)
+        from covas.capabilities.base import group_of
+        assert reg.group_for(group_of(meta), exclude=help_cap) is not None
 
 
 # --- 2. read helpers over a fixture registry -------------------------------

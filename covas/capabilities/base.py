@@ -71,12 +71,19 @@ class HelpMeta:
       * `category`        — short spoken name for the capability ("outfitting").
       * `one_liner`       — one sentence: what it does.
       * `example`         — a real utterance that invokes it.
+      * `group`           — the higher-level bucket this capability belongs to, so "what can
+                            you do" can name a handful of GROUPS instead of reading every
+                            capability at once (help scales as capabilities grow). A Commander
+                            drills in by asking about the group, then a specific capability.
+                            Blank falls back to the category, so an ungrouped capability is its
+                            own singleton group and nothing breaks.
       * `slots`           — the refinements it accepts (may be empty).
       * `help_when_active`— optional extra guidance to speak while its dialog is in progress.
     """
     category: str
     one_liner: str
     example: str
+    group: str = ""
     slots: tuple[Slot, ...] = field(default_factory=tuple)
     help_when_active: Optional[str] = None
 
@@ -130,6 +137,12 @@ def _capability_help(cap: "Capability") -> Optional[HelpMeta]:
     if fn is None:
         return None
     return fn()
+
+
+def group_of(meta: HelpMeta) -> str:
+    """The group a capability belongs to for the help hierarchy, falling back to its category
+    when it declares no group (so an ungrouped capability is its own singleton group)."""
+    return (str(getattr(meta, "group", "") or "").strip() or meta.category)
 
 
 class CapabilityRegistry:
@@ -217,6 +230,42 @@ class CapabilityRegistry:
         for m in self.help_entries(exclude=exclude):
             if m.category.strip().lower() == want:
                 return m
+        return None
+
+    # -- group projection (the help hierarchy) ----------------------------------
+    # "What can you do" names GROUPS; a group drills into its capabilities; a capability
+    # drills into its detail. Groups are derived live from registered metadata (via
+    # `group_of`), so they can't drift from what's actually loaded.
+    def groups(self, *, exclude: Optional["Capability"] = None) -> list[str]:
+        """Distinct group names across registered capabilities, ordered by their most-used
+        member (help_entries is already usage-ranked), ties keeping first appearance."""
+        out: list[str] = []
+        for m in self.help_entries(exclude=exclude):
+            g = group_of(m)
+            if g and g not in out:
+                out.append(g)
+        return out
+
+    def help_entries_in_group(self, group: str,
+                              *, exclude: Optional["Capability"] = None) -> list[HelpMeta]:
+        """Every registered capability in `group` (case-insensitive), usage-ranked. Empty for
+        an unknown group. Used to answer 'what can I do with <group>'."""
+        want = str(group or "").strip().lower()
+        if not want:
+            return []
+        return [m for m in self.help_entries(exclude=exclude)
+                if group_of(m).strip().lower() == want]
+
+    def group_for(self, name: str,
+                  *, exclude: Optional["Capability"] = None) -> Optional[str]:
+        """The canonical group name matching `name` (case-insensitive), or None — so help can
+        tell a group topic from a capability topic without inventing one."""
+        want = str(name or "").strip().lower()
+        if not want:
+            return None
+        for g in self.groups(exclude=exclude):
+            if g.strip().lower() == want:
+                return g
         return None
 
     # -- pure read helpers help consumes (Search Prompt 2) ----------------------

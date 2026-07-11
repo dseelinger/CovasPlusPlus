@@ -101,6 +101,7 @@ class StationSearchCapability:
     def help_meta(self) -> HelpMeta:
         return HelpMeta(
             category="stations",
+            group="navigation and search",
             one_liner=("I find the nearest station by its type, services, landing pad, "
                        "distance from the star, or controlling faction, and copy its system to "
                        "your clipboard."),

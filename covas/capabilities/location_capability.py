@@ -78,6 +78,7 @@ class LocationCarrierCapability:
     def help_meta(self) -> HelpMeta:
         return HelpMeta(
             category="carriers",
+            group="navigation and search",
             one_liner=("I copy your current system to the clipboard, and tell you where your "
                        "fleet carrier is."),
             example="where's my fleet carrier",

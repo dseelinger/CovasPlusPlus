@@ -15,7 +15,8 @@ enable it first (see **§0.3**).
 **Keys** — hold **`[`** to talk · **tap `[`** briefly (under 400 ms) to cancel/stop · **Ctrl+Alt+Q** to quit.
 (You can bind a joystick button to `[` via JoyToKey. There's no separate cancel key by default; the panel's **CANCEL** button always works too.)
 
-**Web panel** — http://127.0.0.1:8765 (opens automatically when you launch the UI build).
+**Web panel** — http://127.0.0.1:8765 (opens automatically when you launch the UI build). The
+**Settings** page is at http://127.0.0.1:8765/settings.
 
 **Sound cues you should hear** (each is a random pick from a small set — swap in your own in `sounds/`):
 - **voiceinput1–4** — plays the instant you press to talk
@@ -26,9 +27,10 @@ enable it first (see **§0.3**).
 **Legend for what each section needs:**
 - 🎮 **ED** — Elite Dangerous must be running (reads live journal/Status.json).
 - 🔊 **HW** — needs real hardware: microphone, speakers/headset. (Nearly every voice step is HW.)
-- ⌨️ **INJECT** — sends real keypresses into ED (keybind automation).
+- ⌨️ **INJECT** — sends real keypresses into ED (keybind automation / auto-honk).
 - 📋 **FILE** — verify by opening a file on disk.
 - 🌐 **PANEL** — verify in the web control panel.
+- 🌍 **NET** — needs internet (Spansh / Inara / web search).
 
 ---
 
@@ -36,32 +38,32 @@ enable it first (see **§0.3**).
 
 ### 0.1 Environment health
 - [ ] 🔊 Run **`check_setup.bat`** (or `.venv\Scripts\python.exe check_setup.py`) → every line reads `[ OK ]`, ending in "All systems go."
-- [ ] Confirm `personality.txt` exists (copy `personality.example.txt` if not) and `ElevenLabsAPIKey.txt` holds your key — both are git-ignored.
+- [ ] Confirm `personality.txt` (or `campaign.txt`) exists and `ElevenLabsAPIKey.txt` holds your key — both git-ignored.
 
 Notes:
 
 ### 0.2 Launch
-- [ ] **Headless:** `run_covas.bat` (or `python run_covas.py`) → console banner shows your model, voice, Whisper size, `Personality ON`, and `TALK: hold [`. No browser.
-- [ ] **With panel:** `run_covas_ui.bat` (or `python run_covas_ui.py`) → same console banner **plus** the browser opens http://127.0.0.1:8765 and the status light reads **IDLE**.
+- [ ] **Headless:** `run_covas.bat` (or `python run_covas.py`) → console banner shows your model, voice, Whisper size, and the capability on/off lines (Router, ED monitor, Proactive, Keybinds, **Auto-honk**, Find module, Personality). No browser.
+- [ ] **With panel:** `run_covas_ui.bat` (or `python run_covas_ui.py`) → same banner **plus** the browser opens http://127.0.0.1:8765 and the status light reads **IDLE**.
 - [ ] Console prints the PTT scan codes line, and `QUIT: Ctrl+Alt+Q`.
 
 Notes:
 
 ### 0.3 Capability toggles — enable what you want to test FIRST
-These features are gated in **`config.toml`** (edit values freely) or via **`overrides.json`**
-(what the web panel writes). **The web Settings page does NOT toggle capabilities** — it only
-changes model, thinking depth, web-search on/off, personality, ElevenLabs voice/model, and
-Whisper size. Capability enablement is config-file only.
-
-Confirm each of these before running its section (as shipped, most are already `true`; **keybinds is the one that ships OFF**):
-- [ ] `[elite].enabled = true` — ED journal/Status monitoring. **Required by** proactive callouts, the keybind combat guard, and the live "current system" used by every search. (§5, §6, §7, §8)
-- [ ] `[proactive].enabled = true` — proactive callouts. Whitelisted events: `FSDJump`, `Docked`, `MissionCompleted`, `LowFuel`, `Overheating`, `Died`. (§5.2)
-- [ ] `[keybinds].enabled = true` — **DEFAULT OFF.** Flip it on to test §6. Keep `require_confirmation = true` and `combat_guard = true`. Allowlist is `["landing_gear"]`.
+Capabilities are gated in **`config.toml`** (edit freely) or **`overrides.json`** (what the panel
+writes). The Settings page (§14.2) can also flip these, but **capability enable/disable applies on
+the next restart** (only Whisper reloads live). Confirm each before running its section (as shipped,
+most are `true`; **keybinds and auto-honk ship OFF**):
+- [ ] `[elite].enabled = true` — ED journal/Status monitoring. **Required by** proactive/route callouts, the keybind + honk combat guard, carriers, community goals, and the live "current system" used by every search. (§5, §6, §7, §8, §9, §10)
+- [ ] `[proactive].enabled = true` — proactive callouts. (§5.2)
+- [ ] `[route].enabled = true` — **DEFAULT OFF.** Route callouts while flying a plotted route. (§5.3)
+- [ ] `[keybinds].enabled = true` — **DEFAULT OFF.** Landing-gear automation. Keep `require_confirmation`/`combat_guard = true`. (§6.1)
+- [ ] `[honk].enabled = true` — **DEFAULT OFF.** Auto-honk on arrival. Set `fire_group` + `trigger` for cycling, or leave `fire_group = -1` for the hold-primary fallback. (§6.2)
 - [ ] `[nav].enabled = true` — outfitting "find the closest module". (§7)
-- [ ] `[star_systems].enabled = true` — star-system voice search. (§8.1)
-- [ ] `[search].enabled = true` — group toggle for stations, minor factions, signals, and faction-states searches. (§8.2–8.5)
+- [ ] `[star_systems].enabled = true` / `[search].enabled = true` — voice search categories. (§8)
+- [ ] `[cg].enabled` is implicit (`[cg].source`); set `[cg].inara_api_key` to also see CGs you haven't visited. (§10)
 - [ ] `[router].enabled = true` — cost router (cheap tier by default). (§4)
-- [ ] `[web_search].enabled = true` — automatic web search. (§3)
+- [ ] `[web_search].enabled = true` — automatic web search. (§16)
 - [ ] `[personality].enabled = true` — "Commander" address + campaign context.
 
 Notes (which toggles you changed, and where):
@@ -92,157 +94,208 @@ Notes:
 - [ ] Confirm a normal **hold** still records fine (a hold is well over the 400 ms tap threshold).
 - [ ] **Barge-in:** while a reply is being spoken, **hold `[`** again → the speech cuts off and a fresh capture starts.
 - [ ] 🌐 The panel's **CANCEL / STOP** button also stops an in-progress reply.
-- [ ] The old **`]`** key does nothing (retired).
 
 Notes:
 
 ## 4. Cost router — cheap by default, escalates on demand  🔊 HW 🌐 PANEL
 > Verify each turn via the session log's two lines: a **`[router] <model> max_tokens=N — <reason>`** line and a **`[usage] in=… out=… ~$0.00XX [<model>]`** line. (Requires `[router].enabled = true`.)
-- [ ] **Banter uses the cheap tier:** say *"Morning, COVAS — how's it going?"* → router line shows **`claude-haiku-4-5`**; the usage line's model is Haiku and cost is a fraction of a cent.
-- [ ] **"Think hard" escalates:** say *"Think hard about the best way to break in a new ship."* → router line shows **`claude-sonnet-5`** (escalate phrase).
-- [ ] **Depth phrase escalates:** say *"Walk me through the pros and cons of a fuel scoop."* → router escalates to Sonnet.
-- [ ] **Explicit premium:** say *"Use Opus for this — summarize the Thargoid war."* → router line shows **`claude-opus-4-8`**.
-- [ ] **Full breakdown raises the cap:** say *"Give me the full breakdown of the engineering process."* → router line shows a higher `max_tokens` (2048).
-- [ ] (Optional) 🌐 Set the router **pin** off/on, or change the base model in the panel, and confirm the router line reflects it.
+- [ ] **Banter uses the cheap tier:** *"Morning, COVAS — how's it going?"* → router line shows **`claude-haiku-4-5`**; cost a fraction of a cent.
+- [ ] **"Think hard" escalates:** *"Think hard about the best way to break in a new ship."* → **`claude-sonnet-5`**.
+- [ ] **Depth phrase escalates:** *"Walk me through the pros and cons of a fuel scoop."* → Sonnet.
+- [ ] **Explicit premium:** *"Use Opus for this — summarize the Thargoid war."* → **`claude-opus-4-8`**.
+- [ ] **Full breakdown raises the cap:** *"Give me the full breakdown of the engineering process."* → higher `max_tokens` (2048).
+- [ ] (Optional) 🌐 Set the router **pin** in Settings and confirm the router line reflects it.
 
 Notes:
 
-## 5. ED monitoring & proactive callouts  🎮 ED 🔊 HW
-> Requires `[elite].enabled = true` and Elite Dangerous running. Fly around a little so there's live telemetry.
+## 5. ED monitoring, proactive & route callouts  🎮 ED 🔊 HW
+> Requires `[elite].enabled = true` and ED running. Fly around so there's live telemetry.
 
 ### 5.1 Context-aware answers
 - [ ] *"Where am I?"* → names your **current system** (from live telemetry, not a guess).
-- [ ] *"How's my fuel?"* → reports your **fuel level** / status.
+- [ ] *"How's my fuel?"* → reports **fuel level** / status.
 - [ ] *"Am I docked?"* / *"What ship am I in?"* → answers from current status.
-- [ ] *"What did I just do?"* / *"Check my logs."* → summarizes **recent journal events** (jumps, docks, missions).
-- [ ] Say a word with **"context"** in it on an ambiguous question → forces a live status lookup for that turn (the wake word is scrubbed from what the model sees).
+- [ ] *"What did I just do?"* / *"Check my logs."* → summarizes **recent journal events**.
+- [ ] Say a word with **"context"** in it on an ambiguous question → forces a live status lookup (the wake word is scrubbed from what the model sees).
 
 Notes:
 
 ### 5.2 Proactive callouts (`[proactive].enabled = true`)
-- [ ] **Arrival:** perform an **FSD jump** to a new system → within a few seconds COVAS speaks a short in-character callout **without** any PTT press. (Fires only when idle.)
-- [ ] **Dock** at a station → a `Docked` callout fires (at most one line even amid a jump→supercruise→dock burst — min-interval throttle).
-- [ ] **Mute by voice:** say *"COVAS, stop the callouts."* → it confirms; trigger another event → **no** callout. Then *"COVAS, turn callouts back on."* → next event announces again.
-- [ ] A callout in progress is cancelable: hold `[` mid-callout → it cuts off like any speech.
+- [ ] **Arrival:** **FSD jump** to a new system → within a few seconds COVAS speaks a short in-character callout **without** any PTT press (fires only when idle).
+- [ ] **Dock** at a station → a `Docked` callout fires (at most one line amid a jump→supercruise→dock burst — min-interval throttle).
+- [ ] **Mute by voice:** *"COVAS, stop the callouts."* → confirms; trigger another event → **no** callout. Then *"COVAS, turn callouts back on."* → next event announces again.
+- [ ] A callout in progress is cancelable: hold `[` mid-callout → it cuts off.
 
 Notes:
 
-## 6. Keybind automation — landing gear  🎮 ED ⌨️ INJECT 🔊 HW
-> Requires `[keybinds].enabled = true` **and** `[elite].enabled = true` (combat guard reads ED
-> Status). The **Toggle Landing Gear** control must be bound to a key in ED. Only `landing_gear`
-> is allowlisted. Do this **while parked/docked and safe** — it sends a real keypress.
-- [ ] **Arm:** say *"COVAS, toggle my landing gear."* → it says it's **armed but not done**, and asks you to confirm on a separate command. Gear does **not** move yet.
-- [ ] **Confirm on a SEPARATE turn:** say *"Confirm."* (or *"do it"*) → the gear actually toggles in-game (watch the ship).
-- [ ] **Same-turn confirm is refused:** arm and, in the *same* utterance, say "…and do it now" → it refuses to fire in the arming turn.
-- [ ] **Combat guard:** get **interdicted / into a danger state**, then ask to toggle gear → it **refuses** ("won't touch ship controls mid-interdiction / in danger"). With `[elite]` OFF it also refuses (can't prove it's safe).
-- [ ] **Expiry:** arm it, wait past `confirm_window` (60 s), then say *"confirm"* → it says the action expired; nothing fires.
-- [ ] **Hard abort:** arm it, then say *"Abort."* / *"Belay that."* → the arm is cleared and any held key is released.
-- [ ] **Off-allowlist refusal:** ask for a different control (e.g. *"deploy hardpoints"*) → it won't do it (only `landing_gear` is permitted).
+### 5.3 Route callouts (N4 — `[route].enabled = true`)  🎮 ED
+> Plot a multi-jump galaxy-map route first (writes `NavRoute.json`). These go through the proactive path — spoken only when idle, cancelable, and silenced by the proactive mute too.
+- [ ] **Scoopable heads-up:** as you lock/enter the next jump, COVAS says whether the next star is **scoopable** ("Next star's scoopable." / "…isn't scoopable. Top off your fuel if you're low.").
+- [ ] **Jumps remaining:** every **Nth** jump (`[route].every_n`, default 5) it announces jumps remaining to the destination (singular "1 jump remaining" near the end).
+- [ ] **Arrival:** on reaching the final system it says "Arrived at <system>. Route complete." and stops.
+- [ ] **Replot:** plot a new route mid-flight → callouts follow the new route (counts reset).
+- [ ] **Mute:** with the proactive mute on ("stop the callouts"), route callouts are silent too.
 
 Notes:
 
-## 7. Outfitting search — find the closest module  🎮 ED 🔊 HW 📋 clipboard
-> `[nav].enabled = true`. `require_confirmation` ships **off**, so it searches as soon as the
-> module is fully resolved. Result sentence: *"Closest <module>: <station> in <system>, N.N
-> light-years away. Largest pad X. … I've copied <system> to your clipboard."*
-- [ ] **Happy path:** *"Find the closest fuel scoop."* → names the nearest station + system and distance, and **copies the system name** to the clipboard (paste it somewhere to confirm).
-- [ ] **Disambiguation:** *"Find the closest multi-cannon."* → because a multi-cannon needs a **size and mount**, it **asks** (e.g. size small/medium/large/huge and fixed/gimballed/turreted) instead of guessing. Answer the questions → it then searches.
-- [ ] **Mishear recovery:** *"Find the nearest multiple cannon."* → it resolves to / suggests **Multi-Cannon** rather than dead-ending on the misheard word.
-- [ ] **Clipboard:** after any successful search, the clipboard holds the **system** name (what you paste into the galaxy map).
-- [ ] **Already local:** search for a module sold in your **current** system → the reply says the station is **"in your current system"** (distance ~0). *(Note: it still copies that system name — pasting your own system is a harmless no-op; there's no separate "skip copy" behavior.)*
-- [ ] **No current system:** with ED not running and no journal, ask for a module → it says it doesn't know your current system yet, rather than searching blindly.
+## 6. Ship controls — keybinds & auto-honk  🎮 ED ⌨️ INJECT 🔊 HW
+> Both send **real keypresses** into ED and need `[elite].enabled = true` (combat guard). Do these **parked/docked and safe**.
+
+### 6.1 Toggle landing gear (`[keybinds].enabled = true`)
+> The **Toggle Landing Gear** control must be bound to a key in ED. Only `landing_gear` is allowlisted.
+- [ ] **Arm:** *"COVAS, toggle my landing gear."* → says it's **armed but not done**, asks you to confirm separately. Gear does **not** move yet.
+- [ ] **Confirm on a SEPARATE turn:** *"Confirm."* (or *"do it"*) → the gear toggles in-game.
+- [ ] **Same-turn confirm refused:** arm and, in the *same* utterance, say "…and do it now" → refuses to fire in the arming turn.
+- [ ] **Combat guard:** get **interdicted / into danger**, then ask to toggle → **refuses**. With `[elite]` OFF it also refuses (can't prove it's safe).
+- [ ] **Expiry:** arm it, wait past `confirm_window` (60 s), then *"confirm"* → says it expired; nothing fires.
+- [ ] **Hard abort:** arm it, then *"Abort."* / *"Belay that."* → arm cleared, any held key released.
+- [ ] **Off-allowlist refusal:** ask for a different control (*"deploy hardpoints"*) → won't do it.
 
 Notes:
 
-## 8. Voice search categories  🎮 ED 🔊 HW 📋 clipboard
-> `[star_systems].enabled` and `[search].enabled` = true. Each search is stateless conversational
-> slot-filling over Spansh, nearest-first from your current system, and **copies the primary
-> system to the clipboard**. Misheard filter values are validated against a bundled vocabulary
-> and corrected, not silently widened.
+### 6.2 Auto-honk (N5 — `[honk].enabled = true`)
+> Fires the Discovery Scanner shortly after you jump into a **new** system — no button press. Bind the scanner's fire button (and, for cycling, fire-group next/previous) to keys in ED; note the scanner's fire group number (0-based, right HUD panel). Set `[honk].fire_group`, `[honk].trigger` (primary/secondary). At launch the log reports the fire key + group, or a "bind it in-game" warning.
+- [ ] **Configured honk:** with `fire_group` set to the scanner's group, **jump** to a new system → it cycles to the scanner group, **holds** the fire button ~`hold_seconds` (default 6), then cycles **back** — and does **NOT** fire weapons. Log shows a `honk` line.
+- [ ] **Fallback:** set `fire_group = -1`, select the scanner group yourself, jump → it just **holds primary fire** and honks.
+- [ ] **Combat guard:** get interdicted / into danger, then jump (or trigger arrival in danger) → it **refuses** with a logged reason; nothing fires.
+- [ ] **Unknown fire group:** with `[elite]` OFF (or before Status has a fire group) and a configured `fire_group` → it **skips** rather than risk firing in the wrong group.
+- [ ] **Hard abort:** with `[keybinds]` also on, jump and during the ~6 s hold say *"abort"* → the held fire key releases immediately.
+- [ ] **Disabled:** set `[honk].enabled = false` → no honk on arrival.
+
+Notes (reliability quirks — cycle timing, hold too short/long for a full honk):
+
+## 7. Outfitting search — find the closest module  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
+> `[nav].enabled = true`. `require_confirmation` ships **off**, so it searches as soon as the module is fully resolved.
+- [ ] **Happy path:** *"Find the closest fuel scoop."* → names the nearest station + system + distance, and **copies the system** to the clipboard (paste to confirm).
+- [ ] **Disambiguation:** *"Find the closest multi-cannon."* → asks for **size and mount** instead of guessing; answer → it searches.
+- [ ] **Mishear recovery:** *"Find the nearest multiple cannon."* → resolves to / suggests **Multi-Cannon**.
+- [ ] **Already local:** search for a module sold in your **current** system → the reply says it's **"in your current system"** (see the N3 already-there rule in §9 for the copy behavior).
+- [ ] **No current system:** with ED not running and no journal → it says it doesn't know your current system yet, rather than searching blindly.
+
+Notes:
+
+## 8. Voice search categories  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
+> `[star_systems].enabled` and `[search].enabled` = true. Stateless conversational slot-filling over Spansh, nearest-first from your current system, each **copies the primary system** to the clipboard. Misheard filter values are validated against a bundled vocabulary and corrected.
 
 ### 8.1 Star systems
-- [ ] *"Find the nearest Empire system with high security."* → names the closest matching system + distance and copies it. (Slots: allegiance, government, economy, security, Powerplay power/state, population, permit, colonization.)
-
-Notes:
+- [ ] *"Find the nearest Empire system with high security."* → closest matching system + distance, copied.
 
 ### 8.2 Stations
-- [ ] *"Find the nearest station with a shipyard and a large pad."* → nearest matching station/system, copied. (Try *"no carriers"* to exclude fleet carriers, or *"close to the star"* for within ~1000 Ls.)
-
-Notes:
+- [ ] *"Find the nearest station with a shipyard and a large pad."* → nearest matching station/system, copied. (Try *"no carriers"* or *"close to the star"*.)
 
 ### 8.3 Minor factions
-- [ ] *"Where is the nearest system the Dark Wheel is present?"* → nearest system with that faction present (or *"controlled by the Dark Wheel"* for controlling only), copied. An unknown faction name triggers a recovery suggestion instead of a bogus search.
-
-Notes:
+- [ ] *"Where is the nearest system the Dark Wheel is present?"* → nearest system with that faction, copied. An unknown faction name triggers a recovery suggestion, not a bogus search.
 
 ### 8.4 Signals / structures
-- [ ] *"Find the nearest megaship."* → nearest structure of that type (megaship / settlement / outpost / starport), copied.
-
-Notes:
+- [ ] *"Find the nearest megaship."* → nearest structure of that type, copied.
 
 ### 8.5 Faction states (misc)
-- [ ] *"Find the nearest system at war."* → nearest system by controlling-faction state (war, civil war, boom, election, infrastructure failure), copied.
-
-Notes:
+- [ ] *"Find the nearest system at war."* → nearest system by controlling-faction state, copied.
 
 ### 8.6 Refinement re-query
-- [ ] After any of the above, **refine in a follow-up turn** (e.g. after 8.1 say *"actually, make it a low-security anarchy"*) → it re-runs the search with the added/changed filter and gives a new nearest result (doesn't ignore the refinement or start from scratch).
+- [ ] After any of the above, **refine in a follow-up** (*"actually, make it a low-security anarchy"*) → it **re-runs** the search with the changed filter and gives a new nearest result (doesn't ignore it or start over).
 
 Notes:
 
-## 9. Help — what can you do & failure recovery  🔊 HW
-> Help is templated from the capability registry (no LLM), so it never claims a capability that isn't loaded.
-- [ ] **Idle overview:** while idle, *"What can you do?"* → lists **at most 3** capabilities, each with an example utterance, then a short "there are others — ask about …" tail. The categories named match what you enabled in §0.3.
-- [ ] **Topic detail:** *"How do I find a module?"* → describes the **outfitting** capability and its refinements (size, mount, pad).
-- [ ] **Failure recovery:** say a slightly-wrong term, e.g. *"Find the closest power distributer."* (misspelled) → it replies with a suggestion drawn from real values: *"I didn't recognize 'power distributer' — did you mean Power Distributor?"* — never inventing a correction.
-- [ ] An unrecognized **capability** ask (*"Can you plot me a route?"* — not built) → it says it can't do that and offers to list what it can, **without** echoing the fake capability as if it were real.
+## 9. Location & carriers (N3)  🎮 ED 🔊 HW 📋 clipboard
+> `[elite].enabled = true`. The owned fleet carrier is tracked from the journal (pinned to its `CarrierID`).
+- [ ] **Copy current system:** *"Copy my current system."* → copies your **current** system to the clipboard (paste to confirm).
+- [ ] **Fleet carrier:** *"Where's my fleet carrier?"* → speaks its **current system** and copies it. (If you own no carrier, it says so rather than guessing.)
+- [ ] **Squadron carrier:** *"Where's my squadron carrier?"* → explains it's only available **in-game** on the Squadron menu's Carrier Management tab (may name your squadron); it does **not** attempt a lookup or copy.
+- [ ] **Already-there rule:** ask for the fleet carrier while you're **in the carrier's system** → it says you're already there and does **NOT** copy to the clipboard.
 
 Notes:
 
-## 10. Checklist — read, mark, edit  🔊 HW 📋 FILE
-> Uses `ultimate_checklist.md`. Tip: test edits with a **throwaway** line so real objectives are untouched; watch the file change after each step.
-- [ ] *"What should I knock out next?"* → speaks your next pending objective **and overall progress** (e.g. "66 of 807").
-- [ ] *"Give me my next three objectives."* → reads a few upcoming pending items.
-- [ ] *"Mark that one done."* → confirms it's checked; open `ultimate_checklist.md` → that line is now `- [x]`.
+## 10. Community Goals (N6)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
+> Journal-primary (works offline for CGs you've visited). Set `[cg].inara_api_key` to also surface CGs you HAVEN'T visited. Visit a CG board in-game first so the journal has your standing.
+- [ ] **List:** *"List the community goals."* → active CGs (title + system + expiry). With an Inara key, ones you haven't visited are flagged ("…one in <system> you haven't visited yet").
+- [ ] **CG system:** *"What system is the <CG title> community goal in?"* → resolves by (fuzzy) title, speaks the system, and **copies** it — unless it's your current system (then says so, no copy).
+- [ ] **Standing:** *"What's my standing in the <CG title> community goal?"* → "Top 10 Commanders" or "top X%". For a CG not in your journal it says it doesn't have your standing (visit the board).
+- [ ] **No key / feed down:** with no Inara key it works journal-only and notes it can't see unvisited CGs right now (doesn't crash).
+
+Notes:
+
+## 11. Help — categories, drill-in & failure recovery  🔊 HW
+> Help is templated from the capability registry (no LLM), so it never claims a capability that isn't loaded. It's a **hierarchy** so it scales as features grow.
+- [ ] **Overview names CATEGORIES:** *"What can you do?"* → names the **groups** (e.g. navigation and search, your ship, your checklist, community goals, settings) with an invitation to drill in — it does **not** try to read every capability at once.
+- [ ] **Drill into a category:** *"Tell me about navigation and search."* → lists the capabilities in that group (at most 3, then "there are others — ask about …"), each with an example.
+- [ ] **Drill into a capability:** *"How do I find a module?"* → describes the **outfitting** capability and its refinements (size, mount, pad).
+- [ ] **Coverage:** every capability you enabled in §0.3 is reachable — spot-check one from each group (e.g. *"tell me about your ship"* → ship status + ship controls; *"tell me about settings"*, *"tell me about community goals"*).
+- [ ] **Failure recovery:** *"Find the closest power distributer."* (misspelled) → *"I didn't recognize 'power distributer' — did you mean Power Distributor?"* — never inventing a correction.
+- [ ] **Unknown capability:** *"Can you plot me a route?"* (not built) → says it can't, offers to list what it can, **without** echoing the fake capability as real.
+
+Notes:
+
+## 12. Voice-settable settings (N2)  🔊 HW 📋 FILE
+> Change settings by voice, validated against the same schema the Settings page uses. Changes write `overrides.json`; capability enables and a few others apply on restart (Whisper reloads live).
+- [ ] **Set an enum:** *"Set the Whisper model to small."* → confirms the change ("Whisper model set to small"); 📋 appears in `overrides.json`.
+- [ ] **Set a bool:** *"Turn personality off."* → confirms; a follow-up question no longer says "Commander". Turn it back on.
+- [ ] **Natural value:** *"Set thinking to high."* / *"Set the voice speed to 1.1."* → applied.
+- [ ] **Invalid value refused with options:** *"Set the Whisper model to gigantic."* → refuses and **lists the valid options** (doesn't guess or silently widen).
+- [ ] **Unknown setting → help:** *"Set the warp factor to 9."* → routes to help / says it isn't a setting, rather than inventing one.
+- [ ] **Get a setting:** *"What's my Whisper model set to?"* → reads the current value.
+
+Notes:
+
+## 13. Checklist — read, mark, edit  🔊 HW 📋 FILE
+> Uses `ultimate_checklist.md`. Test edits with a **throwaway** line.
+- [ ] *"What should I knock out next?"* → speaks your next pending objective **and progress** (e.g. "66 of 807").
+- [ ] *"Give me my next three objectives."* → reads a few upcoming items.
+- [ ] *"Mark that one done."* → confirms; 📋 that line is now `- [x]`.
 - [ ] *"Actually reopen it."* → back to `- [ ]`.
-- [ ] **Disambiguation:** ask to mark something whose wording matches several lines (e.g. *"mark the Colonia one done"*) → it **asks which one** rather than guessing.
-- [ ] **Add:** *"Add a line after the current one that says 'Reload carrier with Tritium'."* → inserted **directly after**, with matching indentation/nesting; becomes the current line. (`- [ ]` in the file.)
-- [ ] **Modify:** *"Change that line to 'Reload carrier with 25000 tons of Tritium'."* → text updates, checkbox state preserved.
-- [ ] **Delete:** *"Delete the current line."* → the throwaway line is removed; your real objectives are intact.
-- [ ] **External edit:** hand-edit `ultimate_checklist.md`, save, then ask *"What's next?"* → it reflects your edit (reads the file fresh).
+- [ ] **Disambiguation:** ask to mark something matching several lines → it **asks which one**.
+- [ ] **Add / Modify / Delete** a throwaway line → inserted after current with matching nesting / text updated (checkbox preserved) / removed; real objectives intact.
+- [ ] **External edit:** hand-edit the file, save, then *"What's next?"* → reflects your edit (reads fresh).
 
 Notes:
 
-## 11. Web control panel — live status & persistent settings  🌐 PANEL 🔊 HW 📋 FILE
-- [ ] **Live status:** the status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, and status/search lines (timestamped).
-- [ ] Change **Claude model** (e.g. to `claude-sonnet-5`), ask something → still replies. (Note: with the router ON, per-turn tiering may override this base model — see §4.)
-- [ ] Change **Thinking depth** to **High**, ask a reasoning-heavy question → replies with no error; an approach/thinking summary line may appear before the answer.
-- [ ] Toggle **Personality OFF**, ask *"Who am I?"* → reply is plain and does **not** say "Commander". Toggle **ON** → "Commander" returns.
-- [ ] Change **ElevenLabs voice**, ask something → the next reply is in the **new voice**.
-- [ ] (Optional) Change **ElevenLabs model** and **Whisper model** — a Whisper change logs that the model reloaded.
-- [ ] Toggle **web search** off/on and confirm a current-info question does / doesn't search.
+## 14. Web control panel  🌐 PANEL 🔊 HW 📋 FILE
+
+### 14.1 Live status & log
+- [ ] The status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, status/search lines (timestamped).
+
+### 14.2 Settings page (N1) — http://127.0.0.1:8765/settings
+- [ ] The page renders **grouped sections** with the **right control per type** (toggles, dropdowns, number/sliders, text/path) and inline help.
+- [ ] **Filter box:** type in the search box → the list narrows to matching settings.
+- [ ] **Change + save:** change a value → the **save bar** appears with a count; **SAVE CHANGES** → 📋 written to `overrides.json` (config.toml stays pristine).
+- [ ] **Per-setting reset:** a changed (overridden) setting shows **RESET** → click it → reverts to default and drops from `overrides.json`.
+- [ ] **Validation:** try an out-of-range number (e.g. voice speed 2.0) → rejected client-side / server-side, not written.
+- [ ] **Live where supported:** change the **Whisper model** → the log notes the model reloaded (no restart). (Capability enables apply on restart.)
+
+### 14.3 Personality tab (N7)
+- [ ] **Persona picker:** the Personality tab lists personas; selecting one shows a **preview**. Pick a different persona → the next reply's **voice/register changes**.
+- [ ] **Campaign preserved:** switch persona and confirm your **Campaign** text (personal facts) is unchanged — switching voice never wipes it.
+- [ ] **Save as custom:** edit the persona box → **SAVE AS CUSTOM** → a new custom persona appears in the list (written git-ignored under `personalities/custom/`).
+- [ ] **Campaign editor:** edit the Campaign box → **SAVE CAMPAIGN** → a subsequent reply reflects the updated facts.
+
+### 14.4 Voice speed (N7)
+- [ ] Nudge the **Voice speed** slider (1.0–1.2×) and ask something → the reply is spoken **faster**; the value can't exceed 1.2 (clamped).
+
+### 14.5 Log filter (N7)
+- [ ] The Live Log has a **Conversation / All** toggle. **Conversation** (default) shows only your utterances and COVAS replies; **All** shows status/thinking/search/usage/system lines too.
+- [ ] Switch to Conversation → status/thinking/usage lines **hide**; the choice **persists** across a reload.
 
 Notes:
 
-## 12. Settings persistence  🌐 PANEL 📋 FILE
-- [ ] Set model, voice, thinking depth, and personality to specific non-default values in the panel.
-- [ ] 📋 Open `overrides.json` → your changes are written there (config.toml stays pristine).
-- [ ] **Quit** (Ctrl+Alt+Q) and relaunch `run_covas_ui.bat` → the panel comes back with the **same settings**.
+## 15. Settings persistence  🌐 PANEL 📋 FILE
+- [ ] Set model, voice, thinking depth, and personality to non-default values (panel or voice).
+- [ ] 📋 Open `overrides.json` → your changes are there.
+- [ ] **Quit** (Ctrl+Alt+Q) and relaunch → the panel comes back with the **same settings**.
 
 Notes:
 
-## 13. Web search (automatic)  🔊 HW 🌐 PANEL
-- [ ] Ask a current-info question: *"What's the latest Elite Dangerous update right now?"* → the log shows **"Searching the web for &lt;query&gt;"**, the status hits a searching state, and you hear a **processing** beep.
-- [ ] The spoken answer reflects **live/current** info, not just memory.
-- [ ] **Cancel mid-search:** start another current-info question, then tap `[` while it's searching → it stops.
+## 16. Web search (automatic)  🔊 HW 🌐 PANEL 🌍 NET
+- [ ] *"What's the latest Elite Dangerous update right now?"* → log shows **"Searching the web for …"**, status hits a searching state, you hear a **processing** beep.
+- [ ] The spoken answer reflects **live/current** info.
+- [ ] **Cancel mid-search:** start another current-info question, then tap `[` while searching → it stops.
 - [ ] Searches are capped at `[web_search].max_uses` (3) per reply.
 
 Notes:
 
-## 14. Robustness & quit  🔊 HW 📋 FILE
-- [ ] Ask for something with odd symbols/emoji (*"Draw me an ASCII arrow and explain it."*) → it speaks/streams without the console crashing.
-- [ ] 📋 After a session, open the newest **`logs\session_*.log`** → it holds your prompts and replies with timestamps, plus the router/usage lines.
-- [ ] A provider hiccup (e.g. briefly kill network) degrades gracefully — the loop survives and returns to IDLE rather than crashing; a dead TTS falls back to text.
+## 17. Robustness & quit  🔊 HW 📋 FILE
+- [ ] Ask for something with odd symbols/emoji (*"Draw me an ASCII arrow and explain it."*) → speaks/streams without the console crashing.
+- [ ] 📋 After a session, open the newest **`logs\session_*.log`** → prompts + replies with timestamps, plus router/usage lines.
+- [ ] A provider hiccup (briefly kill network) degrades gracefully — the loop survives and returns to IDLE; a dead TTS falls back to text.
 - [ ] **Ctrl+Alt+Q** (or closing the console window) shuts it down cleanly.
 
 Notes:
@@ -252,13 +305,14 @@ Notes:
 ## Needs-hardware / manual-only note
 Everything in this file needs Doug's machine and can't be exercised in CI or a sandbox:
 - 🔊 **HW** (mic + speakers) gates nearly every step — STT capture and TTS playback.
-- 🎮 **ED** (§5–§8) needs Elite Dangerous running so the journal/Status.json feed live telemetry; the searches also need internet (Spansh) and the clipboard checks need a desktop clipboard.
+- 🎮 **ED** (§5–§10) needs Elite Dangerous running so the journal/Status.json feed live telemetry.
 - ⌨️ **INJECT** (§6) sends real DirectInput scancodes into ED — do it parked and safe.
+- 🌍 **NET** (§7, §8, §10, §16) needs internet (Spansh / Inara / web search).
 - 🌐 **PANEL** / 📋 **FILE** checks need the running app and a browser / file access.
 
 The offline `pytest` suite covers the pure logic (parsing, routing, checklist ops, help
-projection, query building) for free — run `pytest` often; this manual pass is for the
-on-hardware, in-game behavior it can't reach.
+projection + grouping, query building, honk sequencing) for free — run `pytest` often; this
+manual pass is for the on-hardware, in-game behavior it can't reach.
 
 ---
 
