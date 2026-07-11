@@ -558,7 +558,7 @@ Acceptance: bare pytest green and offline; manual voice checklist. Stop for revi
 
 ---
 
-## Navigation, Settings & Automation (Prompts N1–N7)
+## Navigation, Settings & Automation (Prompts N1–N10)
 
 Features layered on the existing subsystems. Order matters where noted (N2 depends on N1's
 schema). Same conventions throughout — LLM-native capabilities, dependency injection, and
@@ -800,6 +800,136 @@ payload (fake). (Log filter is client-side; a light template/JS assertion is eno
 
 Acceptance: bare pytest green; manual: switch persona (campaign persists), save a custom, nudge
 speed and hear it, toggle the log to Conversation and confirm stats/thinking hide. Stop for review.
+```
+
+### N8 — Find the closest station selling a SHIP
+
+```
+Read CLAUDE.md, DESIGN_AND_ROADMAP.md (§3.5), and the capability it mirrors:
+covas/capabilities/find_closest_capability.py, covas/nav/modules.py, covas/nav/closest.py,
+covas/search/spansh.py.
+
+Branch: feature/find-closest-ship
+
+Goal: "find the closest station that sells SHIP X" by voice — resolve the ship conversationally,
+find the nearest station selling it, speak it, copy the SYSTEM name to the clipboard. Mirror the
+find-closest-module LLM-native pattern exactly.
+
+Data source: Spansh station search supports a SHIPS filter (like the modules filter). BEFORE
+coding, fetch current Spansh docs + one real sample ship-query response and parse what you
+actually see. REUSE the shared search/spansh.py client + closest.py plumbing (Http seam, distance
+sort, carrier exclusion, pad filter, error handling) — don't duplicate it.
+
+Tasks:
+1. covas/nav/ships.py — a bundled canonical SHIP list (exact Spansh ship names) + pure
+   resolve(query) -> Resolved / Ambiguous(candidates) / Unknown(suggestions), with aliases +
+   fuzzy match for STT mishears ("conda" -> Anaconda, "fdl" -> Fer-de-Lance, "clipper" ->
+   Imperial Clipper). Handle the genuinely AMBIGUOUS families — "Krait" -> Mk II or Phantom;
+   "Cobra" -> Mk III or Mk IV; "Viper" -> Mk III or Mk IV; "Asp" -> Explorer or Scout; "Type" ->
+   Type-6/7/9/10 — ASK which, never guess. Offline + unit-testable.
+2. FindClosestShipCapability (mirror FindClosestCapability): stateless tool
+   find_closest_ship(ship, pad_size?) whose description drives the LLM to normalize the name, ask
+   on ambiguity, and search once resolved. Reads current system (ED context; journal fallback),
+   queries Spansh via the shared client with the ships filter, copies the SYSTEM name (skip the
+   copy when it's the current system — the N3 rule), returns a short spoken line. Register full
+   help metadata.
+3. Routing: update the outfitting + station-search tool descriptions so "where can I buy the
+   <ship>" goes to THIS tool instead of being punted to generic station search.
+4. Config: reuse [nav] (pad default, base URL, enable).
+
+Tests (§9): unit (offline) — resolve for exact / mishear / ambiguous family / unknown; Spansh
+ship-query build + nearest-by-distance from a RECORDED fixture; clipboard via fake copy (and
+skipped when current system); capability end-to-end with fake http + fake clipboard + stubbed
+current system. Integration+local: one live Spansh ship query.
+
+Constraints: no real network/clipboard in the default pytest run; fail soft; LLM-native (no
+classifier/state machine — mirror the outfitting pattern).
+
+Acceptance: bare pytest green and offline; manual: "find the closest Krait" -> asks Mk II or
+Phantom, then finds it and copies the system; "find the closest Anaconda" -> resolves and finds.
+Stop for review.
+```
+
+### N9 — Ship loadout & engineering (read + reason)
+
+```
+Read CLAUDE.md, covas/ed/journal.py (the existing _loadout handler), covas/ed/context.py,
+covas/capabilities/ed_context_capability.py, covas/capabilities/checklist_capability.py, and
+covas/nav/modules.py (for friendly names).
+
+Branch: feature/ship-loadout
+
+Goal: capture the full current ship loadout + engineering from the journal Loadout event and
+answer questions about it by voice — and let the model reason over it (suggest improvements, add
+to the checklist).
+
+Tasks:
+1. Extend _loadout in ed/journal.py to capture the FULL loadout, not just ship name: per module —
+   slot, item (internal symbol), on/health/priority, and its Engineering block if present:
+   BlueprintName, Level (grade), Quality, ExperimentalEffect, and the Modifiers array (label,
+   value, original value). Store a structured loadout snapshot on EDContext (replace on each new
+   Loadout — it's a full snapshot each time).
+2. Friendly names: Loadout uses internal symbols ("int_hyperdrive_size5_class5", "FSD_LongRange",
+   "special_fsd_heavy"). Map module, blueprint, and experimental-effect symbols to spoken names
+   (reuse/extend nav/modules.py; a symbol->name table baked from EDCD outfitting/FDevIDs data —
+   offline). Fall back to the event's *_Localised fields when present.
+3. A LoadoutCapability (LLM-native) with tools answering from the snapshot: engineering on a named
+   module ("what's on my FSD / power plant / thrusters") -> blueprint, grade, experimental,
+   spoken naturally; list all experimental effects; list modules / a slot's module (with key
+   modifiers). Validate names before speaking; if no Loadout seen yet, say so ("board your ship or
+   open outfitting and I'll read it"). Register full help metadata.
+4. Config toggle if useful; reads only local journal data (no CAPI/auth).
+5. Cross-capability behavior (no new plumbing — the checklist tools are already available every
+   turn): the loadout tool descriptions should invite the model, when asked or clearly useful, to
+   reason over the loadout, suggest improvements conversationally, and OFFER to add specific
+   upgrades to the checklist via the existing add_objective tool. For "what's best" engineering
+   advice, lean on web search for current meta and flag uncertainty — never invent module stats or
+   blueprint effects.
+
+Tests (§9): unit (offline) — parse a recorded Loadout fixture (with engineering + an experimental
+effect) into the snapshot; symbol->friendly-name mapping incl. blueprint + experimental; the
+capability answers "engineering on my FSD" and "experimental effects" from a stubbed snapshot; the
+"no loadout yet" path. No network.
+
+Constraints: fail soft; LLM-native; local journal only.
+
+Acceptance: bare pytest green and offline; manual: board ship, ask "what's the engineering on my
+FSD" and "what experimental effects do I have", and try "suggest upgrades and add them to my
+checklist". Stop for review.
+```
+
+### N10 — Web checklist editor (WYSIWYG markdown)
+
+```
+Read CLAUDE.md, covas/web.py + templates/, covas/checklist.py (its "- [ ]"/"- [x]" + indentation
+format), and config.toml ([checklist].file).
+
+Branch: feature/web-checklist-editor
+
+Goal: a "Checklist" tab in the web panel that RENDERS and edits the checklist as markdown
+(WYSIWYG, Obsidian-style — NOT a plain textarea), with first-class checkbox/task-list support,
+editing the same file the voice loop uses.
+
+Tasks:
+1. Add a Checklist tab with a WYSIWYG markdown editor that renders and edits rendered markdown and
+   supports task lists (click a checkbox to toggle; edit text inline; add / remove / nest items).
+   Use a proven library from CDN — Tiptap (ProseMirror) + task-list extension, Milkdown, or TOAST
+   UI Editor's WYSIWYG mode — your pick; checkbox/task-list support is REQUIRED.
+2. Load [checklist].file, edit in the tab, and SAVE back to the same file. The serialized markdown
+   MUST round-trip cleanly through covas/checklist.py's parser: preserve the exact "- [ ]"/"- [x]"
+   task syntax AND the indentation/nesting the model relies on.
+3. Keep voice and web in sync: on save, have the running app reload its Checklist model from disk
+   (both edit the same file). Handle "file changed underneath" gracefully — if the file changed
+   since the tab loaded it (voice edited it), warn before overwriting rather than clobbering.
+4. The file stays git-ignored (personal). No behavior change to the voice checklist tools.
+
+Tests (§9): unit (offline) — round-trip through checklist.py is lossless (checkbox state + nesting
+preserved); the save endpoint writes the file and triggers a model reload; the stale-write guard
+fires when the on-disk file changed since load. (Editor is client-side; a light template check is
+enough.)
+
+Acceptance: bare pytest green; manual: toggle a checkbox and edit an item in the tab, save, confirm
+the file and the voice model reflect it, and that voice-made edits appear on reload. Stop.
 ```
 
 ---
