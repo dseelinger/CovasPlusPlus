@@ -202,11 +202,17 @@ class App:
             from .ed import (EDContext, JournalWatcher, StatusWatcher,
                              resolve_journal_dir, status_path)
             from .capabilities.ed_context_capability import EDContextCapability
+            from .capabilities.loadout_capability import LoadoutCapability
 
             el = self.cfg.get("elite", {})
             jdir = resolve_journal_dir(self.cfg)
             self.ed_ctx = EDContext(recent_maxlen=int(el.get("recent_events_kept", 25)))
             self.registry.register(EDContextCapability(self.ed_ctx))
+            # Ship loadout & engineering (N9): reads the snapshot the journal watcher keeps
+            # on EDContext. Registered with monitoring since that's its only data source.
+            self.registry.register(LoadoutCapability(
+                get_loadout=self.ed_ctx.loadout_snapshot,
+                log=lambda m: self._log("loadout", m)))
             self._start_carriers(jdir)
             self._start_cg(jdir)
 
