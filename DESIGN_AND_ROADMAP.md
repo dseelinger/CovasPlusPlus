@@ -258,6 +258,34 @@ whole `search/spansh.py` transport — no duplicated plumbing.
   `integration+local` canary (`test_live_ship_index_harvest_covers_the_bundle`) fails if the live
   roster ever drifts far from the bundle, prompting a curated top-up.
 
+### Implemented — search data freshness + local shipyard ground truth
+Born from a live bug (2026-07): COVAS recommended a Type-8 at the very station the Commander was
+docked at, while the vendor showed "does not currently stock this ship." Two findings, two layers
+of fix — both hardcoded policy, deliberately not configurable:
+
+- **Staleness filter (all volatile searches).** Spansh's crowdsourced records update only when
+  someone running an EDDN uploader visits, and stock/BGS facts go stale underneath them. Volatile
+  searches now constrain the matching `*_updated_at` **server-side** (a date-only `<=>` range —
+  datetime strings are rejected with 400; verified honoured live on `shipyard_updated_at`,
+  `outfitting_updated_at`, and systems `updated_at`), with a client-side `is_fresh` backstop.
+  Policy in `search/spansh.py`: **stock 2 days** (ships, outfitting), **BGS states 7 days**
+  (minor-faction/misc searches, only when a state slot is in play). Structural searches (station
+  types/services, system attributes, faction presence) are deliberately unfiltered — a Coriolis
+  doesn't stop existing because nobody docked lately. When nothing fresh matches, ONE retry
+  without the window answers from stale data **spoken with an age caveat** ("Fair warning — that
+  listing is N days old…"), so sparse space still gets an answer instead of a dead end.
+- **Local `Shipyard.json` stock veto (ships).** The deeper finding: Spansh's per-station `ships`
+  array is the station's **CATALOG, not its stock** — a minutes-fresh record listed 18 ships at a
+  station whose own `Shipyard.json` PriceList (written when the shipyard is opened; the in-stock,
+  credit-purchasable list) held exactly one. So no freshness makes a Spansh listing prove
+  buyability. The one ground truth available is the Commander's own last shipyard visit:
+  `ed/shipyard.py` reads it fail-soft, and `nav/ship_search.py` **vetoes** a candidate only on
+  positive local evidence (same station by MarketID/name+system, snapshot ≤ the 2-day stock
+  window, hull's symbol absent from the PriceList), skipping to the next-nearest with a spoken
+  reason. Remote stations remain unverifiable with public data — that's the honest ceiling.
+- **Seam left open:** outfitting could adopt the same local veto via `Outfitting.json` if module
+  stock proves similarly catalog-shaped; the shared plumbing is in place.
+
 ---
 
 ## 6. Keybind automation (future phase — sketch)
@@ -339,25 +367,25 @@ The original seven-phase plan is done and tested:
 5. **Proactive callouts** — `ProactiveCapability` (§5).
 6. **Keybind automation** — one-action prototype behind the safety layer (§6).
 7. **Outfitting voice search** — `find-closest-module` (§5, §3.5).
-8. **Voice search & help subsystem** — templated `HelpCapability` (idle + failure-recovery) on one unified registry with a structural help-metadata contract; a shared typed Spansh client (`search/spansh.py`, outfitting refactored onto it); and five LLM-native category capabilities — star systems, stations, minor factions, signals, misc — with offline fuzzy resolution for factions/systems (§3.5). *(Search Prompts 1–5 merged; the Prompt 6 voice-polish pass — refinement re-query, error-mode wiring, low-confidence confirmation — folded in or pending per below.)*
+8. **Voice search & help subsystem** — templated `HelpCapability` (idle + failure-recovery) on one unified registry with a structural help-metadata contract; a shared typed Spansh client (`search/spansh.py`, outfitting refactored onto it); and five LLM-native category capabilities — star systems, stations, minor factions, signals, misc — with offline fuzzy resolution for factions/systems (§3.5). *(Search Prompts 1–6 merged, including the voice-polish pass: refinement re-query, error-mode wiring, low-confidence confirmation.)*
+9. **Settings** — one schema as source of truth, projected to both the web settings page (N1) and the voice `SettingsCapability` (N2).
+10. **Location & carrier commands** (N3) — copy current system; owned-carrier tracking pinned to `CarrierID`; the "already there → don't copy" rule.
+11. **Route callouts** (N4) — scoopable-star + jumps-remaining via the proactive path.
+12. **Auto-honk** (N5, §6).
+13. **Community Goals** (N6) — journal-primary with the Inara feed for completeness.
+14. **Personality tab, voice speed & log filter** (N7).
+15. **Find-closest-ship** (N8, §5) — including the self-updating `ShipIndex` roster.
+16. **"Copy that to my clipboard"** (N11) — one LLM-native `copy_to_clipboard(text, label?)` tool; the model resolves "that" from conversation; explicit request copies even in the current system.
+17. **Search data freshness + local shipyard ground truth** (§5) — the staleness filter on volatile Spansh data and the `Shipyard.json` stock veto, from the live Type-8 bug.
 
 ### Backlog (specced as Claude Code prompts, not yet built)
 Each is a prompt in `CLAUDE_CODE_PROMPTS.md`, LLM-native + offline-tested per §3.5 / §9:
 
-- **N1 — Settings schema + web page.** One settings schema as source of truth; a clean web settings page writing `overrides.json`.
-- **N2 — Voice-settable settings.** The same schema projected to a voice capability.
-- **N3 — Location & carriers.** Copy current system; personal (owned) carrier tracked from the journal, pinned to the owned carrier's `CarrierID` so a squadron carrier the Commander is aboard can't be mistaken for it; "already there → don't copy" fix. (Squadron-carrier *location* is deliberately NOT looked up remotely — no public database resolves a carrier by callsign reliably, so that command just points to the in-game Carrier Management tab.)
-- **N4 — Route callouts.** Scoopable star (K G B F O A M) on approach + jumps-remaining every Nth, from `NavRoute.json` + `FSDTarget`, via the proactive path.
-- ~~**N5 — Auto-honk.**~~ **Built** (§6 "Implemented — auto-honk"): fire the Discovery Scanner on arrival — read the current fire group from Status, cycle to the configured scanner group, hold fire, cycle back; combat-gated, opt-in. This is the last N-series prompt; the pack is now fully implemented.
-- **N6 — Community Goals.** List current CGs (external feed merged with the journal, surfacing ones you haven't visited), CG system (copy, with the N3 already-there rule), and your standing (journal-only: Top N / top band %). External feed is **Inara** `getCommunityGoalsRecent` (needs a free API key) — EDSM has no public CG API. No key → journal-only, fail-soft.
-- **N7 — Personality tab, voice speed & log filter.** Web tab to pick/edit persona (from `personalities/presets.md`) with a separate campaign field + save-as-custom; ElevenLabs `speed` slider (1.0–1.2×); a Conversation/All log filter (default Conversation).
-- **N8 — Find the closest station selling a SHIP.** Mirrors find-closest-module: a ship-name list + resolve (with ambiguous families like Krait → Mk II/Phantom) + the shared Spansh client's ships filter + nearest + clipboard.
 - **N9 — Ship loadout & engineering.** Capture the full journal `Loadout` snapshot (modules + blueprint/grade/experimental/modifiers) onto `EDContext`, friendly-name mapping, and a LoadoutCapability. The model reasons over it (suggest upgrades, add to the checklist via existing tools) — no new plumbing for that; web search for "best" meta.
 - **N10 — Web checklist editor.** A WYSIWYG (Obsidian-style) markdown editor tab with task-list/checkbox support, editing `ultimate_checklist.md`; round-trips losslessly through `checklist.py` and reloads the voice model on save (don't-clobber guard vs. voice edits).
-- **N11 — "Copy that to my clipboard."** A general LLM-native `copy_to_clipboard(text)` tool so the Commander can copy anything just discussed (a system, station, coordinates); the model resolves "that" from context. Explicit request → copies regardless of current location.
 
 ### Sequencing
-N2 needs N1 (shared schema); the Search Prompts run in order (help first, client before categories, the reference category before replicating); N4/N5 lean on the ED monitoring + keybind executor already merged. One branch per prompt, one fresh Claude Code session each. **The prompt pack carries the live worklist; this doc carries the architecture.**
+N9 and N10 are independent of each other and of everything merged; suggested order N9 → N10 (N9 stays in the journal/capability stack the recent work exercised; N10 is self-contained web/front-end work). One branch per prompt, one fresh Claude Code session each. **The prompt pack carries the live worklist; this doc carries the architecture.**
 
 ---
 
