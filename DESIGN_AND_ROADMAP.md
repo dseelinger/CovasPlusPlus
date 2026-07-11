@@ -133,7 +133,7 @@ TTS is a light CPU burst, not a GPU hog, so **Piper runs fine alongside the game
 
 ## 5. Elite Dangerous log monitoring
 
-ED continuously writes game state to disk — the same source EDCopilot, EDMC, and EDDN read. No memory reading, no API keys.
+ED continuously writes game state to disk — the same source other Elite Dangerous tools read. No memory reading, no API keys.
 
 ### What ED writes
 - **Journal** — `%USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous\Journal.<timestamp>.<part>.log`. Newline-delimited JSON, **one event per line, append-only**. Events include `FSDJump`, `Docked`/`Undocked`, `Scan`, `Bounty`, `FuelScoop`, `MissionAccepted/Completed`, `Died`, `LoadGame`, etc.
@@ -214,10 +214,10 @@ pending-request object.
 
 ## 6. Keybind automation (future phase — sketch)
 
-The EDCopilot-style "press buttons to do stuff." Genuinely useful but the twitchy part, so isolate it hard behind a capability with a safety layer.
+Hands-off keybind automation — pressing your bound keys to do things. Genuinely useful but the twitchy part, so isolate it hard behind a capability with a safety layer.
 
 - **Read bindings, don't hardcode keys.** ED stores bindings as XML in `%LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Bindings\Custom.4.0.binds`. Parse it to map an *action* (e.g. `LandingGearToggle`, `HyperSuperCombination`, `SetSpeed100`) to the physical key the Commander bound. The app targets actions; the binds file resolves keys. This is what makes it portable across setups.
-- **Injection gotcha.** ED often ignores plain virtual-key events; reliable input usually needs **scancode-level `SendInput`** (DirectInput-style), and timed press/hold/release for things like "hold to charge FSD." Budget for this being fiddly — it's the same reason EDCopilot can feel kludgy. Prototype one action (toggle landing gear) end-to-end before generalizing.
+- **Injection gotcha.** ED often ignores plain virtual-key events; reliable input usually needs **scancode-level `SendInput`** (DirectInput-style), and timed press/hold/release for things like "hold to charge FSD." Budget for this being fiddly — reliable key injection into ED is finicky work. Prototype one action (toggle landing gear) end-to-end before generalizing.
 - **Macros over single keys.** Real tasks are sequences with waits and state checks ("launch": request docking→wait→boost→retract gear). Model these as small scripted macros that can *read Status.json between steps* to verify state instead of firing blind. The log watcher (§5) is what makes automation non-blind.
 - **Safety.** Confirmation for consequential actions, a hard global abort, an allowlist of permitted actions, and a "never during combat/interdiction" guard from Status flags. Keep it strictly opt-in.
 - **LLM as intent layer, not button-masher.** Claude/Qwen decides *which* macro matches the spoken request; a deterministic executor runs the keystrokes. Don't let the model synthesize raw key sequences.

@@ -586,7 +586,7 @@ Tasks:
    (toggle, dropdown, number/slider, text/path), inline help, per-setting reset-to-default,
    client-side validation against the schema, a search/filter box, and a save that writes
    overrides.json via the existing mechanism. Reload the running config where already
-   supported (Whisper). Bar to clear: cleaner and calmer than EDCopilot's settings.
+   supported (Whisper). Bar to clear: a clean, calm, uncluttered settings page.
 3. Server-side: validate every POSTed setting against the schema; reject unknown keys/values
    LOUDLY — never write unvalidated data into overrides.json.
 

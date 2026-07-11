@@ -5,8 +5,9 @@ Hold a key, talk, and get a spoken reply in character. It converses, watches you
 state, tracks a checklist, runs galaxy-wide searches by voice, presses the odd ship
 control on request, and can look things up on the web — all through one push-to-talk loop.
 
-It **does not fly your ship** (EDCopilot's job). It's a *companion*: situational awareness,
-lookups, and banter, with a hard safety layer around the few keystrokes it will send.
+It **does not fly your ship** — it's a conversation and knowledge companion, not a
+flight-control tool: situational awareness, lookups, and banter, with a hard safety layer
+around the few keystrokes it will send.
 
 > Unofficial, fan-made. Elite Dangerous is a trademark of Frontier Developments plc.
 > COVAS++ is not affiliated with, endorsed by, or supported by Frontier.
