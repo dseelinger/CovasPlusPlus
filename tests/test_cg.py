@@ -202,7 +202,8 @@ def _cap(*, system="Deciat", fetch_external="ok", clip=None):
     external = [CommunityGoal(title="Empire Weapons Drive", system="Facece", cgid=999,
                              expiry="2026-07-20T07:00:00Z")]
     if fetch_external == "ok":
-        fx = lambda: external
+        def fx():
+            return external
     elif fetch_external == "fail":
         def fx():
             raise CGFeedError("Inara down")

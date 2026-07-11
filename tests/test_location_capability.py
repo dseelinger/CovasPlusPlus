@@ -6,8 +6,6 @@ touches the network or the real clipboard. Covers the three tools plus the N3 "a
 """
 from __future__ import annotations
 
-import pytest
-
 from covas.capabilities.base import help_meta_problems
 from covas.capabilities.location_capability import LocationCarrierCapability
 from covas.nav import CarrierInfo
@@ -57,7 +55,6 @@ def test_fleet_carrier_reports_and_copies():
 
 
 def test_fleet_carrier_pending_jump_noted():
-    info = CarrierInfo("Nomad's Rest", "K7X-B0X", "Sol", "Colonia")
     # carrier is elsewhere-with-a-pending-jump; current system is Deciat so it copies
     cap, clip = _cap(system="Deciat", fleet=CarrierInfo("N", "K7X-B0X", "Sol", "Colonia"))
     out = cap.run_tool("where_is_fleet_carrier", {})
