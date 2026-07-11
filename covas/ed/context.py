@@ -81,6 +81,11 @@ class EDContext:
         self.carrier_callsign: str | None = None
         self.carrier_system: str | None = None
         self.carrier_pending_system: str | None = None
+        # The current ship's full loadout (a frozen ed/loadout.LoadoutSnapshot), replaced
+        # wholesale on every journal Loadout event. Kept OUT of _FIELDS/summary(): it's big,
+        # structured, and read on demand by the LoadoutCapability's tools — never injected
+        # into the (cached) system prompt.
+        self._loadout = None
 
     def update(self, **changes) -> None:
         """Atomically set one or more fields. Unknown keys raise (fail loud) so a typo
@@ -112,6 +117,19 @@ class EDContext:
         """A plain-dict copy of the carrier fields, taken under lock."""
         with self._lock:
             return {k: getattr(self, k) for k in _CARRIER_FIELDS}
+
+    # -- ship loadout (N9) ---------------------------------------------------------------
+    def set_loadout(self, snapshot) -> None:
+        """Replace the stored ship loadout (each journal Loadout event is a full snapshot).
+        `snapshot` is a frozen `ed/loadout.LoadoutSnapshot` (or None to clear)."""
+        with self._lock:
+            self._loadout = snapshot
+
+    def loadout_snapshot(self):
+        """The current `LoadoutSnapshot`, or None when no Loadout event has been seen yet.
+        The snapshot is immutable, so handing out the reference is thread-safe."""
+        with self._lock:
+            return self._loadout
 
     def fuel_pct(self) -> float | None:
         with self._lock:

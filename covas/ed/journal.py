@@ -16,6 +16,7 @@ from typing import Callable
 
 from ..events import EventBus
 from .context import EDContext
+from .loadout import parse_loadout
 
 # ED's journals live under the Windows user profile. Resolved at runtime (never a
 # hardcoded C:\Users\... path — see the repo guardrails) so it's portable per machine.
@@ -173,6 +174,10 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     patch = handler(event)
     if patch:
         ctx.update(**patch)
+    # Loadout carries far more than the context patch (per-module engineering, N9): store
+    # the full structured snapshot alongside — each event is complete, so replace wholesale.
+    if event.get("event") == "Loadout":
+        ctx.set_loadout(parse_loadout(event))
     return patch
 
 
