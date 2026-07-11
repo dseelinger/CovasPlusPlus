@@ -354,6 +354,7 @@ Each is a prompt in `CLAUDE_CODE_PROMPTS.md`, LLM-native + offline-tested per §
 - **N8 — Find the closest station selling a SHIP.** Mirrors find-closest-module: a ship-name list + resolve (with ambiguous families like Krait → Mk II/Phantom) + the shared Spansh client's ships filter + nearest + clipboard.
 - **N9 — Ship loadout & engineering.** Capture the full journal `Loadout` snapshot (modules + blueprint/grade/experimental/modifiers) onto `EDContext`, friendly-name mapping, and a LoadoutCapability. The model reasons over it (suggest upgrades, add to the checklist via existing tools) — no new plumbing for that; web search for "best" meta.
 - **N10 — Web checklist editor.** A WYSIWYG (Obsidian-style) markdown editor tab with task-list/checkbox support, editing `ultimate_checklist.md`; round-trips losslessly through `checklist.py` and reloads the voice model on save (don't-clobber guard vs. voice edits).
+- **N11 — "Copy that to my clipboard."** A general LLM-native `copy_to_clipboard(text)` tool so the Commander can copy anything just discussed (a system, station, coordinates); the model resolves "that" from context. Explicit request → copies regardless of current location.
 
 ### Sequencing
 N2 needs N1 (shared schema); the Search Prompts run in order (help first, client before categories, the reference category before replicating); N4/N5 lean on the ED monitoring + keybind executor already merged. One branch per prompt, one fresh Claude Code session each. **The prompt pack carries the live worklist; this doc carries the architecture.**

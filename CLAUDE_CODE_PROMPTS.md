@@ -558,7 +558,7 @@ Acceptance: bare pytest green and offline; manual voice checklist. Stop for revi
 
 ---
 
-## Navigation, Settings & Automation (Prompts N1–N10)
+## Navigation, Settings & Automation (Prompts N1–N11)
 
 Features layered on the existing subsystems. Order matters where noted (N2 depends on N1's
 schema). Same conventions throughout — LLM-native capabilities, dependency injection, and
@@ -930,6 +930,45 @@ enough.)
 
 Acceptance: bare pytest green; manual: toggle a checkbox and edit an item in the tab, save, confirm
 the file and the voice model reflect it, and that voice-made edits appear on reload. Stop.
+```
+
+### N11 — "Copy that to my clipboard" (general, conversational)
+
+```
+Read CLAUDE.md, covas/nav/clipboard.py (copy()), covas/capabilities/_search_support.py
+(copy_system helper), and find_closest_capability.py for the LLM-native pattern.
+
+Branch: feature/copy-to-clipboard
+
+Goal: a general "copy that to my clipboard" voice command that works on anything from the
+conversation — "copy that system onto my clipboard" after the AI names Elvira Martuuk's system,
+"copy that station", "copy those coordinates", etc.
+
+Design: LLM-native. Expose ONE tool the model calls with the exact text to copy; the model
+resolves what "that" refers to from the recent conversation. No parsing/heuristics on our side.
+
+Tasks:
+1. A ClipboardCapability with a tool copy_to_clipboard(text, label?): puts `text` on the Windows
+   clipboard via the existing nav/clipboard.py copy() (INJECTED so tests use a fake). Returns a
+   short confirmation of what was copied. `label` is optional flavor for the spoken reply
+   ("the system", "the station").
+2. Tool description: copy the SPECIFIC value the Commander refers to (usually just a name — a
+   system, station, or coordinates — not a whole sentence), resolved from recent conversation,
+   and confirm back ("Copied Khun to your clipboard."). This is an EXPLICIT copy request, so copy
+   regardless of current location — do NOT apply the search "skip if it's your current system"
+   rule here.
+3. Fail soft: a clipboard error is spoken, never raised into the loop. Register help metadata.
+4. (Optional) if the text is clearly an ED system name you MAY validate it against EDSM/Spansh and
+   note if unrecognized — but default to copying what the Commander referred to; never block on a
+   network call.
+
+Tests (§9): unit (offline) — copy_to_clipboard routes text to a fake clipboard and confirms it; a
+clipboard failure is caught and spoken, not raised; help metadata present. No network.
+
+Constraints: no real clipboard in the default pytest run (inject copy); LLM-native; fail soft.
+
+Acceptance: bare pytest green and offline; manual: ask "where is Elvira Martuuk's system", then
+"copy that system to my clipboard" and confirm the right system name lands on the clipboard. Stop.
 ```
 
 ---
