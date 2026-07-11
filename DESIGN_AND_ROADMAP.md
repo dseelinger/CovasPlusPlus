@@ -377,15 +377,15 @@ The original seven-phase plan is done and tested:
 15. **Find-closest-ship** (N8, §5) — including the self-updating `ShipIndex` roster.
 16. **"Copy that to my clipboard"** (N11) — one LLM-native `copy_to_clipboard(text, label?)` tool; the model resolves "that" from conversation; explicit request copies even in the current system.
 17. **Search data freshness + local shipyard ground truth** (§5) — the staleness filter on volatile Spansh data and the `Shipyard.json` stock veto, from the live Type-8 bug.
+18. **Ship loadout & engineering** (N9) — the full journal `Loadout` snapshot on `EDContext`, offline symbol→spoken-name mapping (`ed/module_names.py`), and a `LoadoutCapability` answering "what's on my FSD" / experimental effects / the fitted rundown, with upgrade suggestions offered onto the checklist.
 
 ### Backlog (specced as Claude Code prompts, not yet built)
 Each is a prompt in `CLAUDE_CODE_PROMPTS.md`, LLM-native + offline-tested per §3.5 / §9:
 
-- **N9 — Ship loadout & engineering.** Capture the full journal `Loadout` snapshot (modules + blueprint/grade/experimental/modifiers) onto `EDContext`, friendly-name mapping, and a LoadoutCapability. The model reasons over it (suggest upgrades, add to the checklist via existing tools) — no new plumbing for that; web search for "best" meta.
 - **N10 — Web checklist editor.** A WYSIWYG (Obsidian-style) markdown editor tab with task-list/checkbox support, editing `ultimate_checklist.md`; round-trips losslessly through `checklist.py` and reloads the voice model on save (don't-clobber guard vs. voice edits).
 
 ### Sequencing
-N9 and N10 are independent of each other and of everything merged; suggested order N9 → N10 (N9 stays in the journal/capability stack the recent work exercised; N10 is self-contained web/front-end work). One branch per prompt, one fresh Claude Code session each. **The prompt pack carries the live worklist; this doc carries the architecture.**
+N10 is the last prompt in the pack and is self-contained web/front-end work, independent of everything merged. One branch per prompt, one fresh Claude Code session each. **The prompt pack carries the live worklist; this doc carries the architecture.**
 
 ---
 
