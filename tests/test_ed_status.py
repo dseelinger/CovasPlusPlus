@@ -120,6 +120,12 @@ def test_apply_status_ignores_missing_fields():
     assert apply_status(ctx, {"event": "Status"}) == {}   # no Flags/Fuel/Cargo -> no-op
 
 
+def test_apply_status_folds_fire_group():
+    ctx = EDContext()
+    patch = apply_status(ctx, {"Flags": 0, "FireGroup": 2})   # auto-honk (N5) reads this
+    assert patch["fire_group"] == 2 and ctx.snapshot()["fire_group"] == 2
+
+
 # --- StatusWatcher read/publish cycle (synchronous, offline) ---------------
 
 def _watcher(tmp_path):
