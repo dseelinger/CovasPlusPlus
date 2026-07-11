@@ -79,6 +79,7 @@ class CGCapability:
     def help_meta(self) -> HelpMeta:
         return HelpMeta(
             category="community goals",
+            group="community goals",
             one_liner=("I list the active community goals, tell you what system a goal is in, "
                        "and how you're standing in one."),
             example="what community goals are active",

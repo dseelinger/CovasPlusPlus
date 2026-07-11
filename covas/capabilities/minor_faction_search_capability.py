@@ -85,6 +85,7 @@ class MinorFactionSearchCapability:
     def help_meta(self) -> HelpMeta:
         return HelpMeta(
             category="minor factions",
+            group="navigation and search",
             one_liner=("I find the nearest system where a minor faction is present or in "
                        "control, or by faction allegiance, government, or state, and copy the "
                        "system to your clipboard."),

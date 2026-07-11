@@ -109,6 +109,7 @@ class SettingsCapability:
     def help_meta(self) -> HelpMeta:
         return HelpMeta(
             category="settings",
+            group="settings",
             one_liner=("I change my settings by voice — the whisper model, thinking depth, "
                        "personality, the voice, web search, and more."),
             example="turn personality off",

@@ -28,6 +28,7 @@ from typing import Callable
 
 from ..keybinds.binds import KeyBinding
 from ..keybinds.executor import ExecutorError
+from .base import HelpMeta
 
 # ---- macros -------------------------------------------------------------------------------
 
@@ -197,6 +198,15 @@ class KeybindCapability:
         out.append(_CONFIRM_TOOL)
         out.append(_ABORT_TOOL)
         return out
+
+    def help_meta(self) -> HelpMeta:
+        return HelpMeta(
+            category="ship controls",
+            group="your ship",
+            one_liner=("I can toggle your landing gear on a separate spoken confirmation, with "
+                       "a combat safety check — say 'abort' any time to cancel."),
+            example="toggle my landing gear",
+        )
 
     def run_tool(self, name: str, inp: dict) -> str:
         try:

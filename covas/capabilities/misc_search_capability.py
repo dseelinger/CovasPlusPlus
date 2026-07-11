@@ -83,6 +83,7 @@ class MiscSearchCapability:
     def help_meta(self) -> HelpMeta:
         return HelpMeta(
             category="faction states",
+            group="navigation and search",
             one_liner=("I find the nearest system by its controlling faction's state — wars, "
                        "civil wars, boom, election, infrastructure failure — and copy the "
                        "system to your clipboard."),

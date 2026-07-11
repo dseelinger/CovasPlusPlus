@@ -6,15 +6,21 @@ registered capability's `HelpMeta`. That's what structurally prevents the compan
 claiming a filter/slot/capability that doesn't exist: help can only speak what the registry
 actually carries.
 
-Three modes, all templated (three phrasing variants each, rotated DETERMINISTICALLY by an
-internal counter — `random` would make the tests flaky):
+The listing is a HIERARCHY so it scales as capabilities grow (they'll soon be too many to
+read at once): "what can you do" names the GROUPS, a group drills into its capabilities, and a
+capability drills into its detail.
 
-  * idle   — "what can you do": the categories the registry exposes, each with one example.
-             Ranked by usage; speak at most 3, then a short "there are others — ask about …"
-             tail. With nothing registered, a graceful empty-state that still reads right.
-  * topic  — "how do I …" / "can you …": detail for ONE category (its example + refinements).
-             A topic that isn't a registered category hits a fallback that NEVER echoes the
-             unrecognized name (help must not imply an unregistered capability exists).
+Modes, all templated (three phrasing variants each, rotated DETERMINISTICALLY by an internal
+counter — `random` would make the tests flaky):
+
+  * idle   — "what can you do": the GROUPS the registry exposes (e.g. navigation and search,
+             ship status, settings), ranked by usage, with an invitation to drill in. With
+             nothing registered, a graceful empty-state that still reads right.
+  * topic  — "how do I …" / "can you …" / "tell me about …": if the topic names a GROUP, list
+             its capabilities (at most 3, then a "there are others" tail); if it names a
+             CAPABILITY, give its detail (example + refinements). A topic that matches neither
+             hits a fallback that NEVER echoes the unrecognized name (help must not imply an
+             unregistered capability/group exists).
   * error  — the important one: failure-recovery. Given a term that failed to resolve, match
              it against the registry's canonical vocabulary and answer with the nearest VALID
              phrasing ("I didn't recognize 'power distributer' as a module — did you mean
@@ -43,9 +49,10 @@ _TOOL_DESCRIPTION = (
     "Explain what you can do, or recover from something you couldn't act on. Call this when "
     "the Commander:\n"
     " - explicitly asks for help ('help', 'what can you do', 'what are my options') — call "
-    "with NO arguments for the overview;\n"
-    " - asks about a specific capability ('how do I find a module', 'can you search "
-    "stations') — pass `topic` with the capability's name;\n"
+    "with NO arguments for the overview (it names the CATEGORIES of things you can do);\n"
+    " - asks about a category or a specific capability ('tell me about navigation', 'how do I "
+    "find a module', 'can you search stations') — pass `topic` with the category/group or the "
+    "capability's name; a group lists its capabilities, a capability gives its detail;\n"
     " - says something you could NOT resolve to a real module / system / option — pass "
     "`unresolved` with the term you couldn't match (and `expected` with what it should have "
     "been, e.g. 'module'), so the reply can suggest the nearest valid phrasing. Prefer this "
@@ -62,8 +69,9 @@ _TOOL = {
         "properties": {
             "topic": {
                 "type": "string",
-                "description": "A capability/category the Commander asked about (e.g. "
-                               "'outfitting'). Omit for a general overview.",
+                "description": "A category/group (e.g. 'navigation and search') or a specific "
+                               "capability (e.g. 'outfitting') the Commander asked about. Omit "
+                               "for the general overview of categories.",
             },
             "unresolved": {
                 "type": "string",
@@ -92,6 +100,11 @@ _IDLE_EMPTY = (
     "I don't have any special capabilities wired up yet, but you can always just talk to me.",
     "No special skills are loaded right now — but I'm happy to just chat.",
     "Nothing extra is set up at the moment, though you can always talk to me.",
+)
+_GROUP_FRAMES = (
+    "Under {group}: {body}.",
+    "For {group}: {body}.",
+    "In {group}, {body}.",
 )
 _TOPIC_HIT = (
     "{cat}: {one_liner} For example, say \"{example}\".{refine}",
@@ -161,27 +174,49 @@ class HelpCapability:
             # Fall back to the empty-state phrasing rather than surfacing an exception.
             return _pick(_IDLE_EMPTY, idx)
 
-    # -- idle: "what can you do" -------------------------------------------------------
+    # -- idle: "what can you do" -> the GROUPS -----------------------------------------
     def _idle(self, idx: int) -> str:
-        entries = self._registry.help_entries(exclude=self)
-        if not entries:
+        groups = self._registry.groups(exclude=self)
+        if not groups:
             return _pick(_IDLE_EMPTY, idx)
-        shown = entries[:3]
-        rest = entries[3:]
-        clauses = [f"for {m.category}, say \"{m.example}\"" for m in shown]
-        line = _pick(_IDLE_FRAMES, idx).format(body=_join_clauses(clauses))
+        line = _pick(_IDLE_FRAMES, idx).format(body=_join_clauses(groups))
+        # Invite drilling in with a concrete, deterministic example, so the Commander can
+        # narrow down instead of hearing every capability at once.
+        line += (f" Ask about any of those — say \"tell me about {groups[0]}\" — "
+                 f"or just tell me what you need.")
+        return line
+
+    # -- topic: a group ("tell me about navigation") or a capability -------------------
+    def _topic(self, topic: str, idx: int) -> str:
+        # Most specific first: a named capability -> its detail.
+        meta = self._registry.help_entry_for(topic, exclude=self)
+        if meta is not None:
+            return self._capability_detail(meta, idx)
+        # Otherwise a group -> list the capabilities under it (a singleton group just gives
+        # that one capability's detail).
+        group = self._registry.group_for(topic, exclude=self)
+        if group is not None:
+            members = self._registry.help_entries_in_group(group, exclude=self)
+            if len(members) == 1:
+                return self._capability_detail(members[0], idx)
+            return self._group_listing(group, members, idx)
+        # Neither -> fallback that does NOT echo the (unvalidated) name, so help never implies
+        # a capability/group exists that doesn't.
+        return _pick(_TOPIC_MISS, idx)
+
+    def _group_listing(self, group: str, members: list[HelpMeta], idx: int) -> str:
+        """List the capabilities in a group, each with an example (at most 3, then a tail)."""
+        shown = members[:3]
+        rest = members[3:]
+        clauses = [f"{m.category} — say \"{m.example}\"" for m in shown]
+        line = _pick(_GROUP_FRAMES, idx).format(group=group, body=_join_clauses(clauses))
         if rest:
             names = _or_list([m.category for m in rest[:3]])
             line += f" There are others too — ask about {names}."
         return line
 
-    # -- topic: "how do I <category>" --------------------------------------------------
-    def _topic(self, topic: str, idx: int) -> str:
-        meta = self._registry.help_entry_for(topic, exclude=self)
-        if meta is None:
-            # Unregistered topic -> fallback that does NOT echo the (unvalidated) name, so
-            # help never implies a capability exists that doesn't.
-            return _pick(_TOPIC_MISS, idx)
+    def _capability_detail(self, meta: HelpMeta, idx: int) -> str:
+        """One capability's detail: what it does, an example, and its refinements."""
         refine = ""
         if meta.slots:
             phrasings = [s.phrasings[0] for s in meta.slots[:3] if s.phrasings]

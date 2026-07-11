@@ -14,6 +14,7 @@ proactive callouts are a later phase (DESIGN §5, §7).
 from __future__ import annotations
 
 from ..ed.context import EDContext
+from .base import HelpMeta
 
 ED_CONTEXT_TOOLS = [
     {
@@ -66,6 +67,15 @@ class EDContextCapability:
 
     def tools(self) -> list[dict]:
         return ED_CONTEXT_TOOLS
+
+    def help_meta(self) -> HelpMeta:
+        return HelpMeta(
+            category="ship status",
+            group="your ship",
+            one_liner=("I answer from live game telemetry — where you are, your fuel and ship, "
+                       "and what you've been doing."),
+            example="where am I",
+        )
 
     def system_context(self) -> str | None:
         """Short line injected into the (cached) system prompt, or None when nothing is

@@ -7,6 +7,7 @@ capability behind the registry (DESIGN §3.3). Behavior is unchanged.
 from __future__ import annotations
 
 from ..checklist import Checklist
+from .base import HelpMeta
 
 # Client-side tools that let Claude read/update the Commander's checklist.
 # The list can be large, so these are scoped: fetch just the next items, search,
@@ -125,6 +126,15 @@ class ChecklistCapability:
 
     def tools(self) -> list[dict]:
         return CHECKLIST_TOOLS
+
+    def help_meta(self) -> HelpMeta:
+        return HelpMeta(
+            category="checklist",
+            group="your checklist",
+            one_liner=("I track your objective checklist — I can read what's next, mark items "
+                       "done or reopened, and add, change, or delete lines."),
+            example="what should I knock out next",
+        )
 
     def run_tool(self, name: str, inp: dict) -> str:
         """Execute a client-side checklist tool Claude called."""
