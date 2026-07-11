@@ -394,14 +394,10 @@ The original seven-phase plan is done and tested:
 17. **Search data freshness + local shipyard ground truth** (§5) — the staleness filter on volatile Spansh data and the `Shipyard.json` stock veto, from the live Type-8 bug.
 18. **Ship loadout & engineering** (N9) — the full journal `Loadout` snapshot on `EDContext`, offline symbol→spoken-name mapping (`ed/module_names.py`), and a `LoadoutCapability` answering "what's on my FSD" / experimental effects / the fitted rundown, with upgrade suggestions offered onto the checklist.
 19. **EDSM current-stock verification for ships** (§5) — every ship-search candidate confirmed against EDSM's live shipyard snapshot (the same data Inara shows) before being spoken, from the live Type-10 bug; answers now match Inara's nearest-seller search.
+20. **Web checklist editor** (N10) — a `/checklist` tab rendering `ultimate_checklist.md` as WYSIWYG markdown (TOAST UI from CDN, dark theme, first-class task lists; plain-textarea fallback when the CDN is unreachable). Saves round-trip losslessly through `checklist.py` (editor `* [ ]` bullets normalized back to `- [ ]`, nesting preserved); voice and web share the file (reads are per-call fresh, the cursor is clamped on save), and a content-hash stale-write guard 409s a save when a voice edit landed underneath, offering reload-vs-overwrite instead of clobbering.
 
-### Backlog (specced as Claude Code prompts, not yet built)
-Each is a prompt in `CLAUDE_CODE_PROMPTS.md`, LLM-native + offline-tested per §3.5 / §9:
-
-- **N10 — Web checklist editor.** A WYSIWYG (Obsidian-style) markdown editor tab with task-list/checkbox support, editing `ultimate_checklist.md`; round-trips losslessly through `checklist.py` and reloads the voice model on save (don't-clobber guard vs. voice edits).
-
-### Sequencing
-N10 is the last prompt in the pack and is self-contained web/front-end work, independent of everything merged. One branch per prompt, one fresh Claude Code session each. **The prompt pack carries the live worklist; this doc carries the architecture.**
+### Backlog
+**Empty — every prompt in `CLAUDE_CODE_PROMPTS.md` is built and merged.** New work starts as a new prompt in the pack (one branch per prompt, one fresh session each). **The prompt pack carries the live worklist; this doc carries the architecture.**
 
 ---
 

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COVAS++ Checklist</title>
+<!-- TOAST UI Editor (WYSIWYG markdown with first-class task lists) from CDN, pinned.
+     If the CDN is unreachable the page degrades to a plain-markdown textarea below. -->
+<link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/toastui-editor.min.css">
+<link rel="stylesheet" href="https://uicdn.toast.com/editor/3.2.2/theme/toastui-editor-dark.min.css">
+<style>
+  :root{
+    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
+    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,#12181f,#0a0d12)}
+  header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
+  header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
+  header a.sub{color:var(--accent2);text-decoration:none}
+  .wrap{padding:16px;max-width:1000px}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:16px}
+  .card h2{margin:0 0 12px;font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  .bar{display:flex;align-items:center;gap:10px;margin-top:12px}
+  .bar button{padding:9px 16px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+      border-radius:6px;font-family:inherit;font-size:13px;letter-spacing:1px;cursor:pointer}
+  .bar button:hover{background:#162836}
+  .bar button.primary{background:var(--accent);color:#0a0d12;border-color:var(--accent);font-weight:bold}
+  .bar button.primary:hover{filter:brightness(1.1)}
+  .msg{color:#39d353;font-size:12px}
+  .msg.err{color:#ff9d9d}
+  .hint{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.6}
+  .conflict{display:none;margin-top:12px;padding:12px;border:1px solid #7a5a2a;border-radius:6px;
+      background:#2a2114;color:#ffce7a;font-size:13px;line-height:1.6}
+  .conflict.show{display:block}
+  .conflict button{margin-right:8px;margin-top:8px;padding:7px 12px;background:#12202c;color:var(--accent2);
+      border:1px solid var(--edge);border-radius:6px;font-family:inherit;font-size:12px;cursor:pointer}
+  #fallback{display:none;width:100%;height:66vh;background:#0c1119;color:var(--text);
+      border:1px solid var(--edge);border-radius:6px;padding:10px;font-family:inherit;
+      font-size:13px;line-height:1.6;resize:vertical}
+  /* keep the editor's dark theme flush with the panel palette */
+  .toastui-editor-dark .toastui-editor-defaultUI{border-color:var(--edge)}
+</style>
+</head>
+<body>
+<header>
+  <h1>COVAS++</h1>
+  <span class="sub">CHECKLIST</span>
+  <a href="/" class="sub">← control panel</a>
+  <a href="/settings" class="sub">⚙ settings</a>
+  <span class="sub" id="fileName" style="margin-left:auto"></span>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Ultimate checklist</h2>
+    <div id="editor"></div>
+    <textarea id="fallback" spellcheck="false"
+      placeholder="- [ ] a pending objective&#10;- [x] a completed one"></textarea>
+    <div class="conflict" id="conflict">
+      ⚠ The checklist file changed on disk since you loaded it — probably a voice edit.
+      Saving now would overwrite that change.<br>
+      <button id="reloadTheirs">RELOAD THEIR VERSION (discard my edits)</button>
+      <button id="overwrite">OVERWRITE ANYWAY</button>
+    </div>
+    <div class="bar">
+      <button class="primary" id="save">SAVE</button>
+      <button id="reload">RELOAD FROM DISK</button>
+      <span class="msg" id="msg"></span>
+    </div>
+    <div class="hint">
+      Click a checkbox to toggle it · edit text inline · <b>Tab</b>/<b>Shift+Tab</b> nest and
+      un-nest items · <b>Ctrl+S</b> saves. The voice loop reads this same file live, so saved
+      edits are heard immediately — and its edits show up here on reload.
+    </div>
+  </div>
+</div>
+
+<script src="https://uicdn.toast.com/editor/3.2.2/toastui-editor-all.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let editor = null;          // TOAST UI instance, or null when the textarea fallback is active
+let VERSION = null;         // content-hash of the file as we last loaded/saved it
+let dirty = false;
+
+// WYSIWYG editor when the CDN loaded; plain textarea otherwise (the panel must not die offline).
+if (window.toastui && window.toastui.Editor) {
+  editor = new toastui.Editor({
+    el: $("editor"), height: "66vh", theme: "dark",
+    initialEditType: "wysiwyg", previewStyle: "tab",
+    usageStatistics: false, autofocus: false,
+    events: { change: () => { dirty = true; } },
+  });
+} else {
+  $("editor").style.display = "none";
+  $("fallback").style.display = "block";
+  $("fallback").addEventListener("input", () => { dirty = true; });
+}
+const getMd = () => editor ? editor.getMarkdown() : $("fallback").value;
+const setMd = md => { editor ? editor.setMarkdown(md, false) : ($("fallback").value = md); dirty = false; };
+
+function flash(text, isErr){
+  const el = $("msg");
+  el.textContent = text; el.classList.toggle("err", !!isErr);
+  clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = ""; }, 3000);
+}
+
+async function load(){
+  const r = await fetch("/api/checklist");
+  const data = await r.json();
+  if (!r.ok) { flash(data.error || "load failed", true); return; }
+  VERSION = data.version;
+  setMd(data.markdown || "");
+  $("fileName").textContent = data.name || "";
+  $("conflict").classList.remove("show");
+}
+
+async function save(force){
+  const r = await fetch("/api/checklist", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ markdown: getMd(), base_version: VERSION, force: !!force }),
+  });
+  const data = await r.json();
+  if (r.status === 409) {           // voice edited the file underneath us — don't clobber
+    $("conflict").classList.add("show");
+    $("conflict")._theirs = data;   // stash their version for "reload theirs"
+    return;
+  }
+  if (!r.ok) { flash(data.error || "save failed", true); return; }
+  VERSION = data.version; dirty = false;
+  $("conflict").classList.remove("show");
+  flash("Saved — " + data.done + "/" + data.items + " complete.");
+}
+
+$("save").onclick = () => save(false);
+$("reload").onclick = async () => {
+  if (dirty && !window.confirm("Discard your unsaved edits and reload from disk?")) return;
+  await load(); flash("Reloaded.");
+};
+$("reloadTheirs").onclick = () => {
+  const theirs = $("conflict")._theirs;
+  if (theirs) { VERSION = theirs.version; setMd(theirs.markdown || ""); }
+  $("conflict").classList.remove("show");
+  flash("Loaded the on-disk version.");
+};
+$("overwrite").onclick = () => save(true);
+
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(false); }
+});
+
+// Coming back to the tab after a voice session: surface a drift warning early rather than
+// only at save time. Cheap version check; never touches the editor content.
+window.addEventListener("focus", async () => {
+  if (VERSION === null) return;
+  try {
+    const data = await (await fetch("/api/checklist")).json();
+    if (data.ok && data.version !== VERSION) {
+      $("conflict").classList.add("show");
+      $("conflict")._theirs = data;
+    }
+  } catch (e) { /* offline blip — the save-time guard still protects the file */ }
+});
+
+load();
+</script>
+</body>
+</html>
