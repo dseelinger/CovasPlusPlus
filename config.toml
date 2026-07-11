@@ -359,12 +359,13 @@ combat_guard = true
 
 
 [nav]
-# Find-closest-module (voice: "find the closest station that sells module X"). Resolves the
-# module conversationally against a BUNDLED offline outfitting taxonomy (ask/confirm/cancel,
-# no network), then — only after confirmation — runs ONE Spansh station search for the nearest
-# station selling it, sorted by distance from your current system, and copies the SYSTEM name
-# to the clipboard. Needs [elite].enabled for the live current-system (else it falls back to
-# the newest journal's last jump/location).
+# Find-closest-module AND find-closest-ship (voice: "find the closest station that sells
+# module X" / "...that sells ship X"). Both share this section. Each resolves the item
+# conversationally against a BUNDLED offline table (modules: ask/confirm/cancel; ships: ask
+# on an ambiguous family like Krait/Cobra/Type — no network), then runs ONE Spansh station
+# search for the nearest station selling it, sorted by distance from your current system, and
+# copies the SYSTEM name to the clipboard. Needs [elite].enabled for the live current-system
+# (else it falls back to the newest journal's last jump/location).
 #
 # DEFAULT OFF — opt in once you want it.
 enabled = true

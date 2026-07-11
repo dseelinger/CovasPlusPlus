@@ -210,6 +210,54 @@ pending-request object.
 - **EDSM fallback** (design note) is stubbed via config intent but not yet wired — Spansh is the
   sole live source for now; a lookup failure fails soft (spoken, never crashes the loop).
 
+### Implemented — find-closest-ship (shares `[nav]`)
+Voice shipyard search: "find the closest station that sells SHIP X." The direct sibling of
+find-closest-module, built on the identical LLM-native, stateless pattern (`covas/nav/ships.py`
++ `ship_search.py` + `FindClosestShipCapability`). It resolves the ship **conversationally**
+against a bundled offline roster, then finds the nearest station selling it and copies the
+SYSTEM name to the clipboard. Shares the `[nav]` config (pad default, base URL, enable) and the
+whole `search/spansh.py` transport — no duplicated plumbing.
+
+- **Bundled ship roster (`ships.py`)** — the 48 canonical Spansh ship names (harvested live from
+  station `ships` arrays, 2026-07), each with aliases for short names / STT mishears ("conda" →
+  Anaconda, "fdl" → Fer-de-Lance, "clipper" → Imperial Clipper). `resolve_ship(query)` is pure/
+  offline and returns `ResolvedShip` / `AmbiguousShip(candidates)` / `UnknownShip(suggestions)`.
+  There's **no NeedAttrs** step (ships have no size/mount) and **no confirmation gate** — a ship
+  is a single unambiguous decision, so a resolved ship searches immediately.
+- **Genuine families ASK, never guess.** Bare "krait" → Krait MkII vs Phantom; "cobra" → MkIII/
+  MkIV/MkV; "viper" → MkIII/MkIV; "asp" and "diamondback" → Explorer/Scout; "type" → Type-6…11.
+  A discriminator ("krait phantom", "type 9") resolves directly. Modelled as an explicit family
+  table checked before substring/fuzzy matching, so disambiguation is deterministic + testable.
+- **Spansh `ships` filter quirks (verified live 2026-07)** — the station `ships` name filter IS
+  honoured server-side (unlike the module *mount* key), and is CASE-SENSITIVE exact-match: "Krait
+  Mk II" and "anaconda" both return **zero**, and an unknown name returns zero (not everything).
+  That's exactly why resolution to the exact canonical name happens offline before the search
+  fires. There's no variant to post-filter (a belt-and-braces `_sells_ship` guard over each
+  result's `ships` list stays, and reads back the ship's PRICE for the spoken line).
+- **Carriers excluded SERVER-SIDE.** Ships are stocked at far fewer stations than modules, and
+  near populated space fleet carriers are ~95% of nearby shipyards — dropping them only
+  client-side would blow the whole search window on carriers and return nothing. So the request
+  constrains `type` to the non-carrier station types (`search/stations.STATION_TYPES`, which omits
+  Drake-Class Carrier); the client-side `is_fleet_carrier` check stays as a backstop.
+- **Routing** lives in the tool descriptions (no classifier): "where can I buy a SHIP" → this tool;
+  a MODULE → find_closest_module; a station by SERVICE/TYPE/PAD → search_stations. Current-system,
+  clipboard, and HTTP are injected exactly as find-closest-module, and a recorded ship-query
+  fixture drives the offline parse/nearest tests.
+- **Staying current as Frontier adds hulls (`ShipIndex`).** The bundled roster is a point-in-time
+  snapshot, and the exact-match `ships` filter means a hull we don't know the exact name of is one
+  we refuse to search for — so a new release would otherwise be unfindable until a code change. A
+  `ShipIndex` (a direct mirror of `search/faction_index.py`: lazy, cached, fail-soft) reconciles
+  the bundle against Spansh's live shipyard data — Spansh has no ship reference endpoint (verified
+  404), so the source of truth is its own shipyards, harvested around Shinrarta Dezhra (the hub
+  stocks the full roster). `app.py` kicks the reconciliation on a **background startup thread** (so
+  the first query never pays the fetch latency, and the voice loop is never blocked); resolution
+  folds any newly-learned names in via `resolve_ship(query, extra_names=…)`, falling back to the
+  bundle until/if the fetch lands, and logs any hulls newer than the bundle. Only NAMES self-update
+  — aliases and ambiguous-family disambiguation stay curated in `ships.py` (a new hull resolves by
+  exact/fuzzy name but won't get a nickname or join a "which one?" family until edited). A free
+  `integration+local` canary (`test_live_ship_index_harvest_covers_the_bundle`) fails if the live
+  roster ever drifts far from the bundle, prompting a curated top-up.
+
 ---
 
 ## 6. Keybind automation (future phase — sketch)

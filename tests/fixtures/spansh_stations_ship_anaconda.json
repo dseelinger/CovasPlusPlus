@@ -1,0 +1,146 @@
+{
+  "count": 10000,
+  "from": 0,
+  "size": 3,
+  "reference": {
+    "id64": 10477373803,
+    "name": "Sol",
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "results": [
+    {
+      "name": "W0F-58M",
+      "system_name": "Alpha Centauri",
+      "distance": 4.37712002205788,
+      "distance_to_arrival": 4060.049856,
+      "type": "Drake-Class Carrier",
+      "has_large_pad": true,
+      "large_pads": 8,
+      "medium_pads": 4,
+      "small_pads": 4,
+      "is_planetary": false,
+      "ships": [
+        {
+          "name": "Anaconda",
+          "price": 146969450,
+          "symbol": "Anaconda"
+        },
+        {
+          "name": "Cobra MkIII",
+          "price": 349720,
+          "symbol": "CobraMkIII"
+        },
+        {
+          "name": "Krait Phantom",
+          "price": 37472254,
+          "symbol": "Krait_Light"
+        },
+        {
+          "name": "Krait MkII",
+          "price": 45814205,
+          "symbol": "Krait_MkII"
+        },
+        {
+          "name": "Python",
+          "price": 56978180,
+          "symbol": "Python"
+        },
+        {
+          "name": "Sidewinder",
+          "price": 32000,
+          "symbol": "SideWinder"
+        }
+      ]
+    },
+    {
+      "name": "Cayley Enterprise",
+      "system_name": "Wolf 359",
+      "distance": 7.77779792904136,
+      "distance_to_arrival": 52.894542,
+      "type": "Planetary Outpost",
+      "has_large_pad": true,
+      "large_pads": 2,
+      "medium_pads": 2,
+      "small_pads": 4,
+      "is_planetary": true,
+      "ships": [
+        {
+          "name": "Adder",
+          "price": 87810,
+          "symbol": "Adder"
+        },
+        {
+          "name": "Anaconda",
+          "price": 146969450,
+          "symbol": "Anaconda"
+        },
+        {
+          "name": "Asp Explorer",
+          "price": 6661150,
+          "symbol": "Asp"
+        },
+        {
+          "name": "Asp Scout",
+          "price": 3961150,
+          "symbol": "Asp_Scout"
+        },
+        {
+          "name": "Beluga Liner",
+          "price": 84532780,
+          "symbol": "BelugaLiner"
+        },
+        {
+          "name": "Cobra MkIII",
+          "price": 349720,
+          "symbol": "CobraMkIII"
+        }
+      ]
+    },
+    {
+      "name": "Beveridge Enterprise",
+      "system_name": "Lalande 21185",
+      "distance": 8.28732088795891,
+      "distance_to_arrival": 5.059203,
+      "type": "Orbis Starport",
+      "has_large_pad": true,
+      "large_pads": 7,
+      "medium_pads": 11,
+      "small_pads": 7,
+      "is_planetary": false,
+      "ships": [
+        {
+          "name": "Anaconda",
+          "price": 146969450,
+          "symbol": "Anaconda"
+        },
+        {
+          "name": "Asp Scout",
+          "price": 3961150,
+          "symbol": "Asp_Scout"
+        },
+        {
+          "name": "Cobra MkIV",
+          "price": 764720,
+          "symbol": "CobraMkIV"
+        },
+        {
+          "name": "Cobra MkV",
+          "price": 1989461,
+          "symbol": "CobraMkV"
+        },
+        {
+          "name": "Corsair",
+          "price": 79304748,
+          "symbol": "Corsair"
+        },
+        {
+          "name": "Diamondback Scout",
+          "price": 564330,
+          "symbol": "DiamondBack"
+        }
+      ]
+    }
+  ]
+}

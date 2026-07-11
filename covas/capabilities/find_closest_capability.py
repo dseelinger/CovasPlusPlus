@@ -100,8 +100,9 @@ _REPORT_STEP = (
 _DESC_NO_CONFIRM = (
     "Find the closest Elite Dangerous station that SELLS a given outfitting module, by "
     "distance from the Commander's current system, and copy that system's name to the "
-    "clipboard. (If the Commander instead wants the nearest station by SERVICE, TYPE, or PAD "
-    "rather than a specific module or ship, use the search_stations tool.) Resolve the module "
+    "clipboard. (If the Commander wants a whole SHIP rather than a module — 'where can I buy "
+    "an Anaconda' — use the find_closest_ship tool; if they want the nearest station by "
+    "SERVICE, TYPE, or PAD, use search_stations.) Resolve the module "
     "CONVERSATIONALLY, then search:\n"
     + _SHARED_STEPS +
     "3. As soon as the module is fully specified (name plus any required size/mount), the "
@@ -113,8 +114,9 @@ _DESC_NO_CONFIRM = (
 _DESC_CONFIRM = (
     "Find the closest Elite Dangerous station that SELLS a given outfitting module, by "
     "distance from the Commander's current system, and copy that system's name to the "
-    "clipboard. (If the Commander instead wants the nearest station by SERVICE, TYPE, or PAD "
-    "rather than a specific module or ship, use the search_stations tool.) Resolve the module "
+    "clipboard. (If the Commander wants a whole SHIP rather than a module — 'where can I buy "
+    "an Anaconda' — use the find_closest_ship tool; if they want the nearest station by "
+    "SERVICE, TYPE, or PAD, use search_stations.) Resolve the module "
     "CONVERSATIONALLY before searching:\n"
     + _SHARED_STEPS +
     "3. When the tool reports the module is RESOLVED, tell the Commander your interpretation "

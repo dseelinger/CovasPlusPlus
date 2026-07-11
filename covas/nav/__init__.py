@@ -13,24 +13,34 @@ Two data sources, deliberately split (see the build prompt + DESIGN §3):
 galaxy map. Everything I/O-bound (HTTP, clipboard) is injected so tests stay hermetic.
 """
 from .modules import (Ambiguous, NeedAttrs, Resolved, Unknown, resolve)
+from .ships import (AmbiguousShip, ResolvedShip, UnknownShip, SHIP_NAMES, resolve_ship)
+from .ship_index import ShipIndex
 from .closest import (ClosestResult, NavError, RequestsHttp, find_closest_module)
+from .ship_search import find_closest_ship
 from .clipboard import copy
 from .location import current_system_from_journal
 from .carrier import (CarrierInfo, carrier_from_journals, squadron_name_from_journals)
 
 __all__ = [
     "Ambiguous",
+    "AmbiguousShip",
     "CarrierInfo",
     "ClosestResult",
     "NavError",
     "NeedAttrs",
     "RequestsHttp",
     "Resolved",
+    "ResolvedShip",
+    "SHIP_NAMES",
+    "ShipIndex",
     "Unknown",
+    "UnknownShip",
     "carrier_from_journals",
     "copy",
     "current_system_from_journal",
     "find_closest_module",
+    "find_closest_ship",
     "resolve",
+    "resolve_ship",
     "squadron_name_from_journals",
 ]
