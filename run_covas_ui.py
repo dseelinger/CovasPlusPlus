@@ -4,10 +4,14 @@ import threading
 import webbrowser
 
 from covas.app import App
+from covas.single_instance import ensure_single_instance
 from covas.web import create_app
 
 
 def main() -> None:
+    # Refuse a second instance before loading anything — two voice loops would share the mic
+    # and speakers and talk over each other. Held for the process lifetime.
+    instance_lock = ensure_single_instance()  # noqa: F841 — keep the lock alive
     core = App()
     try:
         core.start()                      # install PTT / cancel key hooks
