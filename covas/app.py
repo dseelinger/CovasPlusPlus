@@ -145,6 +145,14 @@ class App:
         # landing gear) on request, behind a safety layer (confirmation, allowlist, combat
         # guard, hard abort). Opt-in ([keybinds].enabled, off by default).
         self.keybinds = None
+        # Auto-honk (N5): fire the Discovery Scanner on arrival in a new system. Opt-in
+        # ([honk].enabled, off by default), combat-gated. Shares the keybind executor + binds.
+        self.honk = None
+        # Shared scancode executor + parsed .binds, built once and reused by keybinds and
+        # auto-honk so a hard abort releases keys held by either (and the .binds file is parsed
+        # a single time). Lazily populated by the helpers below.
+        self._shared_executor = None
+        self._binds_cache: dict | None = None
         # Find-closest-module: resolve a module by voice (offline taxonomy), confirm, then
         # find the nearest station selling it via Spansh + copy the system to the clipboard.
         # Opt-in ([nav].enabled, off by default).
@@ -165,6 +173,8 @@ class App:
             self._start_route()
         if self.cfg.get("keybinds", {}).get("enabled"):
             self._start_keybinds()
+        if self.cfg.get("honk", {}).get("enabled"):
+            self._start_honk()
         if self.cfg.get("nav", {}).get("enabled"):
             self._start_nav()
         if self.cfg.get("star_systems", {}).get("enabled"):
@@ -486,22 +496,11 @@ class App:
         never block startup. The combat guard reads the live ED context snapshot (so keybinds
         needs [elite].enabled to positively confirm it's safe to act)."""
         try:
-            from .keybinds import BindsError, load_binds
-            from .keybinds.executor import KeyExecutor
             from .capabilities.keybind_capability import KeybindConfig, KeybindCapability
 
             kcfg = KeybindConfig.from_cfg(self.cfg)
-            try:
-                binds = load_binds(self.cfg)
-            except BindsError as e:
-                # Couldn't locate/read the .binds file — register anyway with no bindings so
-                # the capability gives a clear "bind it in-game / set binds_file" message
-                # rather than vanishing silently.
-                binds = {}
-                self.bus.publish({"type": "log", "who": "system",
-                                  "text": f"Keybinds: {e}"})
-
-            executor = KeyExecutor()   # raises ExecutorError off-Windows -> caught below
+            binds = self._ed_binds()
+            executor = self._key_executor()   # raises ExecutorError off-Windows -> caught below
             snapshot = ((lambda: self.ed_ctx.snapshot()) if self.ed_ctx is not None else None)
             self.keybinds = KeybindCapability(
                 binds=binds, executor=executor, config=kcfg,
@@ -532,6 +531,70 @@ class App:
             self.keybinds = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Keybinds failed to start: {e}"})
+
+    def _ed_binds(self) -> dict:
+        """Parse the active ED key bindings once, shared by keybinds + auto-honk. Returns {}
+        (with a logged reason) if the .binds file can't be located/read, so a capability
+        degrades to a clear 'bind it in-game' message instead of vanishing silently."""
+        if self._binds_cache is None:
+            from .keybinds import BindsError, load_binds
+            try:
+                self._binds_cache = load_binds(self.cfg)
+            except BindsError as e:
+                self._binds_cache = {}
+                self.bus.publish({"type": "log", "who": "system", "text": f"Keybinds: {e}"})
+        return self._binds_cache
+
+    def _key_executor(self):
+        """Build (once) the shared scancode executor used by both keybind actions and auto-honk,
+        so a hard abort releases keys held by either. Raises ExecutorError off-Windows (the
+        callers catch it and leave the feature off)."""
+        if self._shared_executor is None:
+            from .keybinds.executor import KeyExecutor
+            self._shared_executor = KeyExecutor()
+        return self._shared_executor
+
+    # ---- Auto-honk (N5) ---------------------------------------------------
+    def _start_honk(self) -> None:
+        """Build + register the auto-honk capability and ensure the event pump is running. Fail
+        soft — a missing bindings file or a non-Windows host just leaves it off; it must never
+        block startup. Needs ED monitoring for the arrival event, the current fire group, and
+        the combat guard, so warn (don't fail) if that's off."""
+        try:
+            from .capabilities.honk_capability import HonkCapability, HonkConfig
+
+            hcfg = HonkConfig.from_cfg(self.cfg)
+            binds = self._ed_binds()
+            executor = self._key_executor()   # raises ExecutorError off-Windows -> caught below
+            snapshot = ((lambda: self.ed_ctx.snapshot()) if self.ed_ctx is not None else None)
+            self.honk = HonkCapability(
+                hcfg, binds=binds, executor=executor,
+                status_snapshot=snapshot,
+                log=lambda msg: self._log("honk", msg))
+            self.registry.register(self.honk)
+            self._start_event_pump()
+
+            fire = binds.get(hcfg.fire_action)
+            fire_ok = fire is not None and fire.usable
+            where = (f"fire group {hcfg.fire_group}" if hcfg.configured
+                     else "current fire group (no cycling)")
+            if self.ed_ctx is None:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    "Auto-honk ON, but ED monitoring is OFF — no arrival events, and the "
+                    "combat guard can't verify safety, so it won't fire until [elite].enabled."})
+            elif not fire_ok:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    f"Auto-honk ON, but {hcfg.fire_action} has no keyboard binding — bind the "
+                    "Discovery Scanner's fire button to a key in-game so COVAS can honk."})
+            else:
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"Auto-honk ON (hold {hcfg.fire_action} "
+                                          f"{hcfg.hold_seconds:g}s on {where}, combat guard "
+                                          f"{'on' if hcfg.combat_guard else 'off'})."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.honk = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Auto-honk failed to start: {e}"})
 
     # ---- Find-closest-module ----------------------------------------------
     def _start_nav(self) -> None:
@@ -1070,6 +1133,7 @@ def _banner(cfg: dict) -> str:
     ed = "ON" if cfg.get("elite", {}).get("enabled") else "OFF"
     pro = "ON" if cfg.get("proactive", {}).get("enabled") else "OFF"
     kb = "ON" if cfg.get("keybinds", {}).get("enabled") else "OFF"
+    honk = "ON" if cfg.get("honk", {}).get("enabled") else "OFF"
     nav = "ON" if cfg.get("nav", {}).get("enabled") else "OFF"
     return (
         "\n================ COVAS++ (Phase 2) ================\n"
@@ -1080,6 +1144,7 @@ def _banner(cfg: dict) -> str:
         f"  ED monitor : {ed}\n"
         f"  Proactive  : {pro}\n"
         f"  Keybinds   : {kb}\n"
+        f"  Auto-honk  : {honk}\n"
         f"  Find module: {nav}\n"
         f"  Personality: {p}\n"
         f"  Cache TTL  : {cfg['anthropic'].get('cache_ttl', '1h')}\n"

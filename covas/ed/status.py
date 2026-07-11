@@ -139,6 +139,12 @@ def apply_status(ctx: EDContext, status: dict) -> dict:
     if isinstance(status.get("Cargo"), (int, float)):
         patch["cargo"] = float(status["Cargo"])
 
+    # Currently-selected fire group (0-based). Only present in Status.json when in a ship
+    # with hardpoints; auto-honk (N5) reads it to cycle to the Discovery Scanner's group.
+    fg = status.get("FireGroup")
+    if isinstance(fg, int) and not isinstance(fg, bool):
+        patch["fire_group"] = fg
+
     if patch:
         ctx.update(**patch)
     return patch

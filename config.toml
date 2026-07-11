@@ -333,6 +333,31 @@ confirm_window = 60
 allowlist = ["landing_gear"]
 
 
+[honk]
+# Auto-honk (N5) — fire the Discovery Scanner shortly after arriving in a NEW system (an
+# FSDJump into normal space), so you scan the system without lifting a finger. Builds on the
+# keybind executor: the model isn't involved at all — arrival triggers a deterministic
+# keystroke sequence. Requires [elite].enabled (for the arrival event, the current fire group,
+# and the combat guard).
+#
+# DEFAULT OFF — this presses a fire button, so opt in deliberately. The combat guard refuses
+# to honk during danger/interdiction (and when ED status is unavailable), and the shared hard
+# abort ("abort" — see [keybinds]) releases the held key.
+enabled = false
+# The Discovery Scanner's fire group index (0-based, as numbered in the right HUD panel). When
+# set, COVAS reads your CURRENT fire group from Status.json, cycles to this one, honks, then
+# cycles back. Set to -1 if you don't want cycling: it then just holds primary fire (the
+# "hope for the best" fallback that works when the scanner is already your selected group).
+fire_group = -1
+# Which fire button the Discovery Scanner is on: "primary" or "secondary".
+trigger = "primary"
+# How long (seconds) to HOLD the fire button — a full honk takes a few seconds to complete.
+hold_seconds = 6.0
+# Refuse to honk during danger/interdiction (and when ED status is unavailable — we won't act
+# unless we can prove it's safe). Leave ON.
+combat_guard = true
+
+
 [nav]
 # Find-closest-module (voice: "find the closest station that sells module X"). Resolves the
 # module conversationally against a BUNDLED offline outfitting taxonomy (ask/confirm/cancel,

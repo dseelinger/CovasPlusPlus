@@ -293,6 +293,34 @@ SCHEMA: list[Setting] = [
             default=60, min=5, max=300, unit="s",
             phrasings=("confirm window",)),
 
+    # --- Auto-honk ---------------------------------------------------------
+    Setting("honk.enabled", ("honk", "enabled"), "bool",
+            "Auto-honk", "Auto-honk",
+            "Fire the Discovery Scanner automatically on arrival in a new system. "
+            "Needs ED monitoring; combat-gated.",
+            default=False, phrasings=("auto honk", "auto discovery scan", "honk"),
+            example="turn auto honk on"),
+    Setting("honk.fire_group", ("honk", "fire_group"), "int",
+            "Scanner fire group", "Auto-honk",
+            "The Discovery Scanner's fire group (0-based). -1 = don't cycle, just hold "
+            "primary fire.",
+            default=-1, min=-1, max=15, unit="group",
+            phrasings=("scanner fire group", "honk fire group")),
+    Setting("honk.trigger", ("honk", "trigger"), "enum",
+            "Scanner fire button", "Auto-honk",
+            "Which fire button the Discovery Scanner is on.",
+            default="primary", options=["primary", "secondary"],
+            phrasings=("scanner trigger", "honk trigger")),
+    Setting("honk.hold_seconds", ("honk", "hold_seconds"), "float",
+            "Honk hold time", "Auto-honk",
+            "How long to hold the fire button to complete the scan.",
+            default=6.0, min=1.0, max=10.0, unit="s",
+            phrasings=("honk hold time", "honk duration")),
+    Setting("honk.combat_guard", ("honk", "combat_guard"), "bool",
+            "Combat guard", "Auto-honk",
+            "Refuse to honk during danger/interdiction (or unknown status). Leave ON.",
+            default=True, phrasings=("honk combat guard",)),
+
     # --- Navigation & search ----------------------------------------------
     Setting("nav.enabled", ("nav", "enabled"), "bool",
             "Find closest module", "Navigation & search",

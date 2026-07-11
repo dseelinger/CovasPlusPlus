@@ -252,6 +252,31 @@ proving toggle-landing-gear end-to-end before any generalization:
 
 Next actions stay gated behind a go/no-go after on-hardware validation of this one.
 
+### Implemented — auto-honk (`[honk]`, default off, N5)
+The second keybind-driven action, and the first PROACTIVE one — fire the Discovery Scanner
+("honk") on arrival in a new system, no button press (`covas/capabilities/honk_capability.py`).
+It's an **ambient** capability like route callouts (no LLM tools): it subscribes to the bus and
+reacts to the journal's `FSDJump`. It reuses the keybind executor + safety layer:
+
+- **Sequence.** *Configured* (a scanner `fire_group` index + `trigger` are set): read the
+  CURRENT fire group from `Status.json` (folded into `EDContext.fire_group`), compute the exact
+  cycle to the scanner group (`cycle_plan(current, target)` — deterministic `|delta|` steps of
+  `CycleFireGroupNext`/`Previous`, so no total-group-count guess and no wrapping), HOLD the
+  configured `PrimaryFire`/`SecondaryFire` for `hold_seconds` (~6s), then cycle back. *Not
+  configured* (`fire_group = -1`): the accepted fallback — just hold primary fire without cycling.
+- **Safety (reused).** The combat/interdiction guard (`combat_state` + guard messages from the
+  keybind capability) refuses during danger/interdiction AND when ED status is unavailable
+  (can't prove safe). If cycling is needed but the current group is unreadable or a cycle bind is
+  missing, it REFUSES rather than risk holding fire in the wrong group (which could fire weapons).
+  The **shared** `KeyExecutor` (one instance for keybinds + honk) means the hard abort
+  (`abort_keybinds` -> `release_all()`) lifts the held fire key; the executor also clamps hold
+  duration. Every honk and skip is logged.
+- **Non-blocking.** The ~6s hold runs on a spawned daemon thread (injected `spawn`) so it never
+  blocks the event pump; a non-blocking lock drops a second honk while one is in progress.
+- Off by default; needs `[elite].enabled` for the arrival event, the fire group, and the guard.
+  Everything (binds, executor, status snapshot, spawner) is injected, so the whole sequence is
+  unit-tested offline with a recording fake executor.
+
 ---
 
 ## 7. Build status & roadmap
@@ -275,7 +300,7 @@ Each is a prompt in `CLAUDE_CODE_PROMPTS.md`, LLM-native + offline-tested per §
 - **N2 — Voice-settable settings.** The same schema projected to a voice capability.
 - **N3 — Location & carriers.** Copy current system; personal (owned) carrier tracked from the journal, pinned to the owned carrier's `CarrierID` so a squadron carrier the Commander is aboard can't be mistaken for it; "already there → don't copy" fix. (Squadron-carrier *location* is deliberately NOT looked up remotely — no public database resolves a carrier by callsign reliably, so that command just points to the in-game Carrier Management tab.)
 - **N4 — Route callouts.** Scoopable star (K G B F O A M) on approach + jumps-remaining every Nth, from `NavRoute.json` + `FSDTarget`, via the proactive path.
-- **N5 — Auto-honk.** Fire the Discovery Scanner on arrival: read the current fire group from Status, cycle to the configured scanner group, hold fire; combat-gated, opt-in.
+- ~~**N5 — Auto-honk.**~~ **Built** (§6 "Implemented — auto-honk"): fire the Discovery Scanner on arrival — read the current fire group from Status, cycle to the configured scanner group, hold fire, cycle back; combat-gated, opt-in. This is the last N-series prompt; the pack is now fully implemented.
 - **N6 — Community Goals.** List current CGs (external feed merged with the journal, surfacing ones you haven't visited), CG system (copy, with the N3 already-there rule), and your standing (journal-only: Top N / top band %). External feed is **Inara** `getCommunityGoalsRecent` (needs a free API key) — EDSM has no public CG API. No key → journal-only, fail-soft.
 
 ### Sequencing

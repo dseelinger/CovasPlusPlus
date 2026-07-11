@@ -35,6 +35,7 @@ _FIELDS: tuple[str, ...] = (
     "fuel_main",      # main tank fuel, tons
     "fuel_capacity",  # main tank capacity, tons (from the journal, not Status.json)
     "cargo",          # cargo aboard, tons
+    "fire_group",     # currently-selected fire group index (Status.json, 0-based) — auto-honk (N5)
 )
 
 # The Commander's PERSONAL fleet carrier, tracked live from journal carrier events. Kept
@@ -73,6 +74,7 @@ class EDContext:
         self.fuel_main: float | None = None
         self.fuel_capacity: float | None = None
         self.cargo: float | None = None
+        self.fire_group: int | None = None
         # Fleet-carrier state (see _CARRIER_FIELDS).
         self.carrier_id: int | None = None
         self.carrier_name: str | None = None
