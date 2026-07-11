@@ -178,8 +178,17 @@ class MinorFactionSearchCapability:
             return ("I don't know your current system yet — is Elite Dangerous running with "
                     "monitoring on? Jump somewhere, or tell me a system to search near.")
         try:
-            results = sup.run_query(self._spec, slots, self._http, system,
-                                    user_agent=self._cfg.user_agent, size=self._cfg.search_size)
+            # A faction's PRESENCE is stable, but its STATE ticks daily — so only a state-
+            # filtered search constrains data freshness (with a stale fallback + spoken caveat).
+            if "controlling_minor_faction_state" in slots:
+                results, stale_age = sup.run_query_fresh(
+                    self._spec, slots, self._http, system, user_agent=self._cfg.user_agent,
+                    size=self._cfg.search_size, fresh_field="updated_at")
+            else:
+                results = sup.run_query(self._spec, slots, self._http, system,
+                                        user_agent=self._cfg.user_agent,
+                                        size=self._cfg.search_size)
+                stale_age = None
         except sup.NavError as e:
             self._logline(f"search failed: {e}")
             return str(e)
@@ -191,11 +200,12 @@ class MinorFactionSearchCapability:
         best = systems[0]
         copied, here = sup.deliver_system(self._clipboard, best.name, best.distance_ly, self._log)
         self._logline(f"nearest faction match: {best.name} ({best.distance_ly:.1f} ly), "
-                      f"filters={sorted(slots)}, "
+                      f"filters={sorted(slots)}, stale_age={stale_age}, "
                       f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
-        return self._say(best, slots, copied, here)
+        return self._say(best, slots, copied, here, stale_age=stale_age)
 
-    def _say(self, rec, slots: dict, copied: bool, here: bool = False) -> str:
+    def _say(self, rec, slots: dict, copied: bool, here: bool = False, *,
+             stale_age: float | None = None) -> str:
         dist = sup.distance_phrase(rec.distance_ly)
         faction = slots.get("controlling_minor_faction") or slots.get("minor_faction_presences")
         if faction:
@@ -211,6 +221,9 @@ class MinorFactionSearchCapability:
             line = f"Closest match: {rec.name}, {dist}."
             if rec.controlling_minor_faction:
                 line += f" Controlled by {rec.controlling_minor_faction}."
+        # Present only when a state-filtered search answered from the stale fallback.
+        line += sup.stale_note(stale_age, what="that report",
+                               risk="the faction state may have changed")
         return line + sup.clipboard_note(rec.name, copied, here)
 
     def _logline(self, msg: str) -> None:

@@ -229,6 +229,9 @@ class FindClosestShipCapability:
         price = result.extra.get("ship_price")
         if isinstance(price, (int, float)) and price >= 1:
             line += f" It runs about {price:,.0f} credits."
+        # Present only when the answer came from the stale fallback (nothing fresh matched).
+        line += sup.stale_note(result.extra.get("stock_age_days"), what="that listing",
+                               risk="shipyard stock rotates and it may be gone")
         return line + sup.clipboard_note(result.system, copied, here)
 
     # -- helpers ----------------------------------------------------------------------
