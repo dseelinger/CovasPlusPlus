@@ -638,15 +638,21 @@ class App:
             from .nav import RequestsHttp, ShipIndex
             from .capabilities.find_closest_capability import NavConfig
             from .capabilities.find_closest_ship_capability import FindClosestShipCapability
+            from .ed.journal import resolve_journal_dir
+            from .ed.shipyard import read_shipyard_snapshot
 
             ncfg = NavConfig.from_cfg(self.cfg)
             # Live roster so newly-released Frontier hulls are findable without a code change:
             # the index is reconciled against the bundled roster on a background startup thread
             # (below), and resolution falls back to the bundle until/if that fetch lands.
             ship_index = ShipIndex()
+            # Ground-truth stock for the last-visited shipyard (Spansh lists the CATALOG, not
+            # stock). Re-read per lookup — the file is tiny and ED rewrites it on each visit.
+            shipyard_path = resolve_journal_dir(self.cfg) / "Shipyard.json"
             self.ship_nav = FindClosestShipCapability(
                 ncfg, http=RequestsHttp(),
                 get_current_system=self._current_system,
+                get_local_shipyard=lambda: read_shipyard_snapshot(shipyard_path),
                 ship_index=ship_index,
                 log=lambda msg: self._log("ship_nav", msg))
             self.registry.register(self.ship_nav)

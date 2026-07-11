@@ -90,6 +90,10 @@ class FindClosestShipCapability:
       * `http` — the Http poster for Spansh (RequestsHttp in the app; a fake in tests).
       * `get_current_system` — Callable[[], str|None] returning the Commander's current
         system (ED context, with a journal fallback the app wires up), or None.
+      * `get_local_shipyard` — Callable[[], ShipyardSnapshot|None] reading the game's own
+        Shipyard.json (ed/shipyard.py). Ground truth for the last-visited station's stock —
+        Spansh's ships list is the CATALOG, so a contradicted candidate gets skipped. None
+        (the default) disables the cross-check.
       * `resolve` / `search` / `clipboard` — pure/offline deps, defaulted to the real ones
         but overridable in tests.
     """
@@ -100,6 +104,7 @@ class FindClosestShipCapability:
         *,
         http: Http | None = None,
         get_current_system: Callable[[], str | None] | None = None,
+        get_local_shipyard: Callable[[], object | None] | None = None,
         resolve: Callable[..., object] = _default_resolve,
         search: Callable[..., object] = find_closest_ship,
         clipboard: Callable[[str], None] = _default_copy,
@@ -109,6 +114,7 @@ class FindClosestShipCapability:
         self._cfg = config
         self._http = http if http is not None else RequestsHttp()
         self._current_system = get_current_system
+        self._local_shipyard = get_local_shipyard
         self._resolve = resolve
         self._search = search
         self._clipboard = clipboard
@@ -206,6 +212,7 @@ class FindClosestShipCapability:
                 base_url=self._cfg.base_url,
                 user_agent=self._cfg.user_agent,
                 search_size=self._cfg.search_size,
+                local_shipyard=self._read_local_shipyard(),
             )
         except NavError as e:
             self._logline(f"search failed for {resolved.label}: {e}")
@@ -221,8 +228,15 @@ class FindClosestShipCapability:
         return self._say_result(resolved, result, copied, here)
 
     def _say_result(self, resolved: ResolvedShip, result, copied: bool, here: bool) -> str:
-        line = (f"Closest {resolved.label}: {result.station} in {result.system}, "
-                f"{sup.distance_phrase(result.distance_ly)}. Largest pad {result.pad}.")
+        line = ""
+        # A nearer station was contradicted by the Commander's own shipyard visit — say why
+        # it isn't the answer before naming the one that is.
+        skipped = result.extra.get("skipped_local")
+        if skipped:
+            line += (f"Spansh lists it at {skipped}, but the shipyard you visited there "
+                     f"doesn't currently stock it. ")
+        line += (f"Closest {resolved.label}: {result.station} in {result.system}, "
+                 f"{sup.distance_phrase(result.distance_ly)}. Largest pad {result.pad}.")
         arrival = result.extra.get("distance_to_arrival")
         if isinstance(arrival, (int, float)) and arrival >= 1:
             line += f" About {arrival:,.0f} light-seconds from the star."
@@ -235,6 +249,17 @@ class FindClosestShipCapability:
         return line + sup.clipboard_note(result.system, copied, here)
 
     # -- helpers ----------------------------------------------------------------------
+    def _read_local_shipyard(self):
+        """The Commander's own Shipyard.json snapshot, or None. Fail-soft — the cross-check
+        is a bonus; a broken reader never blocks a lookup."""
+        if self._local_shipyard is None:
+            return None
+        try:
+            return self._local_shipyard()
+        except Exception as e:  # noqa: BLE001 — ground truth is a bonus, never fatal
+            self._logline(f"local shipyard snapshot unavailable: {e}")
+            return None
+
     def _extra_names(self) -> tuple[str, ...]:
         """Newly-released ship names from the live index (empty until its background fetch
         lands, or if it's absent/unreachable). Fail-soft — a broken index never blocks a
