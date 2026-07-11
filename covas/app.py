@@ -649,6 +649,7 @@ class App:
         Spansh client built here, current-system read live with a journal fallback."""
         try:
             from .nav import RequestsHttp, ShipIndex
+            from .nav.edsm_stock import EdsmStockLookup
             from .capabilities.find_closest_capability import NavConfig
             from .capabilities.find_closest_ship_capability import FindClosestShipCapability
             from .ed.journal import resolve_journal_dir
@@ -662,15 +663,21 @@ class App:
             # Ground-truth stock for the last-visited shipyard (Spansh lists the CATALOG, not
             # stock). Re-read per lookup — the file is tiny and ED rewrites it on each visit.
             shipyard_path = resolve_journal_dir(self.cfg) / "Shipyard.json"
+            # EDSM current-stock check for every OTHER station — what makes the answer agree
+            # with Inara (Spansh unions ships into a catalog; EDSM keeps the live snapshot).
+            stock_lookup = (EdsmStockLookup(RequestsHttp(), user_agent=ncfg.user_agent)
+                            if ncfg.verify_stock else None)
             self.ship_nav = FindClosestShipCapability(
                 ncfg, http=RequestsHttp(),
                 get_current_system=self._current_system,
                 get_local_shipyard=lambda: read_shipyard_snapshot(shipyard_path),
+                stock_lookup=stock_lookup,
                 ship_index=ship_index,
                 log=lambda msg: self._log("ship_nav", msg))
             self.registry.register(self.ship_nav)
             self.bus.publish({"type": "log", "who": "system",
-                              "text": f"Find-closest-ship ON (pad {ncfg.default_pad_size or 'any'})."})
+                              "text": f"Find-closest-ship ON (pad {ncfg.default_pad_size or 'any'}, "
+                                      f"stock check {'EDSM' if stock_lookup else 'off'})."})
             threading.Thread(target=self._refresh_ship_index, args=(ship_index,),
                              name="ship-index-refresh", daemon=True).start()
         except Exception as e:  # noqa: BLE001 — optional; never block startup

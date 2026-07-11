@@ -282,9 +282,24 @@ of fix — both hardcoded policy, deliberately not configurable:
   `ed/shipyard.py` reads it fail-soft, and `nav/ship_search.py` **vetoes** a candidate only on
   positive local evidence (same station by MarketID/name+system, snapshot ≤ the 2-day stock
   window, hull's symbol absent from the PriceList), skipping to the next-nearest with a spoken
-  reason. Remote stations remain unverifiable with public data — that's the honest ceiling.
-- **Seam left open:** outfitting could adopt the same local veto via `Outfitting.json` if module
-  stock proves similarly catalog-shaped; the shared plumbing is in place.
+  reason.
+- **EDSM current-stock check (ships).** The "remote stations are unverifiable" ceiling turned out
+  to be false — proven by a second live bug (2026-07-11, the Type-10 from Diaguandri): a fresh
+  Spansh record listed 34 ships at Laplace Ring / Balante; the real stock was 16 (no Type-10, no
+  Chieftain). Both Inara and **EDSM** store the **latest EDDN shipyard message** — the actual
+  purchasable list — and agree with each other byte-for-byte, so EDSM's free per-station GET
+  (`api-system-v1/stations/shipyard`) is an Inara-grade stock oracle. `nav/edsm_stock.py` wraps
+  it (injected GET seam, normalized names — EDSM writes "Krait Mk II", Spansh "Krait MkII");
+  `nav/ship_search.py` walks Spansh's distance-sorted candidates and answers the **nearest one
+  EDSM confirms in stock** (≤ 12 checks/pass, memoized across the stale-fallback pass),
+  vetoing contradicted candidates with a spoken reason (`skipped_stock`). Absence of EDSM data
+  is never treated as absence of stock — an unconfirmable answer is spoken **with a caveat**
+  (`stock_unverified`), and a dead EDSM degrades to the old behavior (fail soft). Verified live:
+  the Type-10 and Chieftain answers now match Inara's own nearest-seller search #1 exactly
+  (Stronghold Carrier / Ebor, 19.3 ly). Kill switch: `[nav].verify_stock`.
+- **Seam left open:** outfitting could adopt the same two checks via `Outfitting.json` and
+  EDSM's outfitting endpoint if module stock proves similarly catalog-shaped; the shared
+  plumbing is in place.
 
 ---
 
@@ -378,6 +393,7 @@ The original seven-phase plan is done and tested:
 16. **"Copy that to my clipboard"** (N11) — one LLM-native `copy_to_clipboard(text, label?)` tool; the model resolves "that" from conversation; explicit request copies even in the current system.
 17. **Search data freshness + local shipyard ground truth** (§5) — the staleness filter on volatile Spansh data and the `Shipyard.json` stock veto, from the live Type-8 bug.
 18. **Ship loadout & engineering** (N9) — the full journal `Loadout` snapshot on `EDContext`, offline symbol→spoken-name mapping (`ed/module_names.py`), and a `LoadoutCapability` answering "what's on my FSD" / experimental effects / the fitted rundown, with upgrade suggestions offered onto the checklist.
+19. **EDSM current-stock verification for ships** (§5) — every ship-search candidate confirmed against EDSM's live shipyard snapshot (the same data Inara shows) before being spoken, from the live Type-10 bug; answers now match Inara's nearest-seller search.
 
 ### Backlog (specced as Claude Code prompts, not yet built)
 Each is a prompt in `CLAUDE_CODE_PROMPTS.md`, LLM-native + offline-tested per §3.5 / §9:

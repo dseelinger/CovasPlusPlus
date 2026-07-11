@@ -94,6 +94,10 @@ class FindClosestShipCapability:
         Shipyard.json (ed/shipyard.py). Ground truth for the last-visited station's stock —
         Spansh's ships list is the CATALOG, so a contradicted candidate gets skipped. None
         (the default) disables the cross-check.
+      * `stock_lookup` — the (system, station) -> current-stock callable (an
+        `EdsmStockLookup` in the app) that confirms each candidate is REALLY selling the
+        ship before it's spoken — the local veto generalized to unvisited stations. None
+        (the default) skips verification, keeping tests offline and legacy behavior intact.
       * `resolve` / `search` / `clipboard` — pure/offline deps, defaulted to the real ones
         but overridable in tests.
     """
@@ -105,6 +109,7 @@ class FindClosestShipCapability:
         http: Http | None = None,
         get_current_system: Callable[[], str | None] | None = None,
         get_local_shipyard: Callable[[], object | None] | None = None,
+        stock_lookup: Callable[[str, str], object | None] | None = None,
         resolve: Callable[..., object] = _default_resolve,
         search: Callable[..., object] = find_closest_ship,
         clipboard: Callable[[str], None] = _default_copy,
@@ -115,6 +120,7 @@ class FindClosestShipCapability:
         self._http = http if http is not None else RequestsHttp()
         self._current_system = get_current_system
         self._local_shipyard = get_local_shipyard
+        self._stock_lookup = stock_lookup
         self._resolve = resolve
         self._search = search
         self._clipboard = clipboard
@@ -205,6 +211,11 @@ class FindClosestShipCapability:
         """The one networked step — fires as soon as a ship resolves to a single model."""
         system = self._current_system() if self._current_system is not None else None
         pad = self._pad_size(inp)
+        # Only pass the stock seam when it exists, so injected `search` fakes without the
+        # kwarg keep working (the extra_names pattern).
+        kwargs: dict = {}
+        if self._stock_lookup is not None:
+            kwargs["stock_lookup"] = self._stock_lookup
         try:
             result = self._search(
                 resolved, system, self._http,
@@ -213,6 +224,7 @@ class FindClosestShipCapability:
                 user_agent=self._cfg.user_agent,
                 search_size=self._cfg.search_size,
                 local_shipyard=self._read_local_shipyard(),
+                **kwargs,
             )
         except NavError as e:
             self._logline(f"search failed for {resolved.label}: {e}")
@@ -222,19 +234,25 @@ class FindClosestShipCapability:
         # rule): you're already there, so copying your own system just clobbers the clipboard.
         copied, here = sup.deliver_system(self._clipboard, result.system, result.distance_ly,
                                           self._log)
+        stock = ("confirmed" if result.extra.get("stock_verified")
+                 else "unverified" if result.extra.get("stock_unverified") else "unchecked")
         self._logline(f"nearest {resolved.label}: {result.station} in {result.system} "
-                      f"({result.distance_ly:.1f} ly), pad {result.pad}, "
+                      f"({result.distance_ly:.1f} ly), pad {result.pad}, stock={stock}, "
                       f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
         return self._say_result(resolved, result, copied, here)
 
     def _say_result(self, resolved: ResolvedShip, result, copied: bool, here: bool) -> str:
         line = ""
-        # A nearer station was contradicted by the Commander's own shipyard visit — say why
-        # it isn't the answer before naming the one that is.
+        # A nearer station was contradicted — by the Commander's own shipyard visit, or by
+        # current stock data (EDSM). Say why it isn't the answer before naming the one that
+        # is; at most ONE skip note, this is spoken aloud.
         skipped = result.extra.get("skipped_local")
         if skipped:
             line += (f"Spansh lists it at {skipped}, but the shipyard you visited there "
                      f"doesn't currently stock it. ")
+        elif result.extra.get("skipped_stock"):
+            line += (f"Spansh lists it nearer at {result.extra['skipped_stock']}, but "
+                     f"current stock data says it isn't actually available there. ")
         line += (f"Closest {resolved.label}: {result.station} in {result.system}, "
                  f"{sup.distance_phrase(result.distance_ly)}. Largest pad {result.pad}.")
         arrival = result.extra.get("distance_to_arrival")
@@ -246,6 +264,10 @@ class FindClosestShipCapability:
         # Present only when the answer came from the stale fallback (nothing fresh matched).
         line += sup.stale_note(result.extra.get("stock_age_days"), what="that listing",
                                risk="shipyard stock rotates and it may be gone")
+        # The stock check couldn't confirm this one (no data / source down) — say so rather
+        # than imply the certainty a confirmed answer has.
+        if result.extra.get("stock_unverified"):
+            line += " I couldn't verify live stock for this one, so no guarantees."
         return line + sup.clipboard_note(result.system, copied, here)
 
     # -- helpers ----------------------------------------------------------------------
