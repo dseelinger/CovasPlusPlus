@@ -9,7 +9,8 @@ import sys
 
 import pytest
 
-from covas.nav import RequestsHttp, copy, find_closest_module, resolve
+from covas.nav import (RequestsHttp, copy, find_closest_module, find_closest_ship, resolve,
+                       resolve_ship)
 from covas.nav.clipboard import ClipboardError
 
 
@@ -23,6 +24,33 @@ def test_live_spansh_finds_a_multicannon_near_sol():
     assert result.system and result.station
     assert result.distance_ly >= 0.0
     assert result.pad in ("S", "M", "L")
+
+
+@pytest.mark.integration
+@pytest.mark.local
+def test_live_spansh_finds_an_anaconda_near_sol():
+    """One real Spansh query: nearest station selling an Anaconda from Sol. Proves the `ships`
+    filter shape + parsing against the live API (a canary if Spansh changes its response)."""
+    r = resolve_ship("Anaconda")
+    result = find_closest_ship(r, "Sol", RequestsHttp(), pad_size="L")
+    assert result.system and result.station
+    assert result.distance_ly >= 0.0
+    assert result.pad in ("S", "M", "L")
+    assert result.extra.get("ship_price", 1) > 0            # price read from the ships list
+
+
+@pytest.mark.integration
+@pytest.mark.local
+def test_live_ship_index_harvest_covers_the_bundle():
+    """The live roster harvest returns a healthy ship list — the canary for a Frontier release:
+    if this ever surfaces names the bundle is missing, add them to `nav/ships.py`."""
+    from covas.nav.ship_index import fetch_ship_names
+    from covas.nav.ships import SHIP_NAMES
+    names = set(fetch_ship_names())
+    assert len(names) >= 30                                 # a full hub shipyard lists the roster
+    missing = set(SHIP_NAMES) - names
+    # A couple of hulls may be transiently out of stock; flag a large gap as real drift.
+    assert len(missing) <= 3, f"bundle names not seen live (roster drift?): {sorted(missing)}"
 
 
 @pytest.mark.integration

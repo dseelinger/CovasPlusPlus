@@ -157,6 +157,9 @@ class App:
         # find the nearest station selling it via Spansh + copy the system to the clipboard.
         # Opt-in ([nav].enabled, off by default).
         self.nav = None
+        # Find-closest-ship: resolve a ship by voice (offline roster), then find the nearest
+        # station selling it via Spansh + copy the system to the clipboard. Shares [nav].
+        self.ship_nav = None
         # Route callouts (N4): proactive heads-ups while flying a plotted route (scoopable
         # star, jumps remaining, arrival). Opt-in ([route].enabled, off by default).
         self.route = None
@@ -177,6 +180,7 @@ class App:
             self._start_honk()
         if self.cfg.get("nav", {}).get("enabled"):
             self._start_nav()
+            self._start_ship_nav()
         if self.cfg.get("star_systems", {}).get("enabled"):
             self._start_system_search()
         if self.cfg.get("search", {}).get("enabled"):
@@ -624,6 +628,49 @@ class App:
             self.nav = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Find-closest-module failed to start: {e}"})
+
+    # ---- Find-closest-ship ------------------------------------------------
+    def _start_ship_nav(self) -> None:
+        """Build + register the find-closest-ship capability (shares [nav]). Fail soft: a
+        startup problem just leaves the feature off. Same seams as find-closest-module —
+        Spansh client built here, current-system read live with a journal fallback."""
+        try:
+            from .nav import RequestsHttp, ShipIndex
+            from .capabilities.find_closest_capability import NavConfig
+            from .capabilities.find_closest_ship_capability import FindClosestShipCapability
+
+            ncfg = NavConfig.from_cfg(self.cfg)
+            # Live roster so newly-released Frontier hulls are findable without a code change:
+            # the index is reconciled against the bundled roster on a background startup thread
+            # (below), and resolution falls back to the bundle until/if that fetch lands.
+            ship_index = ShipIndex()
+            self.ship_nav = FindClosestShipCapability(
+                ncfg, http=RequestsHttp(),
+                get_current_system=self._current_system,
+                ship_index=ship_index,
+                log=lambda msg: self._log("ship_nav", msg))
+            self.registry.register(self.ship_nav)
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Find-closest-ship ON (pad {ncfg.default_pad_size or 'any'})."})
+            threading.Thread(target=self._refresh_ship_index, args=(ship_index,),
+                             name="ship-index-refresh", daemon=True).start()
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.ship_nav = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Find-closest-ship failed to start: {e}"})
+
+    def _refresh_ship_index(self, ship_index) -> None:
+        """Background startup task: fetch Spansh's current ship list and log any hulls newer
+        than the bundled roster (they're now findable). Fail-soft — off the hot path, never
+        blocks the voice loop, and a fetch failure just leaves the bundle in charge."""
+        try:
+            ship_index.refresh()
+            new = ship_index.extra_names()
+            if new:
+                self._log("ship_nav", f"live roster added {len(new)} ship(s) not in the "
+                                      f"bundle: {', '.join(new)}.")
+        except Exception as e:  # noqa: BLE001 — best-effort; the bundled roster still works
+            self._log("ship_nav", f"live roster refresh failed: {e}")
 
     # ---- Star-system search -----------------------------------------------
     def _start_system_search(self) -> None:
