@@ -58,6 +58,10 @@ class NavConfig:
     # the keybind safety layer) makes the confirmation real — the model can't self-confirm
     # inside the arming turn the way it otherwise will.
     require_confirmation: bool = False
+    # SHIP search only: confirm each candidate's CURRENT stock against EDSM before speaking
+    # it (Spansh lists a station's catalog, not its stock). DEFAULT ON — the kill switch
+    # exists in case EDSM misbehaves. Ignored by the module search.
+    verify_stock: bool = True
 
     @classmethod
     def from_cfg(cls, cfg: dict) -> "NavConfig":
@@ -71,6 +75,7 @@ class NavConfig:
             default_pad_size=pad,
             search_size=int(n.get("search_size", d.search_size) or d.search_size),
             require_confirmation=bool(n.get("require_confirmation", False)),
+            verify_stock=bool(n.get("verify_stock", True)),
         )
 
 

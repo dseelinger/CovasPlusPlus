@@ -380,6 +380,12 @@ default_pad_size = "L"
 # How many nearest module-selling stations to fetch per search before client-side
 # mount filtering picks the closest match. 50 comfortably covers the common cases.
 search_size = 50
+# SHIP search only: verify each candidate's CURRENT stock against EDSM before answering.
+# Spansh's per-station ships list is the station's CATALOG (every hull ever seen there),
+# not its live stock — EDSM keeps the latest shipyard snapshot, the same data Inara shows,
+# so with this ON the answer matches Inara. Costs a few sub-second lookups per search.
+# Turn OFF only if EDSM is misbehaving (answers then come with a "couldn't verify" caveat).
+verify_stock = true
 # Require an explicit, SEPARATE-turn confirmation ("yes" / "confirm") before the search runs.
 # DEFAULT OFF — as soon as the module is fully resolved (name + any needed size/mount) it
 # searches immediately; this is a read-only lookup, so the extra confirm turn is just friction.

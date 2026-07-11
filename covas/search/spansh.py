@@ -216,3 +216,14 @@ class RequestsHttp:
         except ValueError:
             body = None
         return resp.status_code, body
+
+    def get_json(self, url: str, params: dict | None = None, *, headers: dict | None = None,
+                 timeout: float = 20.0) -> tuple[int, object]:
+        """The GET sibling of post_json (EDSM's endpoints are GET; Spansh's are POST)."""
+        import requests  # local import: keeps the offline stack importable without hitting it
+        resp = requests.get(url, params=params, headers=headers, timeout=timeout)
+        try:
+            body: object = resp.json()
+        except ValueError:
+            body = None
+        return resp.status_code, body

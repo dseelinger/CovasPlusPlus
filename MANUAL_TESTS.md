@@ -174,6 +174,18 @@ Notes (reliability quirks — cycle timing, hold too short/long for a full honk)
 
 Notes:
 
+### 7.1 Ship search — find the closest ship (N8 + EDSM stock verification)
+> Same `[nav]` section. `verify_stock = true` (default): every candidate's **current stock** is
+> confirmed against EDSM before it's spoken, so answers should **match Inara's nearest-seller
+> search** (inara.cz → the ship's page → Search ships, near your current system).
+- [ ] **Happy path:** *"Where can I buy an Anaconda?"* → nearest station + system + distance + price, system copied. **Cross-check on Inara:** same station is Inara's #1 (or within the same distance when several tie).
+- [ ] **Catalog-vs-stock (THE Type-10 bug):** ask for a ship your **current station catalogs but doesn't stock** (the in-game shipyard shows it "unavailable") → the answer is a **different** station that really stocks it, optionally noting the nearer listing was skipped ("current stock data says it isn't actually available there"). Verify the named station really sells it on Inara.
+- [ ] **Family disambiguation:** *"Find the closest Krait."* → asks **MkII or Phantom**, doesn't guess; answer → searches once.
+- [ ] **Unverified caveat:** rare in populated space — if the reply ends with *"I couldn't verify live stock…"*, the named station had no recent EDSM data; spot-check it on Inara.
+- [ ] **Kill switch:** set `[nav].verify_stock = false`, restart → searches still work (startup line says `stock check off`), no EDSM calls, no caveats.
+
+Notes:
+
 ## 8. Voice search categories  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
 > `[star_systems].enabled` and `[search].enabled` = true. Stateless conversational slot-filling over Spansh, nearest-first from your current system, each **copies the primary system** to the clipboard. Misheard filter values are validated against a bundled vocabulary and corrected.
 
