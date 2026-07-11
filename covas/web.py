@@ -1,13 +1,24 @@
-"""Localhost control panel: live log/status (index.html) + a schema-driven
-settings page (settings.html). Served with Flask.
+"""Localhost control panel: live log/status (index.html), a schema-driven
+settings page (settings.html), and a WYSIWYG checklist editor (checklist.html,
+N10). Served with Flask.
 
 Every settings write — from the quick-config card, the full settings page, or a
 future client — is validated against the ONE schema in `settings_schema.py`
 before it can reach overrides.json. Unknown keys and out-of-range/invalid values
 are rejected loudly (HTTP 400) so unvalidated data never lands on disk (N1).
+
+The checklist editor edits the SAME file the voice loop uses ([checklist].file).
+Voice and web stay in sync for free on the read side — `Checklist` re-reads the
+file on every call — so "reload on save" only needs the cursor clamped and a log
+event published. The write side carries a stale-write guard: every load hands the
+client a content-hash `version`, and a save whose `base_version` no longer
+matches the file on disk (a voice edit landed meanwhile) is refused with HTTP 409
+so the panel can warn instead of clobbering.
 """
 from __future__ import annotations
+import hashlib
 import json
+from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 from flask_sock import Sock
@@ -15,6 +26,34 @@ from flask_sock import Sock
 from . import elevenlabs as el
 from . import personality as persona
 from . import settings_schema as schema
+from .checklist import ITEM_RE
+
+
+def _file_version(path: Path) -> str:
+    """Content-hash fingerprint of the checklist file (missing file == empty). Hash of
+    CONTENT, not mtime, so a no-op rewrite doesn't false-positive the stale guard."""
+    try:
+        data = path.read_bytes()
+    except OSError:
+        data = b""
+    return hashlib.sha256(data).hexdigest()[:16]
+
+
+def _normalize_tasks(markdown: str) -> str:
+    """Keep the on-disk task syntax canonical after a WYSIWYG round-trip: editors serialize
+    task bullets as `* [ ]`, the file's convention (and the roster the voice model relies on)
+    is `- [ ]`. Only lines the checklist parser recognizes as tasks are touched — indentation
+    (nesting) and the checkbox state pass through byte-for-byte; every other line (headings,
+    notes) is left exactly as the editor wrote it. Ends with one trailing newline, matching
+    `Checklist._write`."""
+    out = []
+    for line in markdown.splitlines():
+        m = ITEM_RE.match(line)
+        if m and "*" in m.group(1):
+            line = f"{m.group(1).replace('*', '-', 1)}[{m.group(2)}] {m.group(3)}"
+        out.append(line)
+    text = "\n".join(out)
+    return text + "\n" if text else ""
 
 THINKING_TIERS = schema.THINKING_TIERS
 WHISPER_SIZES = schema.WHISPER_SIZES
@@ -202,6 +241,63 @@ def create_app(core) -> Flask:
         core.update_settings({"personality": {"persona": saved}})   # select it immediately
         return jsonify({"ok": True, "selected": saved,
                         "personas": persona.list_personas(core.cfg)})
+
+    # ---- Checklist editor (N10) -------------------------------------------------
+    def _checklist_path() -> Path | None:
+        raw = (core.cfg.get("checklist", {}) or {}).get("file")
+        return Path(raw) if raw else None
+
+    @flask_app.route("/checklist")
+    def checklist_page():
+        return render_template("checklist.html")
+
+    @flask_app.route("/api/checklist")
+    def checklist_state():
+        path = _checklist_path()
+        if path is None:
+            return jsonify({"ok": False, "error": "no checklist file configured"}), 400
+        try:
+            # utf-8-sig: a BOM (a Notepad hand-edit) must not reach the editor — it would
+            # render the first heading as literal text and get escaped on the next save.
+            markdown = path.read_text(encoding="utf-8-sig")
+        except OSError:
+            markdown = ""                      # missing file: an empty, saveable checklist
+        return jsonify({"ok": True, "markdown": markdown,
+                        "version": _file_version(path), "name": path.name})
+
+    @flask_app.route("/api/checklist", methods=["POST"])
+    def checklist_save():
+        """Save the editor's markdown back to [checklist].file. Refuses (409) when the file
+        changed since the client loaded it — a voice edit landed — unless `force` is set;
+        the response carries the CURRENT content so the client can offer reload-vs-overwrite
+        instead of silently clobbering either side."""
+        path = _checklist_path()
+        if path is None:
+            return jsonify({"ok": False, "error": "no checklist file configured"}), 400
+        b = request.get_json(force=True) or {}
+        current = _file_version(path)
+        if not b.get("force") and b.get("base_version") != current:
+            try:
+                on_disk = path.read_text(encoding="utf-8-sig")   # BOM-safe, as in the GET
+            except OSError:
+                on_disk = ""
+            return jsonify({"ok": False, "error": "stale",
+                            "version": current, "markdown": on_disk}), 409
+        text = _normalize_tasks(str(b.get("markdown") or ""))
+        try:
+            path.write_text(text, encoding="utf-8")
+        except OSError as e:
+            return jsonify({"ok": False, "error": f"write failed: {e}"}), 500
+        # "Reload" the voice model: reads are already per-call fresh, so only the in-memory
+        # cursor needs care — clamp it so it can't point past the (possibly shorter) new list.
+        items = core.checklist.items()
+        core.checklist.current = min(core.checklist.current, len(items))
+        done = sum(1 for _, d, _ in items if d)
+        core.bus.publish({"type": "log", "who": "system",
+                          "text": f"Checklist updated from the web editor "
+                                  f"({done}/{len(items)} complete)."})
+        return jsonify({"ok": True, "version": _file_version(path),
+                        "items": len(items), "done": done})
 
     @flask_app.route("/api/cancel", methods=["POST"])
     def cancel():
