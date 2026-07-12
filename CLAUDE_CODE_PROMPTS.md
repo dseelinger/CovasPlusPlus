@@ -973,7 +973,7 @@ Acceptance: bare pytest green and offline; manual: ask "where is Elvira Martuuk'
 
 ---
 
-## Audio / Comms / Chatter Subsystem (Prompts C1–C8)
+## Audio / Comms / Chatter Subsystem (Prompts C1–C11)
 
 A separate subsystem: an atmospheric audio layer — a multi-bus mixer with per-bus DSP,
 context-driven "space chatter," and comms voicing of ED `ReceiveText` events. AI-native, but the
@@ -1254,6 +1254,146 @@ SFX eligibility gating; rotation deterministic.
 
 Acceptance: bare pytest green and offline; manual: trigger an interdiction and confirm the layered
 audio. Stop for review.
+```
+
+### C9 — Integration: wire the audio layer into the running app (closing step)
+
+```
+[Prepend the C-series boilerplate above.]
+Read CLAUDE.md, DESIGN_AND_ROADMAP.md, covas/app.py + run_covas.py + run_covas_ui.py + web.py, the
+C1–C8 components (the bus mixer, cue registry/governor/driver, comms gate + voicer, chatter, music,
+interdiction/SFX cues), covas/settings_schema.py, and MANUAL_TESTS.md.
+
+Branch: feature/audio-integration
+
+Goal: WIRE the C1–C8 audio layer into the running app so it actually plays in-game, and close the
+three gaps that were blocked on it (live settings, voice controls + help, in-game manual tests).
+C1–C8 built and unit-tested each component behind a play/emit/speak seam; nothing constructs or
+connects them in the live loop. THIS is the assembly step. (It's genuinely new scope — the C1–C8
+prompts were infra-only and stopped at their seams.)
+
+Tasks:
+1. UNIFY THE OUTPUT FIRST — this is the crux. Today covas/tts.py opens its OWN sounddevice stream
+   straight to the device, and the C1 BusMixer opens a SEPARATE one — so speech currently bypasses
+   the bus system entirely and two things would fight over the device. Make the BusMixer the SINGLE
+   thing that opens the audio device, and route ALL playback through it: COVAS speech -> the COVAS
+   bus, comms -> the Comms bus (radio DSP), cues/SFX/music/alerts -> their buses. Retire the direct
+   device playback in tts.py / audio.py / piper_tts (submit their PCM to the mixer instead).
+   Preserve barge-in + cancel semantics through the mixer. Nothing but the mixer touches the device.
+2. Compose the layer at the app composition root (app.py): construct ONE shared BusMixer + cue
+   governor; subscribe the comms bus to ReceiveText -> the channel gate (C4) -> CommsVoicer (C5) ->
+   the Comms bus; drive the CueDriver (C3) from EDContext/state changes feeding chatter (C6) + SFX
+   (C8); wire the InterdictionCue (C8) off Interdiction/UnderAttack; start the MusicDirector (C7)
+   with context crossfades; resolve comms voice-ids. Everything OFF by default (honor the enable
+   flags). FAIL SOFT — a dead audio component must never break the voice loop or block a watcher.
+3. Voice controls as a small Capability (goes through the tool registry the loop already runs):
+   tools for "mute/unmute the chatter", "turn the music up/down" / "stop the music", "quiet the
+   comms", and a master "mute all ambient audio". Register FULL help metadata (this satisfies the
+   help requirement). These flip the same runtime state the settings set.
+4. Real settings: add the audio settings a running consumer now honors to settings_schema.py —
+   master enables ([audio.cues], [music], [audio.interdiction], comms on/off), per-bus volume, and
+   comms voice pickers (from the live ElevenLabs voice source) — and make them take EFFECT at
+   runtime (apply/reload like other settings) so they aren't dead. Skip settings the schema can't
+   model (track lists, DSP tables); leave those file-configured with a note.
+5. Fix the dead flag + audit: InterdictionCue.from_cfg must honor [audio.interdiction].enabled
+   (currently it reads only `sting`). Then audit ALL ~9 audio config groups so every advertised
+   enable/volume flag is actually consumed by a live component — no more dead config.
+6. Manual tests: add an in-game C-series section to MANUAL_TESTS.md — enable the layer; jump/dock
+   to hear chatter; trigger an interdiction for the layered cue; receive an NPC/station line and a
+   player DM to hear the comms bus + voices; toggle each voice control; change an audio setting and
+   confirm it takes effect live.
+
+Tests (§9, offline): unit — COVAS speech routes through the mixer's COVAS bus (assert it does NOT
+open a second device stream); app composition constructs and wires the components with fakes (no
+device, no network, no journal watcher); a ReceiveText fixture flows gate -> voicer -> fake TTS on
+the comms bus; the voice-control tools flip runtime state; a settings change applies to the live
+components; interdiction.enabled=false suppresses the cue; every audio enable flag has a consumer.
+The existing C1–C8 tests still pass.
+
+Acceptance: bare pytest green and offline; manual — the in-game section actually produces audio and
+the settings/voice-controls take effect; no dead enable flags remain. Stop for review.
+```
+
+### C10 — Voice cast (voice pool + deterministic assignment + provider routing)
+
+```
+[Prepend the C-series boilerplate above.]
+Read CLAUDE.md, covas/mixer/comms.py + variants.py (comms voicing), C1 (per-line voice on the
+mixer), covas/providers/ (ElevenLabs + Piper TTS), covas/elevenlabs.py (voice list). Run AFTER C9.
+
+Branch: feature/voice-cast
+
+Goal: a "voice cast" for everything the audio layer speaks — a configurable voice POOL with
+DETERMINISTIC identity->voice assignment, and provider routing so COVAS stays on ElevenLabs while
+the NPC/comms/chatter cast uses local Piper (free, runs alongside the game, no ElevenLabs burn).
+
+Tasks:
+1. A voice-cast module: a pool of voices (per provider) and assign(identity) -> voice that is
+   DETERMINISTIC — hash a stable identity key (the ReceiveText From name, a station/carrier name,
+   an NPC id) to a voice, so different speakers sound different and the SAME speaker stays
+   consistent across a session. Player DMs -> the fixed male voice (from C4); COVAS -> the persona
+   voice.
+2. Provider routing: COVAS speech -> ElevenLabs (the persona voice); the comms/NPC/chatter cast ->
+   Piper by default (multiple local voice models = the pool), with ElevenLabs as an opt-in override
+   per bus/category. Wire through the C1 per-line voice + bus selection.
+3. Config [audio.voices]: the ElevenLabs male-DM voice, the persona voice, and the Piper voice pool
+   (a list of installed Piper models) + which provider each bus/category uses. Surface the pickers
+   in settings_schema.py (build on C9's settings).
+4. EXCLUSION HOOK: the pool builder must skip voices unusable for TTS on the account — leave a clean
+   filter point the ™-voice bug fix plugs into (exclude from BOTH the picker and the
+   random/atmospheric pool). Never select an unusable voice.
+
+Tests (§9, offline): unit — assign() is deterministic (same identity -> same voice; different
+identities spread across the pool); player DM -> male voice; routing picks Piper for the cast and
+ElevenLabs for COVAS; the exclusion hook drops a flagged voice. No network; TTS calls faked.
+
+Acceptance: bare pytest green and offline; manual — two different NPCs sound different and stable;
+COVAS on your ElevenLabs voice, the cast on Piper. Stop for review.
+```
+
+### C11 — Drop-in content pipeline (auto-discover assets + line pools)
+
+```
+[Prepend the C-series boilerplate above.]
+Read CLAUDE.md, covas/mixer/cues.py + example_cues.py + chatter.py + music.py, and the C2 registry.
+Run AFTER C9 (needs the wired cues).
+
+Branch: feature/audio-content-dropin
+
+Goal: make audio + line content DROP-IN — scan convention folders at load and auto-populate cue
+sample sets, music tracks, and chatter/threat line pools, so adding content is dropping a file in
+the right place (or editing a text file) with NO code/config edits. A missing folder/file leaves
+that cue simply silent (no error), per the fail-closed-silent rule.
+
+Conventions (create the folder skeleton + a short README in each; add all to .gitignore):
+- SFX samples: audio/sfx/<cue>/*.{wav,ogg,flac} — <cue> in {thargoid_voices, space_radiation,
+  hyperspace_weirdness, interdiction_sting}. ANY filenames; every file in the folder joins that
+  cue's sample set (deterministic rotation). Migrate the hardcoded sounds/interdiction_sting.wav
+  to audio/sfx/interdiction_sting/.
+- Music tracks: audio/music/<context>/*.{wav,ogg,flac,mp3} — <context> in {deep_space, populated,
+  unpopulated, nebula, near_star, combat_adjacent, scooping_fuel, default}. ANY filenames.
+- Line pools: content/chatter/<category>.txt — <category> in {deep_space_musing, open_space_idle,
+  station_traffic, supercruise_ambient}; one spoken line per non-blank line, '#' lines ignored.
+  And content/interdiction_threat.txt for the assistant threat-assessment pool.
+
+Tasks:
+1. A content loader that at startup scans these folders and attaches samples/tracks/phrasings to
+   the matching registered cues/music contexts. Unknown/extra folders ignored; empty/missing ones
+   leave that cue silent (no error).
+2. Create the folder skeleton with a README-in-each (the drop rule + accepted formats); add audio/
+   and content/ to .gitignore (keep any committed example line file if useful).
+3. A "content status" report (a log line + a settings/web readout): per cue/context, how many
+   files/lines were found and which are empty/silent — so it's obvious what still needs content.
+4. Decode via soundfile (wav/flac/ogg; note mp3 depends on libsndfile). Validate chatter/threat
+   lines before speaking (help/anti-hallucination rules).
+
+Tests (§9, offline): unit — the loader maps a temp folder tree to the right cues/contexts; a
+missing folder yields a silent (not errored) cue; chatter .txt parses lines + ignores '#' comments;
+the content-status counts are correct. No device/network.
+
+Acceptance: bare pytest green and offline; manual — drop a wav into audio/sfx/thargoid_voices/ and
+hear it on the ambient bus; add lines to content/chatter/station_traffic.txt and hear them; the
+content-status report reflects what's present. Stop for review.
 ```
 
 ---
