@@ -973,6 +973,291 @@ Acceptance: bare pytest green and offline; manual: ask "where is Elvira Martuuk'
 
 ---
 
+## Audio / Comms / Chatter Subsystem (Prompts C1–C8)
+
+A separate subsystem: an atmospheric audio layer — a multi-bus mixer with per-bus DSP,
+context-driven "space chatter," and comms voicing of ED `ReceiveText` events. AI-native, but the
+**LLM is never in the realtime audio path** — it only produces text that is validated and routed.
+
+**Direction:** mirror the search subsystem's discipline — a **cue registry** (modeled on the help
+registry), structural (not prompt-based) safety, determinism over randomness where it aids
+testing, and fail-closed behavior with graceful cockpit fallback. Over-talking is the primary
+failure mode; hard rate limits + cooldowns everywhere.
+
+**Reuse map:** `covas/tts.py` + `covas/audio.py` (current PCM playback), `covas/providers/` (TTS
+voices), `covas/ed/` (journal + Status + `EDContext`), and `help_capability.py` + `base.py` (the
+registry pattern the cue registry mirrors). Music/SFX assets are local + git-ignored (supply your
+own rights), like `sounds/`.
+
+**Ordering:** infra → registry → driver → the safety-critical channel gate (C4, fully specified,
+highest safety value) → variants → chatter → music → example cues.
+
+**Boilerplate — paste at the top of Prompts C2–C8 when you run them:**
+
+> **Cue-registry requirement.** Every SFX, chatter category, music context, and comms cue MUST
+> self-register with the cue registry (C2): its eligible game states, target bus, cooldown/rate
+> limit, and phrasing pool or sample set. A cue that registers without a bus or without eligibility
+> states must FAIL a test. A cue with no valid trigger states is silent — it must not error. Where
+> a capability adds a voice-commandable control (mute, volume, toggle), also register help metadata
+> per the search subsystem's help requirement.
+>
+> **Structural safety.** Hallucination prevention is structural, not prompt-based — validated
+> output spaces, fail-closed tests, loud in CI but graceful fallback in the cockpit. The LLM is
+> NEVER in the realtime audio path; it only produces text that is then validated and routed.
+> Determinism over randomness where it aids testability (phrasing rotation, not random selection).
+> Enforce hard rate limits + cooldowns.
+
+---
+
+### C1 — Audio bus mixer + per-bus DSP (infrastructure)
+
+```
+Read CLAUDE.md, DESIGN_AND_ROADMAP.md, covas/tts.py + covas/audio.py (current PCM playback), and
+covas/providers/ (TTS).
+
+Branch: feature/audio-bus-mixer
+
+Goal: a multi-bus audio mixer with per-bus DSP and independent volume — the shared foundation for
+comms, chatter, SFX, music, and alerts.
+
+Tasks:
+1. Named buses, each with its own processing chain + independent volume:
+   - COVAS  — clean, full volume, no processing (the ship's own assistant).
+   - Comms  — bandpass ~300–3000 Hz + light static bed + compression, ducked a few dB under COVAS.
+   - Ambient — SFX layers.  Music — ambient music.  Alert — warning stings.
+2. A mixer that mixes concurrent sources across buses to the output device (sounddevice callback
+   pulling from active per-bus sources). Existing COVAS speech routes through the COVAS bus with no
+   change in character.
+3. Per-bus DSP as PURE functions on PCM buffers (unit-testable, no device): biquad bandpass,
+   additive noise bed, simple compressor, gain/duck. The comms radio treatment is applied by DSP
+   at mix time — NOT per-file pre-editing.
+4. Extend the TTS path so a spoken line can target a chosen BUS and a chosen VOICE (comms uses a
+   different voice + the comms bus; COVAS uses the clean bus + the COVAS voice). Keep the injectable
+   seam so the default test run never opens an audio device.
+5. Config [audio.buses]: per-bus volume + enable, sensible defaults.
+
+Tests (§9): unit (offline) — DSP functions transform a known buffer correctly (bandpass attenuates
+out-of-band tones, gain scales, compressor limits peaks); the mixer sums sources with per-bus gain
+deterministically on in-memory buffers. No device in the default run; integration+local for real
+playback.
+
+Acceptance: bare pytest green and offline; manual: COVAS speech unchanged; a test tone through the
+comms bus sounds radio-filtered. Stop for review.
+```
+
+### C2 — Cue registry contract
+
+```
+[Prepend the C-series boilerplate above.]
+Read CLAUDE.md, covas/capabilities/help_capability.py + base.py (the registry pattern to mirror),
+and C1.
+
+Branch: feature/cue-registry
+
+Goal: a cue registry (mirroring the help registry) that every SFX, chatter category, music context,
+and comms cue registers with — structurally enforced.
+
+Tasks:
+1. A CueRegistry + cue definition: eligible game states, target bus, cooldown/rate limit, and a
+   phrasing pool (chatter) OR sample set (SFX) OR context tag (music).
+2. A registration-contract test that FAILS if a cue registers without a bus or without eligibility
+   states. A cue with an empty trigger-state set is valid but never eligible (silent, no error).
+3. Pure query helpers: given a game-state eligibility set, return eligible cues per bus (for C3).
+
+Tests: unit (offline) — contract test flags an incomplete cue, passes a complete one; eligibility
+query returns the right cues for a state; an empty-trigger cue stays silent.
+
+Acceptance: bare pytest green; this contract test gates the later C-prompts. Stop.
+```
+
+### C3 — Game-state driver + eligibility engine + rate governor
+
+```
+[Prepend the C-series boilerplate above.]
+Read CLAUDE.md, covas/ed/ (journal + Status + EDContext), C2, C1.
+
+Branch: feature/cue-driver
+
+Goal: drive the mixer from live game state — compute eligibility, let the registry decide which
+cues may play, and enforce the anti-over-talking budget.
+
+Tasks:
+1. From journal + Status + EDContext, compute a current eligibility set (population, docked,
+   supercruise, conflict zone, deep space, hyperspace, fuel state, near-star, …).
+2. A governor enforcing per-cue cooldowns + a global rate cap so the system never over-talks (the
+   primary failure mode). Deterministic selection among eligible cues (rotation, not random).
+3. On state-change/tick, pick allowed cues and hand them to the mixer/bus. Opt-in via config, off
+   by default.
+
+Tests: unit (offline) — eligibility from Status/journal fixtures; the governor blocks a cue in
+cooldown and enforces the global cap; rotation is deterministic. No device.
+
+Acceptance: bare pytest green and offline. Stop.
+```
+
+### C4 — ReceiveText capture + channel gate + fail-closed classifier  [CORE SAFETY CONTRACT]
+
+```
+[Prepend the C-series boilerplate above.]
+Read CLAUDE.md, covas/ed/journal.py, and C1–C3. THIS PROMPT CARRIES THE CORE SAFETY CONTRACT —
+build it fully and test it exhaustively.
+
+Branch: feature/comms-channel-gate
+
+Goal: capture ED `ReceiveText` events and decide — FAIL-CLOSED — which may ever be voiced, and how.
+ReceiveText is comms-panel TEXT the game never voices itself; voicing it at all is our feature, so
+this gate is safety-critical.
+
+Facts (verified against the journal schema): ReceiveText fields = From, From_Localised, Message,
+Message_Localised, Channel. Channel enum includes player, npc, local, wing, friend, voicechat (also
+squadron, starsystem). Real players carry a "CMDR"/$cmdr_decorate-prefixed From_Localised; NPCs do
+not.
+
+Tasks:
+1. A PURE, deterministic classifier classify(event) -> Decision, exhaustively tested:
+   - channel == 'player' -> VOICE VERBATIM (a real human DM'ing the Commander directly); fixed MALE
+                            voice (journal has no gender data — do NOT randomize; male is right more
+                            often than a coin flip).
+   - channel == 'npc'    -> ELIGIBLE for the variant pipeline (C5); voice deterministic from the NPC
+                            name if gendered, else default.
+   - channel in {local, wing, friend, voicechat, squadron, starsystem} -> DROP, never TTS (the
+                            Open-population firehose of real players).
+   - anything else / unknown / missing channel -> AMBIGUOUS: voice ONLY if From_Localised does NOT
+                            start with "CMDR" (treat as npc-like); if CMDR-prefixed (a real
+                            commander), DROP.
+   Net gate = player OR npc OR (ambiguous AND NOT CMDR-prefixed). If a line cannot be confidently
+   classified as an NPC line OR the Commander's own direct player DM, DO NOT voice it. Silence beats
+   voicing a random stranger.
+2. Template-identity dedup: normalize Message (strip numbers + proper names) into a template hash;
+   cooldown by SOURCE TEMPLATE, not exact string, so station spam / repeated announcements aren't
+   re-voiced (even reworded) per jump. Wire into the C3 governor.
+3. Emit a structured VoiceableComms record (channel, decision, source text, chosen voice, allowed
+   variant tier) for C5. Route NOTHING to TTS here — this prompt only classifies + dedups.
+
+Tests (§9): unit (offline), EXHAUSTIVE — one case per channel value; player+CMDR = verbatim/male;
+npc = variant-eligible; each firehose channel dropped; ambiguous+CMDR dropped; ambiguous+non-CMDR
+allowed as npc; missing/empty channel handled per the rule; dedup collapses two numerically-
+different instances of the same template; and an explicit test that an unclassifiable line is NOT
+voiced (the fail-closed default). The classifier must NEVER return "voice" for a real-player
+broadcast.
+
+Constraints: pure + deterministic; fail-closed; no TTS in this prompt.
+
+Acceptance: bare pytest green; the exhaustive channel matrix passes; show me the decision table.
+Stop for review — I'll validate this one carefully before C5.
+```
+
+### C5 — Comms variant generator + validator + verbatim fallback
+
+```
+[Prepend the C-series boilerplate above.]
+Read CLAUDE.md, C4 (VoiceableComms records), C1 (comms bus + voice selection), covas/llm.py.
+
+Branch: feature/comms-variants
+
+Goal: voice the gated comms lines — player DMs verbatim; NPC lines at their allowed variant tier,
+with a validator and a guaranteed verbatim fallback. The LLM produces text only; never in the
+realtime audio path.
+
+Tasks:
+1. Variant tiers for npc lines (the cue category picks the allowed tier): verbatim (exact,
+   fact-bearing/mission lines); paraphrase (same meaning, reworded, fact-neutral); riff (same
+   intent, embellished with tone, asserts nothing checkable).
+2. A validator on any generated variant: reject if it introduces a proper noun not in the source,
+   changes a number, or invents a threat/instruction. On ANY failure -> fall back to voicing the
+   verbatim SOURCE line (always the guaranteed-safe fallback).
+3. Route final text to TTS on the comms bus (radio treatment) with the chosen voice; player DMs go
+   verbatim on the fixed male voice. Respect the C3 governor + C4 dedup.
+
+Tests (§9): unit (offline) — validator catches an added proper noun / changed number / invented
+threat and triggers verbatim fallback; a clean paraphrase passes; player lines are never
+paraphrased; LLM calls faked (no network in the default run; a paid-integration test may exercise
+the real generator).
+
+Acceptance: bare pytest green and offline; manual: an NPC line gets a safe riff, a tampered variant
+falls back to verbatim, a player DM is read verbatim on the comms bus. Stop.
+```
+
+### C6 — Space chatter generator
+
+```
+[Prepend the C-series boilerplate above.]
+Read CLAUDE.md, C2 (cue registry), C3 (driver), C1 (buses).
+
+Branch: feature/space-chatter
+
+Goal: context-driven "space chatter" — invented ambient lines from game state, template-pool
+driven, with fact-bearing gating.
+
+Tasks:
+1. Chatter categories register with the cue registry (eligibility states, bus, cooldown, phrasing
+   pool). Eligibility is a function of state — station-traffic chatter ineligible in unpopulated
+   systems; deep-space musings MORE eligible there.
+2. Template pools drive fact-bearing lines (fact_bearing:true) — no LLM asserting game facts (help
+   discipline). LLM generation permitted ONLY for low-stakes flavor musings flagged
+   fact_bearing:false (nothing checkable). Deterministic rotation within a pool.
+3. Governed by C3 (cooldowns/rate) so chatter never over-talks.
+
+Tests: unit (offline) — eligibility gating per state; fact_bearing:true never routes to the LLM;
+fact_bearing:false flavor asserts no checkable fact; rotation deterministic.
+
+Acceptance: bare pytest green and offline. Stop.
+```
+
+### C7 — Music library + context crossfade
+
+```
+[Prepend the C-series boilerplate above.]
+Read CLAUDE.md, C1 (music bus), C3 (driver).
+
+Branch: feature/music-library
+
+Goal: ambient music, context-crossfaded — a curated PRE-GENERATED library, NOT a live API.
+
+Tasks:
+1. A curated music library tagged by context (deep space, populated system, nebula, near-star,
+   combat-adjacent), played via the music bus with crossfades keyed to game-state transitions.
+2. Music files are local assets (git-ignored, supply your own rights, like sounds/); the registry
+   maps context tags -> track sets. Suno has no official public API (mid-2026), so generation is
+   OUT of the runtime path — leave a clearly-marked seam for a future "generate fresh track" if an
+   official API lands, but it must NOT be a runtime dependency.
+3. Crossfade logic is pure/testable (gain envelopes over buffers); device playback is
+   integration/manual.
+
+Tests: unit (offline) — context->track selection; crossfade gain-envelope math; no runtime
+generation dependency.
+
+Acceptance: bare pytest green and offline. Stop.
+```
+
+### C8 — Worked-example cues (pirate interdiction + SFX layers)
+
+```
+[Prepend the C-series boilerplate above.]
+Read CLAUDE.md, C1–C6.
+
+Branch: feature/example-cues
+
+Goal: prove the layered-cue pattern with real cues.
+
+Tasks:
+1. Pirate-interdiction layered cue off journal Interdiction / UnderAttack: (a) warning sting ->
+   alert bus; (b) assistant threat-assessment line -> COVAS bus, clean, DETERMINISTIC phrasing
+   rotation from a pool; (c) the pirate's own line -> comms bus, radio/static, ducked. All via the
+   cue registry + governor.
+2. Ambient SFX layers registered as cues: Thargoid voices, hyperspace weirdness, space-radiation
+   bed — eligibility-gated (e.g. hyperspace, deep space) on the ambient bus.
+3. Everything opt-in, off by default; governed by cooldowns/rate.
+
+Tests: unit (offline) — the interdiction cue emits the three layers to the right buses in order;
+SFX eligibility gating; rotation deterministic.
+
+Acceptance: bare pytest green and offline; manual: trigger an interdiction and confirm the layered
+audio. Stop for review.
+```
+
+---
+
 ### Tips for running these
 - Keep `CLAUDE.md` current — Claude Code reads it every session.
 - If a step balloons, ask Claude Code to split it and update this file.

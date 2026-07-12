@@ -171,14 +171,26 @@ re-call just passes more-complete args (module → +size/mount → +confirmed); 
 pending-request object.
 
 - **Two data sources, split on purpose.** Module *taxonomy* (names/sizes/mounts/ratings) is a
-  bundled static table (`modules.py`, baked from real EDCD/Spansh outfitting data), so the whole
-  ask/confirm/cancel disambiguation is **offline, fast, unit-testable — no network**. Only
-  *station location* touches the wire (`closest.py`, Spansh), and only after confirmation.
+  bundled static table — the **complete** module set generated from EDCD/FDevIDs
+  `outfitting.csv` into `nav/module_data.py` (regenerate via `scripts/gen_module_taxonomy.py`)
+  and exposed through `modules.py` (which adds friendly mishear aliases) — so the whole
+  ask/confirm/cancel disambiguation is **offline, fast, unit-testable — no network**, and it
+  recognises every purchasable module, not a hand-picked subset. Only *station location*
+  touches the wire (`closest.py`, Spansh), and only after confirmation.
 - **`resolve(query, size?, mount?)`** is pure and returns one of `Resolved` /
   `NeedAttrs(missing, options)` / `Ambiguous(candidates)` / `Unknown(suggestions)`. The LLM does
   the fuzzy *understanding* (mishears like "multiple cannon" → Multi-Cannon); the tool
   *validates* and guides the next question. It never guesses a missing attribute — but a module
   sold in exactly one size or mount has that value *determined*, not asked.
+- **Staying current with Frontier (two layers, symmetric for modules and ships).** The offline
+  table is authoritative but a point-in-time snapshot, so both `modules.py` and `ships.py` are
+  backed by a live, fail-soft startup index (`module_index.py` / `ship_index.py`) that harvests
+  the names Spansh currently knows and folds any the bundle is missing into `resolve(...,
+  extra_names=…)`. A brand-new module/ship is then findable with **no code change**; if Spansh is
+  unreachable the index is empty and the bundle is in charge. A live-learned *module* has no known
+  size/mount, so it searches by name only until the EDCD CSV is regenerated
+  (`scripts/gen_module_taxonomy.py`) — the refresh upgrades it to full size/mount guidance.
+  Curated aliases and ambiguous-family disambiguation stay hand-maintained either way.
 - **Confirmation is configurable (`[nav].require_confirmation`, default OFF).** By default a
   fully-resolved module searches immediately — this is a read-only lookup, so the extra
   "confirm" turn is friction (on-hardware testing showed Haiku just self-confirms it anyway).
@@ -397,7 +409,7 @@ The original seven-phase plan is done and tested:
 20. **Web checklist editor** (N10) — a `/checklist` tab rendering `ultimate_checklist.md` as WYSIWYG markdown (TOAST UI from CDN, dark theme, first-class task lists; plain-textarea fallback when the CDN is unreachable). Saves round-trip losslessly through `checklist.py` (editor `* [ ]` bullets normalized back to `- [ ]`, nesting preserved); voice and web share the file (reads are per-call fresh, the cursor is clamped on save), and a content-hash stale-write guard 409s a save when a voice edit landed underneath, offering reload-vs-overwrite instead of clobbering.
 
 ### Backlog
-**Empty — every prompt in `CLAUDE_CODE_PROMPTS.md` is built and merged.** New work starts as a new prompt in the pack (one branch per prompt, one fresh session each). **The prompt pack carries the live worklist; this doc carries the architecture.**
+Prompts 1–7, Search 1–6, and N1–N11 are all built and merged. **Outstanding: the Audio / Comms / Chatter subsystem (C1–C8)** in `CLAUDE_CODE_PROMPTS.md` — the atmospheric audio layer (multi-bus mixer + per-bus DSP, cue registry, game-state driver, the fail-closed `ReceiveText` channel gate, comms variants, space chatter, music crossfade, and worked-example cues). None of it is implemented yet; ordering is infra → registry → driver → the safety-critical C4 gate → variants → chatter → music → example cues. New work otherwise starts as a new prompt in the pack (one branch per prompt, one fresh session each). **The prompt pack carries the live worklist; this doc carries the architecture.**
 
 ---
 
