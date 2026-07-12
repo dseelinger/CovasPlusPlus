@@ -42,6 +42,20 @@ from .chatter import (
 )
 from .cues import Cue, CueRegistry, cue_problems, validate_cue
 from .driver import CueDriver
+from .music import (
+    MUSIC_CONTEXTS,
+    MusicDirector,
+    MusicLibrary,
+    MusicTransition,
+    crossfade,
+    equal_power_gains,
+    fade_in,
+    fade_out,
+    generate_track,
+    music_context,
+    music_cues,
+    register_music,
+)
 from .variants import (
     CommsVoicer,
     VoicedComms,
@@ -107,6 +121,18 @@ __all__ = [
     "chatter_cues",
     "is_flavor_safe",
     "register_chatter",
+    "MUSIC_CONTEXTS",
+    "MusicDirector",
+    "MusicLibrary",
+    "MusicTransition",
+    "crossfade",
+    "equal_power_gains",
+    "fade_in",
+    "fade_out",
+    "generate_track",
+    "music_context",
+    "music_cues",
+    "register_music",
     "BusMixer",
     "bus_gains",
     "float_to_pcm16",
