@@ -1,0 +1,104 @@
+site_name: COVAS++
+site_description: >-
+  A local voice AI companion for Elite Dangerous — hold a key, talk, and get a
+  spoken reply in character. It watches your game state, tracks a checklist,
+  searches the galaxy by voice, and more.
+site_url: https://dseelinger.github.io/CovasPlusPlus/
+repo_url: https://github.com/dseelinger/CovasPlusPlus
+repo_name: dseelinger/CovasPlusPlus
+copyright: >-
+  Unofficial, fan-made. Elite Dangerous is a trademark of Frontier Developments plc.
+  COVAS++ is not affiliated with, endorsed by, or supported by Frontier.
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+
+# Fail the strict build on a broken cross-page link OR a broken #anchor fragment,
+# so the docs can't drift into dead links (the CI runs `mkdocs build --strict`).
+validation:
+  links:
+    absolute_links: relative_to_docs
+    anchors: warn
+    unrecognized_links: warn
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install & setup: getting-started/install.md
+      - Running COVAS++: getting-started/running.md
+      - The voice loop: getting-started/voice-loop.md
+  - Talking to COVAS:
+      - Personas & voice: using/personas-voice.md
+      - The checklist: using/checklist.md
+      - Help & recovery: using/help.md
+      - Settings by voice: using/settings.md
+      - Copy to clipboard: using/clipboard.md
+  - Elite Dangerous awareness:
+      - Game-state monitoring: elite/monitoring.md
+      - Proactive callouts: elite/proactive-callouts.md
+      - Route callouts: elite/route-callouts.md
+      - Ship loadout & engineering: elite/loadout.md
+      - Location & fleet carriers: elite/location-carriers.md
+      - Community goals: elite/community-goals.md
+  - Voice search:
+      - Overview: search/index.md
+      - Outfitting (modules): search/outfitting.md
+      - Shipyards (ships): search/shipyards.md
+      - Star systems: search/star-systems.md
+      - Stations: search/stations.md
+      - Minor factions: search/minor-factions.md
+      - Faction states: search/faction-states.md
+      - Signals & structures: search/signals.md
+  - Ship automation:
+      - Keybind automation: automation/keybinds.md
+      - Auto-honk: automation/auto-honk.md
+  - Ambient audio: audio/ambient-audio.md
+  - The control panel: control-panel.md
+  - Configuration reference: configuration.md
+  - Roadmap: roadmap.md
