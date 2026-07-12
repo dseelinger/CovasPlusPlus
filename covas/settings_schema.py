@@ -299,7 +299,7 @@ SCHEMA: list[Setting] = [
             "Auto-honk", "Auto-honk",
             "Fire the Discovery Scanner automatically on arrival in a new system. "
             "Needs ED monitoring; combat-gated.",
-            default=True, phrasings=("auto honk", "auto discovery scan", "honk"),
+            default=False, phrasings=("auto honk", "auto discovery scan", "honk"),
             example="turn auto honk on"),
     Setting("honk.fire_group", ("honk", "fire_group"), "int",
             "Scanner fire group", "Auto-honk",

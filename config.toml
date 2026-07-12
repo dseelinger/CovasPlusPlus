@@ -465,10 +465,10 @@ allowlist = ["landing_gear"]
 # keystroke sequence. Requires [elite].enabled (for the arrival event, the current fire group,
 # and the combat guard).
 #
-# DEFAULT ON, but SAFE: it presses a fire button, so it stays inert until you map the scanner
-# (set fire_group below). The combat guard refuses to honk during danger/interdiction (and when
-# ED status is unavailable), and the shared hard abort ("abort" — see [keybinds]) releases the key.
-enabled = true
+# DEFAULT OFF — pending the DSS-mishap safety net. It presses a fire button, and if your current
+# fire group holds the Detailed Surface Scanner instead of the Discovery Scanner, honking drops
+# you into Surface-Scanner mode (in supercruise too). Turn on once the scanner is in your fire group.
+enabled = false
 # The Discovery Scanner's fire group index (0-based, as numbered in the right HUD panel). When
 # set, COVAS reads your CURRENT fire group from Status.json, cycles to this one, honks, then
 # cycles back. Left at -1 (unmapped), auto-honk does NOTHING — it won't blind-fire and risk
