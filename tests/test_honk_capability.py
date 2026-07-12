@@ -1,12 +1,14 @@
-"""Unit tests for auto-honk (N5) — offline, free (DESIGN §6, §9).
+"""Unit tests for auto-honk (N5 + K2 detect-and-recover) — offline, free (DESIGN §6, §9).
 
-Covers the pure fire-group cycle math, the arrival-triggered honk sequence (asserting the
-exact key sequence + hold duration via a recording fake executor), the combat/interdiction
-guard, the disabled/no-op path, and the unbound-key and unknown-fire-group fail-soft paths.
-No journal, no audio, no real key injection.
+Covers the pure fire-group cycle math, the configured honk (cycle -> hold -> cycle back),
+the unconfigured probe-and-recover (short probe; on a Surface-Scanner misfire it exits +
+warns + disarms), the guards (combat, supercruise, analysis mode), the fail-soft paths,
+re-arm (verbal tool + auto on a discovery scan), and config parsing. A recording fake
+executor asserts the exact key sequence; no journal, no audio, no real key injection.
 """
 from __future__ import annotations
 
+from covas.ed.status import GUI_FOCUS_SAA
 from covas.keybinds.binds import KeyBinding
 from covas.capabilities.honk_capability import (CYCLE_NEXT, CYCLE_PREV, HonkCapability,
                                                 HonkConfig, cycle_plan)
@@ -36,11 +38,14 @@ _BINDS = {
     "SecondaryFire": KeyBinding(action="SecondaryFire", key="Key_2"),
     "CycleFireGroupNext": KeyBinding(action="CycleFireGroupNext", key="Key_N"),
     "CycleFireGroupPrevious": KeyBinding(action="CycleFireGroupPrevious", key="Key_B"),
+    "ExplorationSAAExitThirdPerson": KeyBinding(action="ExplorationSAAExitThirdPerson", key="Key_X"),
 }
-_SAFE = {"in_danger": False, "being_interdicted": False, "supercruise": True, "fire_group": 0}
+# A "safe to honk" snapshot: not in danger, in supercruise, analysis (not combat) mode, no focus.
+_SAFE = {"in_danger": False, "being_interdicted": False, "supercruise": True,
+         "analysis_mode": True, "gui_focus": None, "fire_group": 0}
 
 
-def _cap(*, cfg=None, binds=None, status=_SAFE):
+def _cap(*, cfg=None, binds=None, status=_SAFE, speak=None):
     ex = _FakeExecutor()
     cap = HonkCapability(
         cfg or HonkConfig(enabled=True),
@@ -48,6 +53,7 @@ def _cap(*, cfg=None, binds=None, status=_SAFE):
         executor=ex,
         status_snapshot=(lambda: status),
         spawn=lambda fn: fn(),            # synchronous: run the sequence inline for the test
+        speak=speak,
         log=lambda m: None)
     return cap, ex
 
@@ -110,46 +116,53 @@ def test_secondary_trigger_holds_secondary_fire():
     assert ex.calls == [("hold", "Key_2", 6.0)]
 
 
-# --- fallback (no fire group configured) -----------------------------------
+# --- unconfigured: probe-and-recover ---------------------------------------
 
-def test_fallback_holds_primary_without_cycling():
-    cfg = HonkConfig(enabled=True, fire_group=-1, hold_seconds=6.0, allow_unmapped_fire=True)
-    # even with a known current group, an unconfigured target means "just hold primary fire"
-    cap, ex = _cap(cfg=cfg, status={**_SAFE, "fire_group": 2})
+def test_unconfigured_probe_then_honks_when_clear():
+    # No fire group set: short probe, GuiFocus stays normal -> complete the honk.
+    cfg = HonkConfig(enabled=True, fire_group=-1, probe_seconds=0.4, hold_seconds=6.0)
+    cap, ex = _cap(cfg=cfg, status={**_SAFE, "gui_focus": None})
     _jump(cap)
-    assert ex.calls == [("hold", "Key_1", 6.0)]
+    assert ex.calls == [("hold", "Key_1", 0.4), ("hold", "Key_1", 6.0)]
 
 
-def test_unconfigured_is_inert_by_default():
-    # On by default but no scanner fire group mapped -> must NOT fire (no blind hold), even
-    # with the fire button bound and a safe status. allow_unmapped_fire defaults False.
-    cfg = HonkConfig(enabled=True, fire_group=-1)
-    cap, ex = _cap(cfg=cfg, status={**_SAFE, "fire_group": 2})
+def test_unconfigured_probe_detects_dss_and_recovers():
+    # Probe opened the Surface Scanner (GuiFocus == SAA) -> exit, warn, disarm, NO full honk.
+    spoken: list[str] = []
+    cfg = HonkConfig(enabled=True, fire_group=-1, probe_seconds=0.4, hold_seconds=6.0)
+    cap, ex = _cap(cfg=cfg, status={**_SAFE, "gui_focus": GUI_FOCUS_SAA},
+                   speak=lambda t: spoken.append(t))
     _jump(cap)
-    assert ex.calls == []
+    assert ex.calls == [("hold", "Key_1", 0.4), ("press", "Key_X", 0.0)]
+    assert cap._disarmed is True
+    assert spoken and "Surface Scanner" in spoken[0]
 
 
-def test_no_status_means_no_honk_even_with_guard_off():
-    # Without live ED status we can't confirm supercruise, so we don't fire — even with the
-    # combat guard off and the blind fallback opted in.
-    cfg = HonkConfig(enabled=True, fire_group=-1, combat_guard=False, hold_seconds=6.0, allow_unmapped_fire=True)
-    ex = _FakeExecutor()
-    cap = HonkCapability(cfg, binds=_BINDS, executor=ex,
-                         status_snapshot=None, spawn=lambda fn: fn())
-    _jump(cap)
-    assert ex.calls == []
+# --- disarm / re-arm -------------------------------------------------------
 
-
-def test_only_honks_in_supercruise():
-    # Configured + safe, but NOT in supercruise (dropped to normal space) -> no fire, so it
-    # can't send you into the Surface Scanner.
-    cfg = HonkConfig(enabled=True, fire_group=0)
-    cap, ex = _cap(cfg=cfg, status={**_SAFE, "supercruise": False})
+def test_disarmed_skips():
+    cap, ex = _cap(cfg=HonkConfig(enabled=True, fire_group=-1))
+    cap._disarmed = True
     _jump(cap)
     assert ex.calls == []
 
 
-# --- combat / interdiction guard -------------------------------------------
+def test_rearm_tool_clears_disarm():
+    cap, _ = _cap()
+    cap._disarmed = True
+    msg = cap.run_tool("rearm_auto_honk", {})
+    assert "re-armed" in msg.lower() and cap._disarmed is False
+
+
+def test_auto_rearm_on_discovery_scan():
+    cap, ex = _cap(cfg=HonkConfig(enabled=True, fire_group=-1))
+    cap._disarmed = True
+    cap.on_event({"type": "ed_event", "event": "FSSDiscoveryScan", "BodyCount": 5})
+    assert cap._disarmed is False
+    assert ex.calls == []              # a re-arm event never fires a honk
+
+
+# --- guards ----------------------------------------------------------------
 
 def test_guard_suppresses_during_danger():
     cap, ex = _cap(status={"in_danger": True, "being_interdicted": False, "fire_group": 0})
@@ -172,9 +185,24 @@ def test_guard_suppresses_when_status_unknown():
     assert ex.calls == []                 # can't prove it's safe -> no honk
 
 
+def test_supercruise_required():
+    cap, ex = _cap(cfg=HonkConfig(enabled=True, fire_group=0),
+                   status={**_SAFE, "supercruise": False})
+    _jump(cap)
+    assert ex.calls == []
+
+
+def test_analysis_mode_required():
+    cap, ex = _cap(cfg=HonkConfig(enabled=True, fire_group=0),
+                   status={**_SAFE, "analysis_mode": False})
+    _jump(cap)
+    assert ex.calls == []
+
+
 def test_guard_can_be_disabled_for_configured_honk_with_status():
     cfg = HonkConfig(enabled=True, fire_group=0, combat_guard=False)
-    cap, ex = _cap(cfg=cfg, status={"in_danger": True, "supercruise": True, "fire_group": 0})
+    cap, ex = _cap(cfg=cfg, status={"in_danger": True, "supercruise": True,
+                                    "analysis_mode": True, "fire_group": 0})
     _jump(cap)
     assert ex.calls == [("hold", "Key_1", 6.0)]   # guard off -> honks despite danger
 
@@ -182,8 +210,7 @@ def test_guard_can_be_disabled_for_configured_honk_with_status():
 # --- fail-soft paths -------------------------------------------------------
 
 def test_unknown_fire_group_does_not_fire():
-    # configured to cycle, but the current group is unreadable -> must NOT fire (could hold
-    # fire in the wrong group and shoot weapons)
+    # configured to cycle, but the current group is unreadable -> must NOT fire
     cfg = HonkConfig(enabled=True, fire_group=2)
     cap, ex = _cap(cfg=cfg, status={**_SAFE, "fire_group": None})
     _jump(cap)
@@ -217,10 +244,9 @@ def test_non_arrival_events_ignored():
     assert ex.calls == []
 
 
-def test_ambient_no_tools():
+def test_exposes_rearm_tool():
     cap, _ = _cap()
-    assert cap.tools() == []
-    assert not hasattr(cap, "help_meta")   # ambient: not advertised to the model
+    assert [t["name"] for t in cap.tools()] == ["rearm_auto_honk"]
 
 
 def test_bad_event_does_not_raise():
@@ -235,18 +261,19 @@ def test_bad_event_does_not_raise():
 def test_config_from_cfg_defaults():
     d = HonkConfig.from_cfg({})
     assert d.enabled is False and d.fire_group == -1 and d.trigger == "primary"
-    assert d.hold_seconds == 6.0 and d.combat_guard is True and d.configured is False
+    assert d.hold_seconds == 6.0 and d.probe_seconds == 0.4
+    assert d.combat_guard is True and d.configured is False
 
 
 def test_config_from_cfg_reads_and_normalizes():
     c = HonkConfig.from_cfg({"honk": {"enabled": True, "fire_group": 3,
                                       "trigger": "SECONDARY", "hold_seconds": 4.5,
-                                      "combat_guard": False}})
+                                      "probe_seconds": 0.6, "combat_guard": False}})
     assert c.enabled and c.fire_group == 3 and c.trigger == "secondary"
-    assert c.hold_seconds == 4.5 and c.combat_guard is False and c.configured is True
-    assert c.fire_action == "SecondaryFire"
+    assert c.hold_seconds == 4.5 and c.probe_seconds == 0.6 and c.combat_guard is False
+    assert c.configured is True and c.fire_action == "SecondaryFire"
 
 
 def test_config_bad_values_fall_back():
-    c = HonkConfig.from_cfg({"honk": {"fire_group": "x", "hold_seconds": "y"}})
-    assert c.fire_group == -1 and c.hold_seconds == 6.0
+    c = HonkConfig.from_cfg({"honk": {"fire_group": "x", "hold_seconds": "y", "probe_seconds": "z"}})
+    assert c.fire_group == -1 and c.hold_seconds == 6.0 and c.probe_seconds == 0.4

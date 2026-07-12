@@ -688,6 +688,7 @@ class App:
             self.honk = HonkCapability(
                 hcfg, binds=binds, executor=executor,
                 status_snapshot=snapshot,
+                speak=self._speak_proactive_line,   # spoken Surface-Scanner-misfire warning (K2)
                 log=lambda msg: self._log("honk", msg))
             self.registry.register(self.honk)
             self._start_event_pump()

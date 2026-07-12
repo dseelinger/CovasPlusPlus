@@ -35,6 +35,7 @@ import threading
 from dataclasses import dataclass
 from typing import Callable, Optional
 
+from ..ed.status import GUI_FOCUS_SAA
 from ..keybinds.binds import KeyBinding
 from ..keybinds.executor import ExecutorError
 from .keybind_capability import SAFE, _GUARD_MESSAGES, combat_state
@@ -45,6 +46,12 @@ CYCLE_NEXT = "CycleFireGroupNext"
 CYCLE_PREV = "CycleFireGroupPrevious"
 PRIMARY_FIRE = "PrimaryFire"
 SECONDARY_FIRE = "SecondaryFire"
+# The bind that backs out of the Detailed Surface Scanner (SAA) probe view — pressed to recover
+# when an unconfigured honk attempt actually opened the DSS (the current fire group held it).
+SAA_EXIT = "ExplorationSAAExitThirdPerson"
+
+# The verbal re-arm tool the Commander can invoke after a Surface-Scanner misfire disarms honk.
+_REARM_TOOL = "rearm_auto_honk"
 
 
 @dataclass(frozen=True)
@@ -53,15 +60,16 @@ class HonkConfig:
     `enabled`.
 
     `fire_group` is the Discovery Scanner's fire group index (0-based, as shown in the right
-    HUD panel). A negative value means "not configured": auto-honk then stays INERT (it won't
-    blind-fire) unless `allow_unmapped_fire` opts into the hold-primary-fire fallback.
-    `trigger` picks which fire button the scanner sits on."""
+    HUD panel). When set, we cycle to it deterministically. When NOT set (negative), we use
+    PROBE-AND-RECOVER: a short test-press, and if it opened the Surface Scanner (the current
+    group held the DSS) we back out, warn, and disarm until re-armed. `trigger` picks the
+    fire button; `probe_seconds` is the short unconfigured test-press."""
     enabled: bool = False
     fire_group: int = -1
     trigger: str = "primary"        # "primary" | "secondary"
     hold_seconds: float = 6.0
+    probe_seconds: float = 0.4      # unconfigured: short test-press to detect a DSS misfire
     combat_guard: bool = True
-    allow_unmapped_fire: bool = False   # opt back into the blind hold-primary-fire fallback
 
     @classmethod
     def from_cfg(cls, cfg: dict) -> "HonkConfig":
@@ -77,18 +85,22 @@ class HonkConfig:
             hold_seconds = max(0.0, float(h.get("hold_seconds", d.hold_seconds)))
         except (TypeError, ValueError):
             hold_seconds = d.hold_seconds
+        try:
+            probe_seconds = max(0.0, float(h.get("probe_seconds", d.probe_seconds)))
+        except (TypeError, ValueError):
+            probe_seconds = d.probe_seconds
         return cls(
             enabled=bool(h.get("enabled", False)),
             fire_group=fire_group,
             trigger=trigger,
             hold_seconds=hold_seconds,
+            probe_seconds=probe_seconds,
             combat_guard=bool(h.get("combat_guard", True)),
-            allow_unmapped_fire=bool(h.get("allow_unmapped_fire", False)),
         )
 
     @property
     def configured(self) -> bool:
-        """Whether a specific scanner fire group is set (else we use the fallback)."""
+        """Whether a specific scanner fire group is set (else we probe-and-recover)."""
         return self.fire_group >= 0
 
     @property
@@ -132,6 +144,7 @@ class HonkCapability:
         executor: object,
         status_snapshot: Optional[Callable[[], Optional[dict]]] = None,
         spawn: Optional[Callable[[Callable[[], None]], None]] = None,
+        speak: Optional[Callable[[str], object]] = None,
         log: Optional[Callable[[str], None]] = None,
     ) -> None:
         self._cfg = config
@@ -139,24 +152,45 @@ class HonkCapability:
         self._executor = executor
         self._status = status_snapshot
         self._spawn = spawn or _default_spawn
+        self._speak = speak
         self._log = log
         self._lock = threading.Lock()   # non-blocking: skip a second honk while one is holding
+        self._disarmed = False          # set after a DSS misfire; cleared by verbal/auto re-arm
 
     # -- capability interface ---------------------------------------------------------
-    # Ambient/event-driven, like route callouts: no LLM tools, no help metadata.
+    # One tool: verbal re-arm after a Surface-Scanner misfire disarms honk. Otherwise ambient.
     def tools(self) -> list[dict]:
-        return []
+        return [{
+            "name": _REARM_TOOL,
+            "description": ("Re-arm auto-honk after it paused itself because a honk opened the "
+                            "Detailed Surface Scanner instead of the Discovery Scanner. Call "
+                            "when the Commander confirms the Discovery Scanner is now in their "
+                            "current fire group, or asks to re-arm / turn auto-honk back on."),
+            "input_schema": {"type": "object", "properties": {}},
+        }]
+
+    def run_tool(self, name: str, inp: dict) -> str:
+        if name != _REARM_TOOL:
+            return f"Unknown tool: {name}"
+        was = self._disarmed
+        self._disarmed = False
+        return "Auto-honk re-armed." if was else "Auto-honk was already armed."
 
     def on_event(self, event: dict) -> None:
-        """Bus hook (event-pump thread). Fire the honk on arrival in a new system. Must never
-        raise — a bad event must not take the pump down — and must not block the pump for the
-        hold duration, so the actual sequence runs on the injected spawner."""
+        """Bus hook (event-pump thread). Honk on arrival in a new system; auto-rearm on a real
+        discovery scan. Must never raise (a bad event mustn't take the pump down) and must not
+        block the pump for the hold duration — the honk sequence runs on the injected spawner."""
         try:
             if not isinstance(event, dict) or event.get("type") != "ed_event":
                 return
-            if event.get("event") != "FSDJump":
+            name = event.get("event")
+            if name == "FSSDiscoveryScan":
+                # A discovery scan completed (ours or a manual honk) -> the scanner clearly works
+                # in this setup, so lift any disarm left by an earlier Surface-Scanner misfire.
+                self._rearm("a discovery scan completed")
                 return
-            self._spawn(self._do_honk)
+            if name == "FSDJump":
+                self._spawn(self._do_honk)
         except Exception:  # noqa: BLE001 — never crash the event pump on a bad event
             pass
 
@@ -177,57 +211,57 @@ class HonkCapability:
             self._lock.release()
 
     def _honk_sequence(self) -> None:
-        # 1. Safety guard (combat/interdiction, or unknown status when the guard is on).
+        # 0. Disarmed after a prior Surface-Scanner misfire — stay quiet until re-armed.
+        if self._disarmed:
+            self._logline("skipped: disarmed after a Surface-Scanner misfire — say 're-arm auto "
+                          "honk', or complete a discovery scan, once the Discovery Scanner is in "
+                          "your fire group.")
+            return
+
+        # 1. Combat/interdiction guard (and unknown status when the guard is on).
         guard = self._guard()
         if guard is not None:
             self._logline(f"blocked: {guard}")
             return
 
-        # 1b. Only honk in SUPERCRUISE. If you've dropped to normal space, holding fire can
-        #     trigger the wrong thing (e.g. sends you into the Surface Scanner). Needs live ED
-        #     status to confirm — present whenever the arrival event that triggers us fired.
         snap = self._status() if self._status is not None else None
         if not snap:
-            self._logline("skipped: ED status unavailable — can't confirm we're in supercruise.")
+            self._logline("skipped: ED status unavailable — can't confirm it's safe to honk.")
             return
+
+        # 2. SUPERCRUISE only.
         if not snap.get("supercruise"):
-            self._logline("skipped: not in supercruise — auto-honk only fires the Discovery "
-                          "Scanner in supercruise (so it can't trigger the Surface Scanner).")
+            self._logline("skipped: not in supercruise.")
             return
 
-        # 2. Unconfigured (no scanner fire group set) can't prove the CURRENT group holds the
-        #    scanner and not weapons, so — by this capability's own safety rule — we don't fire.
-        #    Auto-honk ships ON but stays INERT until the scanner is mapped ([honk].fire_group);
-        #    it never blind-fires. Opt into the old fallback with [honk].allow_unmapped_fire.
-        if not self._cfg.configured and not self._cfg.allow_unmapped_fire:
-            self._logline("skipped: auto-honk is on but no Discovery Scanner fire group is set "
-                          "([honk].fire_group = -1) — set it (or enable "
-                          "[honk].allow_unmapped_fire) so we fire the scanner, not weapons.")
+        # 3. ANALYSIS mode only — the scanners don't work in combat mode.
+        if not snap.get("analysis_mode"):
+            self._logline("skipped: in combat mode — switch to analysis mode to honk.")
             return
 
-        # 3. The fire button must be bound to a key we can press.
+        # 4. The fire button must be bound to a key we can press.
         fire_binding = self._binds.get(self._cfg.fire_action)
         if fire_binding is None or not fire_binding.usable:
             self._logline(f"skipped: {self._cfg.fire_action} has no keyboard binding — "
                           f"bind the Discovery Scanner's fire button to a key in-game.")
             return
 
-        # 4. If a scanner fire group is configured, cycle to it first (deterministic).
-        reverse: Optional[tuple[str, int]] = None
         if self._cfg.configured:
-            plan = self._plan_cycle()
-            if plan is None:
-                return                     # couldn't determine/reach the group -> already logged
-            forward_token, count, reverse = plan
-            if count:
-                forward = self._binds[forward_token]   # presence checked in _plan_cycle
-                for _ in range(count):
-                    self._executor.press(forward)
+            self._honk_configured(fire_binding)
+        else:
+            self._honk_unconfigured(fire_binding)
 
-        # 5. Hold the fire button for the honk duration to complete the scan.
+    def _honk_configured(self, fire_binding: KeyBinding) -> None:
+        """Known scanner group: cycle to it (deterministic), hold fire, cycle back."""
+        plan = self._plan_cycle()
+        if plan is None:
+            return                         # couldn't determine/reach the group -> already logged
+        forward_token, count, reverse = plan
+        if count:
+            forward = self._binds[forward_token]   # presence checked in _plan_cycle
+            for _ in range(count):
+                self._executor.press(forward)
         self._executor.hold(fire_binding, self._cfg.hold_seconds)
-
-        # 6. Cycle back to the original fire group so we leave the ship as we found it.
         if reverse is not None:
             back_token, back_count = reverse
             back = self._binds.get(back_token)
@@ -237,10 +271,48 @@ class HonkCapability:
             else:
                 self._logline(f"honked, but couldn't restore the fire group "
                               f"({back_token} not bound).")
+        self._logline(f"honked — fire group {self._cfg.fire_group}.")
 
-        where = f"group {self._cfg.fire_group}" if self._cfg.configured else "current group"
-        self._logline(f"honked — held {self._cfg.fire_action} for "
-                      f"{self._cfg.hold_seconds:g}s ({where}).")
+    def _honk_unconfigured(self, fire_binding: KeyBinding) -> None:
+        """No fire group set: a short probe-press, then check whether it opened the Surface
+        Scanner. If so, back out + warn + disarm; else complete the honk on the current group."""
+        self._executor.hold(fire_binding, self._cfg.probe_seconds)
+        snap = self._status() if self._status is not None else None
+        if snap and snap.get("gui_focus") == GUI_FOCUS_SAA:
+            self._recover_from_dss()
+            return
+        self._executor.hold(fire_binding, self._cfg.hold_seconds)
+        self._logline("honked — current fire group (probe clear).")
+
+    def _recover_from_dss(self) -> None:
+        """The probe opened the Detailed Surface Scanner — the current group holds the DSS, not
+        the Discovery Scanner. Back out, warn, and disarm until re-armed."""
+        exit_binding = self._binds.get(SAA_EXIT)
+        if exit_binding is not None and exit_binding.usable:
+            self._executor.press(exit_binding)
+        else:
+            self._logline(f"couldn't auto-exit the Surface Scanner ({SAA_EXIT} not bound) — "
+                          f"back out manually.")
+        self._disarmed = True
+        self._logline("disarmed: a honk opened the Surface Scanner (wrong fire group).")
+        self._say("Heads up — that fired your Surface Scanner, not the Discovery Scanner. "
+                  "Auto-honk is paused until you confirm the Discovery Scanner is in your "
+                  "current fire group.")
+
+    def _say(self, text: str) -> None:
+        """Speak a warning through the injected seam if wired; else fall back to the log."""
+        if self._speak is not None:
+            try:
+                self._speak(text)
+                return
+            except Exception:  # noqa: BLE001 — a TTS hiccup must not crash the honk thread
+                pass
+        self._logline(f"(warning): {text}")
+
+    def _rearm(self, reason: str) -> None:
+        if self._disarmed:
+            self._disarmed = False
+            self._logline(f"re-armed ({reason}).")
 
     def _plan_cycle(self) -> Optional[tuple[str, int, Optional[tuple[str, int]]]]:
         """Work out the cycle to reach the configured scanner group from the current one.

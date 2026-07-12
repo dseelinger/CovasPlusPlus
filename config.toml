@@ -465,14 +465,15 @@ allowlist = ["landing_gear"]
 # keystroke sequence. Requires [elite].enabled (for the arrival event, the current fire group,
 # and the combat guard).
 #
-# DEFAULT OFF — pending the DSS-mishap safety net. It presses a fire button, and if your current
-# fire group holds the Detailed Surface Scanner instead of the Discovery Scanner, honking drops
-# you into Surface-Scanner mode (in supercruise too). Turn on once the scanner is in your fire group.
+# DEFAULT OFF pending on-hardware timing verification of the probe-and-recover safety net. Once
+# tuned it can go on: an unconfigured honk probes first and backs out of a Surface-Scanner misfire
+# (see fire_group + probe_seconds). Guards: supercruise + analysis mode + not in danger.
 enabled = false
 # The Discovery Scanner's fire group index (0-based, as numbered in the right HUD panel). When
 # set, COVAS reads your CURRENT fire group from Status.json, cycles to this one, honks, then
-# cycles back. Left at -1 (unmapped), auto-honk does NOTHING — it won't blind-fire and risk
-# hitting weapons. Set this to your scanner's fire group to arm it (or see allow_unmapped_fire).
+# cycles back. Left at -1 (unmapped), auto-honk uses probe-and-recover: a short test-press that
+# backs out + warns + pauses if it opened the Surface Scanner instead of honking. Set this to your
+# scanner's fire group to skip the probe and cycle deterministically.
 fire_group = -1
 # Which fire button the Discovery Scanner is on: "primary" or "secondary".
 trigger = "primary"
@@ -481,9 +482,10 @@ hold_seconds = 6.0
 # Refuse to honk during danger/interdiction (and when ED status is unavailable — we won't act
 # unless we can prove it's safe). Leave ON.
 combat_guard = true
-# Opt back into the old blind fallback: when fire_group is -1, hold primary fire anyway (only
-# safe if the Discovery Scanner is already your selected fire group). OFF = inert until mapped.
-allow_unmapped_fire = false
+# Unconfigured (fire_group = -1) probe-and-recover: length of the short test-press (seconds) used
+# to detect a Surface-Scanner misfire before the full honk — long enough to register the mode,
+# short enough not to launch a probe. Tune on hardware.
+probe_seconds = 0.4
 
 
 [nav]
