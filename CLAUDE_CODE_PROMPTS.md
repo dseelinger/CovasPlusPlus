@@ -1658,6 +1658,75 @@ Checks: pytest green. Manual: drop N files in a type folder -> they rotate; remo
 returns. Stop.
 ```
 
+## Keybind / auto-honk fixes (Prompts K1–K2)
+
+Surfaced while designing the installer (reading Doug's real `Custom.4.2.binds`). K1 is a
+live bug; K2 is the safe-default-on auto-honk Doug asked for. Independent of the installer.
+
+### K1 — Fix stale binds-suffix detection  [BUG — blocks all keybind features]
+
+```
+Read covas/keybinds/binds.py (resolve_binds_file, _BINDS_SUFFIX, active_preset) and its .binds
+test fixture.
+
+Branch: fix/binds-suffix
+
+Goal: find the active .binds regardless of ED's version suffix. `_BINDS_SUFFIX` is hardcoded
+".4.0.binds", but live ED (Odyssey) writes "<preset>.4.2.binds", so resolve_binds_file raises
+BindsError and ALL keybind features (automation, auto-honk) silently fail on current ED.
+
+Tasks:
+1. Resolve "<preset>.*.binds" by globbing the bindings dir and picking the HIGHEST version suffix
+   (parse the numeric major.minor), falling back to "<preset>.binds". Keep [keybinds].binds_file
+   override precedence.
+2. Unit tests: files {Custom.4.0.binds, Custom.4.2.binds} -> pick 4.2; only Custom.4.2.binds ->
+   pick it; none -> BindsError with the clear "set [keybinds].binds_file" message.
+3. Don't touch the XML parser.
+
+Checks: pytest green offline. Manual: resolve_binds_file() finds Custom.4.2.binds on the real box.
+Acceptance: keybind automation + honk can load bindings on current ED. Stop.
+```
+
+### K2 — Auto-honk detect-and-recover (safe default-on)
+
+```
+Read covas/capabilities/honk_capability.py, covas/ed/status.py (Flags incl HudAnalysisMode bit 27;
+add GuiFocus), covas/ed/context.py (snapshot fields), the FSSDiscoveryScan journal event, config.toml
+[honk], covas/settings_schema.py honk.*. Depends on K1 (needs bindings to load).
+
+Branch: feature/honk-detect-recover
+
+Goal: make auto-honk safe enough to default ON without knowing the fire group, by detecting the
+Detailed-Surface-Scanner misfire and backing out — the DSS fires in supercruise too, and fire-group
+-> module mapping is NOT exposed by ED, so we can't pre-check it.
+
+Guards — fire only when ALL hold:
+  * Supercruise (already implemented).
+  * ANALYSIS mode, not combat — Status.json Flags HudAnalysisMode (bit 27, already parsed). Expose
+    it in the snapshot and require it (the scanners only work in analysis mode anyway).
+  * Combat/interdiction guard (existing).
+
+Detect-and-recover:
+  1. Honk = hold PrimaryFire (modifier-aware; e.g. Doug's is Shift+F).
+  2. Add GuiFocus parsing to status.py; expose in the snapshot. SAA mode = GuiFocus == 10 (FSS = 9).
+  3. Watch GuiFocus during/just after the hold: if it flips to SAA (10) within ~1s, the current fire
+     group holds the DSS -> RELEASE fire immediately, press ExplorationSAAExitThirdPerson (Doug's =
+     Backspace) to exit, SPEAK a warning ("that's your Surface Scanner, not the Discovery Scanner —
+     auto-honk paused until you confirm the Discovery Scanner is in your current fire group"), DISARM
+     (runtime flag).
+  4. Success = the FSSDiscoveryScan journal event -> stay silent.
+  5. Verbal ACK re-arms (phrase/tool, e.g. "the discovery scanner's set" / "re-arm honk").
+  6. Once the net is in, default honk ON again (config.toml + schema, keep them in sync).
+
+Unit tests (offline, fake executor + fake status/journal): SAA-detected -> release+exit+disarm+warn;
+FSSDiscoveryScan -> silent success; non-supercruise / combat-mode / interdiction -> no fire; ack
+re-arms. Manual (hardware): TIMING — confirm GuiFocus==10 shows on a deliberate misfire and we release
+before a probe launches; confirm Backspace exits cleanly; confirm the ack flow end to end.
+
+Acceptance: wrong fire group -> one honk attempt backs out cleanly + disarms with a spoken warning;
+right group -> silent honk. Stop.
+```
+
 ---
 
 ### Tips for running these
