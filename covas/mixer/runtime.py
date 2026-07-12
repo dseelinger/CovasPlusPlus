@@ -22,13 +22,22 @@ from ..capabilities.base import HelpMeta, Slot
 from .buses import ALERT, AMBIENT, COMMS, COVAS, MUSIC
 from .chatter import ChatterPlayer, chatter_cues
 from .comms import capture
+from .content import (
+    ContentBundle,
+    content_status,
+    empty_bundle,
+    merged_music_library,
+    overlay_cues,
+    status_summary,
+    threat_lines,
+)
 from .cues import CueRegistry
 from .driver import CueDriver
 from .eligibility import EligibilityEngine
-from .example_cues import InterdictionCue, SfxPlayer, sfx_cues
+from .example_cues import DEFAULT_THREAT_LINES, InterdictionCue, SfxPlayer, sfx_cues
 from .governor import CueGovernor, GovernorConfig
 from .mixer import pcm16_to_float, speak_on_bus
-from .music import MusicDirector, MusicLibrary
+from .music import MusicDirector
 from .variants import CommsVoicer, make_variant_generator
 from .voices import VoiceCast, build_cast
 
@@ -65,6 +74,7 @@ class AudioLayer:
         llm=None,  # noqa: ANN001 — for comms variants + chatter flavor (cheap tier); None = pool/verbatim only
         cheap_model: Optional[str] = None,
         cast_synth: Optional[Callable] = None,  # noqa: ANN001 — (Voice, text) -> (pcm, sr)
+        content: Optional[ContentBundle] = None,
         clock: Callable[[], float] = time.monotonic,
         log: Optional[Callable[[str], None]] = None,
     ) -> None:
@@ -73,6 +83,9 @@ class AudioLayer:
         self.tts = tts
         self._ed_ctx = ed_ctx
         self._log = log or (lambda _m: None)
+        # Drop-in content (C11): dropped-in SFX/music/line files overlay the shipped defaults. An
+        # empty bundle = no drop-in content (cues keep their built-in pools / config samples).
+        self._content = content if content is not None else empty_bundle()
 
         # Voice cast (C10): assign a distinct, stable voice to each comms/chatter speaker and route
         # it to the right provider (the injected synth). When the app doesn't supply one, default
@@ -90,11 +103,10 @@ class AudioLayer:
         self.music_on = bool((cfg.get("music", {}) or {}).get("enabled", False))
         self.muted = False
 
-        # Cues: chatter + SFX in one registry the driver governs.
+        # Cues: chatter + SFX in one registry the driver governs, with drop-in content overlaid
+        # (folder SFX samples / chatter line files replace the shipped defaults when present).
         self._registry = CueRegistry()
-        for cue in chatter_cues():
-            self._registry.register(cue)
-        for cue in sfx_cues(cfg):
+        for cue in overlay_cues(list(chatter_cues()) + list(sfx_cues(cfg)), self._content):
             self._registry.register(cue)
         # The governor only THROTTLES (cooldowns + global rate) here — the audio layer's own
         # per-category flags are the on/off gates, so force it enabled (its [audio.cues].enabled
@@ -119,11 +131,24 @@ class AudioLayer:
         self._comms = CommsVoicer(self._comms_play, generate=comms_gen,
                                   governor=self._governor, clock=clock)
 
-        # Music (C7) + interdiction (C8).
-        self._music = MusicDirector(MusicLibrary.from_cfg(cfg),
+        # Music (C7): config tracks + dropped-in audio/music/<context> files.
+        self._music = MusicDirector(merged_music_library(cfg, self._content),
                                     enabled=self.music_on)
-        self._interdiction = InterdictionCue.from_cfg(cfg, self._emit,
-                                                      governor=self._governor, clock=clock)
+        # Interdiction (C8): drop-in sting sample set + threat pool file override the defaults.
+        idn = (audio.get("interdiction", {}) or {})
+        self._interdiction = InterdictionCue(
+            self._emit, governor=self._governor, clock=clock,
+            enabled=bool(idn.get("enabled", False)),
+            sting=str(idn.get("sting", "")),
+            sting_samples=tuple(self._content.sfx.get("interdiction_sting", [])),
+            threat_lines=threat_lines(self._content, DEFAULT_THREAT_LINES))
+
+        self._log(status_summary(self._content))
+
+    def content_status(self) -> list[dict]:
+        """Per cue/context/pool: how many files/lines were found and whether it's silent — so the
+        web/settings readout can show what still needs content."""
+        return content_status(self._content)
 
     # -- fuel for the driver ----------------------------------------------------
     def _fuel(self) -> Optional[float]:
