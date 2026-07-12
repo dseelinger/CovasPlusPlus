@@ -620,13 +620,18 @@ class App:
         so tests never need it; current-system is read live from ED context with a journal
         fallback."""
         try:
-            from .nav import RequestsHttp
+            from .nav import RequestsHttp, ModuleIndex
             from .capabilities.find_closest_capability import NavConfig, FindClosestCapability
 
             ncfg = NavConfig.from_cfg(self.cfg)
+            # Live taxonomy so newly-released Frontier modules are findable without a CSV
+            # refresh: reconciled against the bundled taxonomy on a background startup thread
+            # (below), and resolution falls back to the bundle until/if that fetch lands.
+            module_index = ModuleIndex()
             self.nav = FindClosestCapability(
                 ncfg, http=RequestsHttp(),
                 get_current_system=self._current_system,
+                module_index=module_index,
                 log=lambda msg: self._log("nav", msg))
             self.registry.register(self.nav)
             if self.ed_ctx is None:
@@ -637,10 +642,25 @@ class App:
                 self.bus.publish({"type": "log", "who": "system",
                                   "text": f"Find-closest-module ON "
                                           f"(pad {ncfg.default_pad_size or 'any'})."})
+            threading.Thread(target=self._refresh_module_index, args=(module_index,),
+                             name="module-index-refresh", daemon=True).start()
         except Exception as e:  # noqa: BLE001 — optional; never block startup
             self.nav = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Find-closest-module failed to start: {e}"})
+
+    def _refresh_module_index(self, module_index) -> None:
+        """Background startup task: fetch Spansh's current module list and log any modules newer
+        than the bundled taxonomy (they're now findable). Fail-soft — off the hot path, never
+        blocks the voice loop, and a fetch failure just leaves the bundle in charge."""
+        try:
+            module_index.refresh()
+            new = module_index.extra_names()
+            if new:
+                self._log("nav", f"live taxonomy added {len(new)} module(s) not in the "
+                                 f"bundle: {', '.join(new)}.")
+        except Exception as e:  # noqa: BLE001 — best-effort; the bundled taxonomy still works
+            self._log("nav", f"live taxonomy refresh failed: {e}")
 
     # ---- Find-closest-ship ------------------------------------------------
     def _start_ship_nav(self) -> None:

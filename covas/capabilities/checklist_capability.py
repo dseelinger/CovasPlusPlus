@@ -18,7 +18,11 @@ CHECKLIST_TOOLS = [
         "description": (
             "Return the Commander's next pending (unfinished) Elite Dangerous "
             "checklist objectives, in order, with overall progress. Use this for "
-            "'what's next' / 'what should I do'. Returns each as '#<number>: <text>'."
+            "'what's next' / 'what should I do'. Returns each as '#<number>: <text>'. "
+            "This tool (and other checklist tool results) is the ONLY source of truth for "
+            "what's next or pending — NEVER state, guess, or paraphrase a next/pending "
+            "objective that didn't come from a checklist tool result. If you don't have a "
+            "fresh one, call this tool; do not invent an objective."
         ),
         "input_schema": {
             "type": "object",
@@ -52,7 +56,11 @@ CHECKLIST_TOOLS = [
             "Mark a checklist objective completed or reopened. Identify it by 'number' "
             "(from get_next_objectives / find_objectives), by 'query' text, or omit "
             "both to use the current line. If a query matches multiple objectives the "
-            "tool changes nothing and returns the candidates so you can disambiguate."
+            "tool changes nothing and returns the candidates so you can disambiguate. "
+            "When you complete an item, the result also names the REAL next pending "
+            "objective (or says all are done) — relay THAT and only that. NEVER state, "
+            "guess, or paraphrase a 'next' objective yourself; the tool result is the only "
+            "truth. If it says all objectives are complete, do not invent a next one."
         ),
         "input_schema": {
             "type": "object",
@@ -175,8 +183,20 @@ class ChecklistCapability:
                 text = cl.set_number(int(number), completed) if number else \
                     (cl.set_number(cl.current, completed) if cl.current else None)
                 n = number or cl.current
-                return (f"Done. #{n} '{text}' is now {verb}."
-                        if text else "I don't know which objective you mean.")
+                if not text:
+                    return "I don't know which objective you mean."
+                result = f"Done. #{n} '{text}' is now {verb}."
+                # On a COMPLETION, hand the model the REAL next objective so it never has to
+                # (and must never) invent one. Skip on reopen — 'next' doesn't apply there.
+                if completed:
+                    pend, _done, total = cl.next_pending(1)
+                    if pend:
+                        nn, nt = pend[0]
+                        result += f" Next pending is #{nn}: '{nt}'."
+                    else:
+                        result += (f" That was the last one — all {total} "
+                                   f"objectives are complete.")
+                return result
 
             if name == "add_objective":
                 new_num, text = cl.add(inp.get("text", ""),

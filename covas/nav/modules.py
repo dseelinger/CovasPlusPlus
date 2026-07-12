@@ -25,6 +25,8 @@ import difflib
 import re
 from dataclasses import dataclass, field
 
+from .module_data import MODULE_ROWS
+
 # ED size vocabulary. Hardpoints (weapons) are sold in small/medium/large/huge = class
 # 1/2/3/4; core/optional internals use class numbers 1-8; utilities are size-less (class 0).
 _SIZE_WORDS: dict[str, int] = {
@@ -104,135 +106,87 @@ class Unknown:
 
 
 # ---- the taxonomy -------------------------------------------------------------------------
-# Baked from real Spansh station outfitting data (names/sizes/mounts/ratings verified live).
-# Not every module in the game — a broad, useful core that a Commander is likely to ask for
-# by voice. Extend by adding rows; `resolve()` picks them up automatically. `M`/`W`/`FGT`
-# helpers keep the rows terse.
+# The COMPLETE module set, baked offline from EDCD/FDevIDs outfitting.csv into
+# `module_data.MODULE_ROWS` (regenerate with `scripts/gen_module_taxonomy.py`). Every
+# purchasable module is here with its real sizes/mounts/ratings and the EXACT Spansh
+# filter name — so `resolve()` recognises anything the Commander can actually buy, not a
+# hand-picked subset. We only hand-maintain the friendly *aliases* below (mishears +
+# shorthand for the modules people ask for by voice); the rows themselves are generated.
 
-_FIXED = ("Fixed",)
-_FGT = ("Fixed", "Gimbal", "Turret")
-_FT = ("Fixed", "Turret")
+# Friendly spoken aliases / common mishears, keyed by the exact module name. Everything the
+# game sells resolves by its real name regardless; these just make the frequent asks robust
+# to Whisper's spelling and to shorthand ("mc", "fsd", "scoop"). Names not listed simply
+# have no extra aliases — that's fine.
+_ALIASES: dict[str, tuple[str, ...]] = {
+    "Multi-Cannon": ("multicannon", "multi cannon", "multiple cannon", "mc"),
+    "Beam Laser": ("beam", "beamlaser"),
+    "Burst Laser": ("burst",),
+    "Pulse Laser": ("pulse",),
+    "Cannon": ("cannons",),
+    "Fragment Cannon": ("frag cannon", "fragcannon", "frag", "shotgun"),
+    "Plasma Accelerator": ("plasma", "pa"),
+    "Rail Gun": ("railgun", "rail"),
+    "Missile Rack": ("missiles", "missile", "dumbfire", "dumbfire missiles"),
+    "Seeker Missile Rack": ("seeker missiles", "seekers", "seeker missile"),
+    "Torpedo Pylon": ("torpedoes", "torpedo"),
+    "Mine Launcher": ("mines", "mine"),
+    "Mining Laser": ("mining lasers", "extractor"),
+    "AX Multi-Cannon": ("anti xeno multi-cannon", "ax multicannon", "anti-xeno multicannon"),
+    "AX Missile Rack": ("ax missiles", "anti xeno missile rack"),
+    "Abrasion Blaster": ("abrasion",),
+    "Frame Shift Drive": ("fsd", "hyperdrive", "jump drive", "frameshift drive"),
+    "Frame Shift Drive (SCO)": ("sco drive", "sco fsd", "supercruise overcharge", "fsd sco"),
+    "Thrusters": ("thruster", "engines"),
+    "Power Plant": ("powerplant", "reactor"),
+    "Power Distributor": ("distributor", "distro"),
+    "Life Support": ("lifesupport",),
+    "Sensors": ("sensor",),
+    "Fuel Tank": ("fueltank", "tank"),
+    "Fuel Scoop": ("fuelscoop", "scoop"),
+    "Shield Generator": ("shields", "shield gen", "sg"),
+    "Bi-Weave Shield Generator": ("biweave", "bi weave", "bi-weave shields", "biweave shields"),
+    "Prismatic Shield Generator": ("prismatics", "prismatic shields", "prismatic shield"),
+    "Shield Cell Bank": ("scb", "shield cell", "cell bank"),
+    "Cargo Rack": ("cargo", "cargo hold"),
+    "Hull Reinforcement Package": ("hrp", "hull reinforcement"),
+    "Module Reinforcement Package": ("mrp", "module reinforcement"),
+    "Auto Field-Maintenance Unit": ("afmu", "auto field maintenance unit",
+                                    "field maintenance unit", "repair unit"),
+    "Frame Shift Drive Interdictor": ("interdictor", "fsd interdictor", "interdiction"),
+    "Detailed Surface Scanner": ("dss", "surface scanner"),
+    "Collector Limpet Controller": ("collector limpets", "collector controller", "collector limpet"),
+    "Prospector Limpet Controller": ("prospector limpets", "prospector controller",
+                                     "prospector limpet"),
+    "Repair Limpet Controller": ("repair limpets", "repair controller", "repair limpet"),
+    "Fuel Transfer Limpet Controller": ("fuel transfer limpets", "fuel limpet"),
+    "Fighter Hangar": ("hangar", "fighter bay", "scb hangar"),
+    "Shield Booster": ("shield boosters", "booster"),
+    "Heat Sink Launcher": ("heatsink", "heat sink", "heatsinks"),
+    "Chaff Launcher": ("chaff",),
+    "Point Defence": ("point defense", "pd turret"),
+    "Kill Warrant Scanner": ("kws", "kill warrant"),
+    "Cargo Scanner": ("manifest scanner",),
+    "Frame Shift Wake Scanner": ("wake scanner", "fsd wake scanner"),
+    "Electronic Countermeasure": ("ecm",),
+    "Shutdown Field Neutraliser": ("shutdown neutralizer", "caustic neutraliser"),
+    "Pulse Wave Analyser": ("pulse wave analyzer", "pwa"),
+    # newly-covered modules people ask for by a shorter name. Bare "docking computer" maps to
+    # the Standard one (the sensible default); "advanced docking computer" exact-matches its
+    # own name and needs no alias.
+    "Standard Docking Computer": ("docking computer", "std docking computer"),
+    "Supercruise Assist": ("sc assist", "supercruise"),
+}
 
 
-def _w(id, name, sizes, mounts, ratings="", aliases=()) -> ModuleSpec:
-    return ModuleSpec(id, name, "weapon", tuple(sizes), tuple(mounts), ratings, tuple(aliases))
+def _spec_from_row(row: tuple) -> ModuleSpec:
+    """Build a ModuleSpec from a generated (id, name, category, sizes, mounts, ratings) row,
+    attaching any hand-curated aliases for that name."""
+    sid, name, category, sizes, mounts, ratings = row
+    return ModuleSpec(sid, name, category, tuple(sizes), tuple(mounts), ratings,
+                      _ALIASES.get(name, ()))
 
 
-def _i(id, name, sizes, ratings="", aliases=()) -> ModuleSpec:
-    return ModuleSpec(id, name, "internal", tuple(sizes), (), ratings, tuple(aliases))
-
-
-def _c(id, name, sizes, ratings="", aliases=()) -> ModuleSpec:  # core/standard internal
-    return ModuleSpec(id, name, "standard", tuple(sizes), (), ratings, tuple(aliases))
-
-
-def _u(id, name, ratings="", aliases=(), mounts=()) -> ModuleSpec:  # utility (class 0)
-    return ModuleSpec(id, name, "utility", (), tuple(mounts), ratings, tuple(aliases))
-
-
-TAXONOMY: tuple[ModuleSpec, ...] = (
-    # --- weapons (hardpoints): small/medium/large/huge + Fixed/Gimbal/Turret --------------
-    _w("multi_cannon", "Multi-Cannon", (1, 2, 3, 4), _FGT, "ACEFG",
-       ("multicannon", "multi cannon", "multiple cannon", "multi-cannon", "mc")),
-    _w("beam_laser", "Beam Laser", (1, 2, 3, 4), _FGT, "ACDEF",
-       ("beam", "beam laser", "beamlaser")),
-    _w("burst_laser", "Burst Laser", (1, 2, 3, 4), _FGT, "DEFG",
-       ("burst", "burst laser")),
-    _w("pulse_laser", "Pulse Laser", (1, 2, 3, 4), _FGT, "ADEFG",
-       ("pulse", "pulse laser")),
-    _w("cannon", "Cannon", (1, 2, 3, 4), _FGT, "BCDEF", ("cannons",)),
-    _w("fragment_cannon", "Fragment Cannon", (1, 2, 3), _FGT, "ACDE",
-       ("frag cannon", "fragcannon", "frag", "shotgun")),
-    _w("plasma_accelerator", "Plasma Accelerator", (2, 3, 4), _FIXED, "ABC",
-       ("plasma", "plasma accelerator", "pa")),
-    _w("rail_gun", "Rail Gun", (1, 2), _FIXED, "BD",
-       ("railgun", "rail gun", "rail")),
-    _w("missile_rack", "Missile Rack", (1, 2, 3), _FIXED, "AB",
-       ("missiles", "missile", "dumbfire", "dumbfire missiles")),
-    _w("seeker_missile", "Seeker Missile Rack", (1, 2, 3), _FIXED, "AB",
-       ("seeker missiles", "seekers", "seeker missile")),
-    _w("torpedo", "Torpedo Pylon", (1, 2, 3), _FIXED, "I",
-       ("torpedoes", "torpedo", "torpedo pylon")),
-    _w("mine_launcher", "Mine Launcher", (1, 2), _FIXED, "I", ("mines", "mine")),
-    _w("mining_laser", "Mining Laser", (1, 2), _FT, "D",
-       ("mining laser", "mining lasers", "extractor")),
-    _w("ax_multi_cannon", "AX Multi-Cannon", (2, 3), _FT, "CEF",
-       ("anti xeno multi-cannon", "ax multicannon", "anti-xeno multicannon")),
-    _w("ax_missile_rack", "AX Missile Rack", (2, 3), _FT, "AB",
-       ("ax missiles", "anti xeno missile rack")),
-    _w("abrasion_blaster", "Abrasion Blaster", (1,), _FT, "D", ("abrasion",)),
-    # --- core internals (standard): class-numbered, no mount ------------------------------
-    _c("frame_shift_drive", "Frame Shift Drive", (2, 3, 4, 5, 6, 7, 8), "ABCDE",
-       ("fsd", "frame shift drive", "hyperdrive", "jump drive", "frameshift drive")),
-    _c("fsd_sco", "Frame Shift Drive (SCO)", (2, 3, 4, 5, 6, 7, 8), "ABCD",
-       ("sco drive", "sco fsd", "supercruise overcharge", "fsd sco")),
-    _c("thrusters", "Thrusters", (2, 3, 4, 5, 6, 7, 8), "ABCDE",
-       ("thruster", "engines")),
-    _c("power_plant", "Power Plant", (2, 3, 4, 5, 6, 7, 8), "ABCDE",
-       ("powerplant", "power plant", "reactor")),
-    _c("power_distributor", "Power Distributor", (1, 2, 3, 4, 5, 6, 7, 8), "ABCDE",
-       ("distributor", "power distributor", "distro")),
-    _c("life_support", "Life Support", (1, 2, 3, 4, 5, 6, 7, 8), "ABCDE",
-       ("lifesupport", "life support")),
-    _c("sensors", "Sensors", (1, 2, 3, 4, 5, 6, 7, 8), "ABCDE",
-       ("sensor", "sensors")),
-    _c("fuel_tank", "Fuel Tank", (1, 2, 3, 4, 5, 6, 7, 8), "C",
-       ("fueltank", "fuel tank", "tank")),
-    # --- optional internals: class-numbered, no mount ------------------------------------
-    _i("fuel_scoop", "Fuel Scoop", (1, 2, 3, 4, 5, 6, 7, 8), "ABCDE",
-       ("fuelscoop", "fuel scoop", "scoop")),
-    _i("shield_generator", "Shield Generator", (2, 3, 4, 5, 6, 7, 8), "ABCDE",
-       ("shields", "shield generator", "shield gen", "sg")),
-    _i("bi_weave", "Bi-Weave Shield Generator", (1, 2, 3, 4, 5, 6, 7, 8), "C",
-       ("biweave", "bi weave", "bi-weave shields", "biweave shields")),
-    _i("prismatic", "Prismatic Shield Generator", (1, 2, 3, 4, 5, 6, 7, 8), "A",
-       ("prismatics", "prismatic shields", "prismatic shield")),
-    _i("shield_cell_bank", "Shield Cell Bank", (1, 2, 3, 4, 5, 6, 7, 8), "ABCDE",
-       ("scb", "shield cell", "cell bank", "shield cell bank")),
-    _i("cargo_rack", "Cargo Rack", (1, 2, 3, 4, 5, 6, 7, 8), "E",
-       ("cargo", "cargo rack", "cargo hold")),
-    _i("hull_reinforcement", "Hull Reinforcement Package", (1, 2, 3, 4, 5), "DE",
-       ("hrp", "hull reinforcement", "hull reinforcement package")),
-    _i("module_reinforcement", "Module Reinforcement Package", (1, 2, 3, 4, 5), "DE",
-       ("mrp", "module reinforcement", "module reinforcement package")),
-    _i("afmu", "Auto Field-Maintenance Unit", (1, 2, 3, 4, 5, 6, 7, 8), "ABCDE",
-       ("afmu", "auto field maintenance unit", "field maintenance unit", "repair unit")),
-    _i("fsd_interdictor", "Frame Shift Drive Interdictor", (1, 2, 3, 4), "ABCDE",
-       ("interdictor", "fsd interdictor", "interdiction")),
-    _i("refinery", "Refinery", (1, 2, 3, 4), "ABCDE", ("refinery",)),
-    _i("detailed_surface_scanner", "Detailed Surface Scanner", (1,), "CI",
-       ("dss", "surface scanner", "detailed surface scanner")),
-    _i("collector_limpet", "Collector Limpet Controller", (1, 3, 5, 7), "ABCDE",
-       ("collector limpets", "collector controller", "collector limpet")),
-    _i("prospector_limpet", "Prospector Limpet Controller", (1, 3, 5, 7), "ABCDE",
-       ("prospector limpets", "prospector controller", "prospector limpet")),
-    _i("repair_limpet", "Repair Limpet Controller", (1, 3, 5, 7), "ABCDE",
-       ("repair limpets", "repair controller", "repair limpet")),
-    _i("fuel_transfer_limpet", "Fuel Transfer Limpet Controller", (1, 3, 5, 7), "ABCDE",
-       ("fuel transfer limpets", "fuel limpet")),
-    _i("fighter_hangar", "Fighter Hangar", (5, 6, 7), "D",
-       ("hangar", "fighter hangar", "fighter bay", "scb hangar")),
-    # --- utilities (class 0): no size, (almost) no mount ----------------------------------
-    _u("shield_booster", "Shield Booster", "ABCDE",
-       ("shield boosters", "booster", "shield booster")),
-    _u("heat_sink", "Heat Sink Launcher", "I",
-       ("heatsink", "heat sink", "heat sink launcher", "heatsinks")),
-    _u("chaff", "Chaff Launcher", "I", ("chaff", "chaff launcher")),
-    _u("point_defence", "Point Defence", "I",
-       ("point defense", "point defence", "pd turret")),
-    _u("kill_warrant_scanner", "Kill Warrant Scanner", "ABCDE",
-       ("kws", "kill warrant scanner", "kill warrant")),
-    _u("cargo_scanner", "Cargo Scanner", "ABCDE",
-       ("manifest scanner", "cargo scanner")),
-    _u("frame_shift_wake_scanner", "Frame Shift Wake Scanner", "ABCDE",
-       ("wake scanner", "fsd wake scanner", "frame shift wake scanner")),
-    _u("ecm", "Electronic Countermeasure", "F",
-       ("ecm", "electronic countermeasure")),
-    _u("shutdown_neutraliser", "Shutdown Field Neutraliser", "F",
-       ("shutdown field neutraliser", "shutdown neutralizer", "caustic neutraliser")),
-    _u("pulse_wave_analyser", "Pulse Wave Analyser", "ABCDE",
-       ("pulse wave analyzer", "pulse wave analyser", "pwa")),
-)
+TAXONOMY: tuple[ModuleSpec, ...] = tuple(_spec_from_row(r) for r in MODULE_ROWS)
 
 
 # ---- normalization + lookup ---------------------------------------------------------------
@@ -260,9 +214,29 @@ def _build_lookup() -> dict[str, ModuleSpec]:
 
 _LOOKUP = _build_lookup()
 
+# Every canonical module name, for the help subsystem's failure-recovery vocabulary and as the
+# bundled baseline the live ModuleIndex reconciles against (mirrors ships.SHIP_NAMES).
+MODULE_NAMES: tuple[str, ...] = tuple(spec.name for spec in TAXONOMY)
+
 # A short, friendly starter list for the Unknown case (common asks).
 _COMMON = ("Multi-Cannon", "Beam Laser", "Frame Shift Drive", "Fuel Scoop",
            "Shield Generator", "Cargo Rack")
+
+
+def _lookup_with_extras(extra_names) -> dict[str, ModuleSpec]:
+    """The bundled name/alias lookup, plus a synthetic spec for each extra canonical name (a
+    module Spansh knows that the bundle doesn't yet — see `module_index.py`). Extras contribute
+    their exact name only, with NO sizes/mounts: a live-only module resolves by name and searches
+    unqualified (no "which size?" guidance) until the next EDCD refresh fills its attributes in.
+    Bundled names always win a collision. Returns `_LOOKUP` unchanged (no copy) when there are no
+    genuinely-new extras. Mirrors ships._lookup_with_extras."""
+    fresh: dict[str, ModuleSpec] = {}
+    for name in extra_names or ():
+        key = _norm(name)
+        if key and key not in _LOOKUP and key not in fresh:
+            # category "" so no size-word/mount logic engages; sizes/mounts empty -> Resolved.
+            fresh[key] = ModuleSpec(id=f"live:{key}", name=str(name), category="")
+    return {**_LOOKUP, **fresh} if fresh else _LOOKUP
 
 
 # ---- size / mount parsing -----------------------------------------------------------------
@@ -349,9 +323,16 @@ def _finish(spec: ModuleSpec, size, mount) -> Resolved | NeedAttrs:
                     category=spec.category, size=rsize, mount=rmount)
 
 
-def resolve(query: str, size=None, mount=None) -> Resolved | NeedAttrs | Ambiguous | Unknown:
+def resolve(query: str, size=None, mount=None,
+            *, extra_names=()) -> Resolved | NeedAttrs | Ambiguous | Unknown:
     """Map a loose module name (+ optional size & mount) to a structured outcome. Pure and
     offline — the LLM drives the dialog and re-calls this with more-complete args each turn.
+
+    `extra_names` are canonical module names Spansh knows that the bundled taxonomy is missing
+    (newly-released modules, from the live `ModuleIndex`); they're folded into the lookup so a
+    brand-new module resolves by exact/containment/fuzzy match. Such a live-only module has no
+    known sizes/mounts, so it resolves straight to a name-only search. Default empty -> pure
+    bundled behaviour. Mirrors ships.resolve_ship.
 
     Matching, most-confident first:
       1. exact normalized match on a name or alias,
@@ -362,15 +343,17 @@ def resolve(query: str, size=None, mount=None) -> Resolved | NeedAttrs | Ambiguo
     if not q:
         return Unknown(query=str(query), suggestions=list(_COMMON))
 
+    lookup = _lookup_with_extras(extra_names)
+
     # 1. exact
-    if q in _LOOKUP:
-        return _finish(_LOOKUP[q], size, mount)
+    if q in lookup:
+        return _finish(lookup[q], size, mount)
 
     # 2. containment — the query is inside a name/alias, or a name sits inside the query
     #    ("closest multi cannon please" contains "multicannon"). Dedupe to distinct specs.
     hits: list[ModuleSpec] = []
     seen: set[str] = set()
-    for key, spec in _LOOKUP.items():
+    for key, spec in lookup.items():
         if len(key) < 3:
             continue
         if (q in key or key in q) and spec.id not in seen:
@@ -382,11 +365,11 @@ def resolve(query: str, size=None, mount=None) -> Resolved | NeedAttrs | Ambiguo
         return Ambiguous(candidates=_unique_names(hits))
 
     # 3. fuzzy — catches Whisper mishears the aliases don't cover
-    close = difflib.get_close_matches(q, list(_LOOKUP), n=6, cutoff=0.72)
+    close = difflib.get_close_matches(q, list(lookup), n=6, cutoff=0.72)
     specs: list[ModuleSpec] = []
     seen.clear()
     for key in close:
-        spec = _LOOKUP[key]
+        spec = lookup[key]
         if spec.id not in seen:
             seen.add(spec.id)
             specs.append(spec)
@@ -395,7 +378,7 @@ def resolve(query: str, size=None, mount=None) -> Resolved | NeedAttrs | Ambiguo
     if len(specs) > 1:
         return Ambiguous(candidates=_unique_names(specs))
 
-    return Unknown(query=str(query), suggestions=_suggest(q))
+    return Unknown(query=str(query), suggestions=_suggest(q, lookup))
 
 
 def _unique_names(specs: list[ModuleSpec]) -> list[str]:
@@ -403,8 +386,11 @@ def _unique_names(specs: list[ModuleSpec]) -> list[str]:
     return [s.name for s in specs][:8]
 
 
-def _suggest(q: str) -> list[str]:
-    """Best-effort near names for an Unknown, else a few common modules."""
-    close = difflib.get_close_matches(q, [_norm(s.name) for s in TAXONOMY], n=3, cutoff=0.5)
-    names = [_LOOKUP[c].name for c in close if c in _LOOKUP]
+def _suggest(q: str, lookup: dict[str, ModuleSpec] | None = None) -> list[str]:
+    """Best-effort near names for an Unknown, else a few common modules. Suggests over the given
+    lookup (bundled + any live extras) so a near-miss on a new module can still be offered."""
+    lut = lookup if lookup is not None else _LOOKUP
+    by_name = {_norm(s.name): s.name for s in lut.values()}
+    close = difflib.get_close_matches(q, list(by_name), n=3, cutoff=0.5)
+    names = [by_name[c] for c in close]
     return names or list(_COMMON[:4])

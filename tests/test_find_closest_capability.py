@@ -151,6 +151,67 @@ def test_no_current_system_is_spoken():
     assert http.calls == []
 
 
+# --- live taxonomy: a newly-released module becomes findable (parity with ships) -----------
+
+class FakeModuleIndex:
+    def __init__(self, extras):
+        self._extras = tuple(extras)
+
+    def extra_names(self):
+        return self._extras
+
+
+def _body_selling(module_name: str) -> dict:
+    """A one-station Spansh body whose outfitting includes `module_name` (large pad)."""
+    return {"count": 1, "results": [
+        {"name": "Cayley Enterprise", "system_name": "Wolf 359", "distance": 7.8,
+         "distance_to_arrival": 232.0, "has_large_pad": True, "large_pads": 2,
+         "type": "Planetary Outpost",
+         "modules": [{"category": "hardpoint", "class": 3, "rating": "B",
+                      "name": module_name, "weapon_mode": "Fixed"}]},
+    ]}
+
+
+def test_new_module_from_index_resolves_and_searches():
+    """A module absent from the bundle but surfaced by the live index resolves and searches — no
+    CSV refresh needed when Frontier adds a module. It searches by NAME only (no class filter),
+    since a live-learned module has no known size."""
+    http = FakeHttp(body=_body_selling("Neutron Pulse Cannon"))
+    clip = FakeClipboard()
+    cap = FindClosestCapability(
+        NavConfig(enabled=True), http=http, get_current_system=(lambda: "Sol"),
+        clipboard=clip, module_index=FakeModuleIndex(["Neutron Pulse Cannon"]))
+    out = cap.run_tool("find_closest_module", {"module": "Neutron Pulse Cannon"})
+    assert len(http.calls) >= 1
+    module_filter = http.calls[0]["payload"]["filters"]["modules"]
+    assert module_filter == [{"name": "Neutron Pulse Cannon"}]   # name only, no class
+    assert clip.copied == ["Wolf 359"] and "Wolf 359" in out    # station's system copied
+
+
+def test_unknown_without_index_extra_stays_unknown():
+    """The same module, with no live index, is not recognised (proving the index is what enabled
+    it) and never hits the network."""
+    cap, http, clip = _cap()
+    cap.run_tool("find_closest_module", {"module": "Neutron Pulse Cannon"})
+    assert http.calls == [] and clip.copied == []
+
+
+def test_broken_module_index_is_fail_soft():
+    """A throwing index never breaks a lookup — resolution falls back to the bundled taxonomy."""
+    class BadIndex:
+        def extra_names(self):
+            raise RuntimeError("index boom")
+    http, clip = FakeHttp(), FakeClipboard()
+    cap = FindClosestCapability(
+        NavConfig(enabled=True), http=http, get_current_system=(lambda: "Sol"),
+        clipboard=clip, module_index=BadIndex())
+    # bundled module still resolves and searches despite the broken index
+    out = cap.run_tool("find_closest_module",
+                       {"module": "multicannon", "size": "medium", "mount": "fixed",
+                        "confirmed": True})
+    assert "Walz Depot" in out and "Sol" in out                # answer still delivered
+
+
 def test_pad_default_from_config_used():
     cap, http, clip = _cap(cfg=NavConfig(enabled=True, default_pad_size="L"))
     cap.run_tool("find_closest_module",

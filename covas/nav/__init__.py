@@ -12,7 +12,8 @@ Two data sources, deliberately split (see the build prompt + DESIGN §3):
 `clipboard.py` copies the resulting SYSTEM name so the Commander can paste it into the
 galaxy map. Everything I/O-bound (HTTP, clipboard) is injected so tests stay hermetic.
 """
-from .modules import (Ambiguous, NeedAttrs, Resolved, Unknown, resolve)
+from .modules import (Ambiguous, NeedAttrs, Resolved, Unknown, MODULE_NAMES, resolve)
+from .module_index import ModuleIndex
 from .ships import (AmbiguousShip, ResolvedShip, UnknownShip, SHIP_NAMES, resolve_ship)
 from .ship_index import ShipIndex
 from .closest import (ClosestResult, NavError, RequestsHttp, find_closest_module)
@@ -26,6 +27,8 @@ __all__ = [
     "AmbiguousShip",
     "CarrierInfo",
     "ClosestResult",
+    "MODULE_NAMES",
+    "ModuleIndex",
     "NavError",
     "NeedAttrs",
     "RequestsHttp",

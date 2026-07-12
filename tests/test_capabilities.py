@@ -96,3 +96,50 @@ def test_checklist_tool_errors_are_caught(tmp_path):
     cap = _cap(tmp_path)
     out = cap.run_tool("set_objective", {"number": "not-a-number", "completed": True})
     assert out.startswith("Tool error:")
+
+
+# --- next-objective anti-hallucination (fix/checklist-next-hallucination) ------------------
+
+def _cap3(tmp_path) -> ChecklistCapability:
+    """A three-item fixture so 'the next one' is a concrete, checkable line."""
+    f = tmp_path / "checklist.md"
+    f.write_text("- [ ] Scoop fuel\n- [ ] Jump to Sol\n- [ ] Sell cargo\n", encoding="utf-8")
+    return ChecklistCapability(Checklist(str(f)))
+
+
+def test_completing_item_returns_the_real_next_pending(tmp_path):
+    """Completing an item hands back the ACTUAL next objective from the list, so the model
+    relays truth instead of inventing a 'next up'."""
+    cap = _cap3(tmp_path)
+    out = cap.run_tool("set_objective", {"number": 1, "completed": True})
+    assert "#1 'Scoop fuel' is now completed" in out
+    # The real next line is #2 'Jump to Sol' — and it must be quoted verbatim from the file.
+    assert "Jump to Sol" in out and "#2" in out
+    _, _, next_text = cap.checklist.items()[1]
+    assert next_text in out                      # reported next == checklist, not a guess
+    assert "Sell cargo" not in out               # only the immediate next, not later items
+
+
+def test_completing_middle_item_reports_next_still_pending(tmp_path):
+    """With #1 already done, completing #2 surfaces #3 (first pending in file order)."""
+    cap = _cap3(tmp_path)
+    cap.run_tool("set_objective", {"number": 1, "completed": True})
+    out = cap.run_tool("set_objective", {"number": 2, "completed": True})
+    assert "Sell cargo" in out and "#3" in out
+
+
+def test_completing_last_item_says_all_complete_no_invented_next(tmp_path):
+    """Completing the final pending item reports all-complete — never a fabricated next."""
+    cap = _cap3(tmp_path)
+    for n in (1, 2, 3):
+        out = cap.run_tool("set_objective", {"number": n, "completed": True})
+    assert "all 3 objectives are complete" in out.lower()
+    assert "next pending" not in out.lower()     # nothing invented after the last item
+
+
+def test_reopening_item_does_not_append_a_next(tmp_path):
+    """Reopening is not a completion, so the 'next pending' framing must not appear."""
+    cap = _cap3(tmp_path)
+    out = cap.run_tool("set_objective", {"number": 2, "completed": False})
+    assert "reopened" in out
+    assert "next pending" not in out.lower()

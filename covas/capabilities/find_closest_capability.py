@@ -198,6 +198,7 @@ class FindClosestCapability:
         resolve: Callable[..., object] = _default_resolve,
         search: Callable[..., object] = find_closest_module,
         clipboard: Callable[[str], None] = _default_copy,
+        module_index: object | None = None,
         log: Callable[[str], None] | None = None,
     ) -> None:
         self._cfg = config
@@ -206,6 +207,10 @@ class FindClosestCapability:
         self._resolve = resolve
         self._search = search
         self._clipboard = clipboard
+        # Optional live taxonomy: surfaces module names Spansh knows that the bundle is missing
+        # (newly-released modules), folded into resolution so a new module is findable with no
+        # code change. None -> bundled taxonomy only (the default; keeps tests offline).
+        self._module_index = module_index
         self._log = log
         self._tool = _build_tool(config.require_confirmation)
         # Confirmation turn-gate (only used when require_confirmation is on): _turn counts
@@ -280,7 +285,11 @@ class FindClosestCapability:
         if not module:
             return "Which module should I find the closest station for?"
 
-        outcome = self._resolve(module, inp.get("size"), inp.get("mount"))
+        # Fold in any modules the live index learned Spansh knows but the bundle doesn't. Only
+        # pass the kwarg when there ARE extras, so the injected resolve seam stays simple.
+        extra = self._extra_names()
+        outcome = (self._resolve(module, inp.get("size"), inp.get("mount"), extra_names=extra)
+                   if extra else self._resolve(module, inp.get("size"), inp.get("mount")))
 
         if isinstance(outcome, Unknown):
             return self._say_unknown(outcome)
@@ -403,6 +412,19 @@ class FindClosestCapability:
         except Exception as e:  # noqa: BLE001 — clipboard is a convenience, never fatal
             self._logline(f"clipboard copy failed: {e}")
             return False
+
+    def _extra_names(self) -> tuple[str, ...]:
+        """Newly-released module names from the live index (empty until its background fetch
+        lands, or if it's absent/unreachable). Fail-soft — a broken index never blocks a lookup;
+        resolution just uses the bundled taxonomy."""
+        idx = self._module_index
+        if idx is None:
+            return ()
+        try:
+            return tuple(idx.extra_names())
+        except Exception as e:  # noqa: BLE001 — the live taxonomy is a bonus, never fatal
+            self._logline(f"module index unavailable: {e}")
+            return ()
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:
