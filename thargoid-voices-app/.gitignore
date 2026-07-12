@@ -1,0 +1,19 @@
+# Local runtime config (last-used output folder)
+config.json
+
+# Any output rendered/saved locally
+output/
+*.wav
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Editor / OS cruft
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

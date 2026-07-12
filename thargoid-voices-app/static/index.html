@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thargoid Voices</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="glyph">&#9678;</span>
+      <div>
+        <h1>Thargoid Voices</h1>
+        <p class="sub">Generate &middot; audition &middot; curate alien voice SFX &mdash; local only</p>
+      </div>
+    </div>
+    <div class="outdir">
+      <label for="outdir">Output folder</label>
+      <div class="outdir-row">
+        <input id="outdir" type="text" spellcheck="false"
+               placeholder="Paste your Thargoid Voices folder path…" />
+        <button id="saveOutdir" class="btn ghost">Set</button>
+      </div>
+      <div id="outdirMsg" class="hint"></div>
+    </div>
+  </header>
+
+  <nav id="tabs" class="tabs"></nav>
+
+  <main>
+    <section class="panel">
+      <p id="typeDesc" class="type-desc"></p>
+
+      <div class="controls">
+        <div class="slider">
+          <label>Pitch <span class="tag">size / alien-ness</span> <output id="pitchOut"></output></label>
+          <input id="pitch" type="range" min="0" max="100" value="50" />
+          <div class="scale"><span>large / low</span><span>small / alien</span></div>
+        </div>
+        <div class="slider">
+          <label>Harshness <span class="tag">distortion drive</span> <output id="harshnessOut"></output></label>
+          <input id="harshness" type="range" min="0" max="100" value="50" />
+          <div class="scale"><span>clean</span><span>brutal</span></div>
+        </div>
+        <div class="slider">
+          <label>Reverb <span class="tag">space / size</span> <output id="reverbOut"></output></label>
+          <input id="reverb" type="range" min="0" max="100" value="50" />
+          <div class="scale"><span>dry</span><span>cavernous</span></div>
+        </div>
+
+        <div class="mini">
+          <label>Variants
+            <input id="count" type="number" min="1" max="12" value="4" />
+          </label>
+          <label>Seed <span class="tag">blank = random</span>
+            <input id="seed" type="number" placeholder="random" />
+          </label>
+          <button id="resetDefaults" class="btn ghost small" title="Restore this type's default slider positions">Reset sliders</button>
+        </div>
+
+        <div class="actions">
+          <button id="genOne" class="btn primary">Generate</button>
+          <button id="genAll" class="btn">Generate all types</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="results">
+      <div class="results-head">
+        <h2>Variants</h2>
+        <div>
+          <span id="resultCount" class="hint"></span>
+          <button id="clearResults" class="btn ghost small">Clear</button>
+        </div>
+      </div>
+      <div id="variants" class="variant-list"></div>
+      <p id="emptyMsg" class="empty">Nothing generated yet. Pick a type, set the sliders, and hit <b>Generate</b>.</p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

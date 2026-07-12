@@ -1,0 +1,7 @@
+# Thargoid Voices — standalone local generator app.
+# Pinned to versions verified on Python 3.13 (Windows). pedalboard has no
+# Python 3.14 wheels yet, so use a 3.13 interpreter for the venv.
+Flask==3.1.3
+numpy==2.5.1
+soundfile==0.14.0
+pedalboard==0.9.24
