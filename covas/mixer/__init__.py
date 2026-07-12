@@ -42,6 +42,15 @@ from .chatter import (
 )
 from .cues import Cue, CueRegistry, cue_problems, validate_cue
 from .driver import CueDriver
+from .example_cues import (
+    DEFAULT_PIRATE_LINES,
+    DEFAULT_THREAT_LINES,
+    InterdictionCue,
+    Layer,
+    SfxPlayer,
+    register_sfx,
+    sfx_cues,
+)
 from .music import (
     MUSIC_CONTEXTS,
     MusicDirector,
@@ -133,6 +142,13 @@ __all__ = [
     "music_context",
     "music_cues",
     "register_music",
+    "DEFAULT_PIRATE_LINES",
+    "DEFAULT_THREAT_LINES",
+    "InterdictionCue",
+    "Layer",
+    "SfxPlayer",
+    "register_sfx",
+    "sfx_cues",
     "BusMixer",
     "bus_gains",
     "float_to_pcm16",
