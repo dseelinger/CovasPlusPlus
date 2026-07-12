@@ -221,10 +221,15 @@ class App:
             self.audio = AudioLayer(
                 self.cfg, self.mixer, self.tts,
                 ed_ctx=self.ed_ctx, llm=self.llm, cheap_model=cheap,
+                cast_synth=self._build_cast_synth(),
                 log=lambda m: self._log("audio", m))
             self.registry.register(
                 AudioControlsCapability(self.audio, log=lambda m: self._log("audio", m)))
             self._start_event_pump()
+            # Fetch the (famous-filtered) ElevenLabs voice list off the hot path and rebuild the
+            # cast's exclusions when it lands — never block startup on a network call.
+            threading.Thread(target=self._refresh_cast_exclusions, name="cast-exclusions",
+                             daemon=True).start()
             if self.ed_ctx is None:
                 self.bus.publish({"type": "log", "who": "system", "text":
                     "Audio layer ON (bus mixer), but ED monitoring is OFF — no game events to "
@@ -236,6 +241,47 @@ class App:
             self.audio = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Audio layer failed to start: {e}"})
+
+    def _build_cast_synth(self):
+        """The C10 cast synth router: ElevenLabs for EL/persona voices, local Piper models (cached)
+        for the cast pool. EL synth reuses the app's own provider (which keeps a fake/mock run
+        offline); only when the main provider is REAL Piper do we build a dedicated ElevenLabs
+        provider for EL voices. Either backend may be absent -> that voice fails soft to silence."""
+        from .mixer import CastSynth
+
+        el_synth = None
+        try:
+            from .providers.elevenlabs_tts import ElevenLabsTTS
+            from .providers.piper_tts import PiperTTS
+            if isinstance(self.tts, PiperTTS):     # Piper is the main voice -> a separate EL cast
+                el_prov = ElevenLabsTTS(self.cfg)
+                el_synth = lambda text, vid: el_prov.synth_pcm(text, vid)  # noqa: E731
+            else:                                   # EL main, or a fake/mock -> reuse it (offline-safe)
+                el_synth = self.tts.synth_pcm
+        except Exception:  # noqa: BLE001 — no EL available; EL voices fall to silence
+            el_synth = None
+        return CastSynth(el_synth=el_synth, piper_loader=self._load_piper_voice,
+                         log=lambda m: self._log("audio", m))
+
+    def _load_piper_voice(self, model_path: str):
+        """Load a Piper model as a cast voice (lazy, one per path). Returns an object with
+        synth_pcm(text) -> (pcm, sr). Raises if Piper/the model isn't available (CastSynth
+        catches it and degrades to silence)."""
+        from .providers.piper_tts import PiperTTS
+        cfg = dict(self.cfg)
+        cfg["piper"] = {"model": model_path}
+        return PiperTTS(cfg)
+
+    def _refresh_cast_exclusions(self) -> None:
+        """Background: fetch the famous-filtered ElevenLabs voice list and rebuild the cast so a
+        ™/unusable voice is dropped from the pool. Fail-soft — the cast works without it."""
+        try:
+            from . import elevenlabs as el
+            voices = el.list_voices(self.cfg)
+            if self.audio is not None:
+                self.audio.rebuild_cast(el_voices=voices)
+        except Exception as e:  # noqa: BLE001 — best-effort; no filtering if the API is unreachable
+            self._log("audio", f"cast voice-exclusion refresh skipped: {e}")
 
     # ---- Elite Dangerous monitoring (DESIGN §5) ---------------------------
     def _start_ed_monitoring(self) -> None:
@@ -845,8 +891,13 @@ class App:
 
     def _log(self, who: str, text: str) -> None:
         ts = _dt.datetime.now().strftime("%H:%M:%S")
-        self._logf.write(f"{ts}  {who}: {text}\n")
-        self._logf.flush()
+        try:
+            self._logf.write(f"{ts}  {who}: {text}\n")
+            self._logf.flush()
+        except (ValueError, OSError):
+            # The log file may be closed while a daemon (index/cast refresh) is still finishing
+            # on the way out — never let a late log line crash a background thread.
+            pass
         self.bus.publish({"type": "log", "who": who, "text": text})
 
     def set_state(self, state: str, extra: str = "") -> None:

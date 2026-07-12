@@ -86,6 +86,23 @@ male    = ""
 female  = ""
 default = ""
 
+[audio.voices]
+# Voice cast (C10). COVAS (you) always speak on ElevenLabs with the persona voice
+# ([elevenlabs].voice_id). The NPC/comms/chatter CAST is assigned deterministically from a pool
+# so different speakers sound different but the same speaker stays consistent across a session.
+# `cast_provider` is the cast's default/fallback provider: "piper" (LOCAL, free, runs beside the
+# game — recommended) or "elevenlabs" (burns credits per line). Direct player DMs use `player_ref`
+# (a Piper .onnx path or an EL voice_id); blank = the first male pool voice, else the persona.
+cast_provider = "piper"
+player_ref    = ""
+# The cast pool — one entry per voice. Empty = the cast degrades to a single voice (the persona),
+# i.e. today's single-voice behaviour. Add voices as array-of-tables, e.g.:
+#   [[audio.voices.pool]]
+#   provider = "piper"                        # "piper" or "elevenlabs"
+#   ref      = "voices/en_US-ryan-high.onnx"  # a Piper .onnx path, or an EL voice_id
+#   gender   = "male"                         # "male" / "female" / "neutral" (gendered NPCs match)
+pool = []
+
 [audio.sfx]
 # Ambient SFX cues (C8): local samples (git-ignored, supply your own) on the ambient bus,
 # eligibility-gated (hyperspace / deep space). Each is a LIST of sample paths; empty = silent.

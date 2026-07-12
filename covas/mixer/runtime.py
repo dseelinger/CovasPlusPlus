@@ -19,7 +19,7 @@ from dataclasses import replace
 from typing import Callable, Optional
 
 from ..capabilities.base import HelpMeta, Slot
-from .buses import ALERT, AMBIENT, COMMS, MUSIC
+from .buses import ALERT, AMBIENT, COMMS, COVAS, MUSIC
 from .chatter import ChatterPlayer, chatter_cues
 from .comms import capture
 from .cues import CueRegistry
@@ -27,9 +27,10 @@ from .driver import CueDriver
 from .eligibility import EligibilityEngine
 from .example_cues import InterdictionCue, SfxPlayer, sfx_cues
 from .governor import CueGovernor, GovernorConfig
-from .mixer import speak_on_bus
+from .mixer import pcm16_to_float, speak_on_bus
 from .music import MusicDirector, MusicLibrary
-from .variants import CommsVoicer, comms_voice_id, make_variant_generator
+from .variants import CommsVoicer, make_variant_generator
+from .voices import VoiceCast, build_cast
 
 
 def _text_generator(llm, model: Optional[str]):  # noqa: ANN001
@@ -63,6 +64,7 @@ class AudioLayer:
         ed_ctx=None,  # noqa: ANN001 — EDContext (fuel %); also the driver's context
         llm=None,  # noqa: ANN001 — for comms variants + chatter flavor (cheap tier); None = pool/verbatim only
         cheap_model: Optional[str] = None,
+        cast_synth: Optional[Callable] = None,  # noqa: ANN001 — (Voice, text) -> (pcm, sr)
         clock: Callable[[], float] = time.monotonic,
         log: Optional[Callable[[str], None]] = None,
     ) -> None:
@@ -71,6 +73,13 @@ class AudioLayer:
         self.tts = tts
         self._ed_ctx = ed_ctx
         self._log = log or (lambda _m: None)
+
+        # Voice cast (C10): assign a distinct, stable voice to each comms/chatter speaker and route
+        # it to the right provider (the injected synth). When the app doesn't supply one, default
+        # to a synth through the app's own TTS provider (today's single-voice behaviour).
+        self._cast_synth = cast_synth or (
+            lambda voice, text: self.tts.synth_pcm(text, voice.ref or None))
+        self._cast: VoiceCast = build_cast(cfg, synth=self._cast_synth)
 
         audio = cfg.get("audio", {}) or {}
         # Runtime toggles, seeded from config. The governor's own `enabled` ([audio.cues]) gates
@@ -126,23 +135,24 @@ class AudioLayer:
             return None
 
     # -- routing helpers (all fail soft) ----------------------------------------
-    def _speak_bus(self, text: str, bus: str) -> bool:
-        """Speak a chatter line on its bus via the TTS provider + mixer."""
+    def _submit_voice(self, voice, text: str, bus: str) -> bool:  # noqa: ANN001 — a Voice
+        """Synthesize `text` with a cast Voice (routed to its provider) and play it on `bus`."""
         try:
-            speak_on_bus(self.mixer, self.tts, text, bus=bus)
+            pcm, sr = self._cast.synth(voice, text)
+            self.mixer.submit(bus, pcm16_to_float(pcm), sr)
             return True
         except Exception as e:  # noqa: BLE001
-            self._log(f"chatter speak failed: {e}")
+            self._log(f"voice synth/play failed: {e}")
             return False
 
-    def _comms_play(self, text: str, voice: str) -> bool:
-        try:
-            speak_on_bus(self.mixer, self.tts, text, bus=COMMS,
-                         voice_id=comms_voice_id(self.cfg, voice))
-            return True
-        except Exception as e:  # noqa: BLE001
-            self._log(f"comms speak failed: {e}")
-            return False
+    def _speak_bus(self, text: str, bus: str) -> bool:
+        """Speak a chatter line on its bus with a stable chatter cast voice."""
+        return self._submit_voice(self._cast.assign("chatter"), text, bus)
+
+    def _comms_play(self, text: str, record) -> bool:  # noqa: ANN001 — a VoiceableComms
+        """Voice a gated comms line: the cast picks the voice from the sender identity (player
+        DMs get the fixed player voice), routed to its provider on the radio-treated comms bus."""
+        return self._submit_voice(self._cast.for_record(record), text, COMMS)
 
     def _play_sample(self, sample: str, bus: str) -> bool:
         try:
@@ -170,13 +180,18 @@ class AudioLayer:
             return False
         if layer.kind == "sfx":
             return self._play_sample(layer.payload, layer.bus)
-        try:
-            vid = comms_voice_id(self.cfg, layer.voice) if layer.bus == COMMS else None
-            speak_on_bus(self.mixer, self.tts, layer.payload, bus=layer.bus, voice_id=vid)
-            return True
-        except Exception as e:  # noqa: BLE001
-            self._log(f"interdiction layer failed: {e}")
-            return False
+        if layer.bus == COVAS:
+            # The assistant's own threat line -> the persona voice on the clean bus.
+            try:
+                speak_on_bus(self.mixer, self.tts, layer.payload, bus=COVAS)
+                return True
+            except Exception as e:  # noqa: BLE001
+                self._log(f"interdiction covas line failed: {e}")
+                return False
+        # The pirate's line -> a cast voice (male) on the radio-treated comms bus.
+        hint = layer.voice if layer.voice in ("male", "female") else None
+        return self._submit_voice(self._cast.assign("pirate", gender_hint=hint),
+                                  layer.payload, layer.bus)
 
     def _realize_music(self, transition) -> None:  # noqa: ANN001 — MusicTransition or None
         if transition is None:
@@ -251,9 +266,16 @@ class AudioLayer:
         self.mixer.set_bus_config(self.cfg)
         return new
 
+    def rebuild_cast(self, el_voices=None) -> None:  # noqa: ANN001 — list[dict] of EL voices
+        """Rebuild the cast from current config, reusing the synth backends. `el_voices` (the
+        famous-filtered live list) feeds the exclusion hook so an unusable voice is dropped."""
+        self._cast = build_cast(self.cfg, synth=self._cast_synth, el_voices=el_voices)
+
     def apply_settings(self) -> None:
-        """Re-read config after a settings change: bus volumes/treatment + the enable toggles."""
+        """Re-read config after a settings change: bus volumes/treatment, enable toggles, and the
+        voice cast (cast provider / pool / player voice), reusing the existing synth backends."""
         self.mixer.set_bus_config(self.cfg)
+        self.rebuild_cast()
         audio = self.cfg.get("audio", {}) or {}
         self.chatter_on = bool((audio.get("cues", {}) or {}).get("enabled", False))
         self.sfx_on = self.chatter_on

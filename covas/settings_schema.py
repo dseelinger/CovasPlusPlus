@@ -30,6 +30,7 @@ PAD_SIZES = ["S", "M", "L", "any"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
 LLM_PROVIDERS = ["anthropic", "ollama"]
 TTS_PROVIDERS = ["elevenlabs", "piper"]
+CAST_PROVIDERS = ["piper", "elevenlabs"]
 
 # Sentinels for enum options that can only be resolved at runtime (from config
 # or a live API). The web/voice layer supplies the concrete list; when it can't
@@ -452,6 +453,18 @@ SCHEMA: list[Setting] = [
             "ElevenLabs voice for all other NPC comms. Blank = provider default.",
             default="", options_source=OPT_EL_VOICES,
             phrasings=("default comms voice", "neutral comms voice")),
+    Setting("audio.voices.cast_provider", ("audio", "voices", "cast_provider"), "enum",
+            "Cast provider", "Ambient audio",
+            "TTS for the NPC/comms/chatter voice cast: 'piper' (local, free) or 'elevenlabs' "
+            "(burns credits). COVAS itself always uses your ElevenLabs persona voice.",
+            default="piper", options=CAST_PROVIDERS,
+            phrasings=("cast provider", "voice cast provider", "npc voice provider"),
+            example="set the cast provider to piper"),
+    Setting("audio.voices.player_ref", ("audio", "voices", "player_ref"), "string",
+            "Player-DM voice", "Ambient audio",
+            "Voice for direct player DMs — a Piper .onnx path or an ElevenLabs voice id. Blank = "
+            "the first male pool voice, else your persona voice.",
+            default="", phrasings=("player dm voice", "player comms voice")),
 
     # --- Developer ---------------------------------------------------------
     Setting("dev.mock", ("dev", "mock"), "bool",

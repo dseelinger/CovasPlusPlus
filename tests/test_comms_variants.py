@@ -65,8 +65,9 @@ class _RecordingPlay:
         self.ok = ok
         self.calls: list[tuple[str, str]] = []
 
-    def __call__(self, text, voice):
-        self.calls.append((text, voice))
+    def __call__(self, text, record):
+        # C10: play now receives the whole VoiceableComms; record (text, its logical voice).
+        self.calls.append((text, record.voice))
         return self.ok
 
 

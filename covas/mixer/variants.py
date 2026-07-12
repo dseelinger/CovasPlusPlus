@@ -166,16 +166,16 @@ class CommsVoicer:
 
     Injected seams keep it offline-testable:
       * `generate(source, tier) -> str` — the LLM variant generator (None => always verbatim);
-      * `play(text, voice) -> bool` — routes text to the comms bus with the chosen voice
-        (the app wires this to mixer.speak_on_bus with the comms radio treatment) and returns
-        True only if playback started;
+      * `play(final_text, record) -> bool` — routes the final text to the comms bus; it gets the
+        whole VoiceableComms so the caller can pick the voice by sender identity (C10 cast) and
+        returns True only if playback started;
       * `governor` — the SHARED C3 CueGovernor, so comms respect the same rate budget and the
         C4 dedup cooldown (keyed by the record's template).
     """
 
     def __init__(
         self,
-        play: Callable[[str, str], bool],
+        play: Callable[[str, "VoiceableComms"], bool],
         *,
         generate: Optional[Callable[[str, str], str]] = None,
         governor: Optional[CueGovernor] = None,
@@ -226,7 +226,7 @@ class CommsVoicer:
             return VoicedComms(False, "", applied, record.voice, reason)
         started = False
         try:
-            started = bool(self._play(text, record.voice))
+            started = bool(self._play(text, record))
         except Exception as e:  # noqa: BLE001 — a dead TTS degrades, never crashes the loop
             return VoicedComms(False, text, applied, record.voice, f"play error ({type(e).__name__})")
         if started and self._governor is not None:

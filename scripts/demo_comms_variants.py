@@ -36,8 +36,8 @@ def main() -> None:
     mixer = BusMixer(cfg)
     mixer.start()
 
-    def play(text: str, voice: str) -> bool:
-        speak_on_bus(mixer, tts, text, bus=COMMS, voice_id=comms_voice_id(cfg, voice))
+    def play(text: str, record) -> bool:   # C10: play receives the whole record
+        speak_on_bus(mixer, tts, text, bus=COMMS, voice_id=comms_voice_id(cfg, record.voice))
         return True
 
     voicer = CommsVoicer(play, generate=lambda src, tier: _CANNED.get(src, src))
