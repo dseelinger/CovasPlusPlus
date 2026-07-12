@@ -1452,6 +1452,212 @@ a page tied to something real in the code. Tell me the one-time Pages setting to
 all reflect it — plus `DESIGN_AND_ROADMAP.md` if the architecture changed. Keep the four in sync;
 don't let docs drift.
 
+## Installable Windows app (Prompts I1–I8)
+
+These turn **`INSTALLER_DESIGN.md`** into build steps — read it first; it holds the rationale
+and the LOCKED decisions (CPU-only, download-on-first-run, per-user unsigned install, Tier-2
+GitHub-Releases updates, default-vs-override audio content). Each prompt is independently
+shippable and sits on a sub-branch of `feature/installer`. **I1 was implemented in the
+design-seeding session** (this is its record).
+
+### I1 — Writable user-data dir (frozen-vs-source roots)  [PREREQUISITE]
+
+```
+Read CLAUDE.md, INSTALLER_DESIGN.md (the "user-data dir" + "default vs override" sections),
+covas/config.py, covas/app.py (content_root + logging), covas/personality.py, covas/checklist.py,
+covas/mixer/content.py.
+
+Branch: feature/installer  (implemented in the seeding session)
+
+Goal: all WRITABLE state lives under a per-user dir when packaged, while a source run is
+byte-for-byte unchanged. Read-only SHIPPED assets resolve against the app/bundle dir.
+
+Tasks:
+1. config.py: add app_dir() (read-only asset base) and data_dir() (writable base). Source run:
+   both = project root (dev unchanged). Frozen (sys.frozen): app_dir = bundle dir (sys._MEIPASS
+   or exe dir), data_dir = %APPDATA%\COVAS++. Both overridable via COVAS_APP_DIR / COVAS_DATA_DIR
+   env vars (test seam + parity with the existing [audio].content_root seam).
+2. Put config.toml + overrides.json under data_dir; on first run seed data_dir/config.toml from
+   the bundled default when absent.
+3. Split path resolution: WRITABLE fields (personality.file, custom_dir, campaign_file,
+   elevenlabs.api_key_file, checklist.file, logging.dir, piper.model, and sound_cues) resolve
+   against data_dir; SHIPPED-asset fields (personality.presets_file) against app_dir. In source
+   mode both == root, so NO behavior change.
+4. app.py: content_root default -> data_dir (not ROOT).
+5. Unit tests: inject COVAS_APP_DIR/COVAS_DATA_DIR to simulate frozen; assert config seeds,
+   writable paths land under data_dir, asset paths under app_dir, and with no env (source) the
+   resolution is byte-for-byte unchanged.
+
+Checks: python -m compileall covas; pytest (offline) green. Manual (VM): a frozen build writes
+ONLY under %APPDATA%\COVAS++ and never into the install tree.
+Acceptance: source run identical; frozen resolution relocates writable state. Stop.
+```
+
+### I2 — Version string + Tier-2 update check
+
+```
+Read INSTALLER_DESIGN.md (decisions #5 + #6), covas/web.py, run_covas_ui.py.
+
+Branch: feature/installer-updates
+
+Goal: the app knows its version, notices a newer GitHub Release, and can update itself WITHOUT
+clobbering user settings.
+
+Tasks:
+1. covas/__version__.py (__version__ = "x.y.z"), read by the app (and later the build).
+2. Update-check module: GET api.github.com/repos/dseelinger/CovasPlusPlus/releases/latest;
+   semver-compare to __version__; ignore prereleases/drafts; fail-soft on offline/error.
+3. Web UI: an "update available -> vX.Y" banner + an endpoint; the ACTION (Tier 2) downloads the
+   new installer to temp, launches it, and exits (a running exe can't overwrite itself).
+4. Preserve settings: the updater/installer touch ONLY the payload, never %APPDATA%\COVAS++.
+5. Unit-test the semver compare + release-JSON parse with fake payloads (offline).
+
+Checks: pytest green. Manual: against a bumped fake release, the banner appears; downgrade path
+leaves data_dir untouched. Stop.
+```
+
+### I3 — First-run setup flow
+
+```
+Read INSTALLER_DESIGN.md (first-run + default-voice decisions), covas/web.py + templates/,
+covas/providers/elevenlabs_tts.py, covas/config.py.
+
+Branch: feature/installer-firstrun
+
+Goal: a first-launch screen that builds the user's config from nothing.
+
+Tasks:
+1. A "configured?" gate (keys present + STT model available); skip the flow once satisfied.
+2. Setup route + template: enter Anthropic + ElevenLabs keys, pick mic (sd.query_devices), then
+   download STT faster-whisper small.en with progress; write everything under data_dir.
+3. Default voice: fetch the ElevenLabs voice list; pick "George" by NAME, else the FIRST valid
+   voice returned (never dead-end on a rotated catalog).
+4. TTS is ElevenLabs-only (Piper not offered); with no key the app is text-only (existing
+   fail-soft), and the flow makes that explicit.
+5. Unit-test the gate + the voice-resolution (George-present / George-absent / empty list).
+
+Checks: pytest green. Manual (clean VM): fresh launch walks keys->model->voice->mic and lands in
+the working control panel. Stop.
+```
+
+### I4 — PyWebView native window
+
+```
+Read INSTALLER_DESIGN.md (window decision), run_covas_ui.py, covas/app.py, covas/web.py.
+
+Branch: feature/installer-window
+
+Goal: launch the control panel as a NATIVE window (no browser); closing the window QUITS.
+
+Tasks:
+1. New entry run_covas_app.py: start App + install hooks, run Flask on a background thread, then
+   webview.create_window(...) + webview.start() on the main thread. Window close -> core.shutdown()
+   -> exit. Keep run_covas_ui.py (browser path) working unchanged.
+2. Add pywebview to requirements-build.txt (or a [gui] extra) — NOT the base runtime.
+
+Checks: python -m compileall. Manual (hardware): window renders the panel, PTT + audio work,
+closing the window exits cleanly. Stop.
+```
+
+### I5 — PyInstaller one-folder freeze (CPU-only)
+
+```
+Read INSTALLER_DESIGN.md (Phase-0 spike results + trim targets), requirements.txt, run_covas_app.py.
+
+Branch: feature/installer-freeze
+
+Goal: a reproducible frozen build from a CHECKED-IN spec. Proven viable by the Phase-0 spike
+(deps freeze on Python 3.14; 257MB untrimmed).
+
+Tasks:
+1. covas.spec (onedir, entry run_covas_app.py): --collect-data covas (templates + assets), collect
+   ctranslate2/sounddevice/soundfile/faster_whisper/webview; bundle covas/assets, personalities/,
+   and the default config.toml as data.
+2. Trim (verify at runtime, don't cut blind): exclude PyAV video encoders (libx265/SvtAv1); test
+   excluding PyAV entirely (STT on raw mic PCM) and onnxruntime (if VAD unused) — the two biggest
+   wins (av.libs 63MB, onnxruntime 34MB).
+3. requirements-build.txt (pyinstaller, pywebview); build.ps1 to run it.
+
+Checks: the frozen exe imports all native libs (reuse the spike self-test idea) + runs on hardware.
+Acceptance: one-folder build launches the native window on a clean box. Stop.
+```
+
+### I6 — Inno Setup installer (per-user, unsigned)
+
+```
+Read INSTALLER_DESIGN.md (installer + signing decisions), the PyInstaller dist from I5, GitHub
+issue #4 (icon).
+
+Branch: feature/installer-inno
+
+Goal: COVAS++ Setup.exe — a friendly per-user installer.
+
+Tasks:
+1. covas.iss: install per-user to %LOCALAPPDATA%\Programs\COVAS++ (NO admin/UAC), Start-menu +
+   desktop shortcuts (custom icon per issue #4), uninstaller, install-over-previous, LZMA compression.
+2. Unsigned: DOCUMENT the SmartScreen "unknown publisher -> More info -> Run anyway" step for users.
+3. build.ps1: run PyInstaller (I5) then ISCC to emit the setup exe; stamp version from
+   covas/__version__.py.
+
+Checks: Manual (clean Win11 VM snapshot): install with no admin prompt, launch from Start menu,
+first-run flow works, uninstall is clean. Stop.
+```
+
+### I7 — Docs + voice-help + manual-tests sync
+
+```
+Read CLAUDE.md (definition of done), INSTALLER_DESIGN.md, docs/getting-started/*, MANUAL_TESTS.md,
+covas/capabilities/help_capability.py, DESIGN_AND_ROADMAP.md.
+
+Branch: feature/installer-docs
+
+Goal: bring the four definition-of-done surfaces into line with the packaged app.
+
+Tasks:
+1. docs/getting-started/install.md: rewrite to "download Setup.exe -> run -> first-run wizard";
+   add the SmartScreen "unknown publisher" note; move the Python/venv steps to an advanced
+   "run from source" section.
+2. docs/getting-started/running.md: launch via the desktop/Start-menu icon; closing quits.
+   New docs/getting-started/updating.md (banner -> downloads -> installer relaunch). settings.md +
+   using/help.md: note config/keys now live in %APPDATA%\COVAS++.
+3. Voice help: add "what version are you?" (reads __version__) to help_capability + phrasings; do
+   NOT add "check for updates" by voice (UI-only). Scrub help text of the old server/browser launch.
+4. MANUAL_TESTS.md: a packaged-build + clean-VM acceptance checklist (install, first-run, PTT,
+   ED journal/bindings readable, update banner -> relaunch, settings survive update).
+5. DESIGN_AND_ROADMAP.md: fold in the frozen-app architecture + user-data-dir change.
+
+Checks: mkdocs build --strict clean. Stop.
+```
+
+### I8 — Shippable default audio cues + override model
+
+```
+Read INSTALLER_DESIGN.md (default-vs-override audio), covas/audio.py, covas/mixer/content.py,
+config.toml [sound_cues], tools/cuegen/.
+
+Branch: feature/installer-cues
+
+Goal: UI cues become drop-in/override content with arbitrary-count random rotation, shipping only
+ORIGINAL defaults.
+
+Tasks:
+1. UI cue TYPES listen/processing/completed/failure, each a folder: bundled default at
+   covas/assets/cues/<type>/ (incl. the LOCKED covas/assets/cues/listen/listen_ea.wav); user
+   override at data_dir/sounds/<type>/. If the user folder has >=1 file it REPLACES the default
+   set; play a RANDOM file; any count (1..N) works.
+2. Migrate [sound_cues] fixed per-file lists to folder discovery (extend content.py's pattern or
+   mirror it for the UI cues in audio.py). Missing/empty -> silence (preserve fail-soft).
+3. Generate processing/completed/failure defaults in the SAME voice via tools/cuegen (e.g.
+   completed = resolved rising interval, failure = soft descending minor, processing = low tick);
+   an original interdiction sting default too.
+4. UI "Open cues folder" button (opens data_dir/sounds). 
+5. Unit-test resolution: override replaces default; empty -> default; neither -> silent; and
+   arbitrary file counts rotate.
+
+Checks: pytest green. Manual: drop N files in a type folder -> they rotate; remove them -> default
+returns. Stop.
+```
+
 ---
 
 ### Tips for running these
