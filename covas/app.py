@@ -216,12 +216,13 @@ class App:
         the ambient layer off; COVAS speech still routes through the mixer. Needs the event pump
         so comms/chatter/interdiction/music react to journal events."""
         try:
-            from .config import ROOT
+            from .config import data_dir
             from .mixer import AudioControlsCapability, AudioLayer, ensure_skeleton, load_content
             # Drop-in content (C11): ensure the folder skeleton (idempotent) then scan it, so a
             # dropped-in file joins the cues with no code/config edits. Fail-soft. The root is the
-            # project dir; [audio].content_root overrides it (a seam so tests don't touch the repo).
-            content_root = self.cfg.get("audio", {}).get("content_root") or ROOT
+            # writable data dir (project root in a source run, %APPDATA%\COVAS++ when frozen);
+            # [audio].content_root overrides it (a seam so tests don't touch the repo).
+            content_root = self.cfg.get("audio", {}).get("content_root") or data_dir()
             try:
                 ensure_skeleton(content_root)
             except Exception:  # noqa: BLE001 — skeleton creation must never block startup
