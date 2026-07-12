@@ -321,6 +321,35 @@ Notes:
 
 Notes:
 
+## 18. Audio / Comms / Chatter subsystem (C1–C8)  🔊 HW
+The atmospheric audio layer is built and unit-tested but **not yet wired into the live voice
+loop** (each prompt stopped at its integration seam). So there are no in-game steps yet — the
+only manual checks are three standalone demo scripts that drive the real mixer + DSP + TTS on
+your audio device. Run each with the main app NOT running.
+
+### 18.1 Audio bus mixer + comms radio treatment (C1)
+- [ ] 🔊 `.venv\Scripts\python.exe scripts\demo_comms_bus.py` → hear a tone CLEAN (COVAS bus), then
+  the same tone RADIO-FILTERED (Comms bus: band-limited + compressed + light static bed).
+- [ ] Launch the normal app and confirm a spoken reply sounds **unchanged** (the mixer is additive;
+  COVAS's own path is untouched).
+
+### 18.2 Comms variants — validator + verbatim fallback (C5)
+- [ ] 🔊 `.venv\Scripts\python.exe scripts\demo_comms_variants.py` → three lines on the comms bus:
+  a clean NPC line → a **safe riff**; a tampered variant → **falls back to verbatim**; a player DM →
+  **verbatim, male voice**. The printed `tier=` line confirms which fired.
+
+### 18.3 Layered pirate interdiction (C8)
+- [ ] 🔊 `.venv\Scripts\python.exe scripts\demo_interdiction.py` → one Interdiction fires **three
+  layers in order**: a warning sting (alert bus — needs a sample at `[audio.interdiction].sting`,
+  else that layer is skipped with a note), the assistant's threat line (COVAS bus, clean), and the
+  pirate's line (comms bus, radio-treated).
+
+The rest of the subsystem — C2 cue registry, C3 driver/governor, C4 channel gate, C6 chatter, C7
+music — is pure logic fully covered by `pytest`; there's nothing to hand-test until the layer is
+wired into the app and gains voice controls (mute/volume) and settings.
+
+Notes:
+
 ---
 
 ## Needs-hardware / manual-only note
