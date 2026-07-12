@@ -317,6 +317,12 @@ SCHEMA: list[Setting] = [
             "How long to hold the fire button to complete the scan.",
             default=6.0, min=1.0, max=10.0, unit="s",
             phrasings=("honk hold time", "honk duration")),
+    Setting("honk.allow_unmapped_fire", ("honk", "allow_unmapped_fire"), "bool",
+            "Honk without a mapped scanner", "Auto-honk",
+            "When the scanner fire group isn't set, hold primary fire anyway (the old "
+            "'hope for the best' fallback). OFF = auto-honk stays inert until you map it.",
+            default=False, phrasings=("blind honk", "unmapped honk"),
+            example="turn blind honk off"),
     Setting("honk.combat_guard", ("honk", "combat_guard"), "bool",
             "Combat guard", "Auto-honk",
             "Refuse to honk during danger/interdiction (or unknown status). Leave ON.",

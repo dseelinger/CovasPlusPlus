@@ -113,15 +113,24 @@ def test_secondary_trigger_holds_secondary_fire():
 # --- fallback (no fire group configured) -----------------------------------
 
 def test_fallback_holds_primary_without_cycling():
-    cfg = HonkConfig(enabled=True, fire_group=-1, hold_seconds=6.0)
+    cfg = HonkConfig(enabled=True, fire_group=-1, hold_seconds=6.0, allow_unmapped_fire=True)
     # even with a known current group, an unconfigured target means "just hold primary fire"
     cap, ex = _cap(cfg=cfg, status={**_SAFE, "fire_group": 2})
     _jump(cap)
     assert ex.calls == [("hold", "Key_1", 6.0)]
 
 
+def test_unconfigured_is_inert_by_default():
+    # On by default but no scanner fire group mapped -> must NOT fire (no blind hold), even
+    # with the fire button bound and a safe status. allow_unmapped_fire defaults False.
+    cfg = HonkConfig(enabled=True, fire_group=-1)
+    cap, ex = _cap(cfg=cfg, status={**_SAFE, "fire_group": 2})
+    _jump(cap)
+    assert ex.calls == []
+
+
 def test_fallback_works_without_status_when_guard_off():
-    cfg = HonkConfig(enabled=True, fire_group=-1, combat_guard=False, hold_seconds=6.0)
+    cfg = HonkConfig(enabled=True, fire_group=-1, combat_guard=False, hold_seconds=6.0, allow_unmapped_fire=True)
     ex = _FakeExecutor()
     cap = HonkCapability(cfg, binds=_BINDS, executor=ex,
                          status_snapshot=None, spawn=lambda fn: fn())

@@ -1,8 +1,8 @@
 """Auto-honk — fire the Discovery Scanner on arrival in a new system (N5, DESIGN §6).
 
 The "honk" is a full-system Discovery Scan: hold the Discovery Scanner's fire button for a
-few seconds after jumping in. This capability automates it — OPT-IN, off by default, and
-gated by the same safety layer as the keybind prototype.
+few seconds after jumping in. This capability automates it — ON by default but SAFE: it
+stays inert until the scanner's fire group is mapped, gated by the keybind safety layer.
 
 It's an AMBIENT capability (like route callouts): it advertises no LLM tools, it just
 subscribes to the bus and reacts to the journal's `FSDJump` event (arrival in a new system
@@ -13,8 +13,9 @@ via hyperspace). On arrival, if enabled and safe, it drives the scanner determin
     `CycleFireGroupNext`/`CycleFireGroupPrevious` keybinds (deterministic — we know both
     indices, so we step exactly the right number of times, no guessing), HOLD the configured
     primary/secondary fire key for the honk duration, then cycle back to the original group.
-  * **Not configured** — the accepted "hope for the best" fallback: just hold the primary
-    fire key for the duration (works when the scanner is already the selected group).
+  * **Not configured** — SAFE DEFAULT: do nothing (we can't prove the current group is the
+    scanner and not weapons). Set `allow_unmapped_fire` to opt into the old "hope for the
+    best" fallback (hold primary fire, works when the scanner is already the selected group).
 
 Safety (reuses the keybind layer — DESIGN §6):
   * **Combat/interdiction guard** — refuses during danger/interdiction, and when ED status
@@ -50,13 +51,15 @@ class HonkConfig:
     `enabled`.
 
     `fire_group` is the Discovery Scanner's fire group index (0-based, as shown in the right
-    HUD panel). A negative value means "not configured" -> the fallback (hold primary fire
-    without cycling). `trigger` picks which fire button the scanner sits on."""
+    HUD panel). A negative value means "not configured": auto-honk then stays INERT (it won't
+    blind-fire) unless `allow_unmapped_fire` opts into the hold-primary-fire fallback.
+    `trigger` picks which fire button the scanner sits on."""
     enabled: bool = False
     fire_group: int = -1
     trigger: str = "primary"        # "primary" | "secondary"
     hold_seconds: float = 6.0
     combat_guard: bool = True
+    allow_unmapped_fire: bool = False   # opt back into the blind hold-primary-fire fallback
 
     @classmethod
     def from_cfg(cls, cfg: dict) -> "HonkConfig":
@@ -78,6 +81,7 @@ class HonkConfig:
             trigger=trigger,
             hold_seconds=hold_seconds,
             combat_guard=bool(h.get("combat_guard", True)),
+            allow_unmapped_fire=bool(h.get("allow_unmapped_fire", False)),
         )
 
     @property
@@ -177,14 +181,24 @@ class HonkCapability:
             self._logline(f"blocked: {guard}")
             return
 
-        # 2. The fire button must be bound to a key we can press.
+        # 2. Unconfigured (no scanner fire group set) can't prove the CURRENT group holds the
+        #    scanner and not weapons, so — by this capability's own safety rule — we don't fire.
+        #    Auto-honk ships ON but stays INERT until the scanner is mapped ([honk].fire_group);
+        #    it never blind-fires. Opt into the old fallback with [honk].allow_unmapped_fire.
+        if not self._cfg.configured and not self._cfg.allow_unmapped_fire:
+            self._logline("skipped: auto-honk is on but no Discovery Scanner fire group is set "
+                          "([honk].fire_group = -1) — set it (or enable "
+                          "[honk].allow_unmapped_fire) so we fire the scanner, not weapons.")
+            return
+
+        # 3. The fire button must be bound to a key we can press.
         fire_binding = self._binds.get(self._cfg.fire_action)
         if fire_binding is None or not fire_binding.usable:
             self._logline(f"skipped: {self._cfg.fire_action} has no keyboard binding — "
                           f"bind the Discovery Scanner's fire button to a key in-game.")
             return
 
-        # 3. If a scanner fire group is configured, cycle to it first (deterministic).
+        # 4. If a scanner fire group is configured, cycle to it first (deterministic).
         reverse: Optional[tuple[str, int]] = None
         if self._cfg.configured:
             plan = self._plan_cycle()
@@ -196,10 +210,10 @@ class HonkCapability:
                 for _ in range(count):
                     self._executor.press(forward)
 
-        # 4. Hold the fire button for the honk duration to complete the scan.
+        # 5. Hold the fire button for the honk duration to complete the scan.
         self._executor.hold(fire_binding, self._cfg.hold_seconds)
 
-        # 5. Cycle back to the original fire group so we leave the ship as we found it.
+        # 6. Cycle back to the original fire group so we leave the ship as we found it.
         if reverse is not None:
             back_token, back_count = reverse
             back = self._binds.get(back_token)

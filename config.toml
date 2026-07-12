@@ -465,14 +465,14 @@ allowlist = ["landing_gear"]
 # keystroke sequence. Requires [elite].enabled (for the arrival event, the current fire group,
 # and the combat guard).
 #
-# DEFAULT OFF — this presses a fire button, so opt in deliberately. The combat guard refuses
-# to honk during danger/interdiction (and when ED status is unavailable), and the shared hard
-# abort ("abort" — see [keybinds]) releases the held key.
+# DEFAULT ON, but SAFE: it presses a fire button, so it stays inert until you map the scanner
+# (set fire_group below). The combat guard refuses to honk during danger/interdiction (and when
+# ED status is unavailable), and the shared hard abort ("abort" — see [keybinds]) releases the key.
 enabled = true
 # The Discovery Scanner's fire group index (0-based, as numbered in the right HUD panel). When
 # set, COVAS reads your CURRENT fire group from Status.json, cycles to this one, honks, then
-# cycles back. Set to -1 if you don't want cycling: it then just holds primary fire (the
-# "hope for the best" fallback that works when the scanner is already your selected group).
+# cycles back. Left at -1 (unmapped), auto-honk does NOTHING — it won't blind-fire and risk
+# hitting weapons. Set this to your scanner's fire group to arm it (or see allow_unmapped_fire).
 fire_group = -1
 # Which fire button the Discovery Scanner is on: "primary" or "secondary".
 trigger = "primary"
@@ -481,6 +481,9 @@ hold_seconds = 6.0
 # Refuse to honk during danger/interdiction (and when ED status is unavailable — we won't act
 # unless we can prove it's safe). Leave ON.
 combat_guard = true
+# Opt back into the old blind fallback: when fire_group is -1, hold primary fire anyway (only
+# safe if the Discovery Scanner is already your selected fire group). OFF = inert until mapped.
+allow_unmapped_fire = false
 
 
 [nav]
