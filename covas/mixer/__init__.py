@@ -23,6 +23,7 @@ from .buses import (
     load_bus_configs,
     process,
 )
+from .cues import Cue, CueRegistry, cue_problems, validate_cue
 from .mixer import (
     BusMixer,
     bus_gains,
@@ -45,6 +46,10 @@ __all__ = [
     "comms_params",
     "load_bus_configs",
     "process",
+    "Cue",
+    "CueRegistry",
+    "cue_problems",
+    "validate_cue",
     "BusMixer",
     "bus_gains",
     "float_to_pcm16",
