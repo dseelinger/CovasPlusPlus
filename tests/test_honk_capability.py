@@ -37,7 +37,7 @@ _BINDS = {
     "CycleFireGroupNext": KeyBinding(action="CycleFireGroupNext", key="Key_N"),
     "CycleFireGroupPrevious": KeyBinding(action="CycleFireGroupPrevious", key="Key_B"),
 }
-_SAFE = {"in_danger": False, "being_interdicted": False, "fire_group": 0}
+_SAFE = {"in_danger": False, "being_interdicted": False, "supercruise": True, "fire_group": 0}
 
 
 def _cap(*, cfg=None, binds=None, status=_SAFE):
@@ -129,13 +129,24 @@ def test_unconfigured_is_inert_by_default():
     assert ex.calls == []
 
 
-def test_fallback_works_without_status_when_guard_off():
+def test_no_status_means_no_honk_even_with_guard_off():
+    # Without live ED status we can't confirm supercruise, so we don't fire — even with the
+    # combat guard off and the blind fallback opted in.
     cfg = HonkConfig(enabled=True, fire_group=-1, combat_guard=False, hold_seconds=6.0, allow_unmapped_fire=True)
     ex = _FakeExecutor()
     cap = HonkCapability(cfg, binds=_BINDS, executor=ex,
                          status_snapshot=None, spawn=lambda fn: fn())
     _jump(cap)
-    assert ex.calls == [("hold", "Key_1", 6.0)]
+    assert ex.calls == []
+
+
+def test_only_honks_in_supercruise():
+    # Configured + safe, but NOT in supercruise (dropped to normal space) -> no fire, so it
+    # can't send you into the Surface Scanner.
+    cfg = HonkConfig(enabled=True, fire_group=0)
+    cap, ex = _cap(cfg=cfg, status={**_SAFE, "supercruise": False})
+    _jump(cap)
+    assert ex.calls == []
 
 
 # --- combat / interdiction guard -------------------------------------------
@@ -163,7 +174,7 @@ def test_guard_suppresses_when_status_unknown():
 
 def test_guard_can_be_disabled_for_configured_honk_with_status():
     cfg = HonkConfig(enabled=True, fire_group=0, combat_guard=False)
-    cap, ex = _cap(cfg=cfg, status={"in_danger": True, "fire_group": 0})
+    cap, ex = _cap(cfg=cfg, status={"in_danger": True, "supercruise": True, "fire_group": 0})
     _jump(cap)
     assert ex.calls == [("hold", "Key_1", 6.0)]   # guard off -> honks despite danger
 

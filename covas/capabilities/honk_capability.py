@@ -18,8 +18,10 @@ via hyperspace). On arrival, if enabled and safe, it drives the scanner determin
     best" fallback (hold primary fire, works when the scanner is already the selected group).
 
 Safety (reuses the keybind layer — DESIGN §6):
+  * **Supercruise-only** — only honks in supercruise; in normal space it does nothing (holding
+    fire there can send you into the Surface Scanner instead of honking).
   * **Combat/interdiction guard** — refuses during danger/interdiction, and when ED status
-    is unavailable (can't prove it's safe). Strictly opt-in.
+    is unavailable (can't prove it's safe).
   * **Hard abort** — the shared `KeyExecutor.release_all()` (wired to `abort_keybinds`) lifts
     the held fire key, and the executor clamps hold duration so a key can't stick.
   * Every honk (and every skip, with its reason) is logged.
@@ -179,6 +181,18 @@ class HonkCapability:
         guard = self._guard()
         if guard is not None:
             self._logline(f"blocked: {guard}")
+            return
+
+        # 1b. Only honk in SUPERCRUISE. If you've dropped to normal space, holding fire can
+        #     trigger the wrong thing (e.g. sends you into the Surface Scanner). Needs live ED
+        #     status to confirm — present whenever the arrival event that triggers us fired.
+        snap = self._status() if self._status is not None else None
+        if not snap:
+            self._logline("skipped: ED status unavailable — can't confirm we're in supercruise.")
+            return
+        if not snap.get("supercruise"):
+            self._logline("skipped: not in supercruise — auto-honk only fires the Discovery "
+                          "Scanner in supercruise (so it can't trigger the Surface Scanner).")
             return
 
         # 2. Unconfigured (no scanner fire group set) can't prove the CURRENT group holds the
