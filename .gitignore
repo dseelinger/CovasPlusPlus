@@ -35,9 +35,10 @@ sounds/
 voicelines/
 # ambient music tracks (C7) — supply your own; rights uncertain
 music/
-# drop-in content (C11) — user assets + line pools; skeleton READMEs are generated at runtime
-audio/
-content/
+# drop-in content (C11) — user assets + line pools; skeleton READMEs are generated at runtime.
+# Anchored to the repo root (leading slash) so these don't also swallow docs/audio/ etc.
+/audio/
+/content/
 # Piper voice models (large binaries)
 *.onnx
 *.onnx.json
