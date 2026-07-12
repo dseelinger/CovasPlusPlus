@@ -35,6 +35,15 @@ from .comms import (
 )
 from .cues import Cue, CueRegistry, cue_problems, validate_cue
 from .driver import CueDriver
+from .variants import (
+    CommsVoicer,
+    VoicedComms,
+    build_variant_prompt,
+    clamp_tier,
+    comms_voice_id,
+    make_variant_generator,
+    validate_variant,
+)
 from .eligibility import STATES, EligibilityEngine, flag_states, fuel_states, journal_states
 from .governor import CueGovernor, GovernorConfig
 from .mixer import (
@@ -79,6 +88,13 @@ __all__ = [
     "evaluate",
     "is_receive_text",
     "message_template",
+    "CommsVoicer",
+    "VoicedComms",
+    "build_variant_prompt",
+    "clamp_tier",
+    "comms_voice_id",
+    "make_variant_generator",
+    "validate_variant",
     "BusMixer",
     "bus_gains",
     "float_to_pcm16",
