@@ -63,6 +63,19 @@ noise_level           = 0.02     # static bed amplitude (0 = no hiss)
 compress_threshold_db = -12.0    # peaks above this level get pushed back down
 compress_ratio        = 4.0      # how hard (higher = more level-flattening)
 
+[audio.cues]
+# Cue driver + governor (C3) — the anti-over-talking budget for the ambient audio layer (SFX,
+# space chatter, music, comms). On a game-state change the driver asks the cue registry which
+# cues are eligible and the governor picks ONE within these hard limits (deterministic rotation,
+# never random). Over-talking is the primary failure mode, so these are firm.
+#
+# DEFAULT OFF — the whole audio-cue layer is opt-in. Cue payloads (chatter/SFX/music) arrive in
+# later prompts (C5-C8); until then this drives nothing even when enabled.
+enabled          = false
+min_interval     = 8.0    # seconds between ANY two cues (a hard gap so nothing stacks up)
+max_per_minute   = 6      # global cap: at most this many cues in any rolling 60 seconds
+default_cooldown = 30.0   # a cue won't repeat within this many seconds unless it sets its own
+
 
 [whisper]
 # Local speech-to-text (faster-whisper). Bigger model = more accurate, slower.
