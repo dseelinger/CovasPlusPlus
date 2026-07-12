@@ -28,6 +28,40 @@ cancel       = ""
 input_device   = "Microphone (Logi 4K Stream Edition)"  # your chosen mic (matched by name)
 sample_rate    = 16000   # 16 kHz is what Whisper expects — leave as-is
 tts_output_device = ""   # blank = default speakers/headset
+# Output sample rate of the multi-bus audio mixer (C1). All bus sources (comms/SFX/music)
+# are resampled onto this rate before mixing. 16 kHz matches the ElevenLabs voice stream.
+mix_sample_rate = 16000
+
+
+[audio.buses]
+# Multi-bus mixer levels (C-series audio layer, DESIGN §7). Each named bus has an independent
+# volume trim (dB) and a mute switch. Tonal character is fixed by role — the Comms bus gets the
+# radio treatment (see [audio.comms]); COVAS is deliberately clean/full-volume so the ship's own
+# assistant is never filtered. Comms sits a few dB under COVAS so a radio line can't bury it.
+[audio.buses.covas]
+volume_db = 0.0     # the ship's assistant — clean, full volume, no processing
+enabled   = true
+[audio.buses.comms]
+volume_db = -3.0    # NPC/player comms, radio-treated, ducked under COVAS
+enabled   = true
+[audio.buses.ambient]
+volume_db = -6.0    # SFX layers
+enabled   = true
+[audio.buses.music]
+volume_db = -12.0   # ambient music, well back in the mix
+enabled   = true
+[audio.buses.alert]
+volume_db = 0.0     # warning stings
+enabled   = true
+
+[audio.comms]
+# Comms-bus "over the radio" treatment, applied at RUNTIME by DSP (not pre-edited files):
+# band-limit the voice, compress it, then lay in a light static bed.
+band_low_hz           = 300      # high-pass: drop everything below this (radio band floor)
+band_high_hz          = 3000     # low-pass: drop everything above this (radio band ceiling)
+noise_level           = 0.02     # static bed amplitude (0 = no hiss)
+compress_threshold_db = -12.0    # peaks above this level get pushed back down
+compress_ratio        = 4.0      # how hard (higher = more level-flattening)
 
 
 [whisper]

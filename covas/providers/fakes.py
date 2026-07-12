@@ -29,11 +29,15 @@ class FakeTTS:
 
     def __init__(self, cfg: dict | None = None) -> None:
         self.spoken: list[str] = []
+        # Records the voice each synth_pcm was asked to use (None = default) — for tests
+        # asserting a comms/alert line picked a non-COVAS voice.
+        self.voices_seen: list[str | None] = []
 
     def speak(self, text: str, cancel: threading.Event) -> None:
         self.spoken.append(text)
 
-    def synth_pcm(self, text: str) -> tuple[bytes, int]:
+    def synth_pcm(self, text: str, voice_id: str | None = None) -> tuple[bytes, int]:
+        self.voices_seen.append(voice_id)
         return b"", 16000
 
 

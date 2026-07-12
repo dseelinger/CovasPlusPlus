@@ -38,7 +38,8 @@ class PiperTTS:
         self.sample_rate = int(getattr(self.voice.config, "sample_rate", 22050))
         self._out_device = cfg.get("audio", {}).get("tts_output_device") or None
 
-    def synth_pcm(self, text: str) -> tuple[bytes, int]:
+    def synth_pcm(self, text: str, voice_id: str | None = None) -> tuple[bytes, int]:
+        # Piper loads a single voice model; `voice_id` (a cloud concept) is ignored here.
         buf = bytearray()
         for chunk in self.voice.synthesize(text):
             buf += chunk.audio_int16_bytes
