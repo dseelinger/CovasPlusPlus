@@ -36,6 +36,7 @@ VOICE_DEFAULT = "default"
 
 # ---- variant ceilings (how far C5 may rework a line) -----------------------------------------
 TIER_VERBATIM = "verbatim"     # exact words only (player DMs — never paraphrase a human)
+TIER_PARAPHRASE = "paraphrase"  # same meaning, reworded, fact-neutral (an intermediate tier)
 TIER_RIFF = "riff"             # up to a tonal riff allowed (NPC lines; C5's cue picks <= this)
 
 # Honorifics that reliably imply a gender, so an NPC voice is deterministic from the name when it
