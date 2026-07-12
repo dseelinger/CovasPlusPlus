@@ -20,6 +20,9 @@ Ground rules baked into every prompt (also in `CLAUDE.md`):
   Anything hitting a real service is `@pytest.mark.integration` + `local` (free) or `paid`
   (costs money), excluded from the default run. See `DESIGN_AND_ROADMAP.md` §9.
 - Byte-compile; call out what needs manual on-hardware testing.
+- **Docs + tests + help stay in sync (definition of done).** A feature isn't done until it's
+  reflected in the docs site (`docs/`), a `MANUAL_TESTS.md` check, and its in-app help metadata
+  (plus `DESIGN_AND_ROADMAP.md` if the architecture changed). Update them in the same change.
 - Small commits, one increment per branch. Implement, self-review the diff, tell me
   exactly what to test by hand, and wait for my confirmation before considering it done.
 
@@ -1395,6 +1398,59 @@ Acceptance: bare pytest green and offline; manual — drop a wav into audio/sfx/
 hear it on the ambient bus; add lines to content/chatter/station_traffic.txt and hear them; the
 content-status report reflects what's present. Stop for review.
 ```
+
+---
+
+## Documentation site (standalone)
+
+### DOCS — GitHub Pages documentation site
+
+```
+Read CLAUDE.md, DESIGN_AND_ROADMAP.md, the capability help metadata (covas/capabilities/* +
+help_capability.py), covas/settings_schema.py, config.toml, MANUAL_TESTS.md, and this prompt pack
+(the feature list). Standalone feature.
+
+Branch: feature/docs-site
+
+Goal: a thorough PUBLIC documentation site on GitHub Pages covering every feature, DERIVED from the
+real code / help registry / settings schema / design doc so it can't drift — not invented.
+
+Stack: MkDocs + Material for MkDocs (markdown-authored, Python — matches the project; nav + search).
+Docs in docs/; deploy via a GitHub Action to Pages on push to main.
+
+Tasks:
+1. Scaffold MkDocs Material: mkdocs.yml (site name, nav, Material theme, search), the docs/ tree;
+   add mkdocs + mkdocs-material to requirements-dev.txt (dev-only, NOT runtime).
+2. Author thorough docs, SOURCED from the code (pull from help metadata `one_liner`/`example`/slots,
+   settings_schema, config.toml comments, the design doc, MANUAL_TESTS — do not invent):
+   - Overview: what it is / what it does NOT do (self-contained; no competitor comparisons).
+   - Install & setup (clone, ANTHROPIC_API_KEY, ElevenLabs key, personality/campaign, config).
+   - Running (headless + web control panel).
+   - The voice loop (PTT, cancel, sound cues, cost tiering).
+   - A page per capability/feature — checklist, ED monitoring, proactive callouts, keybinds, the
+     searches (outfitting / ship / systems / stations / factions / signals / misc), help, settings,
+     personas & voice, location & carriers, route callouts, auto-honk, community goals,
+     copy-to-clipboard, ship loadout, and the audio/comms/chatter subsystem — each with what it
+     does, example voice commands (from the help `example`), and its settings.
+   - Configuration reference (from settings_schema + config.toml).
+   - Testing (the unit/integration split) + a Contributing page.
+   - Roadmap (summarize the design-doc backlog).
+   Prefer generating feature lists/examples FROM the help registry + settings schema so the site
+   tracks what the app actually does.
+3. Deploy: .github/workflows/docs.yml — build MkDocs and publish to Pages on push to main. Note in
+   the PR that I must flip Settings -> Pages -> Source: GitHub Actions once.
+4. Add a docs link/badge to README.md. No personal data anywhere (public site).
+
+Checks: `mkdocs build --strict` clean (no broken nav/links) in CI; a link check. No app runtime.
+
+Acceptance: `mkdocs build --strict` passes; the Action publishes on push; every current feature has
+a page tied to something real in the code. Tell me the one-time Pages setting to flip. Stop.
+```
+
+**Ongoing rule (applies to ALL future prompts, not just this one):** a feature isn't done until its
+**documentation** (docs/ site), **manual test** (`MANUAL_TESTS.md`), and **in-app help** metadata
+all reflect it — plus `DESIGN_AND_ROADMAP.md` if the architecture changed. Keep the four in sync;
+don't let docs drift.
 
 ---
 

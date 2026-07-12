@@ -57,6 +57,10 @@ on-hardware testing.
 - **Fail soft.** The voice loop must survive any provider/tool error and return to Idle;
   a dead TTS degrades to text, it doesn't crash the session. Keep the broad `except`
   guards that exist for this reason.
+- **Docs + tests + help stay in sync (definition of done).** A feature isn't done until it's
+  reflected in all of: the documentation site (`docs/`), a manual check in `MANUAL_TESTS.md`,
+  the capability's in-app help metadata, and `DESIGN_AND_ROADMAP.md` if the architecture
+  changed. Update them in the same change — don't let the four drift apart.
 - **Style:** type hints, module docstrings, comments explain *why* not *what*, match the
   existing terse-but-commented voice. Keep diffs small and reviewable.
 
