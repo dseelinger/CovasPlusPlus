@@ -27,7 +27,9 @@ from .eligibility import DEEP_SPACE, HYPERSPACE, UNPOPULATED
 from .governor import CueGovernor
 
 _INTERDICTION_EVENTS = {"Interdiction", "UnderAttack"}
-DEFAULT_STING = "sounds/interdiction_sting.wav"   # alert-bus sting (git-ignored asset)
+# Fallback single sting path. The drop-in pipeline (C11) supplies the real sample set from
+# audio/sfx/interdiction_sting/; this is only used when that folder is empty and no config sting.
+DEFAULT_STING = "audio/sfx/interdiction_sting/interdiction_sting.wav"
 
 # Curated pools — deterministic rotation, no LLM. The threat line is the assistant (clean COVAS
 # voice); the pirate line is voiced on the radio-treated comms bus.
@@ -66,6 +68,7 @@ class InterdictionCue:
         governor: Optional[CueGovernor] = None,
         enabled: bool = True,
         sting: str = DEFAULT_STING,
+        sting_samples: tuple[str, ...] = (),
         threat_lines: tuple[str, ...] = DEFAULT_THREAT_LINES,
         pirate_lines: tuple[str, ...] = DEFAULT_PIRATE_LINES,
         pirate_voice: str = "male",
@@ -77,6 +80,9 @@ class InterdictionCue:
         self._governor = governor
         self._enabled = enabled
         self._sting = str(sting or "").strip() or DEFAULT_STING
+        # Drop-in sting sample set (C11): when present, rotate over it; else the single `sting`.
+        self._sting_samples = tuple(sting_samples)
+        self._rot_sting = 0
         self._threat = tuple(threat_lines)
         self._pirate = tuple(pirate_lines)
         self._pirate_voice = pirate_voice
@@ -107,7 +113,9 @@ class InterdictionCue:
     def layers(self) -> list[Layer]:
         """The three layers in play order — sting (alert), threat (COVAS), pirate (comms) — using
         the current rotation positions. Pure; does not advance the rotation."""
-        out: list[Layer] = [Layer(ALERT, "sfx", self._sting)]
+        sting = (self._sting_samples[self._rot_sting % len(self._sting_samples)]
+                 if self._sting_samples else self._sting)
+        out: list[Layer] = [Layer(ALERT, "sfx", sting)]
         if self._threat:
             out.append(Layer(COVAS, "line", self._threat[self._rot_threat % len(self._threat)]))
         if self._pirate:
@@ -132,6 +140,7 @@ class InterdictionCue:
             emitted = [layer for layer in self.layers() if bool(self._emit(layer))]
             self._rot_threat += 1
             self._rot_pirate += 1
+            self._rot_sting += 1
             if self._governor is not None:
                 self._governor.mark_fired(gcue, now)
             if self._log is not None:

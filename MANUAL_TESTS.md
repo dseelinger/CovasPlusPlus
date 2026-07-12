@@ -365,6 +365,16 @@ on in config (or the Settings page) before testing.
 - [ ] A **male-honorific** NPC ("Mr", "Sir") gets a male cast voice; a **player DM** uses the fixed
   player voice. A voice you can't use (an ElevenLabs ™/famous voice) is never selected.
 
+### 18.6 Drop-in content (C11)
+- [ ] On first run with the layer enabled, confirm the skeleton appears: **`audio/sfx/<cue>/`**,
+  **`audio/music/<context>/`**, **`content/chatter/*.txt`**, **`content/interdiction_threat.txt`**,
+  each with a README explaining the drop rule. The startup log shows a **content-status** line
+  (how many files/lines per cue; what's still silent).
+- [ ] 🔊 Drop a `.wav` into **`audio/sfx/thargoid_voices/`**, restart, jump to hyperspace → hear it
+  on the ambient bus. Add lines to **`content/chatter/station_traffic.txt`** (one per line, `#` =
+  comment), restart, dock → hear your lines (they override the built-in pool). Delete the file →
+  falls back to the built-in pool. A missing/empty folder is simply silent (no error).
+
 Notes:
 
 ---

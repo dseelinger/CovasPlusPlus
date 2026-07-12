@@ -19,7 +19,8 @@ def _cfg(tmp_path, *, audio_enabled: bool) -> dict:
         "checklist": {"file": str(checklist)},
         "conversation": {"max_turns": 20},
         "logging": {"dir": str(tmp_path / "logs")},
-        "audio": {"sample_rate": 16000, "input_device": "", "enabled": audio_enabled},
+        "audio": {"sample_rate": 16000, "input_device": "", "enabled": audio_enabled,
+                  "content_root": str(tmp_path)},   # C11: keep the skeleton out of the repo
         "sound_cues": {},
         "keys": {"push_to_talk": "right ctrl"},
     }

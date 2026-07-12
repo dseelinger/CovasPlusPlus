@@ -216,12 +216,22 @@ class App:
         the ambient layer off; COVAS speech still routes through the mixer. Needs the event pump
         so comms/chatter/interdiction/music react to journal events."""
         try:
-            from .mixer import AudioControlsCapability, AudioLayer
+            from .config import ROOT
+            from .mixer import AudioControlsCapability, AudioLayer, ensure_skeleton, load_content
+            # Drop-in content (C11): ensure the folder skeleton (idempotent) then scan it, so a
+            # dropped-in file joins the cues with no code/config edits. Fail-soft. The root is the
+            # project dir; [audio].content_root overrides it (a seam so tests don't touch the repo).
+            content_root = self.cfg.get("audio", {}).get("content_root") or ROOT
+            try:
+                ensure_skeleton(content_root)
+            except Exception:  # noqa: BLE001 — skeleton creation must never block startup
+                pass
+            content = load_content(content_root)
             cheap = Router.from_cfg(self.cfg).cheap_route(None).model
             self.audio = AudioLayer(
                 self.cfg, self.mixer, self.tts,
                 ed_ctx=self.ed_ctx, llm=self.llm, cheap_model=cheap,
-                cast_synth=self._build_cast_synth(),
+                cast_synth=self._build_cast_synth(), content=content,
                 log=lambda m: self._log("audio", m))
             self.registry.register(
                 AudioControlsCapability(self.audio, log=lambda m: self._log("audio", m)))
