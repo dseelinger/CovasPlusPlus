@@ -66,6 +66,7 @@ from .music import (
     register_music,
 )
 from .runtime import AudioControlsCapability, AudioLayer
+from .voices import CastSynth, Voice, VoiceCast, build_cast
 from .variants import (
     CommsVoicer,
     VoicedComms,
@@ -154,6 +155,10 @@ __all__ = [
     "sfx_cues",
     "AudioControlsCapability",
     "AudioLayer",
+    "CastSynth",
+    "Voice",
+    "VoiceCast",
+    "build_cast",
     "BusMixer",
     "SpeechStream",
     "to_float_mono",

@@ -356,6 +356,15 @@ on in config (or the Settings page) before testing.
 - [ ] 🌐 On the **Settings** page, change a bus **volume** or toggle **comms/chatter/music** →
   applies live (no restart). The **master** `audio.enabled` and comms **voice pickers** persist.
 
+### 18.5 Voice cast (C10)
+- [ ] 🔊 Configure a Piper cast pool: `[audio.voices].cast_provider = "piper"` and add a few
+  `[[audio.voices.pool]]` entries (each `provider`/`ref`/`gender`; `ref` = a local `.onnx` path).
+  Then receive comms from **two different NPCs/stations** → they sound **different**, and the SAME
+  speaker sounds the **same** across the session. Confirm **COVAS still uses your ElevenLabs voice**
+  (persona) while the cast runs on Piper (no ElevenLabs credits burned for NPC lines).
+- [ ] A **male-honorific** NPC ("Mr", "Sir") gets a male cast voice; a **player DM** uses the fixed
+  player voice. A voice you can't use (an ElevenLabs ™/famous voice) is never selected.
+
 Notes:
 
 ---
