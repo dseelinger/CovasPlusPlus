@@ -321,32 +321,40 @@ Notes:
 
 Notes:
 
-## 18. Audio / Comms / Chatter subsystem (C1–C8)  🔊 HW
-The atmospheric audio layer is built and unit-tested but **not yet wired into the live voice
-loop** (each prompt stopped at its integration seam). So there are no in-game steps yet — the
-only manual checks are three standalone demo scripts that drive the real mixer + DSP + TTS on
-your audio device. Run each with the main app NOT running.
+## 18. Audio / Comms / Chatter subsystem (C1–C9)  🎮 ED 🔊 HW
+The atmospheric audio layer is now **wired into the live app** (C9). It's OFF by default: turn it
+on in config (or the Settings page) before testing.
 
-### 18.1 Audio bus mixer + comms radio treatment (C1)
-- [ ] 🔊 `.venv\Scripts\python.exe scripts\demo_comms_bus.py` → hear a tone CLEAN (COVAS bus), then
-  the same tone RADIO-FILTERED (Comms bus: band-limited + compressed + light static bed).
-- [ ] Launch the normal app and confirm a spoken reply sounds **unchanged** (the mixer is additive;
-  COVAS's own path is untouched).
+### 18.0 Enable it
+- [ ] 🌐 Set `[audio].enabled = true` (master — reopens the audio device through the bus mixer),
+  then enable the parts you want: `[audio.cues].enabled` (chatter/SFX), `[audio.comms].enabled`
+  (on by default), `[music].enabled` (needs track files), `[audio.interdiction].enabled`. Requires
+  `[elite].enabled` so game events drive it. Restart after flipping the master switch.
+- [ ] 🔊 With the layer ON, confirm a normal spoken reply still sounds right — COVAS now streams
+  through the mixer's **clean COVAS bus** (no change in character), and a **tap-`[` barge-in still
+  cuts speech instantly**.
 
-### 18.2 Comms variants — validator + verbatim fallback (C5)
-- [ ] 🔊 `.venv\Scripts\python.exe scripts\demo_comms_variants.py` → three lines on the comms bus:
-  a clean NPC line → a **safe riff**; a tampered variant → **falls back to verbatim**; a player DM →
-  **verbatim, male voice**. The printed `tier=` line confirms which fired.
+### 18.1 Bus mixer + comms radio treatment (device-level demos, app NOT running)
+- [ ] 🔊 `.venv\Scripts\python.exe scripts\demo_comms_bus.py` → a tone CLEAN (COVAS bus) then
+  RADIO-FILTERED (Comms bus). `demo_comms_variants.py` → NPC riff / tampered→verbatim / player DM.
+  `demo_interdiction.py` → the three interdiction layers.
 
-### 18.3 Layered pirate interdiction (C8)
-- [ ] 🔊 `.venv\Scripts\python.exe scripts\demo_interdiction.py` → one Interdiction fires **three
-  layers in order**: a warning sting (alert bus — needs a sample at `[audio.interdiction].sting`,
-  else that layer is skipped with a note), the assistant's threat line (COVAS bus, clean), and the
-  pirate's line (comms bus, radio-treated).
+### 18.2 Comms voices in-game (C4/C5)
+- [ ] 🎮 Receive an **NPC/station** comms-panel line (e.g. request docking) → it's read on the
+  radio-treated comms bus. A **direct player DM** is read **verbatim** (fixed male voice). Confirm
+  the Open-play **local/wing chatter is NOT voiced** (the fail-closed gate). Repeated station spam
+  isn't re-read every jump (template dedup).
 
-The rest of the subsystem — C2 cue registry, C3 driver/governor, C4 channel gate, C6 chatter, C7
-music — is pure logic fully covered by `pytest`; there's nothing to hand-test until the layer is
-wired into the app and gains voice controls (mute/volume) and settings.
+### 18.3 Space chatter + SFX + interdiction (C6/C8)
+- [ ] 🎮 With `[audio.cues].enabled`, fly/dock around → occasional ambient **chatter** (rate-limited,
+  never over-talking). 🎮 Trigger an **interdiction** → the layered sting + threat line + pirate line.
+
+### 18.4 Voice controls + live settings (C9)
+- [ ] 🔊 By voice: *"mute the chatter"*, *"quiet the comms"*, *"turn the music down"*, *"turn the
+  music up"*, *"stop the music"*, *"silence all the background audio"*, *"turn the ambient audio
+  back on"* → each takes effect; your own replies are unaffected.
+- [ ] 🌐 On the **Settings** page, change a bus **volume** or toggle **comms/chatter/music** →
+  applies live (no restart). The **master** `audio.enabled` and comms **voice pickers** persist.
 
 Notes:
 

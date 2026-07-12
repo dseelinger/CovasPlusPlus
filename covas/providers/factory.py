@@ -29,15 +29,18 @@ def make_llm(cfg: dict) -> LLMProvider:
     raise ValueError(f"Unknown [llm].provider: {name!r} (use 'anthropic' or 'ollama')")
 
 
-def make_tts(cfg: dict) -> TTSProvider:
+def make_tts(cfg: dict, *, mixer=None) -> TTSProvider:  # noqa: ANN001
+    """Build the configured TTS provider. When `mixer` is given (C9: the audio layer is on),
+    the real providers stream COVAS speech through the shared BusMixer instead of opening their
+    own device stream; the mock ignores it."""
     if mock_enabled(cfg):
         from .fakes import FakeTTS
         return FakeTTS(cfg)
     name = str(cfg.get("tts", {}).get("provider", "elevenlabs")).lower()
     if name == "piper":
         from .piper_tts import PiperTTS
-        return PiperTTS(cfg)
+        return PiperTTS(cfg, mixer=mixer)
     if name == "elevenlabs":
         from .elevenlabs_tts import ElevenLabsTTS
-        return ElevenLabsTTS(cfg)
+        return ElevenLabsTTS(cfg, mixer=mixer)
     raise ValueError(f"Unknown [tts].provider: {name!r} (use 'elevenlabs' or 'piper')")

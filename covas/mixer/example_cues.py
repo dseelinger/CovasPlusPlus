@@ -64,6 +64,7 @@ class InterdictionCue:
         emit: Callable[[Layer], bool],
         *,
         governor: Optional[CueGovernor] = None,
+        enabled: bool = True,
         sting: str = DEFAULT_STING,
         threat_lines: tuple[str, ...] = DEFAULT_THREAT_LINES,
         pirate_lines: tuple[str, ...] = DEFAULT_PIRATE_LINES,
@@ -74,6 +75,7 @@ class InterdictionCue:
     ) -> None:
         self._emit = emit
         self._governor = governor
+        self._enabled = enabled
         self._sting = str(sting or "").strip() or DEFAULT_STING
         self._threat = tuple(threat_lines)
         self._pirate = tuple(pirate_lines)
@@ -89,7 +91,15 @@ class InterdictionCue:
                  governor: Optional[CueGovernor] = None,
                  clock: Callable[[], float] = time.monotonic) -> "InterdictionCue":
         i = (cfg.get("audio", {}) or {}).get("interdiction", {}) or {}
-        return cls(emit, governor=governor, sting=str(i.get("sting", "")), clock=clock)
+        return cls(emit, governor=governor, enabled=bool(i.get("enabled", False)),
+                   sting=str(i.get("sting", "")), clock=clock)
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+
+    def set_enabled(self, on: bool) -> None:
+        self._enabled = bool(on)
 
     def _governor_cue(self) -> Cue:
         return Cue("interdiction", ALERT, frozenset(), cooldown_s=self._cooldown_s)
@@ -111,6 +121,8 @@ class InterdictionCue:
         layers in order and advance the pools. Returns the layers actually emitted. Never raises
         (shares the event pump)."""
         try:
+            if not self._enabled:
+                return []
             if not isinstance(event, dict) or event.get("event") not in _INTERDICTION_EVENTS:
                 return []
             now = self._clock()

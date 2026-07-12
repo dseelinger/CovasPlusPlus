@@ -78,11 +78,19 @@ def test_interdiction_sting_falls_back_to_builtin_when_blank():
     assert emit.layers[0].payload == DEFAULT_STING
 
 
-def test_interdiction_from_cfg_reads_sting():
+def test_interdiction_from_cfg_reads_sting_and_enabled():
     emit = _Emit()
-    cfg = {"audio": {"interdiction": {"sting": "sounds/my_sting.wav"}}}
+    cfg = {"audio": {"interdiction": {"enabled": True, "sting": "sounds/my_sting.wav"}}}
     InterdictionCue.from_cfg(cfg, emit).on_event({"event": "Interdiction"})
     assert emit.layers[0].payload == "sounds/my_sting.wav"
+
+
+def test_interdiction_from_cfg_disabled_by_default():
+    emit = _Emit()
+    # No enabled key -> the cue is off (the C9 dead-flag fix), so nothing fires.
+    InterdictionCue.from_cfg({"audio": {"interdiction": {"sting": "s.wav"}}}, emit).on_event(
+        {"event": "Interdiction"})
+    assert emit.layers == []
 
 
 # ---- ambient SFX cues ----------------------------------------------------------------------
