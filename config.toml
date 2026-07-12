@@ -31,6 +31,12 @@ tts_output_device = ""   # blank = default speakers/headset
 # Output sample rate of the multi-bus audio mixer (C1). All bus sources (comms/SFX/music)
 # are resampled onto this rate before mixing. 16 kHz matches the ElevenLabs voice stream.
 mix_sample_rate = 16000
+# MASTER SWITCH for the whole atmospheric audio layer (C1-C9). DEFAULT OFF. When OFF, playback
+# uses the original direct path (COVAS speech opens its own device stream) — unchanged. When ON,
+# a single BusMixer owns the device and ALL playback routes through it (COVAS on the clean bus;
+# comms/chatter/SFX/music on their buses), and the ambient layer becomes available (each part
+# still has its own enable below). Turn this on first, then enable the parts you want.
+enabled = false
 
 
 [audio.buses]
@@ -55,6 +61,12 @@ volume_db = 0.0     # warning stings
 enabled   = true
 
 [audio.comms]
+# Voice ED ReceiveText comms (NPC/station lines + direct player DMs) on the radio-treated comms
+# bus (C4/C5). Requires [audio].enabled + [elite].enabled (events come from the journal).
+enabled = true
+# Let the LLM reword NPC comms lines (paraphrase/riff, validated, verbatim fallback — C5). OFF by
+# default: it costs a cheap-tier call per NPC line. When off, NPC lines are read verbatim (safe).
+variants = false
 # Comms-bus "over the radio" treatment, applied at RUNTIME by DSP (not pre-edited files):
 # band-limit the voice, compress it, then lay in a light static bed.
 band_low_hz           = 300      # high-pass: drop everything below this (radio band floor)
@@ -121,6 +133,9 @@ enabled          = false
 min_interval     = 8.0    # seconds between ANY two cues (a hard gap so nothing stacks up)
 max_per_minute   = 6      # global cap: at most this many cues in any rolling 60 seconds
 default_cooldown = 30.0   # a cue won't repeat within this many seconds unless it sets its own
+# Let the LLM generate flavor chatter musings (fact_bearing=false lines only, validated to assert
+# nothing checkable — C6). OFF by default (cost); when off, chatter is curated pool lines only.
+flavor           = false
 
 
 [whisper]

@@ -24,8 +24,9 @@ def _stub_provider(monkeypatch, module_name: str, class_name: str):
     mod = types.ModuleType(f"covas.providers.{module_name}")
 
     class _Stub:
-        def __init__(self, cfg):
+        def __init__(self, cfg, **kwargs):   # accepts mixer=... like the real providers (C9)
             self.cfg = cfg
+            self.kwargs = kwargs
 
     _Stub.__name__ = class_name
     setattr(mod, class_name, _Stub)

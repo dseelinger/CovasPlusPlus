@@ -51,7 +51,12 @@ def synth_pcm(cfg: dict, text: str, voice_id: str | None = None) -> bytes:
     return r.content
 
 
-def speak(cfg: dict, text: str, cancel: threading.Event) -> None:
+def speak(cfg: dict, text: str, cancel: threading.Event, *, open_sink=None) -> None:  # noqa: ANN001
+    """Stream ElevenLabs TTS to playback. By default (open_sink=None) it opens its OWN
+    low-latency device stream — the original behaviour. When `open_sink(sr) -> SpeechStream`
+    is supplied (C9: the audio layer is enabled), it feeds the same chunks into the shared
+    BusMixer instead, so the mixer is the single owner of the device. Barge-in via `cancel` is
+    preserved on both paths (abort / stream.cancel drops buffered audio immediately)."""
     text = text.strip()
     if not text:
         return
@@ -68,6 +73,9 @@ def speak(cfg: dict, text: str, cancel: threading.Event) -> None:
     with requests.post(url, json=body, headers=headers, stream=True, timeout=30) as r:
         if r.status_code != 200:
             raise RuntimeError(f"ElevenLabs TTS {r.status_code}: {r.text[:200]}")
+        if open_sink is not None:
+            _stream_to_sink(r, cancel, open_sink(sr))
+            return
         stream = sd.RawOutputStream(samplerate=sr, channels=1, dtype="int16")
         stream.start()
         leftover = b""
@@ -93,3 +101,36 @@ def speak(cfg: dict, text: str, cancel: threading.Event) -> None:
             else:
                 stream.stop()
             stream.close()
+
+
+def _stream_to_sink(r, cancel: threading.Event, sink) -> None:  # noqa: ANN001
+    """Feed the streamed 16-bit PCM into a mixer SpeechStream, preserving whole samples and
+    barge-in. After feeding, block until the mixer drains it — so the caller still returns only
+    once playback is done — but bail out promptly (cancelling the stream) if the Commander barges
+    in during that drain."""
+    leftover = b""
+    cancelled = False
+    try:
+        for chunk in r.iter_content(chunk_size=2048):
+            if cancel.is_set():
+                cancelled = True
+                break
+            if not chunk:
+                continue
+            data = leftover + chunk
+            if len(data) % 2:
+                leftover = data[-1:]
+                data = data[:-1]
+            else:
+                leftover = b""
+            if data:
+                sink.feed(data)
+    finally:
+        if cancelled:
+            sink.cancel()
+        else:
+            sink.finish()
+            while not sink.wait(0.1):        # drain, but stay responsive to a barge-in
+                if cancel.is_set():
+                    sink.cancel()
+                    break

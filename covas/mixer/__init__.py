@@ -65,6 +65,7 @@ from .music import (
     music_cues,
     register_music,
 )
+from .runtime import AudioControlsCapability, AudioLayer
 from .variants import (
     CommsVoicer,
     VoicedComms,
@@ -78,12 +79,14 @@ from .eligibility import STATES, EligibilityEngine, flag_states, fuel_states, jo
 from .governor import CueGovernor, GovernorConfig
 from .mixer import (
     BusMixer,
+    SpeechStream,
     bus_gains,
     float_to_pcm16,
     mix_buffers,
     pcm16_to_float,
     resample,
     speak_on_bus,
+    to_float_mono,
 )
 
 __all__ = [
@@ -149,7 +152,11 @@ __all__ = [
     "SfxPlayer",
     "register_sfx",
     "sfx_cues",
+    "AudioControlsCapability",
+    "AudioLayer",
     "BusMixer",
+    "SpeechStream",
+    "to_float_mono",
     "bus_gains",
     "float_to_pcm16",
     "mix_buffers",

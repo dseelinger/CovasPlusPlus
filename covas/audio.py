@@ -2,6 +2,7 @@
 from __future__ import annotations
 import random
 import threading
+import time
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
@@ -9,10 +10,17 @@ import soundfile as sf
 
 class CuePlayer:
     """Preloads cue files into memory for zero-latency playback. Each cue can be a
-    single file or a list of files — play() picks one at random for variety."""
+    single file or a list of files — play() picks one at random for variety.
 
-    def __init__(self, cfg: dict) -> None:
+    By default it opens its own sounddevice playback. When a shared BusMixer is supplied
+    (C9), cues route through it on the ALERT bus so the mixer is the single device owner and
+    a cue can't fight the voice stream over the device."""
+
+    def __init__(self, cfg: dict, *, mixer=None, bus: str = "alert") -> None:  # noqa: ANN001
         self.cues: dict[str, list[tuple[np.ndarray, int]]] = {}
+        self._mixer = mixer
+        self._bus = bus
+        self._mix_sr = int((cfg.get("audio", {}) or {}).get("mix_sample_rate", 16000))
         sc = cfg.get("sound_cues", {})
         for name in ("listening", "processing", "done", "failed"):
             entry = sc.get(name)
@@ -31,12 +39,25 @@ class CuePlayer:
         if not group:
             return
         data, sr = random.choice(group)
+        if self._mixer is not None:
+            from .mixer import to_float_mono
+            buf = to_float_mono(data)
+            self._mixer.submit(self._bus, buf, sr)
+            if wait:
+                # No device to block on; sleep the cue's (resampled) duration so the "done"
+                # cue still finishes before speech starts.
+                dur = buf.shape[0] / float(sr) if sr else 0.0
+                if dur > 0:
+                    time.sleep(min(dur, 3.0))
+            return
         sd.play(data, sr)
         if wait:
             sd.wait()
 
-    @staticmethod
-    def stop() -> None:
+    def stop(self) -> None:
+        if self._mixer is not None:
+            self._mixer.clear_bus(self._bus)
+            return
         sd.stop()
 
 

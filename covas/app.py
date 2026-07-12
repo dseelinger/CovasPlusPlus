@@ -76,14 +76,27 @@ class App:
         self.overrides = load_overrides()
         self.mock = mock_enabled(self.cfg)
         self.bus = bus or EventBus()
-        self.cues = CuePlayer(self.cfg)
+        # C9 audio layer: when [audio].enabled, ONE BusMixer owns the device and ALL playback
+        # (COVAS speech, cues, comms, chatter, SFX, music) routes through it. Off by default ->
+        # the legacy direct playback path, byte-for-byte unchanged. Built device-free here; the
+        # device is opened in start(). Never built under mock (fakes make no sound).
+        self.mixer = None
+        self.audio = None
+        if self.cfg.get("audio", {}).get("enabled") and not self.mock:
+            try:
+                from .mixer import BusMixer
+                self.mixer = BusMixer(self.cfg)
+            except Exception as e:  # noqa: BLE001 — a mixer failure falls back to legacy playback
+                self.mixer = None
+                print(f"Audio mixer init failed ({e}); using direct playback.", flush=True)
+        self.cues = CuePlayer(self.cfg, mixer=self.mixer)
         self.recorder = Recorder(self.cfg)
         if self.mock:
             print("Dev mock ON — LLM/TTS/STT are fakes; zero API calls, zero cost.", flush=True)
         elif stt is None:
             print("Loading Whisper model (first run may download it)...", flush=True)
         self.stt = stt or make_stt(self.cfg)
-        self.tts = tts or make_tts(self.cfg)
+        self.tts = tts or make_tts(self.cfg, mixer=self.mixer)
         self.llm = llm or make_llm(self.cfg)
 
         # Capabilities register the tools they expose to the LLM. The checklist is
@@ -192,6 +205,37 @@ class App:
             self._start_system_search()
         if self.cfg.get("search", {}).get("enabled"):
             self._start_searches()
+        # C9: compose the audio layer once the mixer, providers, and ED context all exist.
+        if self.mixer is not None:
+            self._start_audio_layer()
+
+    # ---- Audio layer (C1-C8 composition, C9) ------------------------------
+    def _start_audio_layer(self) -> None:
+        """Build the AudioLayer over the shared mixer and register the voice-control capability
+        (which also forwards bus events to the layer). Fail soft — a startup problem just leaves
+        the ambient layer off; COVAS speech still routes through the mixer. Needs the event pump
+        so comms/chatter/interdiction/music react to journal events."""
+        try:
+            from .mixer import AudioControlsCapability, AudioLayer
+            cheap = Router.from_cfg(self.cfg).cheap_route(None).model
+            self.audio = AudioLayer(
+                self.cfg, self.mixer, self.tts,
+                ed_ctx=self.ed_ctx, llm=self.llm, cheap_model=cheap,
+                log=lambda m: self._log("audio", m))
+            self.registry.register(
+                AudioControlsCapability(self.audio, log=lambda m: self._log("audio", m)))
+            self._start_event_pump()
+            if self.ed_ctx is None:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    "Audio layer ON (bus mixer), but ED monitoring is OFF — no game events to "
+                    "drive comms/chatter/music."})
+            else:
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": "Audio layer ON (bus mixer)."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.audio = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Audio layer failed to start: {e}"})
 
     # ---- Elite Dangerous monitoring (DESIGN §5) ---------------------------
     def _start_ed_monitoring(self) -> None:
@@ -885,6 +929,12 @@ class App:
         """Shared tail for update/reset: broadcast the new settings and reload
         Whisper in the background if its model/device/compute changed."""
         self.bus.publish({"type": "settings", "settings": self.public_settings()})
+        # Audio settings (bus volumes, enable toggles, comms treatment) apply live.
+        if self.audio is not None:
+            try:
+                self.audio.apply_settings()
+            except Exception as e:  # noqa: BLE001 — a settings glitch must not crash the loop
+                self._log("system", f"audio settings apply failed: {e}")
         w = self.cfg["whisper"]
         if (w["model"], w["device"], w["compute_type"]) != (
             old_whisper["model"], old_whisper["device"], old_whisper["compute_type"]
@@ -1149,6 +1199,28 @@ class App:
 
         keyboard.hook(on_key)
         keyboard.add_hotkey("ctrl+alt+q", self.request_quit)
+        # Open the shared audio device (the ONLY thing that opens it, when the layer is on). If
+        # the device won't open, fall BACK to the legacy direct path — otherwise COVAS speech
+        # would stream into a mixer that never drains and block. Rebuild tts/cues off the mixer.
+        if self.mixer is not None:
+            try:
+                self.mixer.start()
+            except Exception as e:  # noqa: BLE001 — degrade to direct playback, never block startup
+                self._log("system",
+                          f"audio mixer failed to open the device: {e}; using direct playback.")
+                try:
+                    if self.audio is not None:
+                        self.audio.set_muted(True)
+                except Exception:  # noqa: BLE001
+                    pass
+                self.mixer = None
+                self.audio = None
+                self.cues = CuePlayer(self.cfg)
+                if not self.mock:
+                    try:
+                        self.tts = make_tts(self.cfg)
+                    except Exception:  # noqa: BLE001 — keep whatever tts we had
+                        pass
         self.set_state("Idle")
 
     def wait_for_quit(self) -> None:
@@ -1165,6 +1237,11 @@ class App:
         """Stop the watchers/pump and close the log. Safe to call once on the way out."""
         self._stop_event_pump()
         self._stop_ed_monitoring()
+        if self.mixer is not None:
+            try:
+                self.mixer.stop()
+            except Exception:  # noqa: BLE001 — never let cleanup raise on exit
+                pass
         try:
             self._logf.close()
         except Exception:  # noqa: BLE001 — never let cleanup raise on exit
