@@ -4,3 +4,9 @@
 -r requirements.txt        # dev env is a superset of the runtime env
 pytest>=7.4                # unit tests for the pure logic (tests/)
 ruff>=0.4                  # linter (config in pyproject.toml)
+
+# Documentation site (docs/ -> GitHub Pages). Dev-only: NOT needed to run the app.
+# Build locally with:  .venv\Scripts\python.exe -m mkdocs serve   (live preview at :8000)
+# or:                  .venv\Scripts\python.exe -m mkdocs build --strict
+mkdocs>=1.6                # static docs-site generator (config in mkdocs.yml)
+mkdocs-material>=9.5       # Material theme (nav + search)

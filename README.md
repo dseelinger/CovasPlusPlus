@@ -1,5 +1,10 @@
 # COVAS++
 
+[![Docs](https://img.shields.io/badge/docs-COVAS%2B%2B-deeporange)](https://dseelinger.github.io/CovasPlusPlus/)
+
+📖 **[Full documentation site →](https://dseelinger.github.io/CovasPlusPlus/)** — install, setup, and a
+page per feature with example voice commands.
+
 A local **voice AI companion** for [Elite Dangerous](https://www.elitedangerous.com/), for Windows.
 Hold a key, talk, and get a spoken reply in character. It converses, watches your game
 state, tracks a checklist, runs galaxy-wide searches by voice, presses the odd ship

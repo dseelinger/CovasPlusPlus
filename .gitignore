@@ -54,6 +54,9 @@ __pycache__/
 build/
 dist/
 
+# --- Docs site (MkDocs build output; source lives in docs/) ---
+site/
+
 # --- OS / editor ---
 .DS_Store
 Thumbs.db
