@@ -33,6 +33,8 @@ Bug_prompts.md
 sounds/
 # cached generated TTS output
 voicelines/
+# ambient music tracks (C7) — supply your own; rights uncertain
+music/
 # Piper voice models (large binaries)
 *.onnx
 *.onnx.json

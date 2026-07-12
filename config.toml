@@ -74,6 +74,24 @@ male    = ""
 female  = ""
 default = ""
 
+[music]
+# Ambient music layer (C7). A curated, PRE-GENERATED local library played on the music bus and
+# crossfaded when the game context changes (combat / near-star / deep space / populated / nebula).
+# Track files are LOCAL and git-ignored (supply your own, rights uncertain — like sounds/): drop
+# them under music/ and list them per context below. Generation is deliberately NOT a runtime
+# dependency (no official Suno API). DEFAULT OFF.
+enabled = false
+
+[music.tracks]
+# Each context -> an ordered list of track paths (relative to the project root). Empty = silent
+# for that context; the director picks deterministically and crossfades on a context change.
+combat_adjacent = []
+near_star       = []
+deep_space      = []
+populated       = []
+nebula          = []
+default         = []   # fallback when the current context has no tracks of its own
+
 [audio.cues]
 # Cue driver + governor (C3) — the anti-over-talking budget for the ambient audio layer (SFX,
 # space chatter, music, comms). On a game-state change the driver asks the cue registry which
