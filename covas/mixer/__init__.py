@@ -33,6 +33,13 @@ from .comms import (
     is_receive_text,
     message_template,
 )
+from .chatter import (
+    ChatterPlayer,
+    build_chatter_prompt,
+    chatter_cues,
+    is_flavor_safe,
+    register_chatter,
+)
 from .cues import Cue, CueRegistry, cue_problems, validate_cue
 from .driver import CueDriver
 from .variants import (
@@ -95,6 +102,11 @@ __all__ = [
     "comms_voice_id",
     "make_variant_generator",
     "validate_variant",
+    "ChatterPlayer",
+    "build_chatter_prompt",
+    "chatter_cues",
+    "is_flavor_safe",
+    "register_chatter",
     "BusMixer",
     "bus_gains",
     "float_to_pcm16",
