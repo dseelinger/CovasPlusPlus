@@ -921,8 +921,17 @@ class App:
 
     # ---- local voice commands --------------------------------------------
     def _speak(self, text: str, cancel: threading.Event) -> None:
-        """Play `text` through the injected TTS provider (real, mock, or fake)."""
-        self.tts.speak(text, cancel)
+        """Play `text` through the injected TTS provider (real, mock, or fake).
+        On failure, log LOUDLY (session log + stderr) before re-raising — a dead TTS must be
+        diagnosable, not a silent no-op (e.g. a 401 famous_voice_not_permitted). Callers keep
+        their broad guards and still degrade to text/Idle."""
+        try:
+            self.tts.speak(text, cancel)
+        except Exception as e:  # noqa: BLE001 — re-raised after logging; callers fail soft
+            msg = f"TTS FAILED ({type(e).__name__}): {e}"
+            self._log("system", msg)
+            print(f"\n!! {msg}", file=sys.stderr, flush=True)
+            raise
 
     def _log_usage(self, u: dict) -> None:
         """Record a per-call token/cost usage event to the session log + EventBus."""
@@ -939,8 +948,8 @@ class App:
         self.set_state("Speaking")
         try:
             self._speak(text, cancel)
-        except Exception as e:  # noqa: BLE001
-            self.bus.publish({"type": "log", "who": "system", "text": f"TTS error: {e}"})
+        except Exception:  # noqa: BLE001 — _speak already logged loudly; degrade to text
+            pass
 
     def _handle_command(self, text: str, cancel: threading.Event) -> bool:
         """Route deterministic control commands locally (cancel/personality/voice).
