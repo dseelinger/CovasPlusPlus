@@ -37,8 +37,10 @@ class TTSProvider(Protocol):
     def speak(self, text: str, cancel: threading.Event) -> None:
         """Synthesize and play `text`, stopping promptly if `cancel` is set."""
 
-    def synth_pcm(self, text: str) -> tuple[bytes, int]:
-        """Return (raw 16-bit mono PCM bytes, sample_rate). Used for caching."""
+    def synth_pcm(self, text: str, voice_id: Optional[str] = None) -> tuple[bytes, int]:
+        """Return (raw 16-bit mono PCM bytes, sample_rate). Used for cached status lines and
+        for rendering a line to a chosen BUS/VOICE via the mixer (C1). `voice_id=None` uses
+        the provider's configured voice; providers with a single voice ignore it."""
 
 
 @runtime_checkable
