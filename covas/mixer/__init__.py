@@ -23,6 +23,16 @@ from .buses import (
     load_bus_configs,
     process,
 )
+from .comms import (
+    Decision,
+    VoiceableComms,
+    capture,
+    classify,
+    dedup_key,
+    evaluate,
+    is_receive_text,
+    message_template,
+)
 from .cues import Cue, CueRegistry, cue_problems, validate_cue
 from .driver import CueDriver
 from .eligibility import STATES, EligibilityEngine, flag_states, fuel_states, journal_states
@@ -61,6 +71,14 @@ __all__ = [
     "CueGovernor",
     "GovernorConfig",
     "CueDriver",
+    "Decision",
+    "VoiceableComms",
+    "capture",
+    "classify",
+    "dedup_key",
+    "evaluate",
+    "is_receive_text",
+    "message_template",
     "BusMixer",
     "bus_gains",
     "float_to_pcm16",
