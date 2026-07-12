@@ -24,6 +24,10 @@ logs/
 # personal game checklist
 ultimate_checklist.md
 
+# --- Transient / local working files (scratchpad, not for the repo) ---
+# scratchpad for in-progress / one-off bug-fix prompts
+Bug_prompts.md
+
 # --- License-uncertain / regenerable assets ---
 # sound cues — supply your own; may be copyrighted
 sounds/
