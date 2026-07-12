@@ -74,6 +74,23 @@ male    = ""
 female  = ""
 default = ""
 
+[audio.sfx]
+# Ambient SFX cues (C8): local samples (git-ignored, supply your own) on the ambient bus,
+# eligibility-gated (hyperspace / deep space). Each is a LIST of sample paths; empty = silent.
+# Picked + rate-governed by [audio.cues]; DEFAULT OFF with the rest of the cue layer.
+thargoid_voices      = []
+hyperspace_weirdness = []
+space_radiation      = []
+
+[audio.interdiction]
+# Pirate-interdiction layered cue (C8): on a journal Interdiction/UnderAttack, a warning sting
+# (alert bus), the assistant's threat line (COVAS bus, clean), and the pirate's line (comms bus,
+# radio). Off by default. `sting` is the alert-bus sample path (git-ignored); blank uses the
+# built-in default path (supply your own file there).
+enabled = false
+sting   = ""
+
+
 [music]
 # Ambient music layer (C7). A curated, PRE-GENERATED local library played on the music bus and
 # crossfaded when the game context changes (combat / near-star / deep space / populated / nebula).
