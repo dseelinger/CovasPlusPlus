@@ -55,10 +55,12 @@ def test_all_path_fields_resolved():
     cfg = {
         "personality": {"file": "personality.txt", "presets_file": "personalities/presets.md",
                         "campaign_file": "campaign.txt", "custom_dir": "personalities/custom"},
+        "anthropic": {"api_key_file": "AnthropicAPIKey.txt"},
         "elevenlabs": {"api_key_file": "ElevenLabsAPIKey.txt"},
         "checklist": {"file": "ultimate_checklist.md"},
         "logging": {"dir": "logs"},
         "piper": {"model": "voices/en.onnx"},
+        "whisper": {"download_root": "models"},
     }
     config._resolve_paths(cfg)
     for sec, key in config._PATH_FIELDS:

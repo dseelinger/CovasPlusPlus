@@ -6,9 +6,13 @@ from faster_whisper import WhisperModel
 
 class Transcriber:
     def __init__(self, cfg: dict) -> None:
+        from .firstrun import stt_download_root
         w = cfg["whisper"]
+        # download_root: None in a source run (default HF cache — dev models reused), a per-user
+        # models dir when frozen so weights stay out of the read-only install tree.
         self.model = WhisperModel(
-            w["model"], device=w["device"], compute_type=w["compute_type"]
+            w["model"], device=w["device"], compute_type=w["compute_type"],
+            download_root=stt_download_root(cfg),
         )
         self.language = w["language"] or None
 

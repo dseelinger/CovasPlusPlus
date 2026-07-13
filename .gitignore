@@ -6,6 +6,7 @@
 
 # --- Secrets (NEVER commit) ---
 ElevenLabsAPIKey.txt
+AnthropicAPIKey.txt
 *.key
 .env
 .env.*
