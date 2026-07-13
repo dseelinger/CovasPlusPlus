@@ -208,6 +208,14 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # A windowed (console=False) frozen build has no console, so PyInstaller leaves sys.stdout/
+    # sys.stderr as None — any print() in the app (banner, App startup lines) would then crash.
+    # Redirect them to a null sink so every write is safe; real diagnostics go to the log file
+    # under %APPDATA%\COVAS++\logs. A source run keeps its normal console.
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")  # noqa: SIM115 — process-lifetime sink, never closed
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")  # noqa: SIM115
     if "--selftest" in sys.argv:
         raise SystemExit(_selftest())
     main()
