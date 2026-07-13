@@ -6,3 +6,4 @@
 # ---------------------------------------------------------------------------
 -r requirements.txt        # the build env is a superset of the runtime env
 pywebview>=6.2             # native OS window around the Flask control panel (run_covas_app.py)
+pyinstaller>=6.21          # freeze into a one-folder Windows app (covas.spec / build.ps1)

@@ -13,6 +13,7 @@ imports it lazily inside main(), and a source run that never calls this entry ne
 """
 import os
 import socket
+import sys
 import threading
 import time
 
@@ -22,6 +23,29 @@ from covas.config import load_config
 from covas.setup_web import run_first_run
 from covas.single_instance import ensure_single_instance
 from covas.web import create_app
+
+
+def _selftest() -> int:
+    """Headless build check (`COVAS++.exe --selftest`): import every native/heavy dependency and
+    the whole covas app graph, then exit — proving a FROZEN build bundled them all WITHOUT needing
+    a display, mic, or keys (the Phase-0 spike's self-test, made a first-class entry). A missing
+    bundled lib raises ImportError and exits non-zero, which build.ps1 surfaces as a failure."""
+    import importlib
+    mods = [
+        # native / heavy risks
+        "ctranslate2", "sounddevice", "soundfile", "faster_whisper", "onnxruntime", "av",
+        "numpy", "requests", "anthropic", "flask", "flask_sock", "webview",
+        # the app graph (pulls in the rest of covas transitively)
+        "covas.config", "covas.app", "covas.web", "covas.firstrun", "covas.setup_web",
+    ]
+    for m in mods:
+        importlib.import_module(m)
+    # onnxruntime is what backs the (lazily-imported) Silero VAD we run with vad_filter=True — make
+    # the check meaningful by touching the VAD module too, not just importing faster_whisper.
+    importlib.import_module("faster_whisper.vad")
+    print(f"SELFTEST OK: imported {len(mods) + 1} modules incl. onnxruntime/av/ctranslate2.",
+          flush=True)
+    return 0
 
 
 def _wait_until_serving(host: str, port: int, timeout: float = 10.0) -> bool:
@@ -113,4 +137,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        raise SystemExit(_selftest())
     main()
