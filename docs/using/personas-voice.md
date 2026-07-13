@@ -49,7 +49,7 @@ By default COVAS++ speaks with an **ElevenLabs** cloud voice. You control:
 
 Prefer a **free, fully-local voice**? Switch `[tts].provider` to **Piper**. Piper runs on your CPU
 alongside the game at no cost — the voice is good, if not quite as smooth as ElevenLabs. See
-[Install & setup](../getting-started/install.md#optional-run-fully-local-no-cloud).
+[Install & setup](../getting-started/install.md#run-fully-local-no-cloud).
 
 ## Turning personality off
 

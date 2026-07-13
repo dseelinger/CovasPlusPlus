@@ -105,3 +105,35 @@ def test_mic_saved_to_overrides(client, monkeypatch):
     assert r.status_code == 200
     assert cfg["audio"]["input_device"] == "Blue Yeti"
     assert saved["o"]["audio"]["input_device"] == "Blue Yeti"
+
+
+# --- finish copy is native-aware (the "close this tab" quit-the-app bug, I9/I7) ------------
+# In the NATIVE single window, closing it QUITS the app, so the finish page must NOT tell the
+# user to close a tab — it swaps itself to the panel. A browser tab is safe to close. The copy
+# is injected server-side per `native`, so the served page carries exactly one of the two.
+
+def _setup_html(native: bool) -> str:
+    cfg = {"ui": {"host": "127.0.0.1", "port": 8765},
+           "anthropic": {"api_key_file": "x"}, "elevenlabs": {"api_key_file": "y"},
+           "whisper": {"model": "small.en"}}
+    app = setup_web.create_setup_app(cfg, threading.Event(), native=native)
+    app.config.update(TESTING=True)
+    return app.test_client().get("/").get_data(as_text=True)
+
+
+def test_native_finish_copy_never_says_close_the_tab():
+    html = _setup_html(native=True)
+    assert "close this tab" not in html.lower()          # closing the native window would quit
+    assert "control panel" in html.lower()               # it swaps itself to the panel instead
+
+
+def test_browser_finish_copy_still_says_close_the_tab():
+    html = _setup_html(native=False)                     # the run_covas_ui.py path is unchanged
+    assert "close this tab" in html.lower()
+
+
+def test_finish_copy_defaults_to_browser():
+    # Default (no native kwarg) keeps the browser wording — start_setup_server opts in explicitly.
+    assert setup_web._FINISH_MSG_BROWSER != setup_web._FINISH_MSG_NATIVE
+    assert "close this tab" in setup_web._FINISH_MSG_BROWSER.lower()
+    assert "close this tab" not in setup_web._FINISH_MSG_NATIVE.lower()

@@ -57,6 +57,16 @@ def _selftest() -> int:
     return 0
 
 
+def _wizard_panel_urls(host: str, port: int) -> tuple[str, str]:
+    """The (wizard, panel) URLs for the single native window. They MUST differ by path: the I9
+    handoff navigates the SAME window from the wizard to the panel, and WebView2 treats a
+    `load_url` to the CURRENT url as a no-op — so identical URLs would leave the window stuck on
+    the finished wizard page even though the panel is already serving. The wizard has a dedicated
+    `/setup` route, so it lives there and the panel stays at `/`."""
+    base = f"http://{host}:{port}"
+    return f"{base}/setup", f"{base}/"
+
+
 def _wait_until_serving(host: str, port: int, timeout: float = 10.0) -> bool:
     """Block until the Flask thread is accepting connections (or timeout). Without this the
     window can load before the server binds and show a connection error on first paint."""
@@ -131,7 +141,8 @@ def main() -> None:
     cfg = load_config()
     host = cfg["ui"]["host"]
     port = int(cfg["ui"]["port"])
-    url = f"http://{host}:{port}"
+    # Distinct wizard/panel URLs so the handoff is a real navigation (see _wizard_panel_urls).
+    wizard_url, panel_url = _wizard_panel_urls(host, port)
 
     # Shared state across the GUI thread and the background boot thread. `core` is filled once the
     # panel App is built; `closing` guards the wizard→panel handoff against a mid-wizard window
@@ -149,15 +160,16 @@ def main() -> None:
             return
         state["core"] = core
     else:
-        setup_handle = setup_web.start_setup_server(cfg)  # (srv, thread, done)
+        setup_handle = setup_web.start_setup_server(cfg, native=True)  # (srv, thread, done)
         print("\n================ COVAS++ first-run setup ================", flush=True)
         print("  Complete setup in the window: API keys, speech model, mic.", flush=True)
         print("========================================================\n", flush=True)
 
-    # The one and only window and start() for the session. On a fresh install it opens on the
-    # wizard URL; the same URL becomes the panel after the handoff below.
-    window = webview.create_window("COVAS++", url=url, width=1200, height=820,
-                                   min_size=(900, 640))
+    # The one and only window and start() for the session. A fresh install opens on the wizard
+    # (`/setup`); the handoff below navigates the SAME window to the panel (`/`). A configured
+    # install opens straight on the panel.
+    window = webview.create_window("COVAS++", url=(panel_url if configured else wizard_url),
+                                   width=1200, height=820, min_size=(900, 640))
 
     if configured:
         _install_quit_watch(state["core"], window)
@@ -190,7 +202,10 @@ def main() -> None:
             return
         state["core"] = core
         _install_quit_watch(core, window)
-        window.load_url(url)              # same window: wizard → control panel, no second start()
+        # Navigate the SAME window from /setup to / (the panel). A DIFFERENT path than the wizard,
+        # so WebView2 performs a real navigation instead of no-opping a same-URL load. No second
+        # start().
+        window.load_url(panel_url)
 
     # Blocks on the main thread until the window is closed (user close OR quit-watch destroy).
     # On a fresh install, `_boot` drives the wizard→panel handoff on a pywebview-managed thread.

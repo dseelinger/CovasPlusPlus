@@ -238,6 +238,7 @@ Notes:
 - [ ] **Coverage:** every capability you enabled in §0.3 is reachable — spot-check one from each group (e.g. *"tell me about your ship"* → ship status + ship controls; *"tell me about settings"*, *"tell me about community goals"*).
 - [ ] **Failure recovery:** *"Find the closest power distributer."* (misspelled) → *"I didn't recognize 'power distributer' — did you mean Power Distributor?"* — never inventing a correction.
 - [ ] **Unknown capability:** *"Can you plot me a route?"* (not built) → says it can't, offers to list what it can, **without** echoing the fake capability as real.
+- [ ] **Version by voice:** *"What version are you?"* → speaks the running version (e.g. *"I'm running COVAS++ version 0.1.0."*), matching `covas/__version__.py`. Ask *"check for updates"* by voice → it does **NOT** update; it points you at the control panel's update banner instead.
 
 Notes:
 
@@ -382,6 +383,71 @@ Notes:
 
 ---
 
+## 19. Packaged build — install, first-run wizard & updates (I1–I9)  📦 🖥️ 🔊 HW 🌍 NET
+> The **installed Windows app**: `COVAS++ Setup.exe` → native window, first-run wizard, and the
+> Tier-2 self-updater. Extra markers: 📦 **PKG** — run the packaged build (not from source);
+> 🖥️ **VM** — best done on a **clean Win11 snapshot** (VirtualBox/VMware; Windows Sandbox isn't
+> available on Win11 Home) so "no Python/keys/model preinstalled" is actually proven. Revert the
+> snapshot between passes. A partial dev-machine shortcut: delete `%APPDATA%\COVAS++` + the HF
+> model cache to re-exercise the wizard (does **not** prove the no-runtimes case).
+
+### 19.1 Install (clean VM)  📦 🖥️
+- [ ] Download **`COVAS++ Setup.exe`** from the Releases page → SmartScreen shows *"unknown publisher"* → **More info → Run anyway** installs (documented, expected).
+- [ ] The installer runs **per-user with NO admin/UAC prompt** (installs to `%LOCALAPPDATA%\Programs\COVAS++`).
+- [ ] It creates a **Start-menu entry** and a **desktop icon** (custom icon, not the generic exe icon), and registers an uninstaller.
+
+Notes:
+
+### 19.2 First-run wizard  📦 🖥️ 🔊 HW 🌍 NET
+> On a machine with none of the dev state — that absence *is* the test.
+- [ ] First launch (empty `%APPDATA%\COVAS++`) opens the **setup wizard**, not the panel.
+- [ ] **Anthropic key** entry → accepted; **ElevenLabs key** entry → accepted (or skipped).
+- [ ] **Mic** picker lists your input devices; pick one.
+- [ ] **STT model** downloads (`small.en`, ~250 MB) with a **progress** indicator (needs internet); it's fetched **once**.
+- [ ] Wizard **hands off to the control panel in the same window** — no second window, no browser. The finish message says it's **switching to the control panel** (NOT "close this tab"); the panel appears **without you closing anything** (closing the single native window quits the app).
+- [ ] **No-ElevenLabs path:** finish the wizard with **no** EL key → the app runs **text-only** and says so; add a key later in Settings → spoken replies start working.
+- [ ] **Default voice:** with an EL key, the voice defaults to **George** (or the first valid voice if George isn't in your catalog).
+- [ ] 📋 After the wizard, `%APPDATA%\COVAS++` holds `config.toml`/keys/etc. and the model is under `%LOCALAPPDATA%`; **nothing** was written into the install tree (`%LOCALAPPDATA%\Programs\COVAS++`).
+
+Notes:
+
+### 19.3 Native window & quit  📦 🔊 HW
+- [ ] App launches from the **desktop/Start-menu icon** as a **native window** (no browser tab, no URL bar) rendering the panel.
+- [ ] **PTT works from the window:** hold `[`, speak, release → normal turn; audio plays.
+- [ ] **Closing the window quits** the app — no tray icon, no lingering background process (check Task Manager: no `COVAS++`/python left running).
+
+Notes:
+
+### 19.4 ED files readable from the sandboxless install  📦 🎮 ED
+> The reason MSIX was rejected — the install must read ED's journal + bindings with no container in the way.
+- [ ] With ED running: *"Where am I?"* → names your **current system** (journal is readable from the installed app).
+- [ ] With `[keybinds]`/`[honk]` on, the startup/log confirms your **`Custom.*.binds`** was found and parsed (not a "couldn't find binds" warning).
+
+Notes:
+
+### 19.5 Update banner → download → relaunch  📦 🖥️ 🌍 NET
+> Best on a VM: install an **older** version, then publish/point at a **newer** GitHub Release.
+- [ ] With a newer release available, an **"Update available → vX.Y"** banner appears in the panel on launch. (Already-current → **no** banner.)
+- [ ] Click update → COVAS++ **downloads the new installer**, **exits**, and the installer launches (same SmartScreen step).
+- [ ] After install, relaunch → *"What version are you?"* now reports the **bumped** version.
+
+Notes:
+
+### 19.6 Settings survive the update (decision #6)  📦 🖥️ 📋 FILE
+- [ ] Before updating: change the **voice**, **mic**, and a couple of settings (panel or voice); 📋 note them in `%APPDATA%\COVAS++\overrides.json`.
+- [ ] Run the update (§19.5) → after relaunch, **every changed setting is exactly as you left it** (defaults are NOT re-applied over your choices); `overrides.json` is unchanged.
+- [ ] A setting **added** by the new version appears at its default **without** resetting your existing values.
+
+Notes:
+
+### 19.7 Uninstall  📦 🖥️
+- [ ] Uninstall from **Apps & features** (or the Start-menu uninstaller) → the app and shortcuts are removed; the install tree under `%LOCALAPPDATA%\Programs\COVAS++` is gone.
+- [ ] Note whether your `%APPDATA%\COVAS++` user data is retained (a reinstall should find your settings again).
+
+Notes:
+
+---
+
 ## Needs-hardware / manual-only note
 Everything in this file needs Doug's machine and can't be exercised in CI or a sandbox:
 - 🔊 **HW** (mic + speakers) gates nearly every step — STT capture and TTS playback.
@@ -389,6 +455,7 @@ Everything in this file needs Doug's machine and can't be exercised in CI or a s
 - ⌨️ **INJECT** (§6) sends real DirectInput scancodes into ED — do it parked and safe.
 - 🌍 **NET** (§7, §8, §10, §16) needs internet (Spansh / Inara / web search).
 - 🌐 **PANEL** / 📋 **FILE** checks need the running app and a browser / file access.
+- 📦 **PKG** / 🖥️ **VM** (§19) need the built `Setup.exe` and, to prove the clean-install/first-run/updater story, a **fresh Win11 VM snapshot** (Windows Sandbox isn't available on Win11 Home).
 
 The offline `pytest` suite covers the pure logic (parsing, routing, checklist ops, help
 projection + grouping, query building, honk sequencing) for free — run `pytest` often; this
