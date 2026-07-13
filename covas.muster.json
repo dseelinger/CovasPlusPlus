@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS\u002B\u002B",
+  "tests": [
+    {
+      "id": "fresh-install-native-wizard",
+      "title": "Fresh install shows the first-run wizard IN THE NATIVE WINDOW",
+      "section": "I9. Native first-run wizard",
+      "tags": [
+        "GUI",
+        "NET",
+        "HW"
+      ],
+      "requires": "Empty user-data dir: delete %APPDATA%\\COVAS\u002B\u002B (back it up first if it has your keys). Launch the packaged app via dist\\COVAS\u002B\u002B\\COVAS\u002B\u002B.exe (or \u0060python run_covas_app.py\u0060).",
+      "expected": "The setup wizard renders inside the COVAS\u002B\u002B native PyWebView window. No browser (Edge/Chrome/etc.) opens at any point.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Confirm %APPDATA%\\COVAS\u002B\u002B is absent/empty, then launch COVAS\u002B\u002B.exe (or run_covas_app.py)."
+        },
+        {
+          "id": "s2",
+          "text": "A native window titled COVAS\u002B\u002B appears showing the first-run setup page (API keys / speech model / mic)."
+        },
+        {
+          "id": "s3",
+          "text": "No browser tab or window opens \u2014 the wizard is ONLY in the native window."
+        }
+      ]
+    },
+    {
+      "id": "wizard-to-panel-handoff",
+      "title": "Finishing setup swaps the SAME window to the control panel (no browser)",
+      "section": "I9. Native first-run wizard",
+      "tags": [
+        "GUI",
+        "NET",
+        "HW"
+      ],
+      "requires": "Continue from fresh-install-native-wizard, in the native window on the wizard page.",
+      "expected": "After entering the Anthropic key (ElevenLabs optional), downloading the STT model, and picking a mic, clicking Launch turns the SAME native window into the control panel. Status light reads IDLE. No browser opens.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Enter your Anthropic API key (and optionally ElevenLabs) and save."
+        },
+        {
+          "id": "s2",
+          "text": "Trigger the speech-model download; wait for it to report ready."
+        },
+        {
+          "id": "s3",
+          "text": "Pick a microphone."
+        },
+        {
+          "id": "s4",
+          "text": "Click \u0027Launch COVAS\u002B\u002B\u0027."
+        },
+        {
+          "id": "s5",
+          "text": "The same window navigates to the control panel (status light IDLE). No new browser opens, no second window appears."
+        }
+      ]
+    },
+    {
+      "id": "already-configured-skips-wizard",
+      "title": "Relaunch on a configured install goes straight to the panel",
+      "section": "I9. Native first-run wizard",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Completed setup at least once (keys \u002B STT model present in %APPDATA%\\COVAS\u002B\u002B).",
+      "expected": "Launching COVAS\u002B\u002B.exe (or run_covas_app.py) opens the native window directly on the control panel \u2014 no wizard, no browser.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Close COVAS\u002B\u002B if open, then relaunch it."
+        },
+        {
+          "id": "s2",
+          "text": "The native window opens directly on the control panel (IDLE); the wizard does not appear."
+        }
+      ]
+    },
+    {
+      "id": "bail-mid-wizard-quits-clean",
+      "title": "Closing the window during the wizard quits cleanly",
+      "section": "I9. Native first-run wizard",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Fresh/empty user-data dir so the wizard shows. Launch via COVAS\u002B\u002B.exe (or run_covas_app.py).",
+      "expected": "Closing the native window while still on the wizard exits the process fully \u2014 no orphaned COVAS\u002B\u002B process, and the port (127.0.0.1:8765) is free for an immediate relaunch.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With the wizard showing, close the native window (X) before finishing setup."
+        },
+        {
+          "id": "s2",
+          "text": "Confirm no COVAS\u002B\u002B process lingers (Task Manager) \u2014 the app quit."
+        },
+        {
+          "id": "s3",
+          "text": "Relaunch immediately; it starts again without a \u0027port in use\u0027/\u0027address already in use\u0027 error."
+        }
+      ]
+    },
+    {
+      "id": "native-quit-controls",
+      "title": "Ctrl\u002BAlt\u002BQ and window-close both quit the running app",
+      "section": "I9. Native first-run wizard",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "App running on the control panel (post-setup).",
+      "expected": "Pressing Ctrl\u002BAlt\u002BQ closes the window and exits the process; separately, closing the window with X also exits. No lingering process either way.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With the panel showing, press Ctrl\u002BAlt\u002BQ \u2014 the window closes and the process exits."
+        },
+        {
+          "id": "s2",
+          "text": "Relaunch, then close the window with the X button \u2014 the process also exits (no tray, no background loop)."
+        }
+      ]
+    },
+    {
+      "id": "browser-path-unchanged",
+      "title": "Source browser entry (run_covas_ui.py) still opens the wizard in the browser",
+      "section": "I9. Native first-run wizard",
+      "tags": [
+        "GUI",
+        "NET"
+      ],
+      "requires": "Empty user-data dir. Run the BROWSER entry from source: \u0060python run_covas_ui.py\u0060.",
+      "expected": "run_covas_ui.py is unchanged by I9: on a fresh install it serves the wizard and opens it in the DEFAULT BROWSER (not a native window), then the browser control panel once configured.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With an empty user-data dir, run \u0060python run_covas_ui.py\u0060."
+        },
+        {
+          "id": "s2",
+          "text": "The default browser opens http://127.0.0.1:8765 showing the setup wizard."
+        },
+        {
+          "id": "s3",
+          "text": "Finish setup; the browser continues to the control panel (IDLE)."
+        }
+      ]
+    },
+    {
+      "id": "frozen-selftest",
+      "title": "Frozen build passes the headless self-test",
+      "section": "I9. Native first-run wizard",
+      "tags": [
+        "PKG"
+      ],
+      "requires": "Rebuild the frozen app: \u0060.\\build.ps1 -SelfTest\u0060.",
+      "expected": "PyInstaller produces dist\\COVAS\u002B\u002B\\COVAS\u002B\u002B.exe and \u0060COVAS\u002B\u002B.exe --selftest\u0060 prints \u0027SELFTEST OK ...\u0027 and exits 0 (build.ps1 reports \u0027Self-test passed\u0027).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Run \u0060.\\build.ps1 -SelfTest\u0060 from the repo root."
+        },
+        {
+          "id": "s2",
+          "text": "Build completes and the frozen self-test passes (exit 0)."
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "runId": "run-20260713T174631Z-d7eb",
+      "session": "I9 native first-run wizard",
+      "commit": "b72bc8a",
+      "branch": "feature/installer-native-wizard",
+      "submittedAt": "2026-07-13T18:04:31Z",
+      "results": [
+        {
+          "testId": "fresh-install-native-wizard",
+          "status": "fail",
+          "stepChecks": {
+            "s1": true,
+            "s2": false,
+            "s3": false
+          },
+          "failure": {
+            "notes": "Nothing happened. I tried to run \u0022C:\\dev\\COVAS\u002B\u002B\\dist\\COVAS\u002B\u002B\\COVAS\u002B\u002B.exe\u0022 and nothing happened.",
+            "console": "none",
+            "screenshots": []
+          }
+        },
+        {
+          "testId": "wizard-to-panel-handoff",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false
+          }
+        },
+        {
+          "testId": "already-configured-skips-wizard",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "bail-mid-wizard-quits-clean",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "native-quit-controls",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "browser-path-unchanged",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "frozen-selftest",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        }
+      ]
+    }
+  ]
+}

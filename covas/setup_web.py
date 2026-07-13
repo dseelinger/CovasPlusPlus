@@ -139,12 +139,15 @@ def create_setup_app(cfg: dict, done: threading.Event) -> Flask:
     return app
 
 
-def run_first_run(cfg: dict) -> None:
-    """Serve the wizard and block until it's finished, then return so the caller can start the
-    real app. Uses a stoppable werkzeug server (not app.run) so we can shut it down cleanly and
-    continue in the same process."""
-    import webbrowser
+def start_setup_server(cfg: dict):
+    """Start the wizard on a stoppable werkzeug server WITHOUT opening a browser or blocking.
+    Returns `(srv, thread, done)`: the caller owns the lifecycle — it decides how the wizard is
+    shown (a browser tab or a native PyWebView window pointed at the URL) and, once `done` is
+    set, stops the server with `srv.shutdown(); thread.join()`.
 
+    This is the seam the native-window entry (run_covas_app.py, I9) uses to render the wizard in
+    the SAME window that later becomes the control panel — no browser step. `run_first_run` is the
+    blocking, browser-owning convenience wrapper built on top of it (the run_covas_ui.py path)."""
     from werkzeug.serving import make_server
 
     done = threading.Event()
@@ -154,7 +157,18 @@ def run_first_run(cfg: dict) -> None:
     srv = make_server(host, port, app, threaded=True)
     t = threading.Thread(target=srv.serve_forever, name="setup-server", daemon=True)
     t.start()
+    return srv, t, done
 
+
+def run_first_run(cfg: dict) -> None:
+    """Serve the wizard and block until it's finished, then return so the caller can start the
+    real app. Opens the wizard in the default browser (the run_covas_ui.py path); the native
+    entry uses `start_setup_server` directly and drives its own window instead."""
+    import webbrowser
+
+    srv, t, done = start_setup_server(cfg)
+    host = cfg["ui"]["host"]
+    port = int(cfg["ui"]["port"])
     url = f"http://{host}:{port}"
     print("\n================ COVAS++ first-run setup ================")
     print(f"  Open {url} to finish setup (it should open automatically).")
