@@ -3,7 +3,10 @@ import os
 import threading
 import webbrowser
 
+from covas import firstrun
 from covas.app import App
+from covas.config import load_config
+from covas.setup_web import run_first_run
 from covas.single_instance import ensure_single_instance
 from covas.web import create_app
 
@@ -12,6 +15,15 @@ def main() -> None:
     # Refuse a second instance before loading anything — two voice loops would share the mic
     # and speakers and talk over each other. Held for the process lifetime.
     instance_lock = ensure_single_instance()  # noqa: F841 — keep the lock alive
+
+    # First-run gate (I3): on a fresh install there are no keys and no STT weights, so building
+    # App() would crash or silently block on a download. Serve the setup wizard first; it writes
+    # keys/overrides/weights under data_dir and returns once configured. A source-run dev with a
+    # key + model is already configured, so this is a no-op for them.
+    cfg = load_config()
+    if not firstrun.is_configured(cfg):
+        run_first_run(cfg)
+
     core = App()
     try:
         core.start()                      # install PTT / cancel key hooks

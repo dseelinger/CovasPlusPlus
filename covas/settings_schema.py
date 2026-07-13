@@ -20,7 +20,10 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 # --- static option vocabularies (shared with the UI) -----------------------
-WHISPER_SIZES = ["tiny", "base", "small", "medium", "large-v3"]
+# English-only ".en" variants sit beside the multilingual sizes: same size, more accurate for
+# an English companion. small.en is the shipped default the first-run wizard installs.
+WHISPER_SIZES = ["tiny", "tiny.en", "base", "base.en", "small", "small.en",
+                 "medium", "medium.en", "large-v3"]
 WHISPER_DEVICES = ["cpu", "cuda"]
 WHISPER_COMPUTE = ["int8", "float16", "float32"]
 THINKING_TIERS = ["Off", "Low", "Medium", "High", "Extra", "Max"]

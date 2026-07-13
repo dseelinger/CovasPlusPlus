@@ -164,9 +164,18 @@ device      = "cpu"
 # int8 = fast + low memory on CPU. (float16 for cuda.)
 compute_type = "int8"
 language    = "en"       # force English; set "" to auto-detect
+# Where faster-whisper caches downloaded weights. Blank = the default HuggingFace cache
+# (dev machines reuse their existing models). A packaged build overrides this to a per-user
+# models dir so weights never land in the read-only install tree. Relative paths resolve
+# under the writable data dir.
+download_root = ""
 
 
 [anthropic]
+# API key file (relative paths resolve under the writable data dir). The ANTHROPIC_API_KEY
+# environment variable takes precedence when set — a source-run dev with it exported never
+# needs this file. The first-run wizard writes the key here on a fresh (packaged) install.
+api_key_file = "AnthropicAPIKey.txt"
 # Model shown/selected at runtime. Default + the two alternates you asked for.
 # Cost-tuned default: Sonnet-5 balances quality vs. price for a voice companion.
 # Flip back to "claude-opus-4-8" here (or via the UI dropdown) any time you want

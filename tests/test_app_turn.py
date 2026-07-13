@@ -73,6 +73,33 @@ def test_quit_signal_wiring(tmp_path):
     app.shutdown()               # no watchers running -> closes the log, no error
 
 
+class _RaisingTTS:
+    """A TTS whose speak() always raises — stands in for the missing-key FileNotFoundError."""
+
+    def speak(self, text, cancel):  # noqa: ANN001
+        raise FileNotFoundError("ElevenLabsAPIKey.txt")
+
+
+def test_text_only_mode_skips_tts_quietly(tmp_path):
+    """In text-only mode (no ElevenLabs key), _speak must NOT invoke the TTS or raise — the
+    reply is already shown as text. Guards against the loud per-turn TTS FAILED regression."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=FakeLLM(), tts=_RaisingTTS())
+    app.text_only = True                       # simulate the keyless-ElevenLabs decision
+    app._speak("Clear as a bell, Commander.", threading.Event())  # must not raise
+
+
+def test_speak_still_raises_when_not_text_only(tmp_path):
+    """The loud diagnosable path stays intact for a CONFIGURED-but-broken TTS."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=FakeLLM(), tts=_RaisingTTS())
+    assert app.text_only is False              # injected provider -> not text-only
+    try:
+        app._speak("hi", threading.Event())
+    except FileNotFoundError:
+        pass
+    else:
+        raise AssertionError("_speak should re-raise a real TTS failure")
+
+
 def test_cancel_before_speaking_skips_tts(tmp_path):
     app = _make_app(tmp_path, stt=FakeSTT(text="hello"),
                     llm=FakeLLM(text="hi"), tts=FakeTTS())

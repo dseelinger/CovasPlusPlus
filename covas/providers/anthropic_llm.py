@@ -14,7 +14,12 @@ from .base import OnEvent, ToolHandler
 class AnthropicLLM:
     def __init__(self, cfg: dict) -> None:
         self.cfg = cfg
-        self.client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
+        # Key resolution: ANTHROPIC_API_KEY env var first (dev), else the key file the
+        # first-run wizard writes under data_dir. Pass it explicitly when found; otherwise let
+        # the SDK read the env itself (and raise its own clear error if truly absent).
+        from ..firstrun import anthropic_key
+        key = anthropic_key(cfg)
+        self.client = anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic()
 
     def stream_reply(
         self,

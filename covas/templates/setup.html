@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COVAS++ Setup</title>
+<style>
+  :root{
+    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
+    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff; --ok:#39d353; --err:#ff9d9d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
+  header{display:flex;align-items:baseline;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,#12181f,#0a0d12)}
+  header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
+  header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
+  .wrap{max-width:680px;margin:0 auto;padding:20px 16px 60px}
+  .intro{color:var(--muted);font-size:13px;line-height:1.6;margin:6px 0 20px}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:16px 18px;margin:0 0 16px}
+  .card h2{margin:0 0 4px;font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  .card h2 .req{color:var(--muted);font-size:11px;letter-spacing:1px;margin-left:8px}
+  .card .hint{color:var(--muted);font-size:12px;line-height:1.6;margin:4px 0 12px}
+  .card .hint a{color:var(--accent2)}
+  label.f{display:block;color:var(--muted);font-size:12px;margin:10px 0 4px}
+  input[type=password],input[type=text],select{width:100%;background:#0c1119;color:var(--text);
+    border:1px solid var(--edge);border-radius:6px;padding:9px 10px;font-family:inherit;font-size:13px}
+  button{padding:9px 16px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+    border-radius:6px;font-family:inherit;font-size:13px;letter-spacing:1px;cursor:pointer;margin-top:12px}
+  button:hover{background:#162836}
+  button:disabled{opacity:.45;cursor:default}
+  button.primary{background:var(--accent);color:#120a04;border-color:var(--accent);font-weight:bold}
+  button.primary:hover{background:#ff8f3c}
+  .msg{font-size:12px;margin-top:8px;min-height:1em}
+  .msg.ok{color:var(--ok)} .msg.err{color:var(--err)}
+  .badge{float:right;font-size:11px;letter-spacing:1px;padding:2px 8px;border-radius:10px;border:1px solid var(--edge)}
+  .badge.on{color:var(--ok);border-color:#1d5a2a} .badge.off{color:var(--muted)}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--edge);border-top-color:var(--accent);
+    border-radius:50%;animation:s .8s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .finish{border-color:var(--accent)}
+  .finish .msg{font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>COVAS++</h1>
+  <span class="sub">FIRST-RUN SETUP</span>
+</header>
+
+<div class="wrap">
+  <p class="intro">Welcome, Commander. A few one-time steps and you're flying. Your keys and
+  settings are stored locally on this machine only — nothing is ever uploaded.</p>
+
+  <!-- 1. Keys -->
+  <div class="card">
+    <h2>API keys <span class="req">Anthropic required · ElevenLabs optional</span>
+      <span class="badge off" id="bKeys">not set</span></h2>
+    <div class="hint">
+      <b>Anthropic</b> powers the conversation (required).
+      <a href="https://console.anthropic.com/settings/keys" target="_blank">Get a key →</a><br>
+      <b>ElevenLabs</b> gives COVAS a voice. Leave it blank to run <b>text-only</b> — you can add
+      it later in Settings. <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">Get a key →</a>
+    </div>
+    <label class="f">Anthropic API key</label>
+    <input type="password" id="anthKey" placeholder="sk-ant-…" autocomplete="off">
+    <label class="f">ElevenLabs API key (optional)</label>
+    <input type="password" id="elKey" placeholder="leave blank for text-only" autocomplete="off">
+    <button id="saveKeys">Save keys</button>
+    <div class="msg" id="keysMsg"></div>
+  </div>
+
+  <!-- 2. Speech model -->
+  <div class="card">
+    <h2>Speech-to-text model <span class="req">required</span>
+      <span class="badge off" id="bStt">not installed</span></h2>
+    <div class="hint">Downloads <b>faster-whisper small.en</b> (~250 MB, one time) so COVAS can
+      hear you. Runs entirely on your CPU afterward — no internet needed to talk.</div>
+    <button id="dlModel">Download speech model</button>
+    <div class="msg" id="modelMsg"></div>
+  </div>
+
+  <!-- 3. Voice -->
+  <div class="card">
+    <h2>COVAS voice <span class="req">needs ElevenLabs key</span>
+      <span class="badge off" id="bVoice">not set</span></h2>
+    <div class="hint">Picks the default voice <b>“George”</b> (or the first available voice) from
+      your ElevenLabs library. Change it any time in Settings.</div>
+    <button id="pickVoice">Choose default voice</button>
+    <div class="msg" id="voiceMsg"></div>
+  </div>
+
+  <!-- 4. Mic -->
+  <div class="card">
+    <h2>Microphone <span class="req">optional</span></h2>
+    <div class="hint">Which mic COVAS listens to. Leave on the system default if you're unsure.</div>
+    <label class="f">Input device</label>
+    <select id="mic"><option value="">System default</option></select>
+    <button id="saveMic">Save microphone</button>
+    <div class="msg" id="micMsg"></div>
+  </div>
+
+  <!-- Finish -->
+  <div class="card finish">
+    <h2>Finish</h2>
+    <div class="hint">Enabled once the Anthropic key and speech model are ready.</div>
+    <button class="primary" id="finishBtn" disabled>Launch COVAS++ →</button>
+    <div class="msg" id="finishMsg"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+function msg(id, text, ok){ const el=$(id); el.textContent=text||""; el.className="msg"+(ok===true?" ok":ok===false?" err":""); }
+function badge(id, on, onText, offText){ const el=$(id); el.className="badge "+(on?"on":"off"); el.textContent=on?onText:offText; }
+
+async function jpost(url, body){
+  const r = await fetch(url,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify(body||{})});
+  return {ok:r.ok, data: await r.json()};
+}
+
+let downloading = false;
+
+async function refresh(){
+  let s;
+  try{ s = await (await fetch("/api/setup/status")).json(); }catch(e){ return; }
+  badge("bKeys", s.anthropic, s.elevenlabs?"anthropic + voice":"anthropic set", "not set");
+  badge("bStt", s.stt, "installed", "not installed");
+  $("finishBtn").disabled = !s.configured;
+  if(s.configured) msg("finishMsg","Ready to launch.", true);
+
+  // Reflect an in-flight / finished model download.
+  const d = s.download || {};
+  if(d.state === "downloading"){ downloading = true; $("dlModel").disabled = true;
+    $("modelMsg").innerHTML = '<span class="spin"></span>Downloading… (~250 MB, one time)'; }
+  else if(d.state === "ready"){ downloading = false; $("dlModel").disabled = true;
+    msg("modelMsg","Speech model installed.", true); }
+  else if(d.state === "error"){ downloading = false; $("dlModel").disabled = false;
+    msg("modelMsg","Download failed: "+(d.error||"unknown"), false); }
+}
+
+$("saveKeys").onclick = async () => {
+  msg("keysMsg","Saving…");
+  const {ok,data} = await jpost("/api/setup/keys",
+    {anthropic:$("anthKey").value, elevenlabs:$("elKey").value});
+  if(!ok || !data.ok){ msg("keysMsg", (data&&data.error)||"save failed", false); return; }
+  const hasAnth = data.status && data.status.anthropic;
+  msg("keysMsg", hasAnth ? "Saved." : "Enter your Anthropic key to continue.", hasAnth);
+  refresh();
+};
+
+$("dlModel").onclick = async () => {
+  msg("modelMsg","Starting…"); $("dlModel").disabled = true;
+  const {ok,data} = await jpost("/api/setup/model");
+  if(!ok){ $("dlModel").disabled=false; msg("modelMsg",(data&&data.error)||"failed",false); return; }
+  refresh();
+};
+
+$("pickVoice").onclick = async () => {
+  msg("voiceMsg","Fetching voices…");
+  const {ok,data} = await jpost("/api/setup/voice");
+  if(!ok || !data.ok){ msg("voiceMsg",(data&&data.error)||"failed",false); return; }
+  if(data.skipped){ msg("voiceMsg","Skipped — text-only (no ElevenLabs key).", null);
+    badge("bVoice", false, "", "text-only"); return; }
+  msg("voiceMsg","Voice set to "+data.voice.name+".", true);
+  badge("bVoice", true, data.voice.name, "not set");
+};
+
+$("saveMic").onclick = async () => {
+  const {ok} = await jpost("/api/setup/mic", {device:$("mic").value});
+  msg("micMsg", ok ? "Microphone saved." : "Save failed.", ok);
+};
+
+$("finishBtn").onclick = async () => {
+  msg("finishMsg","Finishing…");
+  const {ok,data} = await jpost("/api/setup/finish");
+  if(!ok || !data.ok){ msg("finishMsg",(data&&data.error)||"not ready",false); return; }
+  msg("finishMsg","Setup complete — COVAS++ is starting. You can close this tab.", true);
+  $("finishBtn").disabled = true;
+};
+
+async function loadMics(){
+  try{
+    const r = await (await fetch("/api/setup/mics")).json();
+    (r.devices||[]).forEach(d => {
+      const o=document.createElement("option"); o.value=d.name; o.textContent=d.name; $("mic").appendChild(o);
+    });
+  }catch(e){ /* no devices listed; system default stays selected */ }
+}
+
+loadMics();
+refresh();
+setInterval(refresh, 1500);   // keep badges + download state live
+</script>
+</body>
+</html>

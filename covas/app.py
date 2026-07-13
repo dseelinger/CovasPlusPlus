@@ -98,6 +98,11 @@ class App:
         self.stt = stt or make_stt(self.cfg)
         self.tts = tts or make_tts(self.cfg, mixer=self.mixer)
         self.llm = llm or make_llm(self.cfg)
+        # Text-only mode (I3): ElevenLabs is the only packaged TTS and it needs a key. With none,
+        # the app runs text-only — a supported path (decision #2), not a failure. Detect it once
+        # so the voice loop skips TTS quietly instead of raising FileNotFoundError every turn.
+        from .firstrun import text_only_mode
+        self.text_only = text_only_mode(self.cfg, mock=self.mock, tts_injected=tts is not None)
 
         # Capabilities register the tools they expose to the LLM. The checklist is
         # one; ED-context and keybinds will be others (DESIGN §3.3). Present only
@@ -190,6 +195,10 @@ class App:
 
         self._logf = self._open_log()
         self._log("system", _cost_summary(self.cfg, self.mock))
+        if self.text_only:
+            self._log("system", "No ElevenLabs key — running in text-only mode; "
+                                "COVAS replies appear as text in the log (add a key in Settings "
+                                "for voice).")
         if self.cfg.get("proactive", {}).get("enabled"):
             self._start_proactive()
         if self.cfg.get("route", {}).get("enabled"):
@@ -286,6 +295,8 @@ class App:
     def _refresh_cast_exclusions(self) -> None:
         """Background: fetch the famous-filtered ElevenLabs voice list and rebuild the cast so a
         ™/unusable voice is dropped from the pool. Fail-soft — the cast works without it."""
+        if self.text_only:
+            return  # no ElevenLabs key: nothing to fetch, and the call would just error
         try:
             from . import elevenlabs as el
             voices = el.list_voices(self.cfg)
@@ -1056,7 +1067,11 @@ class App:
         """Play `text` through the injected TTS provider (real, mock, or fake).
         On failure, log LOUDLY (session log + stderr) before re-raising — a dead TTS must be
         diagnosable, not a silent no-op (e.g. a 401 famous_voice_not_permitted). Callers keep
-        their broad guards and still degrade to text/Idle."""
+        their broad guards and still degrade to text/Idle. In text-only mode (no ElevenLabs key)
+        there is no TTS to attempt — the reply is already shown as text — so skip quietly; that
+        loud path is for a CONFIGURED-but-broken TTS, not the intended keyless mode."""
+        if self.text_only:
+            return
         try:
             self.tts.speak(text, cancel)
         except Exception as e:  # noqa: BLE001 — re-raised after logging; callers fail soft

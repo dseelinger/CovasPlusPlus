@@ -80,10 +80,12 @@ _DATA_PATH_FIELDS = (
     ("personality", "file"),
     ("personality", "campaign_file"),
     ("personality", "custom_dir"),
+    ("anthropic", "api_key_file"),
     ("elevenlabs", "api_key_file"),
     ("checklist", "file"),
     ("logging", "dir"),
     ("piper", "model"),
+    ("whisper", "download_root"),
 )
 _APP_PATH_FIELDS = (
     ("personality", "presets_file"),
