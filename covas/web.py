@@ -18,6 +18,7 @@ so the panel can warn instead of clobbering.
 from __future__ import annotations
 import hashlib
 import json
+import threading
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
@@ -26,6 +27,8 @@ from flask_sock import Sock
 from . import elevenlabs as el
 from . import personality as persona
 from . import settings_schema as schema
+from . import updates
+from .__version__ import __version__
 from .checklist import ITEM_RE
 
 
@@ -129,6 +132,7 @@ def create_app(core) -> Flask:
     def state():
         return jsonify({
             "status": core.state,
+            "version": __version__,
             "settings": core.public_settings(),
             "options": {
                 "models": core.cfg["anthropic"]["available_models"],
@@ -137,6 +141,32 @@ def create_app(core) -> Flask:
             },
             "keys": core.cfg["keys"],
         })
+
+    @flask_app.route("/api/update")
+    def update_check():
+        """Check GitHub for a newer release. Fail-soft: always 200 with a result dict, so a
+        client polling this on load never has to handle an error path. The banner in
+        index.html reads `available`/`latest`/`asset_url` from here."""
+        return jsonify(updates.check_for_update())
+
+    @flask_app.route("/api/update/apply", methods=["POST"])
+    def update_apply():
+        """Tier-2 apply (UI-only action, per decision #5): download the new installer and
+        launch it, then quit so it can replace files we hold open. The client supplies the
+        `asset_url` the check returned. On success we schedule the app's normal quit
+        (request_quit → run_covas_ui's quit-watch does shutdown + exit) just after this
+        response flushes; the installer takes over from there and preserves %APPDATA% state."""
+        b = request.get_json(force=True) or {}
+        asset = b.get("asset_url")
+        if not asset:
+            return jsonify({"ok": False, "error": "no installer asset in the latest release"}), 400
+        try:
+            updates.download_and_launch_installer(asset)
+        except Exception as e:  # noqa: BLE001 — user-initiated: surface the failure, don't quit
+            return jsonify({"ok": False, "error": f"update failed: {e}"}), 502
+        # Hand off to the installer. Delay the quit so this 200 reaches the browser first.
+        threading.Timer(0.5, core.request_quit).start()
+        return jsonify({"ok": True})
 
     @flask_app.route("/api/schema")
     def api_schema():

@@ -56,6 +56,17 @@
   .logfilter a{color:var(--muted);cursor:pointer;text-transform:none}
   .logfilter a.active{color:var(--accent)}
   .log.conv-only .line:not(.conv){display:none}
+  .banner{display:none;align-items:center;gap:14px;padding:10px 20px;
+      background:linear-gradient(90deg,#1a2a12,#0a0d12);border-bottom:1px solid var(--edge);
+      color:#c9e8a8;font-size:13px;letter-spacing:1px}
+  .banner.show{display:flex}
+  .banner b{color:#8fe06a}
+  .banner button{margin-left:auto;padding:7px 14px;background:#12202c;color:var(--accent2);
+      border:1px solid var(--edge);border-radius:6px;font-family:inherit;font-size:12px;
+      letter-spacing:1px;cursor:pointer}
+  .banner button:hover{background:#162836}
+  .banner button:disabled{opacity:.5;cursor:default}
+  .banner .dismiss{background:none;border:none;color:var(--muted);margin-left:8px;padding:7px 4px}
 </style>
 </head>
 <body>
@@ -69,6 +80,12 @@
     <span class="state-name" id="stateName">CONNECTING…</span>
   </div>
 </header>
+
+<div class="banner" id="updateBanner">
+  <span id="updateText"></span>
+  <button id="updateBtn">Update &amp; restart</button>
+  <button class="dismiss" id="updateDismiss" title="Dismiss">✕</button>
+</div>
 
 <div class="wrap">
   <div class="leftcol">
@@ -196,7 +213,41 @@ async function init(){
 
   initPersonality();
   initLogFilter();
+  initUpdateCheck();
   connectWS();
+}
+
+// ---- Update banner (Tier-2 self-update) ----
+async function initUpdateCheck(){
+  let info;
+  try{ info = await (await fetch("/api/update")).json(); }
+  catch(e){ return; }                        // offline / error: no banner, fail-soft
+  if(!info || !info.available) return;
+  const asset = info.asset_url;
+  $("updateText").innerHTML = "A new version is available — <b>" + escapeHtml(info.latest) +
+    "</b> (you're on " + escapeHtml(info.current || "?") + ").";
+  const btn = $("updateBtn");
+  if(!asset){
+    // Release exists but has no installer asset yet: link to it instead of the apply flow.
+    btn.textContent = "View release";
+    btn.onclick = () => { if(info.url) window.open(info.url, "_blank"); };
+  } else {
+    btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = "Downloading…";
+      try{
+        const r = await fetch("/api/update/apply",{method:"POST",
+          headers:{"content-type":"application/json"},body:JSON.stringify({asset_url:asset})});
+        const data = await r.json();
+        if(!r.ok || !data.ok) throw new Error((data && data.error) || "update failed");
+        btn.textContent = "Restarting…";       // app is quitting; installer takes over
+      }catch(err){
+        btn.disabled = false; btn.textContent = "Update & restart";
+        $("updateText").innerHTML = "Update failed: " + escapeHtml(err.message);
+      }
+    };
+  }
+  $("updateDismiss").onclick = () => $("updateBanner").classList.remove("show");
+  $("updateBanner").classList.add("show");
 }
 
 // ---- Personality tab ----

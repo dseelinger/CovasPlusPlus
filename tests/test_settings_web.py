@@ -168,3 +168,53 @@ def test_legacy_endpoint_routes_through_schema(client):
 
     bad = c.post("/api/settings", json={"whisper": "gigantic"})
     assert bad.status_code == 400
+
+
+# --- update banner endpoints (I2) ------------------------------------------
+
+def test_state_exposes_version(client):
+    from covas.__version__ import __version__
+    c, _, _ = client
+    assert c.get("/api/state").get_json()["version"] == __version__
+
+
+def test_update_check_endpoint_passes_through(client, monkeypatch):
+    from covas import web
+    c, _, _ = client
+    fake = {"available": True, "current": "1.0.0", "latest": "v2.0.0",
+            "url": "https://x/2.0.0", "asset_url": "https://x/s.exe"}
+    monkeypatch.setattr(web.updates, "check_for_update", lambda *a, **k: fake)
+    assert c.get("/api/update").get_json() == fake
+
+
+def test_update_apply_requires_asset(client):
+    c, _, _ = client
+    r = c.post("/api/update/apply", json={})
+    assert r.status_code == 400
+    assert "installer asset" in r.get_json()["error"]
+
+
+def test_update_apply_downloads_and_schedules_quit(client, monkeypatch):
+    from covas import web
+    c, core, _ = client
+    launched = {}
+    monkeypatch.setattr(web.updates, "download_and_launch_installer",
+                        lambda url, **k: launched.setdefault("url", url))
+    # Don't actually schedule a real quit timer during the test.
+    monkeypatch.setattr(web.threading, "Timer", lambda *a, **k: type(
+        "T", (), {"start": lambda self: None})())
+    r = c.post("/api/update/apply", json={"asset_url": "https://x/s.exe"})
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    assert launched["url"] == "https://x/s.exe"
+
+
+def test_update_apply_surfaces_download_failure(client, monkeypatch):
+    from covas import web
+    c, _, _ = client
+
+    def boom(url, **k):
+        raise RuntimeError("connection reset")
+    monkeypatch.setattr(web.updates, "download_and_launch_installer", boom)
+    r = c.post("/api/update/apply", json={"asset_url": "https://x/s.exe"})
+    assert r.status_code == 502
+    assert "connection reset" in r.get_json()["error"]
