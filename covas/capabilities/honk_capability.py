@@ -59,7 +59,7 @@ class HonkConfig:
     (Surface-Scanner) group."""
     enabled: bool = False
     trigger: str = "primary"        # "primary" | "secondary"
-    hold_seconds: float = 6.0
+    hold_seconds: float = 5.0
     combat_guard: bool = True
 
     @classmethod

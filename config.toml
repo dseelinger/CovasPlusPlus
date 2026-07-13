@@ -471,7 +471,7 @@ enabled = false
 # Which fire button the Discovery Scanner is on: "primary" or "secondary".
 trigger = "primary"
 # How long (seconds) to HOLD the fire button — a full honk takes a few seconds to complete.
-hold_seconds = 6.0
+hold_seconds = 5.0
 # Refuse to honk during danger/interdiction (and when ED status is unavailable — we won't act
 # unless we can prove it's safe). Leave ON.
 combat_guard = true

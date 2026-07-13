@@ -196,7 +196,7 @@ def test_bad_event_does_not_raise():
 def test_config_from_cfg_defaults():
     d = HonkConfig.from_cfg({})
     assert d.enabled is False and d.trigger == "primary"
-    assert d.hold_seconds == 6.0 and d.combat_guard is True
+    assert d.hold_seconds == 5.0 and d.combat_guard is True
     assert d.fire_action == "PrimaryFire"
 
 
@@ -209,4 +209,4 @@ def test_config_from_cfg_reads_and_normalizes():
 
 def test_config_bad_values_fall_back():
     c = HonkConfig.from_cfg({"honk": {"hold_seconds": "y"}})
-    assert c.hold_seconds == 6.0 and c.trigger == "primary"
+    assert c.hold_seconds == 5.0 and c.trigger == "primary"

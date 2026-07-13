@@ -309,7 +309,7 @@ SCHEMA: list[Setting] = [
     Setting("honk.hold_seconds", ("honk", "hold_seconds"), "float",
             "Honk hold time", "Auto-honk",
             "How long to hold the fire button to complete the scan.",
-            default=6.0, min=1.0, max=10.0, unit="s",
+            default=5.0, min=1.0, max=10.0, unit="s",
             phrasings=("honk hold time", "honk duration")),
     Setting("honk.combat_guard", ("honk", "combat_guard"), "bool",
             "Combat guard", "Auto-honk",
