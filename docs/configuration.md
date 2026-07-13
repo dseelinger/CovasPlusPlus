@@ -113,11 +113,18 @@ See [Personas & voice](using/personas-voice.md).
 |---------|---------|--------------|
 | `conversation.max_turns` | `20` | How many recent turns of history to keep for follow-ups |
 
-## Sound cues (`[sound_cues]`)
+## Sound cues (drop-in folders)
 
 Local sounds played instantly at each stage — see [The voice loop](getting-started/voice-loop.md#sound-cues).
-Each is a list (one picked at random). Cue types: `listening`, `processing`, `done`, `failed`.
-Files live in the git-ignored `sounds/` folder; the app runs fine without them.
+There is **no `[sound_cues]` config section**: cues are resolved by folder. Cue types are
+`listen`, `processing`, `completed`, `failure`, each a folder holding any number of audio files
+(a random one plays). COVAS++ ships originals under `covas/assets/cues/<type>/`; drop your own
+into `<data dir>/sounds/<type>/` to replace a type's default set (use **Open cues folder** in the
+control panel). Empty a folder to fall back; the app runs fine either way.
+
+> **Upgrading from an old `[sound_cues]` config?** The per-file arrays are ignored now. Move (or
+> re-drop) your files into `sounds/listen/`, `sounds/processing/`, `sounds/completed/`, and
+> `sounds/failure/` — note `done`→`completed` and `failed`→`failure`.
 
 ## Checklist (`[checklist]`)
 

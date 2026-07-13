@@ -42,6 +42,14 @@ from .variants import CommsVoicer, make_variant_generator
 from .voices import VoiceCast, build_cast
 
 
+def _default_sting() -> str:
+    """The shipped ORIGINAL interdiction sting (I8), used when the user supplies none. Returns ""
+    if the asset is missing (frozen build without it) so the cue stays fail-soft/silent."""
+    from ..config import app_dir
+    p = app_dir() / "covas" / "assets" / "cues" / "interdiction_sting" / "interdiction_sting.wav"
+    return str(p) if p.is_file() else ""
+
+
 def _text_generator(llm, model: Optional[str]):  # noqa: ANN001
     """Adapt an LLMProvider to `generate(prompt) -> str` (used for chatter flavor musings)."""
     if llm is None:
@@ -135,11 +143,13 @@ class AudioLayer:
         self._music = MusicDirector(merged_music_library(cfg, self._content),
                                     enabled=self.music_on)
         # Interdiction (C8): drop-in sting sample set + threat pool file override the defaults.
+        # With no user sting (config path or drop-in folder), fall back to the shipped ORIGINAL
+        # sting bundled under covas/assets/cues/interdiction_sting/ (I8) instead of silence.
         idn = (audio.get("interdiction", {}) or {})
         self._interdiction = InterdictionCue(
             self._emit, governor=self._governor, clock=clock,
             enabled=bool(idn.get("enabled", False)),
-            sting=str(idn.get("sting", "")),
+            sting=str(idn.get("sting", "")) or _default_sting(),
             sting_samples=tuple(self._content.sfx.get("interdiction_sting", [])),
             threat_lines=threat_lines(self._content, DEFAULT_THREAT_LINES))
 

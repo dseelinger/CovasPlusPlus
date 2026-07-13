@@ -18,11 +18,12 @@ enable it first (see **§0.3**).
 **Web panel** — http://127.0.0.1:8765 (opens automatically when you launch the UI build). The
 **Settings** page is at http://127.0.0.1:8765/settings.
 
-**Sound cues you should hear** (each is a random pick from a small set — swap in your own in `sounds/`):
-- **voiceinput1–4** — plays the instant you press to talk
-- **processing1–3** — plays while working / searching
-- **inputok2** — plays right before the spoken answer
-- **inputfailed1** — plays on any failure (no speech, API/TTS error)
+**Sound cues you should hear** (random pick from each type's folder; ship-original defaults, or
+your own dropped into `<data dir>/sounds/<type>/` — see §2):
+- **listen** — plays the instant you press to talk
+- **processing** — plays while working / searching
+- **completed** — plays right before the spoken answer
+- **failure** — plays on any failure (no speech, API/TTS error)
 
 **Legend for what each section needs:**
 - 🎮 **ED** — Elite Dangerous must be running (reads live journal/Status.json).
@@ -71,21 +72,33 @@ Notes (which toggles you changed, and where):
 ---
 
 ## 1. Core voice loop  🔊 HW
-- [ ] Hold **`[`** → you hear a **voiceinput** cue immediately (before you even speak).
+- [ ] Hold **`[`** → you hear a **listen** cue immediately (before you even speak).
 - [ ] While holding, say *"Hello COVAS, can you hear me? Keep it short."* then release.
 - [ ] On release you hear a **processing** cue.
 - [ ] 🌐 Panel status + log move through **LISTENING → TRANSCRIBING → THINKING → SPEAKING → IDLE**.
 - [ ] 🌐 Your words appear as **Commander: …** and the reply as **COVAS: …** (timestamped) in the log.
-- [ ] Just before the spoken answer you hear **inputok2**, then the reply plays in the ElevenLabs voice.
+- [ ] Just before the spoken answer you hear the **completed** cue, then the reply plays in the ElevenLabs voice.
 - [ ] The reply addresses you as **"Commander"** (personality is on).
 
 Notes:
 
-## 2. Sound cues & failure cue  🔊 HW
-- [ ] Press to talk several times → the **voiceinput** cue **varies** (random of 4).
-- [ ] The **processing** cue also varies across turns (random of 3).
-- [ ] **Failure:** press and release **without speaking** → you hear **inputfailed1** and the log notes no speech was detected.
+## 2. Sound cues — defaults, override & rotation (I8)  🔊 HW 🌐 PANEL 📋 FILE
+> Cues are drop-in **folders**, not config paths. Shipped originals live in
+> `covas/assets/cues/<type>/`; your overrides go in `<data dir>/sounds/<type>/` (project root in a
+> source run; `%APPDATA%\COVAS++\sounds\` when packaged). Types: `listen` / `processing` /
+> `completed` / `failure`.
+- [ ] **Out of the box (no user cues):** press to talk → you hear the **shipped default** `listen`
+      chirp; on release a **processing** tick; a ready **completed** cue before speech.
+- [ ] **Failure:** press and release **without speaking** → you hear the **failure** cue and the log notes no speech was detected.
 - [ ] No spoken "looking it up / GalNet" filler ever plays — a processing beep covers searches.
+- [ ] **Open cues folder:** in the panel, click **Open cues folder** → Explorer opens
+      `<data dir>\sounds\` with `listen/ processing/ completed/ failure/` subfolders (each with a README).
+- [ ] **Override + rotation:** drop **2–3** of your own `.wav`s into `sounds/listen/`, restart →
+      the press-to-talk cue now plays **your** files and **varies** across presses (your set
+      **replaced** the default; any count works).
+- [ ] **Fallback:** empty `sounds/listen/` again, restart → the **shipped default** `listen` cue returns.
+- [ ] **Interdiction sting default:** with `[audio.interdiction].enabled` and no user sting, an
+      interdiction plays the shipped original **sting** (not silence).
 
 Notes:
 

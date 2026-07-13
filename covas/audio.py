@@ -1,16 +1,89 @@
-"""Sound-cue playback and microphone capture."""
+"""Sound-cue playback and microphone capture.
+
+UI cues (I8) are drop-in content, resolved by FOLDER not by config paths. Each cue TYPE is a
+folder; the app plays a RANDOM file from whatever it holds, so a type can carry 1 file or 55
+and users add variety just by dropping in more (no config edit, no fixed count). Two-tier
+resolution, checked once at load, per type:
+
+  1. User override — ``<data_dir>/sounds/<type>/`` — if it holds ≥1 audio file, the user's set
+     REPLACES the default (predictable: overrides are all-or-nothing per type).
+  2. Bundled default — ``covas/assets/cues/<type>/`` (shipped ORIGINALS) — otherwise.
+  3. Neither — silence (preserve the fail-soft rule).
+
+This replaces the old ``[sound_cues]`` explicit-path lists in config.toml. The shipped defaults
+are originals we own (see ``tools/cuegen/``); ``sounds/`` stays git-ignored (user assets).
+"""
 from __future__ import annotations
 import random
 import threading
 import time
+from pathlib import Path
+
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
 
+# Cue TYPES (folder names). Extensible — add a type here + a covas/assets/cues/<type>/ folder.
+CUE_TYPES = ("listen", "processing", "completed", "failure")
+# play() names -> cue type. Keeps the loop's existing call sites (and intuitive synonyms) working
+# after the listen/completed/failure rename.
+_CUE_ALIASES = {"listening": "listen", "done": "completed", "complete": "completed",
+                "failed": "failure", "fail": "failure"}
+CUE_AUDIO_EXTS = (".wav", ".ogg", ".flac", ".mp3")
+
+
+def _scan_cue_dir(folder: Path) -> list[str]:
+    """Audio files in `folder`, deterministically ordered by filename. Missing folder -> []."""
+    if not folder.is_dir():
+        return []
+    return [str(f) for f in sorted(folder.iterdir(), key=lambda p: p.name.lower())
+            if f.is_file() and f.suffix.lower() in CUE_AUDIO_EXTS]
+
+
+def resolve_cue_files(cue_type: str, *, user_base, asset_base) -> list[str]:  # noqa: ANN001 path-likes
+    """Two-tier resolution for one cue type. `user_base` is the writable sounds root
+    (``<data_dir>/sounds``); `asset_base` is the shipped cues root (``covas/assets/cues``).
+    User override (≥1 file) REPLACES the bundled default; else the default; else [] (silent)."""
+    user = _scan_cue_dir(Path(user_base) / cue_type)
+    if user:
+        return user
+    return _scan_cue_dir(Path(asset_base) / cue_type)
+
+
+def cue_roots(cfg: dict):
+    """(user_base, asset_base) for cue resolution. The user override root is
+    ``<content_root>/sounds`` (content_root defaults to the writable data dir; [audio].content_root
+    overrides it — the same test seam the C11 drop-in pipeline uses). The asset root is the shipped
+    ``covas/assets/cues`` under the read-only app dir (bundle dir when frozen)."""
+    from .config import app_dir, data_dir
+    base = (cfg.get("audio", {}) or {}).get("content_root") or str(data_dir())
+    return Path(base) / "sounds", app_dir() / "covas" / "assets" / "cues"
+
+
+_CUE_README = ("Drop your OWN cue audio for '{name}' here — {exts}. ANY file in this folder joins "
+               "the rotation; a random one plays each time (1 file or 50, your call). While this "
+               "folder holds ≥1 file it REPLACES the shipped default set; empty it to fall back.\n")
+
+
+def ensure_cue_skeleton(user_base) -> None:  # noqa: ANN001 — a path-like (<data_dir>/sounds)
+    """Create ``<data_dir>/sounds/<type>/`` + a README in each so the override location is
+    discoverable (idempotent; only writes what's missing). Fail-soft — never blocks startup."""
+    base = Path(user_base)
+    try:
+        for name in CUE_TYPES:
+            d = base / name
+            d.mkdir(parents=True, exist_ok=True)
+            readme = d / "README.txt"
+            if not readme.exists():
+                readme.write_text(_CUE_README.format(name=name, exts=", ".join(CUE_AUDIO_EXTS)),
+                                  encoding="utf-8")
+    except OSError:
+        pass
+
 
 class CuePlayer:
-    """Preloads cue files into memory for zero-latency playback. Each cue can be a
-    single file or a list of files — play() picks one at random for variety.
+    """Preloads cue files into memory for zero-latency playback. Each cue TYPE resolves to a
+    folder (see module docstring); play() picks one file at random for variety.
 
     By default it opens its own sounddevice playback. When a shared BusMixer is supplied
     (C9), cues route through it on the ALERT bus so the mixer is the single device owner and
@@ -21,21 +94,23 @@ class CuePlayer:
         self._mixer = mixer
         self._bus = bus
         self._mix_sr = int((cfg.get("audio", {}) or {}).get("mix_sample_rate", 16000))
-        sc = cfg.get("sound_cues", {})
-        for name in ("listening", "processing", "done", "failed"):
-            entry = sc.get(name)
-            paths = entry if isinstance(entry, list) else ([entry] if entry else [])
+        user_base, asset_base = cue_roots(cfg)
+        try:
+            ensure_cue_skeleton(user_base)
+        except Exception:  # noqa: BLE001 — skeleton creation must never block startup
+            pass
+        for ctype in CUE_TYPES:
             loaded = []
-            for p in paths:
+            for p in resolve_cue_files(ctype, user_base=user_base, asset_base=asset_base):
                 try:
                     data, sr = sf.read(p, dtype="float32", always_2d=False)
                     loaded.append((data, sr))
-                except Exception:  # noqa: BLE001 — a missing cue must not break startup
+                except Exception:  # noqa: BLE001 — a missing/bad cue must not break startup
                     pass
-            self.cues[name] = loaded
+            self.cues[ctype] = loaded
 
     def play(self, name: str, wait: bool = False) -> None:
-        group = self.cues.get(name) or []
+        group = self.cues.get(_CUE_ALIASES.get(name, name)) or []
         if not group:
             return
         data, sr = random.choice(group)

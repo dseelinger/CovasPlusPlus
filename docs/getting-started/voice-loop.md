@@ -38,14 +38,24 @@ looking at the screen:
 
 | Cue | When it plays |
 |-----|---------------|
-| **listening** | The instant you press to talk (before you even speak) |
+| **listen** | The instant you press to talk (before you even speak) |
 | **processing** | While it's working — transcribing, thinking, or searching the web |
-| **done** | The moment an answer is ready, just before speech plays |
-| **failed** | Any failure — no speech heard, or a service error |
+| **completed** | The moment an answer is ready, just before speech plays |
+| **failure** | Any failure — no speech heard, or a service error |
 
-Each cue is picked at random from a small set (for variety) that you supply in the git-ignored
-`sounds/` folder and list under `[sound_cues]` in [`config.toml`](../configuration.md). The app
-runs fine with no cue files at all — you just won't hear the chirps.
+Cues are **drop-in folders**, not config paths. COVAS++ ships original defaults, so you hear
+chirps out of the box. Each cue type is a folder; a **random** file from it plays each time, so
+you add variety just by dropping in more files (1 file or 50 — no config edit, no fixed count).
+
+To use your **own** cues, click **Open cues folder** in the control panel (or open
+`<data dir>/sounds/` yourself) and drop audio into the matching `sounds/<type>/` folder:
+
+- While a type's folder holds **≥1 file**, your set **replaces** the shipped default for that type.
+- Empty the folder to fall back to the default; with neither, that cue is simply silent.
+
+In a source run the data dir is the project root (so the folder is `./sounds/<type>/`, git-ignored);
+a packaged build uses `%APPDATA%\COVAS++\sounds\`. Supported formats: `.wav`, `.ogg`, `.flac`, `.mp3`
+(mp3 depends on your libsndfile build).
 
 ## Replies are short on purpose
 
