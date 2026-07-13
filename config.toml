@@ -459,22 +459,15 @@ allowlist = ["landing_gear"]
 
 
 [honk]
-# Auto-honk (N5) — fire the Discovery Scanner shortly after arriving in a NEW system (an
-# FSDJump into normal space), so you scan the system without lifting a finger. Builds on the
-# keybind executor: the model isn't involved at all — arrival triggers a deterministic
-# keystroke sequence. Requires [elite].enabled (for the arrival event, the current fire group,
-# and the combat guard).
+# Auto-honk (N5) — fire the Discovery Scanner shortly after arriving in a NEW system, so you scan
+# the system without lifting a finger. The model isn't involved — arrival triggers a deterministic
+# keystroke. Requires [elite].enabled (for the arrival event, supercruise/analysis flags, guards).
 #
-# DEFAULT OFF pending on-hardware timing verification of the probe-and-recover safety net. Once
-# tuned it can go on: an unconfigured honk probes first and backs out of a Surface-Scanner misfire
-# (see fire_group + probe_seconds). Guards: supercruise + analysis mode + not in danger.
+# No fire-group setup: COVAS just fires your CURRENT group's Primary/Secondary button and reacts.
+# If that opens the Surface Scanner (wrong group) it backs out, warns, and pauses until re-armed;
+# a weapons group can't fire in supercruise (harmless). DEFAULT OFF pending on-hardware timing
+# verification of that probe-and-recover. Guards: supercruise + analysis mode + not in danger.
 enabled = false
-# The Discovery Scanner's fire group index (0-based, as numbered in the right HUD panel). When
-# set, COVAS reads your CURRENT fire group from Status.json, cycles to this one, honks, then
-# cycles back. Left at -1 (unmapped), auto-honk uses probe-and-recover: a short test-press that
-# backs out + warns + pauses if it opened the Surface Scanner instead of honking. Set this to your
-# scanner's fire group to skip the probe and cycle deterministically.
-fire_group = -1
 # Which fire button the Discovery Scanner is on: "primary" or "secondary".
 trigger = "primary"
 # How long (seconds) to HOLD the fire button — a full honk takes a few seconds to complete.
@@ -482,10 +475,6 @@ hold_seconds = 6.0
 # Refuse to honk during danger/interdiction (and when ED status is unavailable — we won't act
 # unless we can prove it's safe). Leave ON.
 combat_guard = true
-# Unconfigured (fire_group = -1) probe-and-recover: length of the short test-press (seconds) used
-# to detect a Surface-Scanner misfire before the full honk — long enough to register the mode,
-# short enough not to launch a probe. Tune on hardware.
-probe_seconds = 0.4
 
 
 [nav]

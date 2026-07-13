@@ -1,32 +1,27 @@
-"""Auto-honk — fire the Discovery Scanner on arrival in a new system (N5, DESIGN §6).
+"""Auto-honk — fire the Discovery Scanner on arrival in a new system (N5 + K2, DESIGN §6).
 
 The "honk" is a full-system Discovery Scan: hold the Discovery Scanner's fire button for a
-few seconds after jumping in. This capability automates it — ON by default but SAFE: it
-stays inert until the scanner's fire group is mapped, gated by the keybind safety layer.
+few seconds after jumping in. This capability automates it on the journal's `FSDJump` event.
 
-It's an AMBIENT capability (like route callouts): it advertises no LLM tools, it just
-subscribes to the bus and reacts to the journal's `FSDJump` event (arrival in a new system
-via hyperspace). On arrival, if enabled and safe, it drives the scanner deterministically:
+We do NOT track or switch fire groups. We just fire the CURRENT group's Primary/Secondary
+button and react to what happens (K2 detect-and-recover):
 
-  * **Configured** (the scanner's fire group index + trigger are set) — read the CURRENT
-    fire group from Status.json, cycle to the scanner's group via the
-    `CycleFireGroupNext`/`CycleFireGroupPrevious` keybinds (deterministic — we know both
-    indices, so we step exactly the right number of times, no guessing), HOLD the configured
-    primary/secondary fire key for the honk duration, then cycle back to the original group.
-  * **Not configured** — SAFE DEFAULT: do nothing (we can't prove the current group is the
-    scanner and not weapons). Set `allow_unmapped_fire` to opt into the old "hope for the
-    best" fallback (hold primary fire, works when the scanner is already the selected group).
+  * A short PROBE-press, then read Status.json GuiFocus.
+  * If it opened the Detailed Surface Scanner (GuiFocus == SAA) — the current group holds the
+    DSS, not the Discovery Scanner — back out (ExplorationSAAExitThirdPerson), warn, and
+    DISARM until re-armed (the verbal `rearm_auto_honk` tool, or auto on a real
+    FSSDiscoveryScan event).
+  * Otherwise complete the full honk. (A weapons group can't fire in supercruise, so the worst
+    non-scanner case is a harmless no-op that simply doesn't scan.)
 
 Safety (reuses the keybind layer — DESIGN §6):
-  * **Supercruise-only** — only honks in supercruise; in normal space it does nothing (holding
-    fire there can send you into the Surface Scanner instead of honking).
-  * **Combat/interdiction guard** — refuses during danger/interdiction, and when ED status
-    is unavailable (can't prove it's safe).
+  * **Supercruise + analysis-mode only**, and refuses during danger/interdiction or when ED
+    status is unavailable (can't prove it's safe).
   * **Hard abort** — the shared `KeyExecutor.release_all()` (wired to `abort_keybinds`) lifts
     the held fire key, and the executor clamps hold duration so a key can't stick.
-  * Every honk (and every skip, with its reason) is logged.
+  * Every honk (and every skip/recover, with its reason) is logged.
 
-Everything is injected (binds, executor, status snapshot, the thread spawner) so the whole
+Everything is injected (binds, executor, status snapshot, spawner, speak) so the whole
 sequence is unit-testable offline with a recording fake executor.
 """
 from __future__ import annotations
@@ -40,35 +35,31 @@ from ..keybinds.binds import KeyBinding
 from ..keybinds.executor import ExecutorError
 from .keybind_capability import SAFE, _GUARD_MESSAGES, combat_state
 
-# ED binding action tokens the honk sequence drives. The model never sees these — this is a
-# deterministic executor macro, not an LLM tool.
-CYCLE_NEXT = "CycleFireGroupNext"
-CYCLE_PREV = "CycleFireGroupPrevious"
+# ED binding action tokens the honk drives. The model never sees these — deterministic macro.
 PRIMARY_FIRE = "PrimaryFire"
 SECONDARY_FIRE = "SecondaryFire"
 # The bind that backs out of the Detailed Surface Scanner (SAA) probe view — pressed to recover
-# when an unconfigured honk attempt actually opened the DSS (the current fire group held it).
+# when a honk attempt opened the DSS (the current fire group held it, not the Discovery Scanner).
 SAA_EXIT = "ExplorationSAAExitThirdPerson"
 
 # The verbal re-arm tool the Commander can invoke after a Surface-Scanner misfire disarms honk.
 _REARM_TOOL = "rearm_auto_honk"
 
+# Short test-press (seconds) that lets GuiFocus flip to SAA if the current group holds the DSS,
+# before we commit to the full honk hold. Long enough to register the mode, short enough not to
+# launch a probe. Internal (not a user setting) — tune here if hardware testing needs it.
+_PROBE_SECONDS = 0.4
+
 
 @dataclass(frozen=True)
 class HonkConfig:
     """Immutable snapshot of `[honk]`. Off by default; the capability isn't registered unless
-    `enabled`.
-
-    `fire_group` is the Discovery Scanner's fire group index (0-based, as shown in the right
-    HUD panel). When set, we cycle to it deterministically. When NOT set (negative), we use
-    PROBE-AND-RECOVER: a short test-press, and if it opened the Surface Scanner (the current
-    group held the DSS) we back out, warn, and disarm until re-armed. `trigger` picks the
-    fire button; `probe_seconds` is the short unconfigured test-press."""
+    `enabled`. `trigger` picks which fire button the Discovery Scanner sits on; `hold_seconds`
+    is the full honk hold. We don't track fire groups — the detect-and-recover handles a wrong
+    (Surface-Scanner) group."""
     enabled: bool = False
-    fire_group: int = -1
     trigger: str = "primary"        # "primary" | "secondary"
     hold_seconds: float = 6.0
-    probe_seconds: float = 0.4      # unconfigured: short test-press to detect a DSS misfire
     combat_guard: bool = True
 
     @classmethod
@@ -78,49 +69,20 @@ class HonkConfig:
         trigger = str(h.get("trigger", d.trigger) or "").strip().lower()
         trigger = "secondary" if trigger.startswith("sec") else "primary"
         try:
-            fire_group = int(h.get("fire_group", d.fire_group))
-        except (TypeError, ValueError):
-            fire_group = d.fire_group
-        try:
             hold_seconds = max(0.0, float(h.get("hold_seconds", d.hold_seconds)))
         except (TypeError, ValueError):
             hold_seconds = d.hold_seconds
-        try:
-            probe_seconds = max(0.0, float(h.get("probe_seconds", d.probe_seconds)))
-        except (TypeError, ValueError):
-            probe_seconds = d.probe_seconds
         return cls(
             enabled=bool(h.get("enabled", False)),
-            fire_group=fire_group,
             trigger=trigger,
             hold_seconds=hold_seconds,
-            probe_seconds=probe_seconds,
             combat_guard=bool(h.get("combat_guard", True)),
         )
-
-    @property
-    def configured(self) -> bool:
-        """Whether a specific scanner fire group is set (else we probe-and-recover)."""
-        return self.fire_group >= 0
 
     @property
     def fire_action(self) -> str:
         """The ED fire-button action token for the configured trigger."""
         return SECONDARY_FIRE if self.trigger == "secondary" else PRIMARY_FIRE
-
-
-def cycle_plan(current: int, target: int) -> tuple[str, int]:
-    """The fire-group cycle needed to go from `current` to `target`: `(action_token, count)`.
-
-    Deterministic — we know both indices, so we step exactly `|target - current|` times in the
-    right direction and never need the (unknown) total fire-group count or any wrapping. A
-    positive delta cycles Next, negative cycles Previous, zero is a no-op (`("", 0)`)."""
-    delta = target - current
-    if delta > 0:
-        return CYCLE_NEXT, delta
-    if delta < 0:
-        return CYCLE_PREV, -delta
-    return "", 0
 
 
 class HonkCapability:
@@ -130,10 +92,11 @@ class HonkCapability:
       * `binds`  — {action_token: KeyBinding} parsed from the active .binds file (may be {}).
       * `executor` — a KeyExecutor (or a fake recorder in tests) — SHARED with the keybind
         capability when both are on, so a hard abort lifts the held fire key too.
-      * `status_snapshot` — Callable[[], dict|None] returning the live EDContext snapshot for
-        the combat guard AND the current fire group, or None when ED monitoring isn't running.
+      * `status_snapshot` — Callable[[], dict|None] returning the live EDContext snapshot (for
+        the guards + the GuiFocus check), or None when ED monitoring isn't running.
       * `spawn` — runs the (blocking, ~hold_seconds) honk sequence off the event-pump thread;
         defaults to a daemon thread. Tests inject a synchronous runner.
+      * `speak` — speaks a Surface-Scanner-misfire warning (falls back to the log if absent).
     """
 
     def __init__(
@@ -246,43 +209,15 @@ class HonkCapability:
                           f"bind the Discovery Scanner's fire button to a key in-game.")
             return
 
-        if self._cfg.configured:
-            self._honk_configured(fire_binding)
-        else:
-            self._honk_unconfigured(fire_binding)
-
-    def _honk_configured(self, fire_binding: KeyBinding) -> None:
-        """Known scanner group: cycle to it (deterministic), hold fire, cycle back."""
-        plan = self._plan_cycle()
-        if plan is None:
-            return                         # couldn't determine/reach the group -> already logged
-        forward_token, count, reverse = plan
-        if count:
-            forward = self._binds[forward_token]   # presence checked in _plan_cycle
-            for _ in range(count):
-                self._executor.press(forward)
-        self._executor.hold(fire_binding, self._cfg.hold_seconds)
-        if reverse is not None:
-            back_token, back_count = reverse
-            back = self._binds.get(back_token)
-            if back is not None and back.usable:
-                for _ in range(back_count):
-                    self._executor.press(back)
-            else:
-                self._logline(f"honked, but couldn't restore the fire group "
-                              f"({back_token} not bound).")
-        self._logline(f"honked — fire group {self._cfg.fire_group}.")
-
-    def _honk_unconfigured(self, fire_binding: KeyBinding) -> None:
-        """No fire group set: a short probe-press, then check whether it opened the Surface
-        Scanner. If so, back out + warn + disarm; else complete the honk on the current group."""
-        self._executor.hold(fire_binding, self._cfg.probe_seconds)
-        snap = self._status() if self._status is not None else None
-        if snap and snap.get("gui_focus") == GUI_FOCUS_SAA:
+        # 5. Probe-and-recover: a short test-press, then check whether it opened the Surface
+        #    Scanner. If so, back out + warn + disarm; else complete the honk on the current group.
+        self._executor.hold(fire_binding, _PROBE_SECONDS)
+        snap = (self._status() if self._status is not None else None) or snap
+        if snap.get("gui_focus") == GUI_FOCUS_SAA:
             self._recover_from_dss()
             return
         self._executor.hold(fire_binding, self._cfg.hold_seconds)
-        self._logline("honked — current fire group (probe clear).")
+        self._logline("honked — current fire group.")
 
     def _recover_from_dss(self) -> None:
         """The probe opened the Detailed Surface Scanner — the current group holds the DSS, not
@@ -314,46 +249,15 @@ class HonkCapability:
             self._disarmed = False
             self._logline(f"re-armed ({reason}).")
 
-    def _plan_cycle(self) -> Optional[tuple[str, int, Optional[tuple[str, int]]]]:
-        """Work out the cycle to reach the configured scanner group from the current one.
-        Returns (forward_token, count, reverse_or_None), or None (with a logged reason) when we
-        can't safely do it — in which case we must NOT fire, since holding fire in the wrong
-        group could fire weapons."""
-        current = self._current_fire_group()
-        if current is None:
-            self._logline("skipped: current fire group unknown (needs ED monitoring) — "
-                          "not firing, to avoid holding fire in the wrong group.")
-            return None
-        forward_token, count = cycle_plan(current, self._cfg.fire_group)
-        if count == 0:
-            return "", 0, None             # already on the scanner group
-        cyc = self._binds.get(forward_token)
-        if cyc is None or not cyc.usable:
-            self._logline(f"skipped: {forward_token} has no keyboard binding — can't reach the "
-                          f"scanner's fire group. Bind fire-group cycling to a key in-game.")
-            return None
-        back_token = CYCLE_PREV if forward_token == CYCLE_NEXT else CYCLE_NEXT
-        return forward_token, count, (back_token, count)
-
     # -- guards / state ---------------------------------------------------------------
     def _guard(self) -> Optional[str]:
         """Combat/interdiction guard, mirroring the keybind capability. Returns a refusal
-        message when it's not safe to act, or None when clear. Skipped if `combat_guard` is
-        off (the fallback path can then honk without ED monitoring)."""
+        message when it's not safe to act, or None when clear (or when `combat_guard` is off)."""
         if not self._cfg.combat_guard:
             return None
         snap = self._status() if self._status is not None else None
         state = combat_state(snap)
         return None if state == SAFE else _GUARD_MESSAGES[state]
-
-    def _current_fire_group(self) -> Optional[int]:
-        """The currently-selected fire group index from the live ED status, or None when it's
-        unavailable (no monitoring, or not in a ship with hardpoints yet)."""
-        snap = self._status() if self._status is not None else None
-        if not snap:
-            return None
-        fg = snap.get("fire_group")
-        return fg if isinstance(fg, int) and not isinstance(fg, bool) else None
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:

@@ -695,8 +695,6 @@ class App:
 
             fire = binds.get(hcfg.fire_action)
             fire_ok = fire is not None and fire.usable
-            where = (f"fire group {hcfg.fire_group}" if hcfg.configured
-                     else "current fire group (no cycling)")
             if self.ed_ctx is None:
                 self.bus.publish({"type": "log", "who": "system", "text":
                     "Auto-honk ON, but ED monitoring is OFF — no arrival events, and the "
@@ -707,8 +705,9 @@ class App:
                     "Discovery Scanner's fire button to a key in-game so COVAS can honk."})
             else:
                 self.bus.publish({"type": "log", "who": "system",
-                                  "text": f"Auto-honk ON (hold {hcfg.fire_action} "
-                                          f"{hcfg.hold_seconds:g}s on {where}, combat guard "
+                                  "text": f"Auto-honk ON (probe + hold {hcfg.fire_action} on the "
+                                          f"current fire group; backs out of a Surface-Scanner "
+                                          f"misfire; combat guard "
                                           f"{'on' if hcfg.combat_guard else 'off'})."})
         except Exception as e:  # noqa: BLE001 — optional; never block startup
             self.honk = None

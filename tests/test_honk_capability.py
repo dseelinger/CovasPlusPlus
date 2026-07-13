@@ -1,17 +1,16 @@
 """Unit tests for auto-honk (N5 + K2 detect-and-recover) — offline, free (DESIGN §6, §9).
 
-Covers the pure fire-group cycle math, the configured honk (cycle -> hold -> cycle back),
-the unconfigured probe-and-recover (short probe; on a Surface-Scanner misfire it exits +
-warns + disarms), the guards (combat, supercruise, analysis mode), the fail-soft paths,
-re-arm (verbal tool + auto on a discovery scan), and config parsing. A recording fake
-executor asserts the exact key sequence; no journal, no audio, no real key injection.
+No fire groups: the honk fires the CURRENT group's Primary/Secondary and reacts. Covers the
+probe-then-honk, the Surface-Scanner-misfire recovery (exit + warn + disarm), the guards
+(combat, supercruise, analysis mode), re-arm (verbal tool + auto on a discovery scan), the
+fail-soft unbound-key path, and config parsing. A recording fake executor asserts the exact
+key sequence; no journal, no audio, no real key injection.
 """
 from __future__ import annotations
 
 from covas.ed.status import GUI_FOCUS_SAA
 from covas.keybinds.binds import KeyBinding
-from covas.capabilities.honk_capability import (CYCLE_NEXT, CYCLE_PREV, HonkCapability,
-                                                HonkConfig, cycle_plan)
+from covas.capabilities.honk_capability import HonkCapability, HonkConfig, _PROBE_SECONDS
 
 
 # --- recording fake executor -----------------------------------------------
@@ -32,17 +31,15 @@ class _FakeExecutor:
         self.released_all += 1
 
 
-# ED bindings the honk sequence uses, mapped to distinct keys so the sequence is legible.
 _BINDS = {
     "PrimaryFire": KeyBinding(action="PrimaryFire", key="Key_1"),
     "SecondaryFire": KeyBinding(action="SecondaryFire", key="Key_2"),
-    "CycleFireGroupNext": KeyBinding(action="CycleFireGroupNext", key="Key_N"),
-    "CycleFireGroupPrevious": KeyBinding(action="CycleFireGroupPrevious", key="Key_B"),
     "ExplorationSAAExitThirdPerson": KeyBinding(action="ExplorationSAAExitThirdPerson", key="Key_X"),
 }
 # A "safe to honk" snapshot: not in danger, in supercruise, analysis (not combat) mode, no focus.
 _SAFE = {"in_danger": False, "being_interdicted": False, "supercruise": True,
-         "analysis_mode": True, "gui_focus": None, "fire_group": 0}
+         "analysis_mode": True, "gui_focus": None}
+_P = _PROBE_SECONDS
 
 
 def _cap(*, cfg=None, binds=None, status=_SAFE, speak=None):
@@ -62,78 +59,28 @@ def _jump(cap):
     cap.on_event({"type": "ed_event", "event": "FSDJump", "StarSystem": "Sol"})
 
 
-# --- cycle_plan (pure) -----------------------------------------------------
+# --- probe-then-honk -------------------------------------------------------
 
-def test_cycle_plan_forward():
-    assert cycle_plan(0, 3) == (CYCLE_NEXT, 3)
-
-
-def test_cycle_plan_backward():
-    assert cycle_plan(4, 1) == (CYCLE_PREV, 3)
-
-
-def test_cycle_plan_no_move():
-    assert cycle_plan(2, 2) == ("", 0)
-
-
-# --- configured honk: cycle -> hold -> cycle back --------------------------
-
-def test_honk_cycles_holds_and_cycles_back():
-    cfg = HonkConfig(enabled=True, fire_group=2, trigger="primary", hold_seconds=6.0)
-    cap, ex = _cap(cfg=cfg, status={**_SAFE, "fire_group": 0})
+def test_probe_then_honks_when_clear():
+    # Short probe, GuiFocus stays normal -> complete the honk on the current group.
+    cap, ex = _cap(cfg=HonkConfig(enabled=True, hold_seconds=6.0))
     _jump(cap)
-    assert ex.calls == [
-        ("press", "Key_N", 0.0),          # cycle next 0 -> 1
-        ("press", "Key_N", 0.0),          # cycle next 1 -> 2 (scanner group)
-        ("hold", "Key_1", 6.0),           # hold primary fire for the honk
-        ("press", "Key_B", 0.0),          # cycle back 2 -> 1
-        ("press", "Key_B", 0.0),          # cycle back 1 -> 0 (restore original)
-    ]
-
-
-def test_honk_already_on_scanner_group_skips_cycling():
-    cfg = HonkConfig(enabled=True, fire_group=1, hold_seconds=5.0)
-    cap, ex = _cap(cfg=cfg, status={**_SAFE, "fire_group": 1})
-    _jump(cap)
-    assert ex.calls == [("hold", "Key_1", 5.0)]     # no cycle when already there
-
-
-def test_honk_backward_cycle_when_current_above_target():
-    cfg = HonkConfig(enabled=True, fire_group=1, hold_seconds=4.0)
-    cap, ex = _cap(cfg=cfg, status={**_SAFE, "fire_group": 3})
-    _jump(cap)
-    assert ex.calls == [
-        ("press", "Key_B", 0.0), ("press", "Key_B", 0.0),   # prev 3 -> 1
-        ("hold", "Key_1", 4.0),
-        ("press", "Key_N", 0.0), ("press", "Key_N", 0.0),   # next 1 -> 3 (restore)
-    ]
+    assert ex.calls == [("hold", "Key_1", _P), ("hold", "Key_1", 6.0)]
 
 
 def test_secondary_trigger_holds_secondary_fire():
-    cfg = HonkConfig(enabled=True, fire_group=0, trigger="secondary", hold_seconds=6.0)
-    cap, ex = _cap(cfg=cfg, status={**_SAFE, "fire_group": 0})
+    cap, ex = _cap(cfg=HonkConfig(enabled=True, trigger="secondary", hold_seconds=6.0))
     _jump(cap)
-    assert ex.calls == [("hold", "Key_2", 6.0)]
+    assert ex.calls == [("hold", "Key_2", _P), ("hold", "Key_2", 6.0)]
 
 
-# --- unconfigured: probe-and-recover ---------------------------------------
-
-def test_unconfigured_probe_then_honks_when_clear():
-    # No fire group set: short probe, GuiFocus stays normal -> complete the honk.
-    cfg = HonkConfig(enabled=True, fire_group=-1, probe_seconds=0.4, hold_seconds=6.0)
-    cap, ex = _cap(cfg=cfg, status={**_SAFE, "gui_focus": None})
-    _jump(cap)
-    assert ex.calls == [("hold", "Key_1", 0.4), ("hold", "Key_1", 6.0)]
-
-
-def test_unconfigured_probe_detects_dss_and_recovers():
+def test_probe_detects_dss_and_recovers():
     # Probe opened the Surface Scanner (GuiFocus == SAA) -> exit, warn, disarm, NO full honk.
     spoken: list[str] = []
-    cfg = HonkConfig(enabled=True, fire_group=-1, probe_seconds=0.4, hold_seconds=6.0)
-    cap, ex = _cap(cfg=cfg, status={**_SAFE, "gui_focus": GUI_FOCUS_SAA},
+    cap, ex = _cap(status={**_SAFE, "gui_focus": GUI_FOCUS_SAA},
                    speak=lambda t: spoken.append(t))
     _jump(cap)
-    assert ex.calls == [("hold", "Key_1", 0.4), ("press", "Key_X", 0.0)]
+    assert ex.calls == [("hold", "Key_1", _P), ("press", "Key_X", 0.0)]
     assert cap._disarmed is True
     assert spoken and "Surface Scanner" in spoken[0]
 
@@ -141,7 +88,7 @@ def test_unconfigured_probe_detects_dss_and_recovers():
 # --- disarm / re-arm -------------------------------------------------------
 
 def test_disarmed_skips():
-    cap, ex = _cap(cfg=HonkConfig(enabled=True, fire_group=-1))
+    cap, ex = _cap()
     cap._disarmed = True
     _jump(cap)
     assert ex.calls == []
@@ -155,7 +102,7 @@ def test_rearm_tool_clears_disarm():
 
 
 def test_auto_rearm_on_discovery_scan():
-    cap, ex = _cap(cfg=HonkConfig(enabled=True, fire_group=-1))
+    cap, ex = _cap()
     cap._disarmed = True
     cap.on_event({"type": "ed_event", "event": "FSSDiscoveryScan", "BodyCount": 5})
     assert cap._disarmed is False
@@ -165,73 +112,61 @@ def test_auto_rearm_on_discovery_scan():
 # --- guards ----------------------------------------------------------------
 
 def test_guard_suppresses_during_danger():
-    cap, ex = _cap(status={"in_danger": True, "being_interdicted": False, "fire_group": 0})
+    cap, ex = _cap(status={**_SAFE, "in_danger": True})
     _jump(cap)
     assert ex.calls == []
 
 
 def test_guard_suppresses_during_interdiction():
-    cap, ex = _cap(status={"in_danger": False, "being_interdicted": True, "fire_group": 0})
+    cap, ex = _cap(status={**_SAFE, "being_interdicted": True})
     _jump(cap)
     assert ex.calls == []
 
 
 def test_guard_suppresses_when_status_unknown():
     ex = _FakeExecutor()
-    cap = HonkCapability(HonkConfig(enabled=True, fire_group=0),
-                         binds=_BINDS, executor=ex,
+    cap = HonkCapability(HonkConfig(enabled=True), binds=_BINDS, executor=ex,
                          status_snapshot=None, spawn=lambda fn: fn())
     _jump(cap)
     assert ex.calls == []                 # can't prove it's safe -> no honk
 
 
 def test_supercruise_required():
-    cap, ex = _cap(cfg=HonkConfig(enabled=True, fire_group=0),
-                   status={**_SAFE, "supercruise": False})
+    cap, ex = _cap(status={**_SAFE, "supercruise": False})
     _jump(cap)
     assert ex.calls == []
 
 
 def test_analysis_mode_required():
-    cap, ex = _cap(cfg=HonkConfig(enabled=True, fire_group=0),
-                   status={**_SAFE, "analysis_mode": False})
+    cap, ex = _cap(status={**_SAFE, "analysis_mode": False})
     _jump(cap)
     assert ex.calls == []
 
 
-def test_guard_can_be_disabled_for_configured_honk_with_status():
-    cfg = HonkConfig(enabled=True, fire_group=0, combat_guard=False)
-    cap, ex = _cap(cfg=cfg, status={"in_danger": True, "supercruise": True,
-                                    "analysis_mode": True, "fire_group": 0})
+def test_guard_can_be_disabled_with_status():
+    cfg = HonkConfig(enabled=True, combat_guard=False, hold_seconds=6.0)
+    cap, ex = _cap(cfg=cfg, status={**_SAFE, "in_danger": True})
     _jump(cap)
-    assert ex.calls == [("hold", "Key_1", 6.0)]   # guard off -> honks despite danger
+    assert ex.calls == [("hold", "Key_1", _P), ("hold", "Key_1", 6.0)]  # guard off -> honks
 
 
-# --- fail-soft paths -------------------------------------------------------
-
-def test_unknown_fire_group_does_not_fire():
-    # configured to cycle, but the current group is unreadable -> must NOT fire
-    cfg = HonkConfig(enabled=True, fire_group=2)
-    cap, ex = _cap(cfg=cfg, status={**_SAFE, "fire_group": None})
-    _jump(cap)
-    assert ex.calls == []
-
+# --- fail-soft -------------------------------------------------------------
 
 def test_unbound_fire_key_skips():
     binds = dict(_BINDS)
     binds["PrimaryFire"] = KeyBinding(action="PrimaryFire", key=None)   # joystick-only
-    cap, ex = _cap(cfg=HonkConfig(enabled=True, fire_group=0), binds=binds)
+    cap, ex = _cap(binds=binds)
     _jump(cap)
     assert ex.calls == []
 
 
-def test_missing_cycle_binding_does_not_fire():
+def test_recover_without_exit_binding_still_disarms():
     binds = dict(_BINDS)
-    del binds["CycleFireGroupNext"]        # can't reach a higher group
-    cap, ex = _cap(cfg=HonkConfig(enabled=True, fire_group=2), binds=binds,
-                   status={**_SAFE, "fire_group": 0})
+    del binds["ExplorationSAAExitThirdPerson"]     # can't auto-exit
+    cap, ex = _cap(binds=binds, status={**_SAFE, "gui_focus": GUI_FOCUS_SAA})
     _jump(cap)
-    assert ex.calls == []                  # refuse rather than fire in the wrong group
+    assert ex.calls == [("hold", "Key_1", _P)]     # probed, no exit press, but still...
+    assert cap._disarmed is True                   # ...disarms so it can't keep misfiring
 
 
 # --- event gating ----------------------------------------------------------
@@ -260,20 +195,18 @@ def test_bad_event_does_not_raise():
 
 def test_config_from_cfg_defaults():
     d = HonkConfig.from_cfg({})
-    assert d.enabled is False and d.fire_group == -1 and d.trigger == "primary"
-    assert d.hold_seconds == 6.0 and d.probe_seconds == 0.4
-    assert d.combat_guard is True and d.configured is False
+    assert d.enabled is False and d.trigger == "primary"
+    assert d.hold_seconds == 6.0 and d.combat_guard is True
+    assert d.fire_action == "PrimaryFire"
 
 
 def test_config_from_cfg_reads_and_normalizes():
-    c = HonkConfig.from_cfg({"honk": {"enabled": True, "fire_group": 3,
-                                      "trigger": "SECONDARY", "hold_seconds": 4.5,
-                                      "probe_seconds": 0.6, "combat_guard": False}})
-    assert c.enabled and c.fire_group == 3 and c.trigger == "secondary"
-    assert c.hold_seconds == 4.5 and c.probe_seconds == 0.6 and c.combat_guard is False
-    assert c.configured is True and c.fire_action == "SecondaryFire"
+    c = HonkConfig.from_cfg({"honk": {"enabled": True, "trigger": "SECONDARY",
+                                      "hold_seconds": 4.5, "combat_guard": False}})
+    assert c.enabled and c.trigger == "secondary" and c.hold_seconds == 4.5
+    assert c.combat_guard is False and c.fire_action == "SecondaryFire"
 
 
 def test_config_bad_values_fall_back():
-    c = HonkConfig.from_cfg({"honk": {"fire_group": "x", "hold_seconds": "y", "probe_seconds": "z"}})
-    assert c.fire_group == -1 and c.hold_seconds == 6.0 and c.probe_seconds == 0.4
+    c = HonkConfig.from_cfg({"honk": {"hold_seconds": "y"}})
+    assert c.hold_seconds == 6.0 and c.trigger == "primary"
