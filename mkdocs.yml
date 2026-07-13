@@ -72,6 +72,7 @@ nav:
   - Getting started:
       - Install & setup: getting-started/install.md
       - Running COVAS++: getting-started/running.md
+      - Updating COVAS++: getting-started/updating.md
       - The voice loop: getting-started/voice-loop.md
   - Talking to COVAS:
       - Personas & voice: using/personas-voice.md

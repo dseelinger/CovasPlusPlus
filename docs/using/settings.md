@@ -42,9 +42,16 @@ And if you name something that isn't a setting at all (*"set the warp factor to 
 - **On restart** — turning a whole **capability** on or off (e.g. enabling game monitoring or the
   keybinds) applies the next time you launch.
 
-Your changes are written to `overrides.json` (git-ignored), so they persist across restarts and
-`config.toml` stays pristine. Delete a key from the overrides to reset it, or use the per-setting
-**Reset** button on the Settings page.
+Your changes are written to `overrides.json`, so they persist across restarts and `config.toml`
+stays pristine. Delete a key from the overrides to reset it, or use the per-setting **Reset**
+button on the Settings page.
+
+!!! info "Where your settings live"
+    In the installed app, your `config.toml`, `overrides.json`, keys, personality/campaign, and
+    checklist all live in **`%APPDATA%\COVAS++`** (a source run keeps them in the project root).
+    That folder is outside the program files, so **[updating COVAS++](../getting-started/updating.md)
+    never touches your settings** — every value you changed survives an upgrade. Paste
+    `%APPDATA%\COVAS++` into File Explorer's address bar to open it.
 
 ## See also
 

@@ -20,11 +20,22 @@ from flask import Flask, jsonify, render_template, request
 from . import elevenlabs as el
 from . import firstrun
 
+# The finish-step copy differs by HOW the wizard is being shown, because the safe next action
+# differs. In the NATIVE single window (run_covas_app.py) the handoff swaps this SAME window over
+# to the control panel automatically — telling the user to "close this tab" there would make them
+# QUIT the app (closing the only window ends the process). In a BROWSER tab (run_covas_ui.py) the
+# panel comes up separately, so closing the leftover setup tab is exactly right.
+_FINISH_MSG_NATIVE = "Setup complete — starting COVAS++. Switching to the control panel…"
+_FINISH_MSG_BROWSER = "Setup complete — COVAS++ is starting. You can close this tab."
 
-def create_setup_app(cfg: dict, done: threading.Event) -> Flask:
+
+def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) -> Flask:
     """Build the wizard app. `cfg` is mutated in place as steps write overrides (so status
-    reads stay current); `done` is set when setup finishes so the caller can stop serving."""
+    reads stay current); `done` is set when setup finishes so the caller can stop serving.
+    `native` tailors the finish copy to the single-window native flow vs a browser tab (see
+    the message constants above)."""
     app = Flask(__name__, template_folder="templates", static_folder="static")
+    finish_message = _FINISH_MSG_NATIVE if native else _FINISH_MSG_BROWSER
 
     # Coarse STT-download state shared with the status poll. Real byte-progress from
     # huggingface_hub is awkward to capture reliably, so we report a state, not a percent —
@@ -36,7 +47,7 @@ def create_setup_app(cfg: dict, done: threading.Event) -> Flask:
     @app.route("/")
     @app.route("/setup")
     def setup_page():
-        return render_template("setup.html")
+        return render_template("setup.html", finish_message=finish_message)
 
     @app.route("/api/setup/status")
     def status():
@@ -139,7 +150,7 @@ def create_setup_app(cfg: dict, done: threading.Event) -> Flask:
     return app
 
 
-def start_setup_server(cfg: dict):
+def start_setup_server(cfg: dict, *, native: bool = False):
     """Start the wizard on a stoppable werkzeug server WITHOUT opening a browser or blocking.
     Returns `(srv, thread, done)`: the caller owns the lifecycle — it decides how the wizard is
     shown (a browser tab or a native PyWebView window pointed at the URL) and, once `done` is
@@ -151,7 +162,7 @@ def start_setup_server(cfg: dict):
     from werkzeug.serving import make_server
 
     done = threading.Event()
-    app = create_setup_app(cfg, done)
+    app = create_setup_app(cfg, done, native=native)
     host = cfg["ui"]["host"]
     port = int(cfg["ui"]["port"])
     srv = make_server(host, port, app, threaded=True)

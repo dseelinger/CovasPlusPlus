@@ -38,7 +38,7 @@
         "HW"
       ],
       "requires": "Continue from fresh-install-native-wizard, in the native window on the wizard page.",
-      "expected": "After entering the Anthropic key (ElevenLabs optional), downloading the STT model, and picking a mic, clicking Launch turns the SAME native window into the control panel. Status light reads IDLE. No browser opens.",
+      "expected": "After entering the Anthropic key (ElevenLabs optional), downloading the STT model, and picking a mic, clicking Launch turns the SAME native window into the control panel (status light IDLE), no browser. The finish message must say it\u0027s switching to the control panel and must NOT tell you to close the window/tab \u2014 closing the single native window would QUIT the app.",
       "steps": [
         {
           "id": "s1",
@@ -54,11 +54,11 @@
         },
         {
           "id": "s4",
-          "text": "Click \u0027Launch COVAS\u002B\u002B\u0027."
+          "text": "Click \u0027Launch COVAS\u002B\u002B\u0027. Read the finish message: it should say COVAS\u002B\u002B is starting / switching to the control panel \u2014 NOT \u0027you can close this tab\u0027."
         },
         {
           "id": "s5",
-          "text": "The same window navigates to the control panel (status light IDLE). No new browser opens, no second window appears."
+          "text": "WITHOUT closing anything, the same window switches to the control panel (status light IDLE) within a few seconds. Do NOT close the window \u2014 that quits the app."
         }
       ]
     },
@@ -173,6 +173,50 @@
           "text": "Build completes and the frozen self-test passes (exit 0)."
         }
       ]
+    },
+    {
+      "id": "version-by-voice",
+      "title": "\u0022What version are you?\u0022 reports the running version",
+      "section": "I7. Version by voice",
+      "tags": [
+        "HW"
+      ],
+      "requires": "App running (native window, browser UI, or headless). Know the expected version from \u0060covas/__version__.py\u0060 (currently 0.1.0).",
+      "expected": "COVAS speaks the running version, e.g. \u0022I\u0027m running COVAS\u002B\u002B version 0.1.0.\u0022, matching covas/__version__.py exactly.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold \u0060[\u0060, say \u0022What version are you?\u0022, release."
+        },
+        {
+          "id": "s2",
+          "text": "The spoken reply names the version and it matches the string in \u0060covas/__version__.py\u0060."
+        },
+        {
+          "id": "s3",
+          "text": "Try a variant (\u0022which build is this?\u0022) \u2192 still reports the same version."
+        }
+      ]
+    },
+    {
+      "id": "check-updates-by-voice-is-ui-only",
+      "title": "\u0022Check for updates\u0022 by voice does NOT update \u2014 points to the panel",
+      "section": "I7. Version by voice",
+      "tags": [
+        "HW"
+      ],
+      "requires": "App running.",
+      "expected": "Asking to check for / install an update by VOICE does not trigger any download or relaunch; COVAS says updates are done from the control panel\u0027s update banner. (Updating stays a UI action \u2014 INSTALLER_DESIGN decision #5.)",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold \u0060[\u0060, say \u0022Check for updates.\u0022, release."
+        },
+        {
+          "id": "s2",
+          "text": "COVAS does NOT download or relaunch anything; it points you at the control panel\u0027s update banner instead."
+        }
+      ]
     }
   ],
   "runs": [
@@ -248,6 +292,185 @@
           "stepChecks": {
             "s1": false,
             "s2": false
+          }
+        }
+      ]
+    },
+    {
+      "runId": "run-20260713T193111Z-0117",
+      "session": "I7: what version are you? voice query",
+      "commit": "bf452cd",
+      "branch": "feature/installer-docs",
+      "submittedAt": "2026-07-13T19:44:25Z",
+      "results": [
+        {
+          "testId": "fresh-install-native-wizard",
+          "status": "fail",
+          "stepChecks": {
+            "s1": true,
+            "s2": false,
+            "s3": false
+          },
+          "failure": {
+            "screenshots": []
+          }
+        },
+        {
+          "testId": "wizard-to-panel-handoff",
+          "status": "skip",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false
+          }
+        },
+        {
+          "testId": "already-configured-skips-wizard",
+          "status": "skip",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "bail-mid-wizard-quits-clean",
+          "status": "skip",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "native-quit-controls",
+          "status": "skip",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "browser-path-unchanged",
+          "status": "skip",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "frozen-selftest",
+          "status": "skip",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "version-by-voice",
+          "status": "skip",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "check-updates-by-voice-is-ui-only",
+          "status": "skip",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        }
+      ]
+    },
+    {
+      "runId": "run-20260713T203923Z-0a4c",
+      "session": "I7 version query \u002B wizard handoff retest",
+      "commit": "bf452cd",
+      "branch": "feature/installer-docs",
+      "submittedAt": "2026-07-13T20:46:48Z",
+      "results": [
+        {
+          "testId": "fresh-install-native-wizard",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "wizard-to-panel-handoff",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": true,
+            "s5": true
+          }
+        },
+        {
+          "testId": "already-configured-skips-wizard",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true
+          }
+        },
+        {
+          "testId": "bail-mid-wizard-quits-clean",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "native-quit-controls",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true
+          }
+        },
+        {
+          "testId": "browser-path-unchanged",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "frozen-selftest",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true
+          }
+        },
+        {
+          "testId": "version-by-voice",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "check-updates-by-voice-is-ui-only",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true
           }
         }
       ]

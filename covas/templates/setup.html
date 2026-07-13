@@ -175,7 +175,9 @@ $("finishBtn").onclick = async () => {
   msg("finishMsg","Finishing…");
   const {ok,data} = await jpost("/api/setup/finish");
   if(!ok || !data.ok){ msg("finishMsg",(data&&data.error)||"not ready",false); return; }
-  msg("finishMsg","Setup complete — COVAS++ is starting. You can close this tab.", true);
+  // Server-provided so the copy matches how the wizard is shown: the native single window swaps
+  // itself to the panel (closing it would quit the app); a browser tab is safe to close.
+  msg("finishMsg", {{ finish_message|tojson }}, true);
   $("finishBtn").disabled = true;
 };
 

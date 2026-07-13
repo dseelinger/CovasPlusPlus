@@ -45,3 +45,15 @@ loaded features, so the help you hear always matches the app you're actually run
 docs, no phantom features.
 
 There's nothing to configure — help is always on.
+
+## Asking its version
+
+You can also ask COVAS++ which build it's running:
+
+> *"What version are you?"* → *"I'm running COVAS++ version 0.1.0."*
+
+That reads the app's single source-of-truth version string. **Checking for updates is a
+different thing and stays in the control panel** — the [update banner](../getting-started/updating.md)
+downloads and installs a new version, which is a click, never a voice command. Ask the version by
+voice; update from the panel.
+

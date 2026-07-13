@@ -138,6 +138,14 @@ class App:
         self.clipboard_cap = ClipboardCapability(log=lambda m: self._log("clipboard", m))
         self.registry.register(self.clipboard_cap)
 
+        # "What version are you?" (I7): report the running app version by voice, read from the
+        # single-source-of-truth covas/__version__.py. Always on, like help/settings/clipboard
+        # — local and harmless. Checking FOR updates stays a control-panel action, never a
+        # voice command (INSTALLER_DESIGN.md decision #5).
+        from .capabilities.version_capability import VersionCapability
+        self.version_cap = VersionCapability(log=lambda m: self._log("version", m))
+        self.registry.register(self.version_cap)
+
         # Elite Dangerous monitoring (DESIGN §5). Opt-in ([elite].enabled, off by
         # default). When on, two daemon watchers tail ED's journal + Status.json,
         # publishing events on the bus and updating a shared context the ED-context
