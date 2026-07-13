@@ -125,6 +125,36 @@ def test_resolve_preset_named_but_file_missing_raises(tmp_path):
         resolve_binds_file({}, dir_=tmp_path)
 
 
+def test_resolve_picks_highest_version_suffix(tmp_path):
+    # Both .4.0 and .4.2 present -> take the newest.
+    (tmp_path / "StartPreset.4.start").write_text("Custom\n", encoding="utf-8")
+    (tmp_path / "Custom.4.0.binds").write_text(SAMPLE, encoding="utf-8")
+    (tmp_path / "Custom.4.2.binds").write_text(SAMPLE, encoding="utf-8")
+    assert resolve_binds_file({}, dir_=tmp_path).name == "Custom.4.2.binds"
+
+
+def test_resolve_finds_newer_suffix_when_4_0_absent(tmp_path):
+    # The exact bug: only Custom.4.2.binds exists (old code only looked for .4.0).
+    (tmp_path / "StartPreset.4.start").write_text("Custom\n", encoding="utf-8")
+    (tmp_path / "Custom.4.2.binds").write_text(SAMPLE, encoding="utf-8")
+    assert resolve_binds_file({}, dir_=tmp_path).name == "Custom.4.2.binds"
+
+
+def test_resolve_falls_back_to_unversioned_binds(tmp_path):
+    (tmp_path / "StartPreset.4.start").write_text("Plain\n", encoding="utf-8")
+    (tmp_path / "Plain.binds").write_text(SAMPLE, encoding="utf-8")
+    assert resolve_binds_file({}, dir_=tmp_path).name == "Plain.binds"
+
+
+def test_resolve_scoped_to_preset_ignores_others_and_nonnumeric(tmp_path):
+    # A different preset's file and a non-numeric middle must NOT be picked for 'Custom'.
+    (tmp_path / "StartPreset.4.start").write_text("Custom\n", encoding="utf-8")
+    (tmp_path / "Default.4.2.binds").write_text(SAMPLE, encoding="utf-8")
+    (tmp_path / "Custom.backup.binds").write_text(SAMPLE, encoding="utf-8")
+    with pytest.raises(BindsError):
+        resolve_binds_file({}, dir_=tmp_path)
+
+
 def test_load_binds_end_to_end(tmp_path):
     (tmp_path / "StartPreset.4.start").write_text("Custom\n", encoding="utf-8")
     (tmp_path / "Custom.4.0.binds").write_text(SAMPLE, encoding="utf-8")

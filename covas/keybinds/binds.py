@@ -33,8 +33,10 @@ _BINDINGS_SUBPATH = ("Frontier Developments", "Elite Dangerous", "Options", "Bin
 # builds wrote a single-line StartPreset.start.
 _START_PRESET_FILES = ("StartPreset.4.start", "StartPreset.start")
 
-# Bindings file suffix for the current major.minor. "<preset>.4.0.binds".
-_BINDS_SUFFIX = ".4.0.binds"
+# The bindings-file extension. ED versions the base name — "<preset>.<major>.<minor>.binds"
+# (e.g. .4.0 through .4.2 and up), and occasionally an unversioned "<preset>.binds". We pick
+# the HIGHEST version present rather than hardcoding one, so a game update can't hide the binds.
+_BINDS_EXT = ".binds"
 
 # The device string ED uses for keyboard bindings. A joystick/HOTAS uses a hex device id
 # (e.g. "221B0A57"); an unbound slot uses "{NoDevice}".
@@ -104,16 +106,46 @@ def active_preset(dir_: Path) -> str | None:
     return None
 
 
+def _binds_version(filename: str, preset: str) -> tuple[int, ...] | None:
+    """The numeric version of a "<preset>.<v>.binds" file ("Custom.4.2.binds" -> (4, 2)), or
+    None if `filename` isn't a numeric-versioned binds file for `preset`."""
+    prefix = f"{preset}."
+    if not (filename.startswith(prefix) and filename.endswith(_BINDS_EXT)):
+        return None
+    middle = filename[len(prefix):-len(_BINDS_EXT)]         # "4.2"
+    parts = middle.split(".")
+    if not middle or not all(p.isdigit() for p in parts):
+        return None
+    return tuple(int(p) for p in parts)
+
+
+def _preset_binds_file(d: Path, preset: str) -> Path | None:
+    """The active preset's bindings file, tolerant of ED's version suffix. Prefer the highest
+    "<preset>.<v>.binds" present, else an unversioned "<preset>.binds"; None if neither exists.
+    The glob is scoped to THIS preset name, so stale/default presets can't be picked."""
+    try:
+        versioned = [(v, p) for p in d.glob(f"{preset}.*{_BINDS_EXT}")
+                     if (v := _binds_version(p.name, preset)) is not None]
+    except OSError:
+        versioned = []
+    if versioned:
+        versioned.sort(key=lambda vp: vp[0])
+        return versioned[-1][1]
+    plain = d / f"{preset}{_BINDS_EXT}"
+    return plain if plain.exists() else None
+
+
 def resolve_binds_file(cfg: dict | None = None, *, dir_: Path | None = None) -> Path:
     """Locate the active bindings file. Resolution order:
 
       1. `[keybinds].binds_file` override (absolute, or relative to the bindings dir) —
          the escape hatch for when auto-detection picks wrong.
-      2. Active preset from StartPreset.4.start (fallback StartPreset.start) ->
-         `<preset>.4.0.binds` in the bindings directory.
+      2. Active preset from StartPreset.4.start (fallback StartPreset.start) -> the highest
+         `<preset>.<version>.binds` present (or unversioned `<preset>.binds`).
 
     Raises `BindsError` (with a Commander-facing message) if nothing resolvable is found or
-    the resolved file doesn't exist. Never globs `*.binds`."""
+    the preset has no bindings file. The glob is scoped to the active preset name — never a
+    blind `*.binds` that could grab a stale/default preset."""
     d = dir_ or bindings_dir()
 
     override = str((cfg or {}).get("keybinds", {}).get("binds_file", "") or "").strip()
@@ -131,11 +163,11 @@ def resolve_binds_file(cfg: dict | None = None, *, dir_: Path | None = None) -> 
             f"Couldn't find the active ED bindings preset in {d} "
             f"(no {' or '.join(_START_PRESET_FILES)}). Is Elite Dangerous installed and "
             f"run at least once? Set [keybinds].binds_file to point at your .binds file.")
-    p = d / f"{preset}{_BINDS_SUFFIX}"
-    if not p.exists():
+    p = _preset_binds_file(d, preset)
+    if p is None:
         raise BindsError(
-            f"Active preset is '{preset}' but its bindings file is missing: {p}. "
-            f"Set [keybinds].binds_file to override.")
+            f"Active preset is '{preset}' but no bindings file for it was found in {d} "
+            f"(looked for {preset}.*{_BINDS_EXT}). Set [keybinds].binds_file to override.")
     return p
 
 
