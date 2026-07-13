@@ -1,0 +1,8 @@
+# COVAS++ BUILD/PACKAGING dependencies (NOT needed to run from source).
+# These wrap the app as an installable Windows program: a native window (PyWebView)
+# and the frozen build (PyInstaller, added in I5). The base runtime in requirements.txt
+# stays free of them so a source run / CI install pulls nothing GUI- or freeze-specific.
+# Install with:  .venv\Scripts\python.exe -m pip install -r requirements-build.txt
+# ---------------------------------------------------------------------------
+-r requirements.txt        # the build env is a superset of the runtime env
+pywebview>=6.2             # native OS window around the Flask control panel (run_covas_app.py)
