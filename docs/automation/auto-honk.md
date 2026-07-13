@@ -1,52 +1,63 @@
 # Auto-honk
 
 Auto-honk fires the **Discovery Scanner** — the "honk" that reveals a system's bodies — shortly
-after you jump into a **new system**, hands-free. It's the second keystroke COVAS++ can send, built
-on the same guarded [keybind executor](keybinds.md).
+after you jump into a **new system**, hands-free. It's built on the same guarded
+[keybind executor](keybinds.md), and it needs **no fire-group setup**.
 
-!!! danger "Off by default — it presses a fire button"
-    Set `[honk].enabled = true` to use it. Because it holds a fire button, it's combat-gated and
-    opt-in. Test it parked and safe.
+!!! tip "On by default — and safe"
+    Auto-honk ships **on**. It never needs to know your fire groups: it fires your *current*
+    group and reacts. If that turns out to be the wrong group and opens the Surface Scanner, it
+    **backs out, warns you, and pauses itself** until you re-arm. A weapons group can't fire in
+    supercruise, so the worst non-scanner case is a harmless no-op.
 
 ## What happens on arrival
 
-When you jump into a new system (and it's safe), auto-honk does one of two things:
+When you jump into a new system (and it's safe — see below), auto-honk:
 
-- **If you've told it your scanner's fire group** — it reads your *current* fire group from the
-  game, cycles to the scanner group, **holds** the fire button for a few seconds to complete the
-  honk, then cycles back. Deterministic — no guessing.
-- **If you haven't configured a fire group** (`fire_group = -1`) — it just holds the primary fire
-  button for the duration (the "hope for the best" fallback that works when the scanner is already
-  your selected group).
+1. Sends a short **probe-press** of your fire button.
+2. Watches the game for a moment. If that opened the **Detailed Surface Scanner** (the probe
+   view — meaning your current fire group holds the DSS, not the Discovery Scanner), it presses
+   your **Exit Mode** bind to back out, speaks a heads-up, and **disarms** so it can't keep
+   misfiring.
+3. Otherwise it **holds** the fire button for a few seconds to complete the honk.
+
+### Re-arming after a misfire
+
+If auto-honk paused itself, re-arm it either way:
+
+- **Say so** — e.g. *"re-arm auto honk"* or *"the discovery scanner's set"* (it exposes a
+  `rearm_auto_honk` tool the assistant calls).
+- **Automatically** — the next time a real discovery scan completes (you honked manually, or it
+  worked once), it re-arms itself.
+
+The real fix is to put the **Discovery Scanner** in your selected fire group — then every honk
+just works.
 
 ## Safety
 
-Auto-honk reuses the [keybind safety layer](keybinds.md#how-it-stays-safe):
+Auto-honk only fires when **all** of these hold, else it skips (with a logged reason):
 
-- **Combat / interdiction guard** — it won't honk while you're in danger or being interdicted, and
-  it won't act if it can't read your status (it can't prove it's safe).
-- **Cycle safety** — if cycling to the scanner group is needed but your current group can't be read,
-  it **refuses** rather than risk holding fire in the wrong group (which could fire weapons).
-- **Hard abort** — the shared *"abort"* releases the held fire key immediately.
-- Every honk (and every skip) is logged.
+- **In supercruise** — not in normal space or docked.
+- **In analysis mode** — not combat mode (the scanners don't work in combat mode anyway).
+- **Not in danger / not being interdicted**, and your status is readable (it won't act if it
+  can't prove it's safe). Controlled by `honk.combat_guard` (leave on).
+- **Fire button is bound to a key** — COVAS presses keyboard scancodes, so bind the Discovery
+  Scanner's fire to a key in-game (a HOTAS-only bind can't be pressed; a keyboard secondary,
+  even with a modifier, is fine).
 
-The hold runs on a background thread so it never blocks anything else, and a second honk is dropped
-while one's in progress.
+Plus the shared [keybind](keybinds.md#how-it-stays-safe) **hard abort** (*"abort"*) releases the
+held key immediately, the sequence runs on a background thread so it never blocks anything else,
+and a second honk is dropped while one's in progress.
 
-## Setting it up
-
-To get cycling (recommended), bind the scanner's fire button — and, for cycling, fire-group
-next/previous — to keys in-game, and note the scanner's fire group number (0-based, from the right
-HUD panel). Then:
+## Settings
 
 | Setting | What it does |
 |---------|--------------|
-| `honk.enabled` | Master switch (off by default) |
-| `honk.fire_group` | The scanner's fire group (0-based). `-1` = don't cycle, just hold primary fire |
+| `honk.enabled` | Master switch (**on** by default) |
 | `honk.trigger` | Which fire button the scanner is on — `primary` or `secondary` |
-| `honk.hold_seconds` | How long to hold the fire button to complete the scan (~6 s) |
+| `honk.hold_seconds` | How long to hold the fire button to complete the scan (~5 s) |
 | `honk.combat_guard` | Refuse during danger/interdiction or unknown status (leave on) |
 
-At launch the log reports the fire key and group it found, or a "bind it in-game" warning if the
-binding's missing. Requires [game-state monitoring](../elite/monitoring.md)
-(`[elite].enabled = true`). See the [Configuration reference](../configuration.md#auto-honk-honk).
+There's **no fire-group setting** — the detect-and-recover replaces it. Requires
+[game-state monitoring](../elite/monitoring.md) (`[elite].enabled = true`) for the arrival event
+and the guards. See the [Configuration reference](../configuration.md#auto-honk-honk).

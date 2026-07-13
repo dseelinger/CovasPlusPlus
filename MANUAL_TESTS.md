@@ -53,12 +53,12 @@ Notes:
 Capabilities are gated in **`config.toml`** (edit freely) or **`overrides.json`** (what the panel
 writes). The Settings page (§14.2) can also flip these, but **capability enable/disable applies on
 the next restart** (only Whisper reloads live). Confirm each before running its section (as shipped,
-most are `true`; **keybinds and auto-honk ship OFF**):
+**everything defaults ON** so the app shows full functionality out of the box):
 - [ ] `[elite].enabled = true` — ED journal/Status monitoring. **Required by** proactive/route callouts, the keybind + honk combat guard, carriers, community goals, and the live "current system" used by every search. (§5, §6, §7, §8, §9, §10)
 - [ ] `[proactive].enabled = true` — proactive callouts. (§5.2)
-- [ ] `[route].enabled = true` — **DEFAULT OFF.** Route callouts while flying a plotted route. (§5.3)
-- [ ] `[keybinds].enabled = true` — **DEFAULT OFF.** Landing-gear automation. Keep `require_confirmation`/`combat_guard = true`. (§6.1)
-- [ ] `[honk].enabled = true` — **DEFAULT OFF.** Auto-honk on arrival. Set `fire_group` + `trigger` for cycling, or leave `fire_group = -1` for the hold-primary fallback. (§6.2)
+- [ ] `[route].enabled = true` — Route callouts while flying a plotted route. (§5.3)
+- [ ] `[keybinds].enabled = true` — Landing-gear automation. Keep `require_confirmation`/`combat_guard = true`. (§6.1)
+- [ ] `[honk].enabled = true` — Auto-honk on arrival (**on** by default). No fire-group setup — it probes and backs out of a Surface-Scanner misfire. Set `[honk].trigger` only if your scanner is on secondary fire. (§6.2)
 - [ ] `[nav].enabled = true` — outfitting "find the closest module". (§7)
 - [ ] `[star_systems].enabled = true` / `[search].enabled = true` — voice search categories. (§8)
 - [ ] `[cg].enabled` is implicit (`[cg].source`); set `[cg].inara_api_key` to also see CGs you haven't visited. (§10)
@@ -153,16 +153,19 @@ Notes:
 
 Notes:
 
-### 6.2 Auto-honk (N5 — `[honk].enabled = true`)
-> Fires the Discovery Scanner shortly after you jump into a **new** system — no button press. Bind the scanner's fire button (and, for cycling, fire-group next/previous) to keys in ED; note the scanner's fire group number (0-based, right HUD panel). Set `[honk].fire_group`, `[honk].trigger` (primary/secondary). At launch the log reports the fire key + group, or a "bind it in-game" warning.
-- [ ] **Configured honk:** with `fire_group` set to the scanner's group, **jump** to a new system → it cycles to the scanner group, **holds** the fire button ~`hold_seconds` (default 6), then cycles **back** — and does **NOT** fire weapons. Log shows a `honk` line.
-- [ ] **Fallback:** set `fire_group = -1`, select the scanner group yourself, jump → it just **holds primary fire** and honks.
-- [ ] **Combat guard:** get interdicted / into danger, then jump (or trigger arrival in danger) → it **refuses** with a logged reason; nothing fires.
-- [ ] **Unknown fire group:** with `[elite]` OFF (or before Status has a fire group) and a configured `fire_group` → it **skips** rather than risk firing in the wrong group.
-- [ ] **Hard abort:** with `[keybinds]` also on, jump and during the ~6 s hold say *"abort"* → the held fire key releases immediately.
+### 6.2 Auto-honk (N5 + K2 — `[honk].enabled = true`, **on by default**)
+> Fires the Discovery Scanner shortly after you jump into a **new** system — no button press, and **no fire-group setup**. Bind the Discovery Scanner's fire to a **key** in ED (a HOTAS/mouse-only bind can't be pressed; a keyboard secondary, even with a modifier, is fine). At launch the log reports "Auto-honk ON …" or a "bind it in-game" warning.
+- [ ] **Happy path:** with the **Discovery Scanner** in your current fire group, **jump** to a new system → after a short probe it **holds** the fire button ~`hold_seconds` (default 5) and honks; the system map populates. Log: `honked — current fire group`.
+- [ ] **DSS misfire → recover:** deliberately select a fire group holding the **Detailed Surface Scanner**, jump near a planet → it probes, detects the Surface-Scanner (probe) view, presses your **Exit Mode** bind to back out, **speaks** a heads-up, and **disarms**. You end up back in the cockpit, NOT stuck in the DSS. Log: `disarmed: a honk opened the Surface Scanner`.
+- [ ] **Re-arm (voice):** after a disarm, say *"re-arm auto honk"* → it confirms ("Auto-honk re-armed") and honks again next jump.
+- [ ] **Re-arm (auto):** after a disarm, do a **manual** honk yourself → the discovery-scan event re-arms it. Log: `re-armed (a discovery scan completed)`.
+- [ ] **Weapons group harmless:** select a weapons fire group, jump → no weapons fire (supercruise), no scan, no crash.
+- [ ] **Guards:** jump in **combat mode** (not analysis) → skips (`in combat mode`); in **danger/interdiction** → `blocked`; in **normal space** → `not in supercruise`.
+- [ ] **Unbound fire:** if the fire button is HOTAS/mouse-only (no keyboard bind) → it **skips** with a "no keyboard binding" note; nothing fires.
+- [ ] **Hard abort:** with `[keybinds]` also on, jump and during the hold say *"abort"* → the held fire key releases immediately.
 - [ ] **Disabled:** set `[honk].enabled = false` → no honk on arrival.
 
-Notes (reliability quirks — cycle timing, hold too short/long for a full honk):
+Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_DETECT_WINDOW`, the Exit-Mode bind):
 
 ## 7. Outfitting search — find the closest module  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
 > `[nav].enabled = true`. `require_confirmation` ships **off**, so it searches as soon as the module is fully resolved.
