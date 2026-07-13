@@ -318,28 +318,18 @@ speed = 1.0
 output_format = "pcm_16000"
 
 
-[sound_cues]
-# Local audio played INSTANTLY on state change (zero latency). Each cue is a LIST;
-# one is chosen at random for variety. Swap in your own .wav/.mp3 anytime.
-#   listening  = ready for voice input (push-to-talk pressed)
+# Sound cues are now DROP-IN FOLDERS, not config paths (I8) — there is no [sound_cues]
+# section any more. Local audio plays INSTANTLY on each state change (zero latency); a
+# RANDOM file is picked from the type's folder, so drop in 1 file or 50 for variety.
+#   listen     = ready for voice input (push-to-talk pressed)
 #   processing = working / hitting the web
-#   done       = answer ready, just before speech plays
-#   failed     = any failure (no speech heard, API/TTS error, ...)
-# Paths are relative to the project root. The sounds/ folder is git-ignored
-# (supply your own cues); the app runs fine without them.
-listening = [
-  "sounds/voiceinput1.wav",
-  "sounds/voiceinput2.wav",
-  "sounds/voiceinput3.wav",
-  "sounds/voiceinput4.wav",
-]
-processing = [
-  "sounds/processing1.wav",
-  "sounds/processing2.wav",
-  "sounds/processing3.wav",
-]
-done   = ["sounds/inputok2.wav"]
-failed = ["sounds/inputfailed1.wav"]
+#   completed  = answer ready, just before speech plays
+#   failure    = any failure (no speech heard, API/TTS error, ...)
+# COVAS++ ships original defaults under covas/assets/cues/<type>/. To use your OWN cues,
+# drop audio into  <data dir>/sounds/<type>/  — while a type's folder holds >=1 file it
+# REPLACES the shipped default set; empty it to fall back. In a source run the data dir is
+# the project root (so the folder is ./sounds/<type>/, git-ignored); a packaged build uses
+# %APPDATA%\COVAS++\sounds\. The control panel has an "Open cues folder" button.
 
 
 [checklist]

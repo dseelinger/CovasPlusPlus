@@ -99,6 +99,7 @@
       <div class="row"><label>Voice speed</label><input type="range" id="speed" min="1.0" max="1.2" step="0.05"><span class="speedval" id="speedVal">1.0×</span></div>
       <div class="row"><label>Personality</label><div class="toggle" id="personality"><div class="knob"></div></div></div>
       <button class="cancel" id="cancelBtn">■ CANCEL / STOP</button>
+      <div class="prow"><button id="openCues">OPEN CUES FOLDER</button><span class="pmsg" id="cuesMsg"></span></div>
       <div class="keys" id="keys"></div>
     </div>
 
@@ -204,6 +205,13 @@ async function init(){
 
   $("personality").onclick = () => { const v=!getToggle("personality"); setToggle("personality",v); post({personality:v}); };
   $("cancelBtn").onclick = () => fetch("/api/cancel",{method:"POST"});
+  $("openCues").onclick = async () => {
+    const msg = $("cuesMsg");
+    try {
+      const r = await (await fetch("/api/cues/open",{method:"POST"})).json();
+      msg.textContent = r.opened ? "opened" : (r.path || "couldn't open");
+    } catch(e){ msg.textContent = "couldn't open cues folder"; }
+  };
 
   // Voice speed (ElevenLabs native speed, clamped 1.0–1.2 server-side).
   const spd = st.settings.speed || 1.0;

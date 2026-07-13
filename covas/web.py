@@ -168,6 +168,25 @@ def create_app(core) -> Flask:
         threading.Timer(0.5, core.request_quit).start()
         return jsonify({"ok": True})
 
+    @flask_app.route("/api/cues/open", methods=["POST"])
+    def cues_open():
+        """Open the user's cue override folder (<data_dir>/sounds) in the OS file manager so
+        dropping in custom cues is discoverable (I8). Ensures the per-type skeleton first.
+        Fail-soft: returns the path either way, and `opened=false` if the OS couldn't open it
+        (non-Windows, headless) — the client can then just show the path."""
+        import os
+
+        from .audio import cue_roots, ensure_cue_skeleton
+        user_base, _ = cue_roots(core.cfg)
+        ensure_cue_skeleton(user_base)
+        opened = False
+        try:
+            os.startfile(str(user_base))  # noqa: S606 — Windows-only; opens Explorer on our dir
+            opened = True
+        except Exception:  # noqa: BLE001 — no file manager / not Windows: fall back to the path
+            pass
+        return jsonify({"ok": True, "path": str(user_base), "opened": opened})
+
     @flask_app.route("/api/schema")
     def api_schema():
         # Models are resolved server-side (cheap, from config). ElevenLabs voice/

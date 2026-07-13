@@ -217,6 +217,126 @@
           "text": "COVAS does NOT download or relaunch anything; it points you at the control panel\u0027s update banner instead."
         }
       ]
+    },
+    {
+      "id": "cues-shipped-defaults-play",
+      "title": "Shipped default cues play out of the box (no user cues)",
+      "section": "I8. Sound cues (drop-in folders)",
+      "tags": [
+        "HW"
+      ],
+      "requires": "No user cue overrides present: \u0060\u003Cdata dir\u003E\\sounds\\listen\\\u0060 etc. are empty or absent (source run: \u0060.\\sounds\\\u0060; packaged: \u0060%APPDATA%\\COVAS\u002B\u002B\\sounds\\\u0060). App running with speakers/headset.",
+      "expected": "You hear the shipped ORIGINAL cues at each stage \u2014 a \u0060listen\u0060 chirp on press, a \u0060processing\u0060 tick while it works, a \u0060completed\u0060 cue right before speech, and a \u0060failure\u0060 cue on no-speech. None are silent.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold \u0060[\u0060 \u2192 you hear the \u0060listen\u0060 cue immediately (before speaking)."
+        },
+        {
+          "id": "s2",
+          "text": "Say a short prompt and release \u2192 you hear the \u0060processing\u0060 cue."
+        },
+        {
+          "id": "s3",
+          "text": "Just before the spoken answer you hear the \u0060completed\u0060 cue."
+        },
+        {
+          "id": "s4",
+          "text": "Press and release WITHOUT speaking \u2192 you hear the \u0060failure\u0060 cue; the log notes no speech detected."
+        }
+      ]
+    },
+    {
+      "id": "cues-open-folder-button",
+      "title": "\u0027Open cues folder\u0027 opens the sounds dir with the per-type skeleton",
+      "section": "I8. Sound cues (drop-in folders)",
+      "tags": [
+        "GUI",
+        "FILE"
+      ],
+      "requires": "Control panel open (native window or browser).",
+      "expected": "Clicking Open cues folder opens the OS file manager on \u0060\u003Cdata dir\u003E\\sounds\\\u0060 containing \u0060listen\\ processing\\ completed\\ failure\\\u0060 subfolders, each with a \u0060README.txt\u0060. The button shows \u0027opened\u0027.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "In the first (config) card, click \u0060OPEN CUES FOLDER\u0060."
+        },
+        {
+          "id": "s2",
+          "text": "Explorer opens \u0060\u003Cdata dir\u003E\\sounds\\\u0060 (source run: repo \u0060.\\sounds\\\u0060; packaged: \u0060%APPDATA%\\COVAS\u002B\u002B\\sounds\\\u0060)."
+        },
+        {
+          "id": "s3",
+          "text": "It contains \u0060listen\u0060, \u0060processing\u0060, \u0060completed\u0060, \u0060failure\u0060 folders, each with a README.txt explaining drop-in cues."
+        }
+      ]
+    },
+    {
+      "id": "cues-override-replaces-and-rotates",
+      "title": "User cues in a type folder replace the default and rotate randomly",
+      "section": "I8. Sound cues (drop-in folders)",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "Access to \u0060\u003Cdata dir\u003E\\sounds\\listen\\\u0060 (use Open cues folder). Have 2-3 distinct short \u0060.wav\u0060 files to drop in.",
+      "expected": "With \u003E=1 file in \u0060sounds\\listen\\\u0060, the press-to-talk cue plays YOUR files (the shipped default is no longer heard) and VARIES across presses (random rotation over any count).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Drop 2-3 distinct \u0060.wav\u0060 files into \u0060sounds\\listen\\\u0060, then restart COVAS\u002B\u002B."
+        },
+        {
+          "id": "s2",
+          "text": "Press to talk several times \u2192 the \u0060listen\u0060 cue is now clearly YOUR audio, not the shipped chirp."
+        },
+        {
+          "id": "s3",
+          "text": "Across presses the cue VARIES (a random file each time)."
+        }
+      ]
+    },
+    {
+      "id": "cues-empty-folder-falls-back",
+      "title": "Emptying a type folder falls back to the shipped default",
+      "section": "I8. Sound cues (drop-in folders)",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "Continue from cues-override-replaces-and-rotates (your files are in \u0060sounds\\listen\\\u0060).",
+      "expected": "Remove your files from \u0060sounds\\listen\\\u0060 and restart \u2192 the press-to-talk cue is the SHIPPED default \u0060listen\u0060 chirp again (fallback works).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Delete the files you added to \u0060sounds\\listen\\\u0060 (leave the folder empty), then restart COVAS\u002B\u002B."
+        },
+        {
+          "id": "s2",
+          "text": "Press to talk \u2192 you hear the shipped default \u0060listen\u0060 cue, not your removed audio."
+        }
+      ]
+    },
+    {
+      "id": "cues-interdiction-sting-default",
+      "title": "Interdiction plays the shipped original sting when no user sting is set",
+      "section": "I8. Sound cues (drop-in folders)",
+      "tags": [
+        "HW",
+        "GAME"
+      ],
+      "requires": "\u0060[audio.interdiction].enabled\u0060 (and the audio layer) ON, with NO user interdiction sting configured or dropped in. Elite Dangerous running; trigger (or wait for) an Interdiction / UnderAttack event.",
+      "expected": "On an interdiction, the ALERT sting is the shipped ORIGINAL sting (audible), not silence \u2014 the bundled default fills in when the user supplies none.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With interdiction enabled and no custom sting, get interdicted (or pull a rebuy-safe NPC interdiction)."
+        },
+        {
+          "id": "s2",
+          "text": "You hear an alert sting at the start of the interdiction cue (followed by the threat line)."
+        }
+      ]
     }
   ],
   "runs": [
@@ -471,6 +591,412 @@
           "stepChecks": {
             "s1": true,
             "s2": true
+          }
+        }
+      ]
+    },
+    {
+      "runId": "run-20260713T214357Z-4412",
+      "session": "I8 sound cues (drop-in folders)",
+      "commit": "0b25bd4",
+      "branch": "feature/installer-cues",
+      "submittedAt": "2026-07-13T23:15:07Z",
+      "results": [
+        {
+          "testId": "fresh-install-native-wizard",
+          "status": "fail",
+          "stepChecks": {
+            "s1": true,
+            "s2": false,
+            "s3": false
+          },
+          "failure": {
+            "notes": "Setup page failed on downloading the speech model",
+            "screenshots": [
+              ".muster/shots/run-20260713t214357z-4412-fresh-install-native-wizard-e589d3074a5c4b9494f27104eb.png"
+            ]
+          }
+        },
+        {
+          "testId": "wizard-to-panel-handoff",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false
+          }
+        },
+        {
+          "testId": "already-configured-skips-wizard",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "bail-mid-wizard-quits-clean",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "native-quit-controls",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "browser-path-unchanged",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "frozen-selftest",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "version-by-voice",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "check-updates-by-voice-is-ui-only",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "cues-shipped-defaults-play",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false
+          }
+        },
+        {
+          "testId": "cues-open-folder-button",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "cues-override-replaces-and-rotates",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "cues-empty-folder-falls-back",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "cues-interdiction-sting-default",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        }
+      ]
+    },
+    {
+      "runId": "run-20260713T231904Z-f4c1",
+      "session": "I8 cue tests (against configured/source install)",
+      "commit": "0b25bd4",
+      "branch": "feature/installer-cues",
+      "submittedAt": "2026-07-13T23:22:04Z",
+      "results": [
+        {
+          "testId": "fresh-install-native-wizard",
+          "status": "fail",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          },
+          "failure": {
+            "notes": "same error. Where do I find the location where the file in question was when it all executed out of c:\\dev?",
+            "screenshots": []
+          }
+        },
+        {
+          "testId": "wizard-to-panel-handoff",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false
+          }
+        },
+        {
+          "testId": "already-configured-skips-wizard",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "bail-mid-wizard-quits-clean",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "native-quit-controls",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "browser-path-unchanged",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "frozen-selftest",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "version-by-voice",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "check-updates-by-voice-is-ui-only",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "cues-shipped-defaults-play",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false
+          }
+        },
+        {
+          "testId": "cues-open-folder-button",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "cues-override-replaces-and-rotates",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "cues-empty-folder-falls-back",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "cues-interdiction-sting-default",
+          "status": "blocked",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        }
+      ]
+    },
+    {
+      "runId": "run-20260713T234018Z-a241",
+      "session": "I8 cues \u002B full packaged suite",
+      "commit": "0b25bd4",
+      "branch": "feature/installer-cues",
+      "submittedAt": "2026-07-13T23:53:53Z",
+      "results": [
+        {
+          "testId": "fresh-install-native-wizard",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "wizard-to-panel-handoff",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": true,
+            "s5": true
+          }
+        },
+        {
+          "testId": "already-configured-skips-wizard",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true
+          }
+        },
+        {
+          "testId": "bail-mid-wizard-quits-clean",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "native-quit-controls",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true
+          }
+        },
+        {
+          "testId": "browser-path-unchanged",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "frozen-selftest",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true
+          }
+        },
+        {
+          "testId": "version-by-voice",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "check-updates-by-voice-is-ui-only",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true
+          }
+        },
+        {
+          "testId": "cues-shipped-defaults-play",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": true
+          }
+        },
+        {
+          "testId": "cues-open-folder-button",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "cues-override-replaces-and-rotates",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "cues-empty-folder-falls-back",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true
+          }
+        },
+        {
+          "testId": "cues-interdiction-sting-default",
+          "status": "skip",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
           }
         }
       ]
