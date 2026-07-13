@@ -126,6 +126,23 @@ def test_apply_status_folds_fire_group():
     assert patch["fire_group"] == 2 and ctx.snapshot()["fire_group"] == 2
 
 
+def test_apply_status_folds_analysis_mode_and_gui_focus():
+    # auto-honk (K2) reads HudAnalysisMode (bit 27) + GuiFocus (10 = SAA/DSS probe view).
+    ctx = EDContext()
+    patch = apply_status(ctx, {"Flags": (1 << 27), "GuiFocus": 10})
+    assert patch["analysis_mode"] is True
+    assert patch["gui_focus"] == 10
+    snap = ctx.snapshot()
+    assert snap["analysis_mode"] is True and snap["gui_focus"] == 10
+
+
+def test_apply_status_gui_focus_absent_leaves_default():
+    ctx = EDContext()
+    apply_status(ctx, {"Flags": 0})              # combat HUD, no GuiFocus key
+    snap = ctx.snapshot()
+    assert snap["analysis_mode"] is False and snap["gui_focus"] is None
+
+
 # --- StatusWatcher read/publish cycle (synchronous, offline) ---------------
 
 def _watcher(tmp_path):

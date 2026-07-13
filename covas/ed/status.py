@@ -116,6 +116,13 @@ def flag_transitions(old: int | None, new: int) -> list[str]:
     return out
 
 
+# Status.json GuiFocus values (the UI mode the Commander is in). Full set is 0..11; we name
+# the scanner modes auto-honk cares about.
+GUI_FOCUS_NONE = 0
+GUI_FOCUS_FSS = 9    # Full Spectrum System Scanner
+GUI_FOCUS_SAA = 10   # Surface Analysis Scanner — the Detailed Surface Scanner probe view
+
+
 def apply_status(ctx: EDContext, status: dict) -> dict:
     """Fold a Status.json snapshot into the rolling context (flag booleans, fuel, cargo).
     Returns the patch applied — handy for tests. Station/system come from the journal;
@@ -131,6 +138,7 @@ def apply_status(ctx: EDContext, status: dict) -> dict:
         patch["in_danger"] = d["IsInDanger"]
         patch["being_interdicted"] = d["BeingInterdicted"]
         patch["low_fuel"] = d["LowFuel"]
+        patch["analysis_mode"] = d["HudAnalysisMode"]
 
     fuel = status.get("Fuel")
     if isinstance(fuel, dict) and isinstance(fuel.get("FuelMain"), (int, float)):
@@ -144,6 +152,12 @@ def apply_status(ctx: EDContext, status: dict) -> dict:
     fg = status.get("FireGroup")
     if isinstance(fg, int) and not isinstance(fg, bool):
         patch["fire_group"] = fg
+
+    # UI focus mode (GuiFocus): 0=none, 9=FSS, 10=SAA (the Detailed Surface Scanner probe view).
+    # Auto-honk (K2) watches this to catch a honk that actually opened the DSS in the wrong group.
+    gf = status.get("GuiFocus")
+    if isinstance(gf, int) and not isinstance(gf, bool):
+        patch["gui_focus"] = gf
 
     if patch:
         ctx.update(**patch)

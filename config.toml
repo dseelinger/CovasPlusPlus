@@ -36,7 +36,7 @@ mix_sample_rate = 16000
 # a single BusMixer owns the device and ALL playback routes through it (COVAS on the clean bus;
 # comms/chatter/SFX/music on their buses), and the ambient layer becomes available (each part
 # still has its own enable below). Turn this on first, then enable the parts you want.
-enabled = false
+enabled = true
 
 
 [audio.buses]
@@ -116,7 +116,7 @@ space_radiation      = []
 # (alert bus), the assistant's threat line (COVAS bus, clean), and the pirate's line (comms bus,
 # radio). Off by default. `sting` is the alert-bus sample path (git-ignored); blank uses the
 # built-in default path (supply your own file there).
-enabled = false
+enabled = true
 sting   = ""
 
 
@@ -126,7 +126,7 @@ sting   = ""
 # Track files are LOCAL and git-ignored (supply your own, rights uncertain — like sounds/): drop
 # them under music/ and list them per context below. Generation is deliberately NOT a runtime
 # dependency (no official Suno API). DEFAULT OFF.
-enabled = false
+enabled = true
 
 [music.tracks]
 # Each context -> an ordered list of track paths (relative to the project root). Empty = silent
@@ -146,7 +146,7 @@ default         = []   # fallback when the current context has no tracks of its 
 #
 # DEFAULT OFF — the whole audio-cue layer is opt-in. Cue payloads (chatter/SFX/music) arrive in
 # later prompts (C5-C8); until then this drives nothing even when enabled.
-enabled          = false
+enabled          = true
 min_interval     = 8.0    # seconds between ANY two cues (a hard gap so nothing stacks up)
 max_per_minute   = 6      # global cap: at most this many cues in any rolling 60 seconds
 default_cooldown = 30.0   # a cue won't repeat within this many seconds unless it sets its own
@@ -422,7 +422,7 @@ Died             = true
 # [elite].enabled (that's where the events come from).
 #
 # DEFAULT OFF — opt in once you want it.
-enabled = false
+enabled = true
 # Announce jumps-remaining every Nth jump. Lower = chattier. Scoopable + arrival are separate.
 every_n = 5
 # Per-callout toggles — silence any one kind without turning the whole feature off.
@@ -439,7 +439,7 @@ callout_arrival         = true
 #
 # DEFAULT OFF — this is the twitchy part; opt in deliberately. Requires [elite].enabled for
 # the combat guard (it reads ED Status flags to refuse acting during combat/interdiction).
-enabled = false
+enabled = true
 # Bindings file override. Blank = auto-detect: read the active preset from
 #   %LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Bindings\StartPreset.4.start
 # then load "<preset>.4.0.binds" from that folder. Set an absolute path (or a filename
@@ -459,25 +459,19 @@ allowlist = ["landing_gear"]
 
 
 [honk]
-# Auto-honk (N5) — fire the Discovery Scanner shortly after arriving in a NEW system (an
-# FSDJump into normal space), so you scan the system without lifting a finger. Builds on the
-# keybind executor: the model isn't involved at all — arrival triggers a deterministic
-# keystroke sequence. Requires [elite].enabled (for the arrival event, the current fire group,
-# and the combat guard).
+# Auto-honk (N5) — fire the Discovery Scanner shortly after arriving in a NEW system, so you scan
+# the system without lifting a finger. The model isn't involved — arrival triggers a deterministic
+# keystroke. Requires [elite].enabled (for the arrival event, supercruise/analysis flags, guards).
 #
-# DEFAULT OFF — this presses a fire button, so opt in deliberately. The combat guard refuses
-# to honk during danger/interdiction (and when ED status is unavailable), and the shared hard
-# abort ("abort" — see [keybinds]) releases the held key.
-enabled = false
-# The Discovery Scanner's fire group index (0-based, as numbered in the right HUD panel). When
-# set, COVAS reads your CURRENT fire group from Status.json, cycles to this one, honks, then
-# cycles back. Set to -1 if you don't want cycling: it then just holds primary fire (the
-# "hope for the best" fallback that works when the scanner is already your selected group).
-fire_group = -1
+# No fire-group setup: COVAS just fires your CURRENT group's Primary/Secondary button and reacts.
+# If that opens the Surface Scanner (wrong group) it backs out, warns, and pauses until re-armed;
+# a weapons group can't fire in supercruise (harmless). Guards: supercruise + analysis mode +
+# not in danger. ON by default — the probe-and-recover makes it safe with no fire-group setup.
+enabled = true
 # Which fire button the Discovery Scanner is on: "primary" or "secondary".
 trigger = "primary"
 # How long (seconds) to HOLD the fire button — a full honk takes a few seconds to complete.
-hold_seconds = 6.0
+hold_seconds = 5.0
 # Refuse to honk during danger/interdiction (and when ED status is unavailable — we won't act
 # unless we can prove it's safe). Leave ON.
 combat_guard = true

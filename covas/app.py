@@ -216,12 +216,13 @@ class App:
         the ambient layer off; COVAS speech still routes through the mixer. Needs the event pump
         so comms/chatter/interdiction/music react to journal events."""
         try:
-            from .config import ROOT
+            from .config import data_dir
             from .mixer import AudioControlsCapability, AudioLayer, ensure_skeleton, load_content
             # Drop-in content (C11): ensure the folder skeleton (idempotent) then scan it, so a
             # dropped-in file joins the cues with no code/config edits. Fail-soft. The root is the
-            # project dir; [audio].content_root overrides it (a seam so tests don't touch the repo).
-            content_root = self.cfg.get("audio", {}).get("content_root") or ROOT
+            # writable data dir (project root in a source run, %APPDATA%\COVAS++ when frozen);
+            # [audio].content_root overrides it (a seam so tests don't touch the repo).
+            content_root = self.cfg.get("audio", {}).get("content_root") or data_dir()
             try:
                 ensure_skeleton(content_root)
             except Exception:  # noqa: BLE001 — skeleton creation must never block startup
@@ -687,14 +688,13 @@ class App:
             self.honk = HonkCapability(
                 hcfg, binds=binds, executor=executor,
                 status_snapshot=snapshot,
+                speak=self._speak_proactive_line,   # spoken Surface-Scanner-misfire warning (K2)
                 log=lambda msg: self._log("honk", msg))
             self.registry.register(self.honk)
             self._start_event_pump()
 
             fire = binds.get(hcfg.fire_action)
             fire_ok = fire is not None and fire.usable
-            where = (f"fire group {hcfg.fire_group}" if hcfg.configured
-                     else "current fire group (no cycling)")
             if self.ed_ctx is None:
                 self.bus.publish({"type": "log", "who": "system", "text":
                     "Auto-honk ON, but ED monitoring is OFF — no arrival events, and the "
@@ -705,8 +705,9 @@ class App:
                     "Discovery Scanner's fire button to a key in-game so COVAS can honk."})
             else:
                 self.bus.publish({"type": "log", "who": "system",
-                                  "text": f"Auto-honk ON (hold {hcfg.fire_action} "
-                                          f"{hcfg.hold_seconds:g}s on {where}, combat guard "
+                                  "text": f"Auto-honk ON (probe + hold {hcfg.fire_action} on the "
+                                          f"current fire group; backs out of a Surface-Scanner "
+                                          f"misfire; combat guard "
                                           f"{'on' if hcfg.combat_guard else 'off'})."})
         except Exception as e:  # noqa: BLE001 — optional; never block startup
             self.honk = None

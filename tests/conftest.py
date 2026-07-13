@@ -22,6 +22,10 @@ def _block_network(request, monkeypatch):
     # Keep a developer's ambient COVAS_MOCK=1 from silently flipping tests into mock
     # mode; tests that exercise the env override set it explicitly via monkeypatch.
     monkeypatch.delenv("COVAS_MOCK", raising=False)
+    # Likewise, a stray COVAS_APP_DIR/COVAS_DATA_DIR (e.g. left set in the shell) must not
+    # relocate config/overrides mid-suite. Tests that exercise these set them via monkeypatch.
+    monkeypatch.delenv("COVAS_APP_DIR", raising=False)
+    monkeypatch.delenv("COVAS_DATA_DIR", raising=False)
 
     # Integration tests may reach real services — leave their sockets alone.
     if request.node.get_closest_marker("integration"):

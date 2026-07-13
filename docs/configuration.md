@@ -184,10 +184,9 @@ See [Auto-honk](automation/auto-honk.md). **Off by default** — it presses a fi
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `honk.enabled` | `false` | Master switch |
-| `honk.fire_group` | `-1` | Scanner's fire group (0-based); `-1` = don't cycle, just hold primary fire |
+| `honk.enabled` | `true` | Master switch (on by default; no fire-group setup — probes and recovers from a Surface-Scanner misfire) |
 | `honk.trigger` | `primary` | Which fire button the scanner is on |
-| `honk.hold_seconds` | `6.0` | How long to hold the fire button |
+| `honk.hold_seconds` | `5.0` | How long to hold the fire button |
 | `honk.combat_guard` | `true` | Refuse during danger/interdiction or unknown status (leave on) |
 
 ## Navigation & search (`[nav]`, `[star_systems]`, `[search]`)
