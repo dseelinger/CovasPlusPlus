@@ -465,9 +465,9 @@ allowlist = ["landing_gear"]
 #
 # No fire-group setup: COVAS just fires your CURRENT group's Primary/Secondary button and reacts.
 # If that opens the Surface Scanner (wrong group) it backs out, warns, and pauses until re-armed;
-# a weapons group can't fire in supercruise (harmless). DEFAULT OFF pending on-hardware timing
-# verification of that probe-and-recover. Guards: supercruise + analysis mode + not in danger.
-enabled = false
+# a weapons group can't fire in supercruise (harmless). Guards: supercruise + analysis mode +
+# not in danger. ON by default — the probe-and-recover makes it safe with no fire-group setup.
+enabled = true
 # Which fire button the Discovery Scanner is on: "primary" or "secondary".
 trigger = "primary"
 # How long (seconds) to HOLD the fire button — a full honk takes a few seconds to complete.
