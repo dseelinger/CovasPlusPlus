@@ -51,6 +51,7 @@ def _cap(*, cfg=None, binds=None, status=_SAFE, speak=None):
         status_snapshot=(lambda: status),
         spawn=lambda fn: fn(),            # synchronous: run the sequence inline for the test
         speak=speak,
+        sleep=lambda _s: None,            # no real waiting in the detect-window poll
         log=lambda m: None)
     return cap, ex
 
@@ -83,6 +84,26 @@ def test_probe_detects_dss_and_recovers():
     assert ex.calls == [("hold", "Key_1", _P), ("press", "Key_X", 0.0)]
     assert cap._disarmed is True
     assert spoken and "Surface Scanner" in spoken[0]
+
+
+def test_probe_detects_dss_even_when_snapshot_lags():
+    # The ~1s-polled snapshot shows the SAA mode only after a couple reads -> the detect window
+    # must still catch it and recover, NOT do the full honk in the Surface Scanner.
+    reads = [{**_SAFE, "gui_focus": None}] * 3 + [{**_SAFE, "gui_focus": GUI_FOCUS_SAA}]
+    i = {"n": 0}
+
+    def status():
+        snap = reads[min(i["n"], len(reads) - 1)]
+        i["n"] += 1
+        return snap
+
+    ex = _FakeExecutor()
+    cap = HonkCapability(HonkConfig(enabled=True), binds=_BINDS, executor=ex,
+                         status_snapshot=status, spawn=lambda fn: fn(),
+                         sleep=lambda _s: None, log=lambda m: None)
+    _jump(cap)
+    assert ex.calls == [("hold", "Key_1", _P), ("press", "Key_X", 0.0)]  # probe -> exit, no honk
+    assert cap._disarmed is True
 
 
 # --- disarm / re-arm -------------------------------------------------------

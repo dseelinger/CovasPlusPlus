@@ -27,6 +27,7 @@ sequence is unit-testable offline with a recording fake executor.
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -49,6 +50,12 @@ _REARM_TOOL = "rearm_auto_honk"
 # before we commit to the full honk hold. Long enough to register the mode, short enough not to
 # launch a probe. Internal (not a user setting) — tune here if hardware testing needs it.
 _PROBE_SECONDS = 0.4
+
+# The mode change takes a beat to show up in the ~1s-polled Status.json snapshot, so after the
+# probe we WATCH GuiFocus for a window longer than one poll cycle before deciding. Without this
+# the check reads a stale (pre-honk) snapshot, misses the Surface Scanner, and holds fire in it.
+_DETECT_WINDOW = 2.5   # seconds to watch for the Surface-Scanner (SAA) mode after the probe
+_POLL_STEP = 0.25      # how often to re-check the snapshot within that window
 
 
 @dataclass(frozen=True)
@@ -108,6 +115,7 @@ class HonkCapability:
         status_snapshot: Optional[Callable[[], Optional[dict]]] = None,
         spawn: Optional[Callable[[Callable[[], None]], None]] = None,
         speak: Optional[Callable[[str], object]] = None,
+        sleep: Callable[[float], None] = time.sleep,
         log: Optional[Callable[[str], None]] = None,
     ) -> None:
         self._cfg = config
@@ -116,6 +124,7 @@ class HonkCapability:
         self._status = status_snapshot
         self._spawn = spawn or _default_spawn
         self._speak = speak
+        self._sleep = sleep
         self._log = log
         self._lock = threading.Lock()   # non-blocking: skip a second honk while one is holding
         self._disarmed = False          # set after a DSS misfire; cleared by verbal/auto re-arm
@@ -209,15 +218,29 @@ class HonkCapability:
                           f"bind the Discovery Scanner's fire button to a key in-game.")
             return
 
-        # 5. Probe-and-recover: a short test-press, then check whether it opened the Surface
-        #    Scanner. If so, back out + warn + disarm; else complete the honk on the current group.
+        # 5. Probe-and-recover: a short test-press, then WATCH GuiFocus for a window (the
+        #    snapshot polls ~1s, so a single immediate read would be stale). If it opened the
+        #    Surface Scanner, back out + warn + disarm; else complete the honk on the current group.
         self._executor.hold(fire_binding, _PROBE_SECONDS)
-        snap = (self._status() if self._status is not None else None) or snap
-        if snap.get("gui_focus") == GUI_FOCUS_SAA:
+        if self._opened_surface_scanner():
             self._recover_from_dss()
             return
         self._executor.hold(fire_binding, self._cfg.hold_seconds)
         self._logline("honked — current fire group.")
+
+    def _opened_surface_scanner(self) -> bool:
+        """Watch GuiFocus for up to _DETECT_WINDOW for the Surface-Scanner (SAA) mode, re-reading
+        the snapshot every _POLL_STEP so the ~1s poll lag doesn't cause a miss. True as soon as
+        SAA is seen (the mode persists until we exit), else False after the window."""
+        waited = 0.0
+        while True:
+            snap = self._status() if self._status is not None else None
+            if snap and snap.get("gui_focus") == GUI_FOCUS_SAA:
+                return True
+            if waited >= _DETECT_WINDOW:
+                return False
+            self._sleep(_POLL_STEP)
+            waited += _POLL_STEP
 
     def _recover_from_dss(self) -> None:
         """The probe opened the Detailed Surface Scanner — the current group holds the DSS, not
