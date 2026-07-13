@@ -16,7 +16,14 @@
 #     import table, so removing any (even ones we never use) makes `import av` fail with
 #     "DLL load failed while importing _core". A frozen --selftest proved this, so no av trim.
 # Net: ~260 MB onedir, no trims. Inno LZMA (I6) still gets that to a ~120-150 MB download.
+import os
+
 from PyInstaller.utils.hooks import collect_all, collect_data_files
+
+# App/exe icon (I6). A placeholder today (covas/assets/icons/covas.ico, tools/gen_icon.py); the
+# real branded art is issue #4. Optional so the build never breaks if the file is absent.
+_ICON = os.path.join("covas", "assets", "icons", "covas.ico")
+_ICON = _ICON if os.path.exists(_ICON) else None
 
 datas = []
 binaries = []
@@ -74,15 +81,18 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    # console=True for now: run_covas_app.py prints a startup banner + shutdown messages, and a
-    # windowed build can leave sys.stdout as None (print would raise). Flipping to a windowed
-    # (console=False) build is an I6 polish once those writes are made stdout-None-safe.
-    console=True,
+    # Windowed build: no console window spawns beside the native app window (a shipped double-click
+    # app shouldn't show a terminal). A windowed PyInstaller build leaves sys.stdout/stderr as None,
+    # so run_covas_app.py redirects those to os.devnull at startup — every print() in the app stays
+    # safe, and the app logs to %APPDATA%\COVAS++\logs regardless. (--selftest still signals via its
+    # exit code, which is all build.ps1 checks.)
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=_ICON,
 )
 
 coll = COLLECT(
