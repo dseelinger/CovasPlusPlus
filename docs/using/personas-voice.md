@@ -56,7 +56,7 @@ alongside the game at no cost — the voice is good, if not quite as smooth as E
 Want free voices that sound closer to the cloud? Set `[tts].provider = "edge"` to speak through
 **Microsoft Edge's "Read Aloud" neural voices** (the `edge-tts` project) — hundreds of voices, **no
 API key**. Set `[edge].voice` to a voice ShortName (e.g. `en-US-GuyNeural`); browse the catalog with
-`python -m edge_tts --list-voices`. Edge is especially handy for the [voice cast](../audio/ambient-audio.md#the-voice-cast)
+`python -m edge_tts --list-voices`. Edge is especially handy for the [voice cast](../audio/ambient-audio.md#voices-for-the-cast)
 so ambient chatter never burns ElevenLabs credits.
 
 > ⚠ **Optional, not load-bearing.** `edge-tts` rides an **undocumented** endpoint Microsoft intends
