@@ -68,3 +68,5 @@ Thumbs.db
 # --- Manual-test (Muster) run scratch: screenshots live here; the *.muster.json
 #     suite at the repo root IS tracked, but its shots/scratch dir is not. ---
 .muster/
+# Local working suites (e.g. a subset that skips packaged-build tests) stay untracked.
+covas-*.muster.json

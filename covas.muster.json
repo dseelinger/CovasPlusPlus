@@ -1,44 +1,1264 @@
 {
   "schemaVersion": 1,
-  "app": "COVAS\u002B\u002B",
+  "app": "COVAS++",
   "tests": [
+    {
+      "id": "env-health",
+      "title": "Environment health check reports all-OK",
+      "section": "0. Prerequisites",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "Source checkout with `.venv` set up.",
+      "expected": "`check_setup.py` prints `[ OK ]` for every line and ends with \"All systems go.\"; the two secret files exist.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Run `.venv\\Scripts\\python.exe check_setup.py` (or `check_setup.bat`)."
+        },
+        {
+          "id": "s2",
+          "text": "Every line reads `[ OK ]`, ending in \"All systems go.\""
+        },
+        {
+          "id": "s3",
+          "text": "Confirm `personality.txt` (or `campaign.txt`) and `ElevenLabsAPIKey.txt` exist (both git-ignored)."
+        }
+      ]
+    },
+    {
+      "id": "launch-headless-and-panel",
+      "title": "Both entry points launch with the expected banner",
+      "section": "0. Prerequisites",
+      "tags": [
+        "HW",
+        "GUI"
+      ],
+      "requires": "Source checkout, keys present.",
+      "expected": "Headless prints the capability banner and no browser; the UI build prints the same banner AND opens the panel at IDLE. The PTT scan-code line and `QUIT: Ctrl+Alt+Q` are printed.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Run `run_covas.py` (headless) → banner shows model, voice, Whisper size, and capability on/off lines (Router, ED monitor, Proactive, Keybinds, Auto-honk, Find, Personality). No browser opens."
+        },
+        {
+          "id": "s2",
+          "text": "Run `run_covas_ui.py` → same banner PLUS the browser opens http://127.0.0.1:8765 and the status light reads IDLE."
+        },
+        {
+          "id": "s3",
+          "text": "The console prints the PTT scan-codes line and `QUIT: Ctrl+Alt+Q`."
+        }
+      ]
+    },
+    {
+      "id": "core-voice-loop",
+      "title": "Push-to-talk round trip: cues, state machine, spoken reply",
+      "section": "1. Core voice loop",
+      "tags": [
+        "HW",
+        "GUI"
+      ],
+      "requires": "App running with mic + speakers; panel open; personality ON.",
+      "expected": "A held-key utterance flows LISTENING→TRANSCRIBING→THINKING→SPEAKING→IDLE with the right cue at each stage and a spoken reply that addresses you as \"Commander\".",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold `[` → you hear a `listen` cue immediately (before speaking)."
+        },
+        {
+          "id": "s2",
+          "text": "While holding, say \"Hello COVAS, can you hear me? Keep it short.\" then release → you hear a `processing` cue."
+        },
+        {
+          "id": "s3",
+          "text": "Panel status + log move through LISTENING → TRANSCRIBING → THINKING → SPEAKING → IDLE."
+        },
+        {
+          "id": "s4",
+          "text": "Your words appear as `Commander: …` and the reply as `COVAS: …` (timestamped) in the log."
+        },
+        {
+          "id": "s5",
+          "text": "Just before speech you hear the `completed` cue, then the reply plays in the ElevenLabs voice and addresses you as \"Commander\"."
+        }
+      ]
+    },
+    {
+      "id": "cues-shipped-defaults-play",
+      "title": "Shipped default cues play out of the box (no user cues)",
+      "section": "2. Sound cues",
+      "tags": [
+        "HW"
+      ],
+      "requires": "No user cue overrides present: `<data dir>\\sounds\\listen\\` etc. are empty or absent (source run: `.\\sounds\\`; packaged: `%APPDATA%\\COVAS++\\sounds\\`). App running with speakers/headset.",
+      "expected": "You hear the shipped ORIGINAL cues at each stage — a `listen` chirp on press, a `processing` tick while it works, a `completed` cue right before speech, and a `failure` cue on no-speech. None are silent.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold `[` → you hear the `listen` cue immediately (before speaking)."
+        },
+        {
+          "id": "s2",
+          "text": "Say a short prompt and release → you hear the `processing` cue."
+        },
+        {
+          "id": "s3",
+          "text": "Just before the spoken answer you hear the `completed` cue."
+        },
+        {
+          "id": "s4",
+          "text": "Press and release WITHOUT speaking → you hear the `failure` cue; the log notes no speech detected."
+        }
+      ]
+    },
+    {
+      "id": "cues-open-folder-button",
+      "title": "'Open cues folder' opens the sounds dir with the per-type skeleton",
+      "section": "2. Sound cues",
+      "tags": [
+        "GUI",
+        "FILE"
+      ],
+      "requires": "Control panel open (native window or browser).",
+      "expected": "Clicking Open cues folder opens the OS file manager on `<data dir>\\sounds\\` containing `listen\\ processing\\ completed\\ failure\\` subfolders, each with a `README.txt`. The button shows 'opened'.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "In the first (config) card, click `OPEN CUES FOLDER`."
+        },
+        {
+          "id": "s2",
+          "text": "Explorer opens `<data dir>\\sounds\\` (source run: repo `.\\sounds\\`; packaged: `%APPDATA%\\COVAS++\\sounds\\`)."
+        },
+        {
+          "id": "s3",
+          "text": "It contains `listen`, `processing`, `completed`, `failure` folders, each with a README.txt explaining drop-in cues."
+        }
+      ]
+    },
+    {
+      "id": "cues-override-replaces-and-rotates",
+      "title": "User cues in a type folder replace the default and rotate randomly",
+      "section": "2. Sound cues",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "Access to `<data dir>\\sounds\\listen\\` (use Open cues folder). Have 2-3 distinct short `.wav` files to drop in.",
+      "expected": "With >=1 file in `sounds\\listen\\`, the press-to-talk cue plays YOUR files (the shipped default is no longer heard) and VARIES across presses (random rotation over any count).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Drop 2-3 distinct `.wav` files into `sounds\\listen\\`, then restart COVAS++."
+        },
+        {
+          "id": "s2",
+          "text": "Press to talk several times → the `listen` cue is now clearly YOUR audio, not the shipped chirp."
+        },
+        {
+          "id": "s3",
+          "text": "Across presses the cue VARIES (a random file each time)."
+        }
+      ]
+    },
+    {
+      "id": "cues-empty-folder-falls-back",
+      "title": "Emptying a type folder falls back to the shipped default",
+      "section": "2. Sound cues",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "Continue from cues-override-replaces-and-rotates (your files are in `sounds\\listen\\`).",
+      "expected": "Remove your files from `sounds\\listen\\` and restart → the press-to-talk cue is the SHIPPED default `listen` chirp again (fallback works).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Delete the files you added to `sounds\\listen\\` (leave the folder empty), then restart COVAS++."
+        },
+        {
+          "id": "s2",
+          "text": "Press to talk → you hear the shipped default `listen` cue, not your removed audio."
+        }
+      ]
+    },
+    {
+      "id": "cues-interdiction-sting-default",
+      "title": "Interdiction plays the shipped original sting when no user sting is set",
+      "section": "2. Sound cues",
+      "tags": [
+        "HW",
+        "GAME"
+      ],
+      "requires": "`[audio.interdiction].enabled` (and the audio layer) ON, with NO user interdiction sting configured or dropped in. Elite Dangerous running; trigger (or wait for) an Interdiction / UnderAttack event.",
+      "expected": "On an interdiction, the ALERT sting is the shipped ORIGINAL sting (audible), not silence — the bundled default fills in when the user supplies none.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With interdiction enabled and no custom sting, get interdicted (or pull a rebuy-safe NPC interdiction)."
+        },
+        {
+          "id": "s2",
+          "text": "You hear an alert sting at the start of the interdiction cue (followed by the threat line)."
+        }
+      ]
+    },
+    {
+      "id": "cancel-barge-in",
+      "title": "Tap-to-cancel, barge-in, and panel CANCEL all interrupt",
+      "section": "3. Cancel & barge-in",
+      "tags": [
+        "HW",
+        "GUI"
+      ],
+      "requires": "App running with mic + speakers; panel open.",
+      "expected": "A brief tap of `[` (<400 ms) stops thinking/speaking instantly; holding `[` during a reply barges in with a fresh capture; the panel CANCEL button also stops a reply.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Ask a long question (\"Tell me the history of the Elite Dangerous galaxy in detail.\"). While it is thinking or speaking, tap `[` briefly → it stops instantly and returns to IDLE."
+        },
+        {
+          "id": "s2",
+          "text": "Confirm a normal hold still records fine (a hold is well over the 400 ms tap threshold)."
+        },
+        {
+          "id": "s3",
+          "text": "Barge-in: while a reply is being spoken, hold `[` again → speech cuts off and a fresh capture starts."
+        },
+        {
+          "id": "s4",
+          "text": "The panel's CANCEL / STOP button also stops an in-progress reply."
+        }
+      ]
+    },
+    {
+      "id": "cost-router-tiers",
+      "title": "Router picks the cheap tier by default and escalates on demand",
+      "section": "4. Cost router",
+      "tags": [
+        "HW",
+        "GUI"
+      ],
+      "requires": "`[router].enabled = true`; app running; panel open (read the `[router]` and `[usage]` log lines).",
+      "expected": "Each turn logs a `[router] <model> max_tokens=N — <reason>` line and a `[usage] … [<model>]` line; banter uses Haiku, depth/\"think hard\" escalates to Sonnet, explicit \"use Opus\" uses Opus, and \"full breakdown\" raises max_tokens.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Banter cheap tier: \"Morning, COVAS — how's it going?\" → router line shows `claude-haiku-4-5`; cost a fraction of a cent."
+        },
+        {
+          "id": "s2",
+          "text": "\"Think hard about the best way to break in a new ship.\" → `claude-sonnet-5`."
+        },
+        {
+          "id": "s3",
+          "text": "Depth phrase: \"Walk me through the pros and cons of a fuel scoop.\" → Sonnet."
+        },
+        {
+          "id": "s4",
+          "text": "Explicit premium: \"Use Opus for this — summarize the Thargoid war.\" → `claude-opus-4-8`."
+        },
+        {
+          "id": "s5",
+          "text": "\"Give me the full breakdown of the engineering process.\" → higher `max_tokens` (2048)."
+        },
+        {
+          "id": "s6",
+          "text": "(Optional) Set the router pin in Settings and confirm the router line reflects it."
+        }
+      ]
+    },
+    {
+      "id": "ed-context-answers",
+      "title": "Context-aware answers come from live telemetry",
+      "section": "5. ED monitoring & callouts",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[elite].enabled = true`; ED running with live telemetry; fly around a bit.",
+      "expected": "Questions about location/fuel/dock/ship/recent activity are answered from the live journal + Status.json, not guessed; a \"context\" wake word forces a live status lookup and is scrubbed from the prompt.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "\"Where am I?\" → names your current system (from live telemetry)."
+        },
+        {
+          "id": "s2",
+          "text": "\"How's my fuel?\" → reports fuel level / status."
+        },
+        {
+          "id": "s3",
+          "text": "\"Am I docked?\" / \"What ship am I in?\" → answers from current status."
+        },
+        {
+          "id": "s4",
+          "text": "\"What did I just do?\" / \"Check my logs.\" → summarizes recent journal events."
+        },
+        {
+          "id": "s5",
+          "text": "Say a word containing \"context\" on an ambiguous question → forces a live status lookup (the wake word is scrubbed from what the model sees)."
+        }
+      ]
+    },
+    {
+      "id": "proactive-callouts",
+      "title": "Proactive callouts fire on game events and mute by voice",
+      "section": "5. ED monitoring & callouts",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[elite].enabled` and `[proactive].enabled = true`; ED running.",
+      "expected": "Arrival/dock events produce a short in-character spoken callout with no PTT (only when idle, throttled); voice mute silences them and can be turned back on; a callout in progress is cancelable.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Arrival: FSD jump to a new system → within a few seconds COVAS speaks a short callout with NO PTT press (fires only when idle)."
+        },
+        {
+          "id": "s2",
+          "text": "Dock at a station → a `Docked` callout fires (at most one line amid a jump→supercruise→dock burst — min-interval throttle)."
+        },
+        {
+          "id": "s3",
+          "text": "Mute by voice: \"COVAS, stop the callouts.\" → confirms; trigger another event → no callout. Then \"COVAS, turn callouts back on.\" → next event announces again."
+        },
+        {
+          "id": "s4",
+          "text": "A callout in progress is cancelable: hold `[` mid-callout → it cuts off."
+        }
+      ]
+    },
+    {
+      "id": "route-callouts",
+      "title": "Route callouts track a plotted galaxy-map route",
+      "section": "5. ED monitoring & callouts",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[elite].enabled` and `[route].enabled = true`; plot a multi-jump galaxy-map route (writes `NavRoute.json`).",
+      "expected": "While flying the route COVAS calls scoopable heads-ups, jumps-remaining every Nth jump, and an arrival line; replotting resets counts; the proactive mute also silences route callouts.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Scoopable heads-up: as you lock/enter the next jump, COVAS says whether the next star is scoopable."
+        },
+        {
+          "id": "s2",
+          "text": "Jumps remaining: every Nth jump (`[route].every_n`, default 5) it announces jumps remaining (singular \"1 jump remaining\" near the end)."
+        },
+        {
+          "id": "s3",
+          "text": "Arrival: on the final system it says \"Arrived at <system>. Route complete.\" and stops."
+        },
+        {
+          "id": "s4",
+          "text": "Replot mid-flight → callouts follow the new route (counts reset)."
+        },
+        {
+          "id": "s5",
+          "text": "With the proactive mute on (\"stop the callouts\"), route callouts are silent too."
+        }
+      ]
+    },
+    {
+      "id": "ship-loadout-engineering",
+      "title": "Loadout & engineering questions answer from the journal snapshot (N9)",
+      "section": "5. ED monitoring & callouts",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[elite].enabled = true`; ED running so the journal has a Loadout event (re-log or switch ships if needed).",
+      "expected": "COVAS answers about fitted modules and engineering strictly from the live loadout snapshot — it never invents a module, blueprint, or stat — and can OFFER (not auto-add) an upgrade to the checklist.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "\"What's on my FSD?\" / \"What engineering is on my frame shift drive?\" → reports the blueprint + grade + any experimental effect from your actual fit."
+        },
+        {
+          "id": "s2",
+          "text": "\"List my experimental effects.\" → names only effects genuinely fitted."
+        },
+        {
+          "id": "s3",
+          "text": "\"What should I upgrade next?\" → reasons over the real loadout and OFFERS to record a specific upgrade on the checklist (does NOT add it unasked)."
+        },
+        {
+          "id": "s4",
+          "text": "Ask about a module you do NOT have fitted → it says so rather than inventing stats."
+        }
+      ]
+    },
+    {
+      "id": "keybind-landing-gear",
+      "title": "Landing-gear keybind: arm, separate-turn confirm, guards, abort",
+      "section": "6. Ship controls",
+      "tags": [
+        "GAME",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "`[elite].enabled` and `[keybinds].enabled = true`, `require_confirmation`/`combat_guard = true`. Toggle Landing Gear bound in ED. Do this parked/docked and safe.",
+      "expected": "Toggling gear arms without firing, requires a confirm on a SEPARATE turn, refuses same-turn confirm, refuses in danger or with ED off, expires after the window, hard-aborts on \"belay that\", and refuses any off-allowlist control.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Arm: \"COVAS, toggle my landing gear.\" → says armed-but-not-done and asks to confirm separately. Gear does NOT move yet."
+        },
+        {
+          "id": "s2",
+          "text": "Confirm on a SEPARATE turn: \"Confirm.\" (or \"do it\") → the gear toggles in-game."
+        },
+        {
+          "id": "s3",
+          "text": "Same-turn confirm refused: arm and, in the same utterance, say \"…and do it now\" → refuses to fire in the arming turn."
+        },
+        {
+          "id": "s4",
+          "text": "Combat guard: get interdicted / into danger, then ask to toggle → refuses. With `[elite]` OFF it also refuses."
+        },
+        {
+          "id": "s5",
+          "text": "Expiry: arm, wait past `confirm_window` (60 s), then \"confirm\" → says it expired; nothing fires."
+        },
+        {
+          "id": "s6",
+          "text": "Hard abort: arm, then \"Abort.\" / \"Belay that.\" → arm cleared, any held key released."
+        },
+        {
+          "id": "s7",
+          "text": "Off-allowlist refusal: ask for a different control (\"deploy hardpoints\") → won't do it."
+        }
+      ]
+    },
+    {
+      "id": "auto-honk",
+      "title": "Auto-honk on arrival: happy path, DSS-misfire recovery, re-arm, guards",
+      "section": "6. Ship controls",
+      "tags": [
+        "GAME",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "`[elite].enabled` and `[honk].enabled = true`; Discovery Scanner fire bound to a KEY in ED. Startup log says \"Auto-honk ON …\" or a bind warning. Do this safely.",
+      "expected": "On jumping to a NEW system it probes and honks with the Discovery Scanner; a Detailed-Surface-Scanner fire group is detected and backed out of (speaks + disarms); it re-arms by voice or by a manual discovery scan; combat/danger/normal-space/unbound cases skip safely; \"abort\" releases the held key; disabled = no honk.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Happy path: with the Discovery Scanner in your fire group, jump to a new system → after a short probe it holds the fire button ~`hold_seconds` (5) and honks; the system map populates. Log: `honked — current fire group`."
+        },
+        {
+          "id": "s2",
+          "text": "DSS misfire → recover: select a fire group holding the Detailed Surface Scanner, jump near a planet → it detects the Surface-Scanner view, presses Exit Mode, speaks a heads-up, and disarms (you are NOT stuck in the DSS). Log: `disarmed: a honk opened the Surface Scanner`."
+        },
+        {
+          "id": "s3",
+          "text": "Re-arm (voice): after a disarm, \"re-arm auto honk\" → confirms and honks next jump."
+        },
+        {
+          "id": "s4",
+          "text": "Re-arm (auto): after a disarm, do a manual honk yourself → the discovery-scan event re-arms it. Log: `re-armed`."
+        },
+        {
+          "id": "s5",
+          "text": "Weapons group harmless: select a weapons fire group, jump → no weapons fire, no scan, no crash."
+        },
+        {
+          "id": "s6",
+          "text": "Guards: jump in combat mode → skips (`in combat mode`); in danger/interdiction → `blocked`; in normal space → `not in supercruise`."
+        },
+        {
+          "id": "s7",
+          "text": "Unbound fire (HOTAS/mouse-only, no keyboard bind) → skips with a \"no keyboard binding\" note; nothing fires."
+        },
+        {
+          "id": "s8",
+          "text": "Hard abort: with `[keybinds]` on, jump and during the hold say \"abort\" → the held fire key releases immediately."
+        },
+        {
+          "id": "s9",
+          "text": "Disabled: set `[honk].enabled = false` → no honk on arrival."
+        }
+      ]
+    },
+    {
+      "id": "outfitting-find-module",
+      "title": "Find the closest module: search, disambiguation, already-local",
+      "section": "7. Outfitting & ship search",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET"
+      ],
+      "requires": "`[nav].enabled = true`; ED running (current system known); internet.",
+      "expected": "Module searches name the nearest station+system+distance and copy the system to the clipboard, ask for size/mount instead of guessing, recover from a mishear, report \"in your current system\" when local, and refuse to search blind with no current system.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Happy path: \"Find the closest fuel scoop.\" → names the nearest station + system + distance and copies the system to the clipboard (paste to confirm)."
+        },
+        {
+          "id": "s2",
+          "text": "Disambiguation: \"Find the closest multi-cannon.\" → asks for size and mount; answer → it searches."
+        },
+        {
+          "id": "s3",
+          "text": "Mishear recovery: \"Find the nearest multiple cannon.\" → resolves to / suggests Multi-Cannon."
+        },
+        {
+          "id": "s4",
+          "text": "Already local: search for a module sold in your current system → reply says it's \"in your current system\"."
+        },
+        {
+          "id": "s5",
+          "text": "No current system: with ED not running and no journal → says it doesn't know your current system yet, rather than searching blindly."
+        }
+      ]
+    },
+    {
+      "id": "ship-search-stock-verified",
+      "title": "Find the closest ship with EDSM live-stock verification (N8)",
+      "section": "7. Outfitting & ship search",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET"
+      ],
+      "requires": "`[nav].enabled = true`, `verify_stock = true` (default); ED running; internet. Cross-check answers against Inara's nearest-seller search.",
+      "expected": "Ship searches confirm each candidate's current stock against EDSM before speaking, so results match Inara; a catalog-but-not-stocked station is skipped for one that truly stocks it; family names disambiguate; unverifiable results carry a caveat; the kill switch disables EDSM calls.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Happy path: \"Where can I buy an Anaconda?\" → nearest station + system + distance + price, system copied. Cross-check on Inara: same #1 station."
+        },
+        {
+          "id": "s2",
+          "text": "Catalog-vs-stock (the Type-10 bug): ask for a ship your current station catalogs but doesn't stock → the answer is a DIFFERENT station that really stocks it, optionally noting the nearer listing was skipped. Verify on Inara."
+        },
+        {
+          "id": "s3",
+          "text": "Family disambiguation: \"Find the closest Krait.\" → asks MkII or Phantom; answer → searches once."
+        },
+        {
+          "id": "s4",
+          "text": "Unverified caveat: if a reply ends with \"I couldn't verify live stock…\", spot-check that station on Inara."
+        },
+        {
+          "id": "s5",
+          "text": "Kill switch: set `[nav].verify_stock = false`, restart → searches still work (startup line says `stock check off`), no EDSM calls, no caveats."
+        }
+      ]
+    },
+    {
+      "id": "voice-search-categories",
+      "title": "Voice search over Spansh: systems, stations, factions, signals, states, refine",
+      "section": "8. Voice search",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET"
+      ],
+      "requires": "`[star_systems].enabled` and `[search].enabled = true`; ED running (current system known); internet.",
+      "expected": "Each category returns the nearest match from your current system and copies the primary system; misheard filter values are corrected against the bundled vocabulary; a follow-up refinement re-runs the search rather than ignoring it or starting over.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Star systems: \"Find the nearest Empire system with high security.\" → closest match + distance, copied."
+        },
+        {
+          "id": "s2",
+          "text": "Stations: \"Find the nearest station with a shipyard and a large pad.\" → nearest match, copied. (Try \"no carriers\" or \"close to the star\".)"
+        },
+        {
+          "id": "s3",
+          "text": "Minor factions: \"Where is the nearest system the Dark Wheel is present?\" → nearest system, copied. An unknown faction triggers a recovery suggestion, not a bogus search."
+        },
+        {
+          "id": "s4",
+          "text": "Signals / structures: \"Find the nearest megaship.\" → nearest structure, copied."
+        },
+        {
+          "id": "s5",
+          "text": "Faction states: \"Find the nearest system at war.\" → nearest system by controlling-faction state, copied."
+        },
+        {
+          "id": "s6",
+          "text": "Refinement re-query: after any of the above, \"actually, make it a low-security anarchy\" → re-runs with the changed filter and gives a new nearest result."
+        }
+      ]
+    },
+    {
+      "id": "location-and-carriers",
+      "title": "Copy current system; fleet vs squadron carrier; already-there rule (N3)",
+      "section": "9. Location & carriers",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[elite].enabled = true`; ED running. The owned fleet carrier is tracked from the journal.",
+      "expected": "Copying the current system works; the fleet carrier's system is spoken + copied (or \"you own no carrier\"); the squadron carrier is explained as in-game-only (no lookup/copy); asking for the fleet carrier while in its system says you're already there and does NOT copy.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Copy current system: \"Copy my current system.\" → copies your current system (paste to confirm)."
+        },
+        {
+          "id": "s2",
+          "text": "Fleet carrier: \"Where's my fleet carrier?\" → speaks its current system and copies it. (No carrier → says so.)"
+        },
+        {
+          "id": "s3",
+          "text": "Squadron carrier: \"Where's my squadron carrier?\" → explains it's only available in-game on the Squadron menu's Carrier Management tab; does NOT look up or copy."
+        },
+        {
+          "id": "s4",
+          "text": "Already-there rule: ask for the fleet carrier while in the carrier's system → says you're already there and does NOT copy."
+        }
+      ]
+    },
+    {
+      "id": "community-goals",
+      "title": "Community Goals: list, system, standing, offline fallback (N6)",
+      "section": "10. Community goals",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET"
+      ],
+      "requires": "`[cg].source` set; ED running; visit a CG board in-game first so the journal has your standing. Optional `[cg].inara_api_key` to also surface unvisited CGs.",
+      "expected": "CG queries list active goals (flagging unvisited ones with an Inara key), resolve a CG's system by fuzzy title and copy it (unless it's your current system), report your standing or admit it doesn't have it, and degrade gracefully with no key / feed down.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "List: \"List the community goals.\" → active CGs (title + system + expiry); with an Inara key, unvisited ones are flagged."
+        },
+        {
+          "id": "s2",
+          "text": "CG system: \"What system is the <CG title> community goal in?\" → resolves by fuzzy title, speaks the system, and copies it — unless it's your current system (then says so, no copy)."
+        },
+        {
+          "id": "s3",
+          "text": "Standing: \"What's my standing in the <CG title> community goal?\" → \"Top 10 Commanders\" or \"top X%\". For a CG not in your journal it says it doesn't have your standing."
+        },
+        {
+          "id": "s4",
+          "text": "No key / feed down: with no Inara key it works journal-only and notes it can't see unvisited CGs right now (doesn't crash)."
+        }
+      ]
+    },
+    {
+      "id": "help-hierarchy",
+      "title": "Help is a hierarchy templated from the live capability registry",
+      "section": "11. Help & version",
+      "tags": [
+        "HW"
+      ],
+      "requires": "App running; the capabilities you want to spot-check are enabled (see §0.3 in MANUAL_TESTS.md).",
+      "expected": "\"What can you do?\" names CATEGORIES (not every capability); drilling into a category lists ≤3 capabilities with examples; drilling into a capability describes its refinements; every enabled capability is reachable; misspellings get a suggestion, never an invented correction; an unbuilt capability is declined without echoing it as real.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Overview names CATEGORIES: \"What can you do?\" → names the groups (navigation and search, your ship, your checklist, community goals, settings) and invites drilling in — does NOT read every capability."
+        },
+        {
+          "id": "s2",
+          "text": "Drill into a category: \"Tell me about navigation and search.\" → lists its capabilities (≤3, then \"there are others — ask about …\"), each with an example."
+        },
+        {
+          "id": "s3",
+          "text": "Drill into a capability: \"How do I find a module?\" → describes outfitting and its refinements (size, mount, pad)."
+        },
+        {
+          "id": "s4",
+          "text": "Coverage: spot-check one capability per group (e.g. \"tell me about your ship\", \"tell me about settings\", \"tell me about community goals\")."
+        },
+        {
+          "id": "s5",
+          "text": "Failure recovery: \"Find the closest power distributer.\" (misspelled) → \"did you mean Power Distributor?\" — never inventing a correction."
+        },
+        {
+          "id": "s6",
+          "text": "Unknown capability: \"Can you plot me a route?\" (not built) → says it can't and offers to list what it can, WITHOUT echoing the fake capability as real."
+        }
+      ]
+    },
+    {
+      "id": "version-by-voice",
+      "title": "\"What version are you?\" reports the running version",
+      "section": "11. Help & version",
+      "tags": [
+        "HW"
+      ],
+      "requires": "App running (native window, browser UI, or headless). Know the expected version from `covas/__version__.py` (currently 0.1.0).",
+      "expected": "COVAS speaks the running version, e.g. \"I'm running COVAS++ version 0.1.0.\", matching covas/__version__.py exactly.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold `[`, say \"What version are you?\", release."
+        },
+        {
+          "id": "s2",
+          "text": "The spoken reply names the version and it matches the string in `covas/__version__.py`."
+        },
+        {
+          "id": "s3",
+          "text": "Try a variant (\"which build is this?\") → still reports the same version."
+        }
+      ]
+    },
+    {
+      "id": "check-updates-by-voice-is-ui-only",
+      "title": "\"Check for updates\" by voice does NOT update — points to the panel",
+      "section": "11. Help & version",
+      "tags": [
+        "HW"
+      ],
+      "requires": "App running.",
+      "expected": "Asking to check for / install an update by VOICE does not trigger any download or relaunch; COVAS says updates are done from the control panel's update banner. (Updating stays a UI action — INSTALLER_DESIGN decision #5.)",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold `[`, say \"Check for updates.\", release."
+        },
+        {
+          "id": "s2",
+          "text": "COVAS does NOT download or relaunch anything; it points you at the control panel's update banner instead."
+        }
+      ]
+    },
+    {
+      "id": "voice-settable-settings",
+      "title": "Change settings by voice, validated against the schema (N2)",
+      "section": "12. Voice settings",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "App running; you can open `overrides.json` to verify writes.",
+      "expected": "Voice settings changes are validated against the same schema as the Settings page, write `overrides.json`, refuse invalid values while listing the valid options, route unknown settings to help, and can be read back.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set an enum: \"Set the Whisper model to small.\" → confirms; the change appears in `overrides.json`."
+        },
+        {
+          "id": "s2",
+          "text": "Set a bool: \"Turn personality off.\" → confirms; a follow-up no longer says \"Commander\". Turn it back on."
+        },
+        {
+          "id": "s3",
+          "text": "Natural value: \"Set thinking to high.\" / \"Set the voice speed to 1.1.\" → applied."
+        },
+        {
+          "id": "s4",
+          "text": "Invalid value refused with options: \"Set the Whisper model to gigantic.\" → refuses and lists the valid options."
+        },
+        {
+          "id": "s5",
+          "text": "Unknown setting → help: \"Set the warp factor to 9.\" → routes to help / says it isn't a setting."
+        },
+        {
+          "id": "s6",
+          "text": "Get a setting: \"What's my Whisper model set to?\" → reads the current value."
+        }
+      ]
+    },
+    {
+      "id": "checklist-read-mark-edit",
+      "title": "Checklist read, mark, edit, disambiguate, external edit",
+      "section": "13. Checklist",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "App running; uses `ultimate_checklist.md`. Test edits with a THROWAWAY line.",
+      "expected": "Voice reads the next objective + progress and upcoming items, marks/reopens lines (verified in the file), asks which when a mark is ambiguous, adds/modifies/deletes a throwaway line preserving nesting/checkbox, and reflects an external hand-edit on the next read.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "\"What should I knock out next?\" → speaks your next pending objective and progress (e.g. \"66 of 807\")."
+        },
+        {
+          "id": "s2",
+          "text": "\"Give me my next three objectives.\" → reads a few upcoming items."
+        },
+        {
+          "id": "s3",
+          "text": "\"Mark that one done.\" → confirms; that line is now `- [x]`. \"Actually reopen it.\" → back to `- [ ]`."
+        },
+        {
+          "id": "s4",
+          "text": "Disambiguation: ask to mark something matching several lines → it asks which one."
+        },
+        {
+          "id": "s5",
+          "text": "Add / Modify / Delete a throwaway line → inserted after current with matching nesting / text updated (checkbox preserved) / removed; real objectives intact."
+        },
+        {
+          "id": "s6",
+          "text": "External edit: hand-edit the file, save, then \"What's next?\" → reflects your edit (reads fresh)."
+        }
+      ]
+    },
+    {
+      "id": "panel-live-status-log",
+      "title": "Live status light and log track the session",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Panel open; talk to the app.",
+      "expected": "The status light tracks state as you talk and the log scrolls with prompts, replies, router/usage, and status/search lines, all timestamped.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "As you talk, the status light tracks the state machine."
+        },
+        {
+          "id": "s2",
+          "text": "The log scrolls with prompts, replies, router/usage, and status/search lines (timestamped)."
+        }
+      ]
+    },
+    {
+      "id": "panel-settings-page",
+      "title": "Settings page: grouped controls, filter, save/reset, validation, live reload",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI",
+        "FILE"
+      ],
+      "requires": "Panel open at http://127.0.0.1:8765/settings.",
+      "expected": "The Settings page renders grouped sections with the right control per type + inline help, filters live, saves to `overrides.json` (config.toml pristine) with a per-setting RESET, rejects out-of-range values, and reloads Whisper live.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "The page renders grouped sections with the right control per type (toggles, dropdowns, number/sliders, text/path) and inline help."
+        },
+        {
+          "id": "s2",
+          "text": "Filter box: type in the search box → the list narrows to matching settings."
+        },
+        {
+          "id": "s3",
+          "text": "Change + save: change a value → the save bar appears with a count; SAVE CHANGES → written to `overrides.json` (config.toml stays pristine)."
+        },
+        {
+          "id": "s4",
+          "text": "Per-setting reset: a changed setting shows RESET → click → reverts to default and drops from `overrides.json`."
+        },
+        {
+          "id": "s5",
+          "text": "Validation: try an out-of-range number (voice speed 2.0) → rejected, not written."
+        },
+        {
+          "id": "s6",
+          "text": "Live where supported: change the Whisper model → the log notes the model reloaded (no restart)."
+        }
+      ]
+    },
+    {
+      "id": "panel-personality-tab",
+      "title": "Personality tab: persona picker, campaign preserved, save-as-custom, campaign editor (N7)",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Panel open; Personality tab.",
+      "expected": "Selecting a persona previews and changes the spoken voice/register; switching persona never wipes your Campaign facts; editing + SAVE AS CUSTOM adds a git-ignored custom persona; editing + SAVE CAMPAIGN updates the facts reflected in replies.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Persona picker: the tab lists personas; selecting one shows a preview. Pick a different persona → the next reply's voice/register changes."
+        },
+        {
+          "id": "s2",
+          "text": "Campaign preserved: switch persona and confirm your Campaign text (personal facts) is unchanged."
+        },
+        {
+          "id": "s3",
+          "text": "Save as custom: edit the persona box → SAVE AS CUSTOM → a new custom persona appears (written under `personalities/custom/`)."
+        },
+        {
+          "id": "s4",
+          "text": "Campaign editor: edit the Campaign box → SAVE CAMPAIGN → a subsequent reply reflects the updated facts."
+        }
+      ]
+    },
+    {
+      "id": "panel-voice-speed",
+      "title": "Voice speed slider affects speech and clamps at 1.2 (N7)",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Panel open.",
+      "expected": "Nudging the Voice speed slider (1.0–1.2×) makes the next reply faster; the value cannot exceed 1.2.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Nudge the Voice speed slider and ask something → the reply is spoken faster."
+        },
+        {
+          "id": "s2",
+          "text": "The value can't exceed 1.2 (clamped)."
+        }
+      ]
+    },
+    {
+      "id": "panel-log-filter",
+      "title": "Live-log Conversation/All toggle filters and persists (N7)",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI"
+      ],
+      "requires": "Panel open.",
+      "expected": "The Live Log's Conversation/All toggle shows only utterances+replies vs everything; Conversation hides status/thinking/usage lines and the choice persists across a reload.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Conversation (default) shows only your utterances and COVAS replies; All shows status/thinking/search/usage/system lines too."
+        },
+        {
+          "id": "s2",
+          "text": "Switch to Conversation → status/thinking/usage lines hide; the choice persists across a reload."
+        }
+      ]
+    },
+    {
+      "id": "panel-checklist-editor",
+      "title": "Checklist editor tab: rendered markdown, toggle, nest, live sync, stale-write guard (N10)",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI",
+        "FILE",
+        "NET"
+      ],
+      "requires": "Panel open at http://127.0.0.1:8765/checklist (loads a CDN). Edits the SAME `ultimate_checklist.md`. Use a THROWAWAY line.",
+      "expected": "The tab renders the checklist as markdown, toggles/edits/nests lines into the file as `- [ ]` style, syncs voice↔web both directions, and blocks a stale overwrite with an amber warning offering reload-or-overwrite.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Renders as rendered markdown (headings, checkboxes), header shows the file name; checklist links exist on panel + settings headers."
+        },
+        {
+          "id": "s2",
+          "text": "Toggle: click a checkbox → SAVE → the line flips in the file; \"what's next?\" by voice hears the change."
+        },
+        {
+          "id": "s3",
+          "text": "Edit + nest: edit an item inline; Tab nests it under the item above → SAVE → text + indentation land in the file; task lines stay `- [ ]` (never `* [ ]`)."
+        },
+        {
+          "id": "s4",
+          "text": "Voice → web: mark an item by voice, then RELOAD FROM DISK (or refocus) → the voice edit appears."
+        },
+        {
+          "id": "s5",
+          "text": "Stale-write guard: load the tab, make a voice edit, then SAVE in the tab → an amber warning appears; RELOAD THEIR VERSION shows the voice edit, or OVERWRITE ANYWAY forces yours."
+        },
+        {
+          "id": "s6",
+          "text": "Save feedback: a successful save flashes \"Saved — N/M complete\" and the Live Log (All) shows \"Checklist updated from the web editor\"."
+        }
+      ]
+    },
+    {
+      "id": "settings-persistence",
+      "title": "Settings survive a quit and relaunch",
+      "section": "15. Settings persistence",
+      "tags": [
+        "GUI",
+        "FILE"
+      ],
+      "requires": "App running; panel or voice.",
+      "expected": "Non-default model/voice/thinking/personality values are written to `overrides.json` and are still in effect after Ctrl+Alt+Q and relaunch.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set model, voice, thinking depth, and personality to non-default values (panel or voice)."
+        },
+        {
+          "id": "s2",
+          "text": "Open `overrides.json` → your changes are there."
+        },
+        {
+          "id": "s3",
+          "text": "Quit (Ctrl+Alt+Q) and relaunch → the panel comes back with the same settings."
+        }
+      ]
+    },
+    {
+      "id": "web-search-automatic",
+      "title": "Automatic web search on current-info questions, capped and cancelable",
+      "section": "16. Web search",
+      "tags": [
+        "HW",
+        "GUI",
+        "NET"
+      ],
+      "requires": "`[web_search].enabled = true`; app running; panel open; internet.",
+      "expected": "A current-info question triggers a logged web search (with a processing beep), the answer reflects live info, mid-search tap-cancel stops it, and searches are capped at `max_uses` (3) per reply.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "\"What's the latest Elite Dangerous update right now?\" → log shows \"Searching the web for …\", status hits a searching state, you hear a processing beep."
+        },
+        {
+          "id": "s2",
+          "text": "The spoken answer reflects live/current info."
+        },
+        {
+          "id": "s3",
+          "text": "Cancel mid-search: start another current-info question, then tap `[` while searching → it stops."
+        },
+        {
+          "id": "s4",
+          "text": "Searches are capped at `[web_search].max_uses` (3) per reply."
+        }
+      ]
+    },
+    {
+      "id": "robustness-and-quit",
+      "title": "Odd input, session log, provider hiccup, clean quit",
+      "section": "17. Robustness & quit",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "App running.",
+      "expected": "Emoji/symbol input streams without crashing; the newest `logs\\session_*.log` holds timestamped prompts/replies + router/usage; a brief network kill degrades gracefully back to IDLE (dead TTS falls back to text); Ctrl+Alt+Q shuts down cleanly.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Ask for something with odd symbols/emoji (\"Draw me an ASCII arrow and explain it.\") → speaks/streams without the console crashing."
+        },
+        {
+          "id": "s2",
+          "text": "Open the newest `logs\\session_*.log` → prompts + replies with timestamps, plus router/usage lines."
+        },
+        {
+          "id": "s3",
+          "text": "A provider hiccup (briefly kill network) degrades gracefully — the loop survives and returns to IDLE; a dead TTS falls back to text."
+        },
+        {
+          "id": "s4",
+          "text": "Ctrl+Alt+Q (or closing the console window) shuts it down cleanly."
+        }
+      ]
+    },
+    {
+      "id": "audio-enable-master",
+      "title": "Audio layer master switch: COVAS bus unchanged, barge-in intact (C9)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "GUI"
+      ],
+      "requires": "Set `[audio].enabled = true` (master), enable the parts you want, `[elite].enabled` on. Restart after flipping the master switch.",
+      "expected": "With the audio layer ON, a normal spoken reply still sounds right through the mixer's clean COVAS bus and a tap-`[` barge-in still cuts speech instantly.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[audio].enabled = true` and enable the sub-parts (`[audio.cues]`, `[audio.comms]`, `[music]`, `[audio.interdiction]`); restart."
+        },
+        {
+          "id": "s2",
+          "text": "With the layer ON, a normal spoken reply still sounds right (no change in COVAS's character)."
+        },
+        {
+          "id": "s3",
+          "text": "A tap-`[` barge-in still cuts speech instantly."
+        }
+      ]
+    },
+    {
+      "id": "audio-bus-demos",
+      "title": "Bus mixer + comms radio treatment device demos (app not running)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "HW"
+      ],
+      "requires": "Source checkout; app NOT running; speakers.",
+      "expected": "The demo scripts play the expected clean-vs-radio and interdiction-layer tones.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "`.venv\\Scripts\\python.exe scripts\\demo_comms_bus.py` → a tone CLEAN (COVAS bus) then RADIO-FILTERED (Comms bus)."
+        },
+        {
+          "id": "s2",
+          "text": "`demo_comms_variants.py` → NPC riff / tampered→verbatim / player DM. `demo_interdiction.py` → the three interdiction layers."
+        }
+      ]
+    },
+    {
+      "id": "audio-comms-voices",
+      "title": "Comms voices in-game: NPC on radio bus, player DM verbatim, chatter gated (C4/C5)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[audio].enabled`, `[audio.comms].enabled`, `[elite].enabled` ON; ED in Open play.",
+      "expected": "NPC/station comms are read on the radio-treated bus, a direct player DM is read verbatim in the fixed male voice, Open-play local/wing chatter is NOT voiced (fail-closed), and repeated station spam isn't re-read (dedup).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Receive an NPC/station comms-panel line (e.g. request docking) → read on the radio-treated comms bus."
+        },
+        {
+          "id": "s2",
+          "text": "A direct player DM is read verbatim (fixed male voice)."
+        },
+        {
+          "id": "s3",
+          "text": "Open-play local/wing chatter is NOT voiced (the fail-closed gate)."
+        },
+        {
+          "id": "s4",
+          "text": "Repeated station spam isn't re-read every jump (template dedup)."
+        }
+      ]
+    },
+    {
+      "id": "audio-chatter-sfx-interdiction",
+      "title": "Space chatter, SFX, and interdiction sting layers (C6/C8)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[audio.cues].enabled` and `[audio.interdiction].enabled` ON; ED running.",
+      "expected": "Flying/docking produces occasional rate-limited ambient chatter that never over-talks; an interdiction plays the layered sting + threat line + pirate line.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With `[audio.cues].enabled`, fly/dock around → occasional ambient chatter (rate-limited, never over-talking)."
+        },
+        {
+          "id": "s2",
+          "text": "Trigger an interdiction → the layered sting + threat line + pirate line."
+        }
+      ]
+    },
+    {
+      "id": "audio-voice-controls-live",
+      "title": "Voice audio controls and live Settings changes (C9)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "HW",
+        "GUI"
+      ],
+      "requires": "Audio layer ON; app running; panel open.",
+      "expected": "Voice commands mute/duck/stop each background layer without touching COVAS's own replies; changing a bus volume or toggling comms/chatter/music on the Settings page applies live (master + voice pickers persist on restart).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "By voice: \"mute the chatter\", \"quiet the comms\", \"turn the music down/up\", \"stop the music\", \"silence all the background audio\", \"turn the ambient audio back on\" → each takes effect; your own replies are unaffected."
+        },
+        {
+          "id": "s2",
+          "text": "On Settings, change a bus volume or toggle comms/chatter/music → applies live (no restart). The master `audio.enabled` and comms voice pickers persist."
+        }
+      ]
+    },
+    {
+      "id": "audio-voice-cast",
+      "title": "Voice cast pool: distinct + stable NPC voices, COVAS stays ElevenLabs (C10)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "HW"
+      ],
+      "requires": "`[audio.voices].cast_provider = \"piper\"` with a few `[[audio.voices.pool]]` entries (provider/ref/gender; `ref` = local `.onnx`). Audio layer ON.",
+      "expected": "Two different NPCs sound different and the same speaker sounds the same across the session; COVAS keeps your ElevenLabs persona voice (no EL credits for NPC lines); honorific/gender + player-DM voice rules hold; an unusable EL/famous voice is never selected.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Receive comms from two different NPCs/stations → they sound different, and the SAME speaker sounds the same across the session."
+        },
+        {
+          "id": "s2",
+          "text": "COVAS still uses your ElevenLabs voice (persona) while the cast runs on Piper (no ElevenLabs credits burned for NPC lines)."
+        },
+        {
+          "id": "s3",
+          "text": "A male-honorific NPC (\"Mr\", \"Sir\") gets a male cast voice; a player DM uses the fixed player voice; an ElevenLabs ™/famous voice is never selected."
+        }
+      ]
+    },
+    {
+      "id": "audio-dropin-content",
+      "title": "Drop-in content skeleton + overrides + silent fallback (C11)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "Audio layer enabled; first run creates the skeleton. ED running for the in-game drops.",
+      "expected": "First run creates `audio/sfx/<cue>/`, `audio/music/<context>/`, `content/chatter/*.txt`, `content/interdiction_threat.txt` (each with a README) and logs a content-status line; dropped files play/override, deleting them falls back to the built-in pool, and a missing/empty folder is silently ignored.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "First run: the skeleton appears (`audio/sfx/<cue>/`, `audio/music/<context>/`, `content/chatter/*.txt`, `content/interdiction_threat.txt`), each with a README; the startup log shows a content-status line."
+        },
+        {
+          "id": "s2",
+          "text": "Drop a `.wav` into `audio/sfx/thargoid_voices/`, restart, jump to hyperspace → hear it on the ambient bus."
+        },
+        {
+          "id": "s3",
+          "text": "Add lines to `content/chatter/station_traffic.txt` (one per line, `#` = comment), restart, dock → hear your lines (override the built-in pool). Delete the file → falls back to the built-in pool. A missing/empty folder is silent (no error)."
+        }
+      ]
+    },
     {
       "id": "fresh-install-native-wizard",
       "title": "Fresh install shows the first-run wizard IN THE NATIVE WINDOW",
-      "section": "I9. Native first-run wizard",
+      "section": "19. Packaged build",
       "tags": [
         "GUI",
         "NET",
         "HW"
       ],
-      "requires": "Empty user-data dir: delete %APPDATA%\\COVAS\u002B\u002B (back it up first if it has your keys). Launch the packaged app via dist\\COVAS\u002B\u002B\\COVAS\u002B\u002B.exe (or \u0060python run_covas_app.py\u0060).",
-      "expected": "The setup wizard renders inside the COVAS\u002B\u002B native PyWebView window. No browser (Edge/Chrome/etc.) opens at any point.",
+      "requires": "Empty user-data dir: delete %APPDATA%\\COVAS++ (back it up first if it has your keys). Launch the packaged app via dist\\COVAS++\\COVAS++.exe (or `python run_covas_app.py`).",
+      "expected": "The setup wizard renders inside the COVAS++ native PyWebView window. No browser (Edge/Chrome/etc.) opens at any point.",
       "steps": [
         {
           "id": "s1",
-          "text": "Confirm %APPDATA%\\COVAS\u002B\u002B is absent/empty, then launch COVAS\u002B\u002B.exe (or run_covas_app.py)."
+          "text": "Confirm %APPDATA%\\COVAS++ is absent/empty, then launch COVAS++.exe (or run_covas_app.py)."
         },
         {
           "id": "s2",
-          "text": "A native window titled COVAS\u002B\u002B appears showing the first-run setup page (API keys / speech model / mic)."
+          "text": "A native window titled COVAS++ appears showing the first-run setup page (API keys / speech model / mic)."
         },
         {
           "id": "s3",
-          "text": "No browser tab or window opens \u2014 the wizard is ONLY in the native window."
+          "text": "No browser tab or window opens — the wizard is ONLY in the native window."
         }
       ]
     },
     {
       "id": "wizard-to-panel-handoff",
       "title": "Finishing setup swaps the SAME window to the control panel (no browser)",
-      "section": "I9. Native first-run wizard",
+      "section": "19. Packaged build",
       "tags": [
         "GUI",
         "NET",
         "HW"
       ],
       "requires": "Continue from fresh-install-native-wizard, in the native window on the wizard page.",
-      "expected": "After entering the Anthropic key (ElevenLabs optional), downloading the STT model, and picking a mic, clicking Launch turns the SAME native window into the control panel (status light IDLE), no browser. The finish message must say it\u0027s switching to the control panel and must NOT tell you to close the window/tab \u2014 closing the single native window would QUIT the app.",
+      "expected": "After entering the Anthropic key (ElevenLabs optional), downloading the STT model, and picking a mic, clicking Launch turns the SAME native window into the control panel (status light IDLE), no browser. The finish message must say it's switching to the control panel and must NOT tell you to close the window/tab — closing the single native window would QUIT the app.",
       "steps": [
         {
           "id": "s1",
@@ -54,28 +1274,28 @@
         },
         {
           "id": "s4",
-          "text": "Click \u0027Launch COVAS\u002B\u002B\u0027. Read the finish message: it should say COVAS\u002B\u002B is starting / switching to the control panel \u2014 NOT \u0027you can close this tab\u0027."
+          "text": "Click 'Launch COVAS++'. Read the finish message: it should say COVAS++ is starting / switching to the control panel — NOT 'you can close this tab'."
         },
         {
           "id": "s5",
-          "text": "WITHOUT closing anything, the same window switches to the control panel (status light IDLE) within a few seconds. Do NOT close the window \u2014 that quits the app."
+          "text": "WITHOUT closing anything, the same window switches to the control panel (status light IDLE) within a few seconds. Do NOT close the window — that quits the app."
         }
       ]
     },
     {
       "id": "already-configured-skips-wizard",
       "title": "Relaunch on a configured install goes straight to the panel",
-      "section": "I9. Native first-run wizard",
+      "section": "19. Packaged build",
       "tags": [
         "GUI",
         "HW"
       ],
-      "requires": "Completed setup at least once (keys \u002B STT model present in %APPDATA%\\COVAS\u002B\u002B).",
-      "expected": "Launching COVAS\u002B\u002B.exe (or run_covas_app.py) opens the native window directly on the control panel \u2014 no wizard, no browser.",
+      "requires": "Completed setup at least once (keys + STT model present in %APPDATA%\\COVAS++).",
+      "expected": "Launching COVAS++.exe (or run_covas_app.py) opens the native window directly on the control panel — no wizard, no browser.",
       "steps": [
         {
           "id": "s1",
-          "text": "Close COVAS\u002B\u002B if open, then relaunch it."
+          "text": "Close COVAS++ if open, then relaunch it."
         },
         {
           "id": "s2",
@@ -86,13 +1306,13 @@
     {
       "id": "bail-mid-wizard-quits-clean",
       "title": "Closing the window during the wizard quits cleanly",
-      "section": "I9. Native first-run wizard",
+      "section": "19. Packaged build",
       "tags": [
         "GUI",
         "HW"
       ],
-      "requires": "Fresh/empty user-data dir so the wizard shows. Launch via COVAS\u002B\u002B.exe (or run_covas_app.py).",
-      "expected": "Closing the native window while still on the wizard exits the process fully \u2014 no orphaned COVAS\u002B\u002B process, and the port (127.0.0.1:8765) is free for an immediate relaunch.",
+      "requires": "Fresh/empty user-data dir so the wizard shows. Launch via COVAS++.exe (or run_covas_app.py).",
+      "expected": "Closing the native window while still on the wizard exits the process fully — no orphaned COVAS++ process, and the port (127.0.0.1:8765) is free for an immediate relaunch.",
       "steps": [
         {
           "id": "s1",
@@ -100,49 +1320,49 @@
         },
         {
           "id": "s2",
-          "text": "Confirm no COVAS\u002B\u002B process lingers (Task Manager) \u2014 the app quit."
+          "text": "Confirm no COVAS++ process lingers (Task Manager) — the app quit."
         },
         {
           "id": "s3",
-          "text": "Relaunch immediately; it starts again without a \u0027port in use\u0027/\u0027address already in use\u0027 error."
+          "text": "Relaunch immediately; it starts again without a 'port in use'/'address already in use' error."
         }
       ]
     },
     {
       "id": "native-quit-controls",
-      "title": "Ctrl\u002BAlt\u002BQ and window-close both quit the running app",
-      "section": "I9. Native first-run wizard",
+      "title": "Ctrl+Alt+Q and window-close both quit the running app",
+      "section": "19. Packaged build",
       "tags": [
         "GUI",
         "HW"
       ],
       "requires": "App running on the control panel (post-setup).",
-      "expected": "Pressing Ctrl\u002BAlt\u002BQ closes the window and exits the process; separately, closing the window with X also exits. No lingering process either way.",
+      "expected": "Pressing Ctrl+Alt+Q closes the window and exits the process; separately, closing the window with X also exits. No lingering process either way.",
       "steps": [
         {
           "id": "s1",
-          "text": "With the panel showing, press Ctrl\u002BAlt\u002BQ \u2014 the window closes and the process exits."
+          "text": "With the panel showing, press Ctrl+Alt+Q — the window closes and the process exits."
         },
         {
           "id": "s2",
-          "text": "Relaunch, then close the window with the X button \u2014 the process also exits (no tray, no background loop)."
+          "text": "Relaunch, then close the window with the X button — the process also exits (no tray, no background loop)."
         }
       ]
     },
     {
       "id": "browser-path-unchanged",
       "title": "Source browser entry (run_covas_ui.py) still opens the wizard in the browser",
-      "section": "I9. Native first-run wizard",
+      "section": "19. Packaged build",
       "tags": [
         "GUI",
         "NET"
       ],
-      "requires": "Empty user-data dir. Run the BROWSER entry from source: \u0060python run_covas_ui.py\u0060.",
+      "requires": "Empty user-data dir. Run the BROWSER entry from source: `python run_covas_ui.py`.",
       "expected": "run_covas_ui.py is unchanged by I9: on a fresh install it serves the wizard and opens it in the DEFAULT BROWSER (not a native window), then the browser control panel once configured.",
       "steps": [
         {
           "id": "s1",
-          "text": "With an empty user-data dir, run \u0060python run_covas_ui.py\u0060."
+          "text": "With an empty user-data dir, run `python run_covas_ui.py`."
         },
         {
           "id": "s2",
@@ -157,16 +1377,16 @@
     {
       "id": "frozen-selftest",
       "title": "Frozen build passes the headless self-test",
-      "section": "I9. Native first-run wizard",
+      "section": "19. Packaged build",
       "tags": [
         "PKG"
       ],
-      "requires": "Rebuild the frozen app: \u0060.\\build.ps1 -SelfTest\u0060.",
-      "expected": "PyInstaller produces dist\\COVAS\u002B\u002B\\COVAS\u002B\u002B.exe and \u0060COVAS\u002B\u002B.exe --selftest\u0060 prints \u0027SELFTEST OK ...\u0027 and exits 0 (build.ps1 reports \u0027Self-test passed\u0027).",
+      "requires": "Rebuild the frozen app: `.\\build.ps1 -SelfTest`.",
+      "expected": "PyInstaller produces dist\\COVAS++\\COVAS++.exe and `COVAS++.exe --selftest` prints 'SELFTEST OK ...' and exits 0 (build.ps1 reports 'Self-test passed').",
       "steps": [
         {
           "id": "s1",
-          "text": "Run \u0060.\\build.ps1 -SelfTest\u0060 from the repo root."
+          "text": "Run `.\\build.ps1 -SelfTest` from the repo root."
         },
         {
           "id": "s2",
@@ -175,166 +1395,181 @@
       ]
     },
     {
-      "id": "version-by-voice",
-      "title": "\u0022What version are you?\u0022 reports the running version",
-      "section": "I7. Version by voice",
+      "id": "pkg-install-clean-vm",
+      "title": "Installer runs per-user with no admin and creates shortcuts",
+      "section": "19. Packaged build",
       "tags": [
-        "HW"
+        "PKG",
+        "VM"
       ],
-      "requires": "App running (native window, browser UI, or headless). Know the expected version from \u0060covas/__version__.py\u0060 (currently 0.1.0).",
-      "expected": "COVAS speaks the running version, e.g. \u0022I\u0027m running COVAS\u002B\u002B version 0.1.0.\u0022, matching covas/__version__.py exactly.",
+      "requires": "Clean Win11 VM snapshot; download `COVAS++ Setup.exe` from the Releases page.",
+      "expected": "SmartScreen \"unknown publisher\" → Run anyway installs per-user to `%LOCALAPPDATA%\\Programs\\COVAS++` with NO admin/UAC prompt, and creates a Start-menu entry + custom-icon desktop shortcut + a registered uninstaller.",
       "steps": [
         {
           "id": "s1",
-          "text": "Hold \u0060[\u0060, say \u0022What version are you?\u0022, release."
+          "text": "Download `COVAS++ Setup.exe` → SmartScreen shows \"unknown publisher\" → More info → Run anyway installs (documented, expected)."
         },
         {
           "id": "s2",
-          "text": "The spoken reply names the version and it matches the string in \u0060covas/__version__.py\u0060."
+          "text": "The installer runs per-user with NO admin/UAC prompt (installs to `%LOCALAPPDATA%\\Programs\\COVAS++`)."
         },
         {
           "id": "s3",
-          "text": "Try a variant (\u0022which build is this?\u0022) \u2192 still reports the same version."
+          "text": "It creates a Start-menu entry and a desktop icon (custom icon, not the generic exe icon), and registers an uninstaller."
         }
       ]
     },
     {
-      "id": "check-updates-by-voice-is-ui-only",
-      "title": "\u0022Check for updates\u0022 by voice does NOT update \u2014 points to the panel",
-      "section": "I7. Version by voice",
+      "id": "pkg-first-run-details",
+      "title": "First-run wizard: mic picker, STT download, no-EL text-only, default voice, data dirs",
+      "section": "19. Packaged build",
       "tags": [
-        "HW"
+        "PKG",
+        "VM",
+        "HW",
+        "NET"
       ],
-      "requires": "App running.",
-      "expected": "Asking to check for / install an update by VOICE does not trigger any download or relaunch; COVAS says updates are done from the control panel\u0027s update banner. (Updating stays a UI action \u2014 INSTALLER_DESIGN decision #5.)",
+      "requires": "Clean VM with empty `%APPDATA%\\COVAS++`; internet; a mic.",
+      "expected": "The wizard lists mics, downloads `small.en` (~250 MB) once with a progress indicator, runs text-only when EL is skipped (spoken replies start once a key is added), defaults the voice to George, and writes user data to `%APPDATA%` + the model to `%LOCALAPPDATA%` with NOTHING written into the install tree.",
       "steps": [
         {
           "id": "s1",
-          "text": "Hold \u0060[\u0060, say \u0022Check for updates.\u0022, release."
+          "text": "Mic picker lists your input devices; pick one."
         },
         {
           "id": "s2",
-          "text": "COVAS does NOT download or relaunch anything; it points you at the control panel\u0027s update banner instead."
-        }
-      ]
-    },
-    {
-      "id": "cues-shipped-defaults-play",
-      "title": "Shipped default cues play out of the box (no user cues)",
-      "section": "I8. Sound cues (drop-in folders)",
-      "tags": [
-        "HW"
-      ],
-      "requires": "No user cue overrides present: \u0060\u003Cdata dir\u003E\\sounds\\listen\\\u0060 etc. are empty or absent (source run: \u0060.\\sounds\\\u0060; packaged: \u0060%APPDATA%\\COVAS\u002B\u002B\\sounds\\\u0060). App running with speakers/headset.",
-      "expected": "You hear the shipped ORIGINAL cues at each stage \u2014 a \u0060listen\u0060 chirp on press, a \u0060processing\u0060 tick while it works, a \u0060completed\u0060 cue right before speech, and a \u0060failure\u0060 cue on no-speech. None are silent.",
-      "steps": [
-        {
-          "id": "s1",
-          "text": "Hold \u0060[\u0060 \u2192 you hear the \u0060listen\u0060 cue immediately (before speaking)."
-        },
-        {
-          "id": "s2",
-          "text": "Say a short prompt and release \u2192 you hear the \u0060processing\u0060 cue."
+          "text": "STT model downloads (`small.en`, ~250 MB) with a progress indicator (needs internet); fetched once."
         },
         {
           "id": "s3",
-          "text": "Just before the spoken answer you hear the \u0060completed\u0060 cue."
+          "text": "No-ElevenLabs path: finish with no EL key → the app runs text-only and says so; add a key later in Settings → spoken replies start."
         },
         {
           "id": "s4",
-          "text": "Press and release WITHOUT speaking \u2192 you hear the \u0060failure\u0060 cue; the log notes no speech detected."
+          "text": "Default voice: with an EL key, the voice defaults to George (or the first valid voice if George isn't in your catalog)."
+        },
+        {
+          "id": "s5",
+          "text": "After the wizard, `%APPDATA%\\COVAS++` holds config/keys and the model is under `%LOCALAPPDATA%`; NOTHING was written into `%LOCALAPPDATA%\\Programs\\COVAS++`."
         }
       ]
     },
     {
-      "id": "cues-open-folder-button",
-      "title": "\u0027Open cues folder\u0027 opens the sounds dir with the per-type skeleton",
-      "section": "I8. Sound cues (drop-in folders)",
+      "id": "pkg-native-window-ptt",
+      "title": "Packaged app launches from its icon and PTT works in the window",
+      "section": "19. Packaged build",
       "tags": [
-        "GUI",
-        "FILE"
+        "PKG",
+        "HW"
       ],
-      "requires": "Control panel open (native window or browser).",
-      "expected": "Clicking Open cues folder opens the OS file manager on \u0060\u003Cdata dir\u003E\\sounds\\\u0060 containing \u0060listen\\ processing\\ completed\\ failure\\\u0060 subfolders, each with a \u0060README.txt\u0060. The button shows \u0027opened\u0027.",
+      "requires": "Installed packaged app (post-setup).",
+      "expected": "Launching from the desktop/Start-menu icon opens a native window (no browser/URL bar) on the panel, PTT works from the window with audio, and closing the window fully quits (no tray, no lingering process).",
       "steps": [
         {
           "id": "s1",
-          "text": "In the first (config) card, click \u0060OPEN CUES FOLDER\u0060."
+          "text": "Launch from the desktop/Start-menu icon → a native window (no browser tab, no URL bar) rendering the panel."
         },
         {
           "id": "s2",
-          "text": "Explorer opens \u0060\u003Cdata dir\u003E\\sounds\\\u0060 (source run: repo \u0060.\\sounds\\\u0060; packaged: \u0060%APPDATA%\\COVAS\u002B\u002B\\sounds\\\u0060)."
+          "text": "PTT works from the window: hold `[`, speak, release → normal turn; audio plays."
         },
         {
           "id": "s3",
-          "text": "It contains \u0060listen\u0060, \u0060processing\u0060, \u0060completed\u0060, \u0060failure\u0060 folders, each with a README.txt explaining drop-in cues."
+          "text": "Closing the window quits the app — no tray icon, no lingering `COVAS++`/python in Task Manager."
         }
       ]
     },
     {
-      "id": "cues-override-replaces-and-rotates",
-      "title": "User cues in a type folder replace the default and rotate randomly",
-      "section": "I8. Sound cues (drop-in folders)",
+      "id": "pkg-ed-files-readable",
+      "title": "Installed (sandboxless) app reads ED journal + bindings",
+      "section": "19. Packaged build",
       "tags": [
-        "HW",
-        "FILE"
-      ],
-      "requires": "Access to \u0060\u003Cdata dir\u003E\\sounds\\listen\\\u0060 (use Open cues folder). Have 2-3 distinct short \u0060.wav\u0060 files to drop in.",
-      "expected": "With \u003E=1 file in \u0060sounds\\listen\\\u0060, the press-to-talk cue plays YOUR files (the shipped default is no longer heard) and VARIES across presses (random rotation over any count).",
-      "steps": [
-        {
-          "id": "s1",
-          "text": "Drop 2-3 distinct \u0060.wav\u0060 files into \u0060sounds\\listen\\\u0060, then restart COVAS\u002B\u002B."
-        },
-        {
-          "id": "s2",
-          "text": "Press to talk several times \u2192 the \u0060listen\u0060 cue is now clearly YOUR audio, not the shipped chirp."
-        },
-        {
-          "id": "s3",
-          "text": "Across presses the cue VARIES (a random file each time)."
-        }
-      ]
-    },
-    {
-      "id": "cues-empty-folder-falls-back",
-      "title": "Emptying a type folder falls back to the shipped default",
-      "section": "I8. Sound cues (drop-in folders)",
-      "tags": [
-        "HW",
-        "FILE"
-      ],
-      "requires": "Continue from cues-override-replaces-and-rotates (your files are in \u0060sounds\\listen\\\u0060).",
-      "expected": "Remove your files from \u0060sounds\\listen\\\u0060 and restart \u2192 the press-to-talk cue is the SHIPPED default \u0060listen\u0060 chirp again (fallback works).",
-      "steps": [
-        {
-          "id": "s1",
-          "text": "Delete the files you added to \u0060sounds\\listen\\\u0060 (leave the folder empty), then restart COVAS\u002B\u002B."
-        },
-        {
-          "id": "s2",
-          "text": "Press to talk \u2192 you hear the shipped default \u0060listen\u0060 cue, not your removed audio."
-        }
-      ]
-    },
-    {
-      "id": "cues-interdiction-sting-default",
-      "title": "Interdiction plays the shipped original sting when no user sting is set",
-      "section": "I8. Sound cues (drop-in folders)",
-      "tags": [
-        "HW",
+        "PKG",
         "GAME"
       ],
-      "requires": "\u0060[audio.interdiction].enabled\u0060 (and the audio layer) ON, with NO user interdiction sting configured or dropped in. Elite Dangerous running; trigger (or wait for) an Interdiction / UnderAttack event.",
-      "expected": "On an interdiction, the ALERT sting is the shipped ORIGINAL sting (audible), not silence \u2014 the bundled default fills in when the user supplies none.",
+      "requires": "Installed packaged app; ED running; `[keybinds]`/`[honk]` on.",
+      "expected": "The sandboxless install reads ED's journal (\"Where am I?\" names the current system) and finds/parses your `Custom.*.binds` (startup/log confirms, not a \"couldn't find binds\" warning).",
       "steps": [
         {
           "id": "s1",
-          "text": "With interdiction enabled and no custom sting, get interdicted (or pull a rebuy-safe NPC interdiction)."
+          "text": "With ED running: \"Where am I?\" → names your current system (journal readable from the installed app)."
         },
         {
           "id": "s2",
-          "text": "You hear an alert sting at the start of the interdiction cue (followed by the threat line)."
+          "text": "With `[keybinds]`/`[honk]` on, the startup/log confirms your `Custom.*.binds` was found and parsed (not a \"couldn't find binds\" warning)."
+        }
+      ]
+    },
+    {
+      "id": "pkg-update-banner",
+      "title": "Update banner downloads the new installer and relaunches (Tier-2 updater)",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "VM",
+        "NET"
+      ],
+      "requires": "VM with an OLDER version installed; a NEWER GitHub Release published/pointed at.",
+      "expected": "An out-of-date install shows an \"Update available → vX.Y\" banner (current → no banner); clicking it downloads the installer, exits, and launches it; after install the version query reports the bumped version.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With a newer release available, an \"Update available → vX.Y\" banner appears on launch. (Already-current → no banner.)"
+        },
+        {
+          "id": "s2",
+          "text": "Click update → COVAS++ downloads the new installer, exits, and the installer launches (same SmartScreen step)."
+        },
+        {
+          "id": "s3",
+          "text": "After install, relaunch → \"What version are you?\" now reports the bumped version."
+        }
+      ]
+    },
+    {
+      "id": "pkg-settings-survive-update",
+      "title": "User settings survive an update (decision #6)",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "VM",
+        "FILE"
+      ],
+      "requires": "VM mid-update flow (§pkg-update-banner). Change some settings before updating.",
+      "expected": "After the update every changed setting is exactly as left (defaults are NOT re-applied), `overrides.json` is unchanged, and a newly-added setting appears at its default without resetting existing values.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Before updating: change the voice, mic, and a couple of settings; note them in `%APPDATA%\\COVAS++\\overrides.json`."
+        },
+        {
+          "id": "s2",
+          "text": "Run the update → after relaunch, every changed setting is exactly as you left it; `overrides.json` is unchanged."
+        },
+        {
+          "id": "s3",
+          "text": "A setting added by the new version appears at its default WITHOUT resetting your existing values."
+        }
+      ]
+    },
+    {
+      "id": "pkg-uninstall",
+      "title": "Uninstall removes the app and shortcuts; notes user-data retention",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "VM"
+      ],
+      "requires": "Installed packaged app on the VM.",
+      "expected": "Uninstalling from Apps & features removes the app + shortcuts and the install tree under `%LOCALAPPDATA%\\Programs\\COVAS++`; whether `%APPDATA%\\COVAS++` user data is retained is noted (a reinstall should find settings again).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Uninstall from Apps & features (or the Start-menu uninstaller) → the app and shortcuts are removed; the install tree under `%LOCALAPPDATA%\\Programs\\COVAS++` is gone."
+        },
+        {
+          "id": "s2",
+          "text": "Note whether your `%APPDATA%\\COVAS++` user data is retained (a reinstall should find your settings again)."
         }
       ]
     }
@@ -356,7 +1591,7 @@
             "s3": false
           },
           "failure": {
-            "notes": "Nothing happened. I tried to run \u0022C:\\dev\\COVAS\u002B\u002B\\dist\\COVAS\u002B\u002B\\COVAS\u002B\u002B.exe\u0022 and nothing happened.",
+            "notes": "Nothing happened. I tried to run \"C:\\dev\\COVAS++\\dist\\COVAS++\\COVAS++.exe\" and nothing happened.",
             "console": "none",
             "screenshots": []
           }
@@ -509,7 +1744,7 @@
     },
     {
       "runId": "run-20260713T203923Z-0a4c",
-      "session": "I7 version query \u002B wizard handoff retest",
+      "session": "I7 version query + wizard handoff retest",
       "commit": "bf452cd",
       "branch": "feature/installer-docs",
       "submittedAt": "2026-07-13T20:46:48Z",
@@ -871,7 +2106,7 @@
     },
     {
       "runId": "run-20260713T234018Z-a241",
-      "session": "I8 cues \u002B full packaged suite",
+      "session": "I8 cues + full packaged suite",
       "commit": "0b25bd4",
       "branch": "feature/installer-cues",
       "submittedAt": "2026-07-13T23:53:53Z",
