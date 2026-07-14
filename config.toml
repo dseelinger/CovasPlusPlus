@@ -668,6 +668,25 @@ model = ""
 # catalog with:  .venv\Scripts\python.exe -m edge_tts --list-voices
 voice = "en-US-AriaNeural"
 
+[azure]
+# Official Azure Neural TTS — the RELIABLE sibling of Edge above: the SAME neural voices, but over
+# the official Speech service with a real API, an SLA, and a FREE monthly tier (~0.5M characters/mo,
+# generous for NPC chatter). No ToS/reliability asterisk — this is the shippable low/zero-cost way to
+# give the cast big voice variety. Select it with [tts].provider = "azure" (persona) or
+# [audio.voices].cast_provider = "azure" / a per-role override (cast).
+#
+# Needs a Speech resource key + its region. The key comes from the AZURE_SPEECH_KEY environment
+# variable (takes precedence) or this git-ignored file (copy AzureSpeechKey.txt.example). NEVER
+# commit the key. `region` MUST match your Speech resource's region (e.g. eastus, westus2, uksouth).
+api_key_file = "AzureSpeechKey.txt"
+region       = "eastus"
+# Persona/status voice ShortName when [tts].provider = "azure" (same names as Edge). Browse them at
+# https://learn.microsoft.com/azure/ai-services/speech-service/language-support?tabs=tts
+voice = "en-US-AriaNeural"
+# Optional SSML speaking style/emotion (voice-dependent), e.g. "cheerful", "newscast", "chat".
+# Blank = the voice's neutral default. An unsupported style is ignored by the service.
+style = ""
+
 
 [dev]
 # Dev-mode mock. When ON, the LLM/TTS/STT are swapped for fakes (canned text, no

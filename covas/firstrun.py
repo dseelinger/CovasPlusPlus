@@ -91,6 +91,15 @@ def elevenlabs_key(cfg: dict) -> str | None:
     return _read_key(_key_path(cfg, "elevenlabs"))
 
 
+def azure_key(cfg: dict) -> str | None:
+    """The Azure Speech key, env var first (an exported AZURE_SPEECH_KEY wins for a source-run
+    dev), else the key file under data_dir."""
+    env = os.environ.get("AZURE_SPEECH_KEY")
+    if env and env.strip():
+        return env.strip()
+    return _read_key(_key_path(cfg, "azure"))
+
+
 def save_anthropic_key(cfg: dict, key: str) -> None:
     _write_key(_key_path(cfg, "anthropic"), key)
 

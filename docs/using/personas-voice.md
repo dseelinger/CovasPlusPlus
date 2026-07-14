@@ -65,8 +65,21 @@ so ambient chatter never burns ElevenLabs credits.
 > for the Edge browser: it's **ToS-gray**, has **no SLA**, and periodically breaks when Microsoft
 > rotates its anti-abuse tokens. When it's unavailable, COVAS's persona voice **falls back to Piper**
 > (if `[piper].model` is set, else it degrades to text), and cast Edge voices fall silent — **Piper
-> stays the guaranteed free floor.** Official **Azure Neural TTS** (the same voices with an API +
-> SLA + free tier) is the version to actually depend on when that arrives.
+> stays the guaranteed free floor.** For the *same* voices without the asterisk, use **Azure** ↓.
+
+### Reliable neural voices via Azure (`azure`)
+
+Want the same neural voices as Edge, but **dependable**? Set `[tts].provider = "azure"` to use
+**official Azure Neural TTS** — a real API, an **SLA**, and a **free monthly tier (~0.5M characters)**
+that comfortably covers a lot of talking before any spend. It's the shippable, no-asterisk way to give
+the [voice cast](../audio/ambient-audio.md#voices-for-the-cast) big voice variety at low/zero cost.
+
+Setup: create a **Speech** resource in the Azure portal, then provide its **key** (set the
+`AZURE_SPEECH_KEY` environment variable, or paste it into `AzureSpeechKey.txt`) and its **region**
+(`[azure].region`, e.g. `eastus`). Pick a voice ShortName in `[azure].voice` (same names as Edge), and
+optionally an SSML speaking style in `[azure].style` (e.g. `cheerful`, `newscast` — voice-dependent).
+If the key/region is missing or the service errors, the persona degrades to text and cast voices fall
+silent — it never crashes the loop.
 
 ## Turning personality off
 
@@ -80,7 +93,8 @@ neutral — no in-character address or campaign context. Turn it back on the sam
 | `personality.enabled` | Whether the in-character system prompt is used at all |
 | `elevenlabs.voice_id` | Which ElevenLabs voice speaks |
 | `elevenlabs.speed` | Speaking speed, 1.0–1.2× |
-| `tts.provider` | `elevenlabs` (cloud), `piper` (local, free), or `edge` (free neural, no SLA) |
+| `tts.provider` | `edge` (free neural, default), `azure` (free-tier neural + SLA), `elevenlabs` (cloud), or `piper` (local, free) |
 | `edge.voice` | Edge voice ShortName when `tts.provider = edge` (e.g. `en-US-AriaNeural`) |
+| `azure.region` / `azure.voice` / `azure.style` | Azure region, voice ShortName, and optional SSML style when `tts.provider = azure` |
 
 See the [Configuration reference](../configuration.md) for the full list.

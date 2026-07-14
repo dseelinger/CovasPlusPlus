@@ -56,4 +56,9 @@ def make_tts(cfg: dict, *, mixer=None) -> TTSProvider:  # noqa: ANN001
             except Exception:  # noqa: BLE001 — no Piper floor available; degrade to text instead
                 fallback = None
         return EdgeTTS(cfg, mixer=mixer, fallback=fallback)
-    raise ValueError(f"Unknown [tts].provider: {name!r} (use 'elevenlabs', 'piper', or 'edge')")
+    if name == "azure":
+        # Official Azure Neural TTS — the reliable, free-tier sibling of Edge (real API + SLA).
+        from .azure_tts import AzureTTS
+        return AzureTTS(cfg, mixer=mixer)
+    raise ValueError(
+        f"Unknown [tts].provider: {name!r} (use 'edge', 'elevenlabs', 'piper', or 'azure')")
