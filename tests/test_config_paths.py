@@ -58,6 +58,7 @@ def test_all_path_fields_resolved():
         "anthropic": {"api_key_file": "AnthropicAPIKey.txt"},
         "elevenlabs": {"api_key_file": "ElevenLabsAPIKey.txt"},
         "azure": {"api_key_file": "AzureSpeechKey.txt"},
+        "openai_tts": {"api_key_file": "OpenAIAPIKey.txt"},
         "checklist": {"file": "ultimate_checklist.md"},
         "logging": {"dir": "logs"},
         "piper": {"model": "voices/en.onnx"},

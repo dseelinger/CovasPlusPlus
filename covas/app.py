@@ -300,6 +300,7 @@ class App:
                        log=lambda m: self._log("audio", m))
         self._register_edge_cast(cs)
         self._register_azure_cast(cs)
+        self._register_openai_cast(cs)
         return cs
 
     def _register_edge_cast(self, cast_synth) -> None:  # noqa: ANN001 — a CastSynth
@@ -327,6 +328,18 @@ class App:
                 "azure", lambda text, ref: azure.synth_pcm(text, ref or None))
         except Exception as e:  # noqa: BLE001 — optional provider; never block the cast
             self._log("audio", f"Azure cast provider unavailable: {e}")
+
+    def _register_openai_cast(self, cast_synth) -> None:  # noqa: ANN001 — a CastSynth
+        """Register an OpenAI-compatible TTS backend as cast-eligible (issue #16) — a cheap cloud
+        supplemental cast voice. Fail-soft: a synth error (no key, service down) is caught by
+        CastSynth and the voice degrades to silence."""
+        try:
+            from .providers.openai_tts import OpenAITTS
+            oai = OpenAITTS(self.cfg)
+            cast_synth.registry.register(
+                "openai", lambda text, ref: oai.synth_pcm(text, ref or None))
+        except Exception as e:  # noqa: BLE001 — optional provider; never block the cast
+            self._log("audio", f"OpenAI cast provider unavailable: {e}")
 
     def _load_piper_voice(self, model_path: str):
         """Load a Piper model as a cast voice (lazy, one per path). Returns an object with

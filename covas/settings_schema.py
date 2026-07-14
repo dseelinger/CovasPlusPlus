@@ -32,8 +32,8 @@ ROUTER_PINS = ["", "haiku", "sonnet", "opus"]
 PAD_SIZES = ["S", "M", "L", "any"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
 LLM_PROVIDERS = ["anthropic", "ollama"]
-TTS_PROVIDERS = ["elevenlabs", "piper", "edge", "azure"]
-CAST_PROVIDERS = ["piper", "elevenlabs", "edge", "azure"]
+TTS_PROVIDERS = ["elevenlabs", "piper", "edge", "azure", "openai"]
+CAST_PROVIDERS = ["piper", "elevenlabs", "edge", "azure", "openai"]
 
 # Sentinels for enum options that can only be resolved at runtime (from config
 # or a live API). The web/voice layer supplies the concrete list; when it can't
@@ -367,8 +367,8 @@ SCHEMA: list[Setting] = [
     Setting("tts.provider", ("tts", "provider"), "enum",
             "TTS provider", "Providers",
             "Which voice speaks. edge (free edge-tts neural voices — the default; no SLA, falls "
-            "back to piper), azure (official Azure Neural, free tier + SLA), elevenlabs (cloud, "
-            "premium), or piper (local, offline, free).",
+            "back to piper), azure (official Azure Neural, free tier + SLA), openai (cheap cloud, "
+            "OpenAI-compatible), elevenlabs (cloud, premium), or piper (local, offline, free).",
             default="edge", options=TTS_PROVIDERS,
             phrasings=("tts provider", "voice provider")),
     Setting("edge.voice", ("edge", "voice"), "string",
@@ -391,6 +391,25 @@ SCHEMA: list[Setting] = [
             "Optional SSML speaking style/emotion for the Azure voice (voice-dependent), e.g. "
             "cheerful, newscast, chat. Blank = the voice's neutral default.",
             default="", phrasings=("azure style", "azure speaking style", "voice style")),
+    Setting("openai_tts.base_url", ("openai_tts", "base_url"), "string",
+            "OpenAI TTS base URL", "Providers",
+            "OpenAI-compatible audio/speech endpoint when TTS provider = openai. Default is OpenAI; "
+            "point it at any compatible endpoint. Key comes from OPENAI_API_KEY or the key file.",
+            default="https://api.openai.com/v1", phrasings=("openai base url", "openai tts url")),
+    Setting("openai_tts.model", ("openai_tts", "model"), "string",
+            "OpenAI TTS model", "Providers",
+            "TTS model when TTS provider = openai. gpt-4o-mini-tts (cheap, default) or tts-1.",
+            default="gpt-4o-mini-tts", phrasings=("openai tts model", "openai voice model")),
+    Setting("openai_tts.voice", ("openai_tts", "voice"), "string",
+            "OpenAI TTS voice", "Providers",
+            "Voice name when TTS provider = openai: alloy, ash, ballad, coral, echo, fable, nova, "
+            "onyx, sage, shimmer, verse.",
+            default="alloy", phrasings=("openai voice", "openai tts voice")),
+    Setting("openai_tts.instructions", ("openai_tts", "instructions"), "string",
+            "OpenAI TTS instructions", "Providers",
+            "Optional free-text tone/delivery steer, honored by newer models (gpt-4o-mini-tts), "
+            "ignored by older (tts-1). Blank = the voice's default.",
+            default="", phrasings=("openai instructions", "openai tone")),
 
     # --- Control panel -----------------------------------------------------
     Setting("ui.host", ("ui", "host"), "string",
@@ -486,8 +505,8 @@ SCHEMA: list[Setting] = [
             "Cast provider", "Ambient audio",
             "Default TTS for the NPC/comms/chatter voice cast: 'elevenlabs' (random voices, burns "
             "credits), 'piper' (local, free), 'edge' (free edge-tts neural voices — no key, no SLA), "
-            "or 'azure' (official Azure Neural, free tier + SLA). Per-role overrides live in "
-            "[audio.voices.providers] in config.toml. COVAS itself uses your persona ([tts].provider).",
+            "'azure' (official Azure Neural, free tier + SLA), or 'openai' (cheap cloud). Per-role "
+            "overrides live in [audio.voices.providers]. COVAS uses your persona ([tts].provider).",
             default="elevenlabs", options=CAST_PROVIDERS,
             phrasings=("cast provider", "voice cast provider", "npc voice provider"),
             example="set the cast provider to piper"),

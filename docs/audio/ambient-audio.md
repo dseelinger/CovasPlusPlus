@@ -78,7 +78,7 @@ comms   = "elevenlabs"   # premium voices for station/NPC comms
 
 This is the seam additional voice providers plug into: each registers under its name and becomes
 selectable for any role — a ladder from free/local Piper through free-neural Edge/Azure and cheap
-cloud to premium, mirroring the LLM cost router.
+cloud (OpenAI) to premium (ElevenLabs), mirroring the LLM cost router.
 
 **`edge` (edge-tts) — free neural voices, no key.** The `edge` provider speaks through Microsoft
 Edge's "Read Aloud" Azure Neural voices: hundreds of distinct voices, no API key, and no ElevenLabs
@@ -99,6 +99,13 @@ at low/zero cost, with no ToS/reliability asterisk. Needs a Speech resource **ke
 env var or `AzureSpeechKey.txt`) and **region** (`[azure].region`). Set `cast_provider = "azure"` or a
 per-role override, and pin explicit voices with pool entries `provider = "azure"`, `ref = "<ShortName>"`.
 A key/region/service problem makes those cast voices **fall silent** (never crashes the loop).
+
+**`openai` — a cheap cloud voice.** The `openai` provider speaks through an OpenAI-compatible
+`audio/speech` endpoint. Its voice set is small and fixed (alloy, nova, shimmer, …), so it's better as
+a persona or a *supplemental* cast voice than a large diverse cast. Needs `OPENAI_API_KEY`
+(env var or `OpenAIAPIKey.txt`); `[openai_tts].base_url` is configurable for compatible endpoints. Pin
+voices with pool entries `provider = "openai"`, `ref = "<voice>"`. A key/service problem makes those
+cast voices **fall silent** (never crashes the loop).
 
 ## Drop-in content
 

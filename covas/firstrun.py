@@ -100,6 +100,16 @@ def azure_key(cfg: dict) -> str | None:
     return _read_key(_key_path(cfg, "azure"))
 
 
+def openai_key(cfg: dict) -> str | None:
+    """The OpenAI key, env var first (an exported OPENAI_API_KEY wins, and is the natural way to
+    share ONE key between the OpenAI TTS and a future OpenAI LLM provider), else the key file under
+    data_dir. Read from [openai_tts].api_key_file today."""
+    env = os.environ.get("OPENAI_API_KEY")
+    if env and env.strip():
+        return env.strip()
+    return _read_key(_key_path(cfg, "openai_tts"))
+
+
 def save_anthropic_key(cfg: dict, key: str) -> None:
     _write_key(_key_path(cfg, "anthropic"), key)
 
