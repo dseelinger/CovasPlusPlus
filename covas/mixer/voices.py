@@ -15,9 +15,10 @@ providers:
     unusable voice (an ElevenLabs 'famous'/™ voice) can never be selected — in the pool OR picker.
     When no pool is configured and `random_el` is on, it seeds a RANDOM default pool from the live
     ElevenLabs library (minus the persona voice) so the cast has many distinct voices out of the box.
-  * `CastSynth` — routes a chosen Voice to the right provider (ElevenLabs voice_id / a cached
-    Piper model) to produce PCM. Injected, so the default test run never loads a model or hits
-    the network. A synth failure fails soft to silence.
+  * `CastSynth` — routes a chosen Voice to its provider's backend via a `TTSProviderRegistry`
+    (issue #14) to produce PCM. ElevenLabs + Piper register today; Edge/OpenAI/Azure/Cartesia
+    (#15–#18) drop in on the same registry. Injected/registered, so the default test run never
+    loads a model or hits the network. A synth failure fails soft to silence.
 """
 from __future__ import annotations
 
@@ -115,8 +116,13 @@ def build_cast(
     (the default) and the live `el_voices` list is available, the pool is seeded from the whole
     ElevenLabs library MINUS the persona voice — so the comms/chatter/player cast has many
     distinct random voices with zero configuration, and always sounds like someone other than COVAS."""
+    from ..providers.registry import resolve_provider
+
     v = (cfg.get("audio", {}) or {}).get("voices", {}) or {}
-    cast_provider = str(v.get("cast_provider", EL)).lower()
+    # The pool's default/fallback provider, via the per-role resolver so a `[audio.voices.providers]`
+    # override for the "cast" umbrella (or an absent one) is honored. Per-voice providers on pool
+    # entries still win for that voice.
+    cast_provider = resolve_provider(cfg, "cast", default=v.get("cast_provider", EL))
     allowed_el = ({x["voice_id"] for x in el_voices} if el_voices is not None else None)
     extra = exclude or (lambda _voice: False)
 
@@ -162,34 +168,62 @@ def build_cast(
 
 
 class CastSynth:
-    """Routes a Voice to the right TTS provider and returns raw PCM. Backends are injected:
+    """Routes a chosen `Voice` to its provider's backend via a `TTSProviderRegistry` (issue #14)
+    and returns raw PCM. Providers register by name (see `providers/registry.py`); the Edge/OpenAI/
+    Azure/Cartesia casts (#15–#18) drop in by registering a backend on the same registry, with no
+    change here. A voice whose provider has no backend, or any synth error, fails soft to silence
+    rather than raising into the loop.
+
+    Back-compat: the original `el_synth`/`piper_loader` injection still works — they're wrapped
+    into a fresh registry under the 'elevenlabs'/'piper' names. Pass `registry=` instead to share
+    one registry across providers (so more can be registered on `.registry` later):
       * `el_synth(text, voice_id|None) -> (pcm, sr)` — the ElevenLabs path;
-      * `piper_loader(model_path) -> obj with synth_pcm(text) -> (pcm, sr)` — cached per model.
-    Either may be absent; a voice whose provider has no backend, or any synth error, fails soft to
-    silence rather than raising into the loop."""
+      * `piper_loader(model_path) -> obj with synth_pcm(text) -> (pcm, sr)` — cached per model."""
 
     def __init__(
         self,
         *,
+        registry=None,  # noqa: ANN001 — a TTSProviderRegistry (lazy import to avoid a cycle)
         el_synth: Optional[Callable[[str, Optional[str]], tuple[bytes, int]]] = None,
         piper_loader: Optional[Callable[[str], object]] = None,
         log: Optional[Callable[[str], None]] = None,
     ) -> None:
-        self._el = el_synth
-        self._piper_loader = piper_loader
-        self._piper: dict[str, object] = {}
+        from ..providers.registry import TTSProviderRegistry
+
         self._log = log or (lambda _m: None)
+        if registry is None:
+            registry = TTSProviderRegistry()
+            if el_synth is not None:
+                registry.register(EL, lambda text, ref: el_synth(text, ref or None))
+            if piper_loader is not None:
+                registry.register(PIPER, _piper_backend(piper_loader))
+        self._registry = registry
+
+    @property
+    def registry(self):  # noqa: ANN201 — a TTSProviderRegistry
+        """The provider registry. Register more backends on it (Edge/OpenAI/…) to cast their
+        voices without touching CastSynth."""
+        return self._registry
 
     def __call__(self, voice: Voice, text: str) -> tuple[bytes, int]:
         try:
-            if voice.provider == EL and self._el is not None:
-                return self._el(text, voice.ref or None)
-            if voice.provider == PIPER and self._piper_loader is not None:
-                model = self._piper.get(voice.ref)
-                if model is None:
-                    model = self._piper_loader(voice.ref)
-                    self._piper[voice.ref] = model
-                return model.synth_pcm(text)  # type: ignore[attr-defined]
+            if self._registry.has(voice.provider):
+                return self._registry.synth(voice.provider, text, voice.ref)
         except Exception as e:  # noqa: BLE001 — a dead voice degrades to silence, never crashes
             self._log(f"cast synth failed ({voice.provider}:{voice.ref}): {e}")
         return b"", 16000
+
+
+def _piper_backend(piper_loader: Callable[[str], object]):  # noqa: ANN201 — a TTSBackend
+    """Wrap a Piper model loader into a registry backend, caching one loaded model per .onnx path
+    (the old CastSynth behaviour — load once, then reuse)."""
+    cache: dict[str, object] = {}
+
+    def backend(text: str, ref: str) -> tuple[bytes, int]:
+        model = cache.get(ref)
+        if model is None:
+            model = piper_loader(ref)
+            cache[ref] = model
+        return model.synth_pcm(text)  # type: ignore[attr-defined]
+
+    return backend

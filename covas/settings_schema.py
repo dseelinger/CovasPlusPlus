@@ -462,8 +462,9 @@ SCHEMA: list[Setting] = [
             phrasings=("default comms voice", "neutral comms voice")),
     Setting("audio.voices.cast_provider", ("audio", "voices", "cast_provider"), "enum",
             "Cast provider", "Ambient audio",
-            "TTS for the NPC/comms/chatter voice cast: 'elevenlabs' (random voices, burns credits) "
-            "or 'piper' (local, free). COVAS itself always uses your ElevenLabs persona voice.",
+            "Default TTS for the NPC/comms/chatter voice cast: 'elevenlabs' (random voices, burns "
+            "credits) or 'piper' (local, free). Per-role overrides live in [audio.voices.providers] "
+            "in config.toml. COVAS itself always uses your ElevenLabs persona voice ([tts].provider).",
             default="elevenlabs", options=CAST_PROVIDERS,
             phrasings=("cast provider", "voice cast provider", "npc voice provider"),
             example="set the cast provider to piper"),
