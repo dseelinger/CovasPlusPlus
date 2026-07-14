@@ -101,13 +101,14 @@ def azure_key(cfg: dict) -> str | None:
 
 
 def openai_key(cfg: dict) -> str | None:
-    """The OpenAI key, env var first (an exported OPENAI_API_KEY wins, and is the natural way to
-    share ONE key between the OpenAI TTS and a future OpenAI LLM provider), else the key file under
-    data_dir. Read from [openai_tts].api_key_file today."""
+    """The OpenAI key, shared between the OpenAI LLM (#12) and TTS (#16) providers. Env var first
+    (an exported OPENAI_API_KEY wins — the natural way to share ONE key), else the key file: the
+    LLM's `[openai].api_key_file`, falling back to `[openai_tts].api_key_file` (both default to the
+    same OpenAIAPIKey.txt, so one file serves both)."""
     env = os.environ.get("OPENAI_API_KEY")
     if env and env.strip():
         return env.strip()
-    return _read_key(_key_path(cfg, "openai_tts"))
+    return _read_key(_key_path(cfg, "openai")) or _read_key(_key_path(cfg, "openai_tts"))
 
 
 def cartesia_key(cfg: dict) -> str | None:

@@ -303,10 +303,19 @@ voice-cast pool live in the same sections — see the comments in `config.toml`.
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `llm.provider` | `anthropic` | `anthropic` (cloud) or `ollama` (local, out-of-game only) |
+| `llm.provider` | `anthropic` | `anthropic` (cloud, Claude), `openai` (any OpenAI-compatible cloud — OpenAI/Groq/DeepSeek/OpenRouter), or `ollama` (local, out-of-game only) |
+| `openai.base_url` / `.model` | OpenAI / `gpt-4o-mini` | OpenAI-compatible `chat/completions` endpoint + router-off model when `llm.provider = "openai"`; per-tier models live in `[openai.tiers]` |
 | `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `azure.region` / `azure.voice` / `azure.style` | `eastus` / `en-US-AriaNeural` / *(blank)* | Azure Neural region, voice ShortName, and optional SSML style when `tts.provider = "azure"` |
 | `openai_tts.base_url` / `.model` / `.voice` / `.instructions` | OpenAI / `gpt-4o-mini-tts` / `alloy` / *(blank)* | OpenAI-compatible endpoint, model, voice, and optional tone steer when `tts.provider = "openai"` |
 | `cartesia.model` / `.voice` / `.language` | `sonic-2` / *(blank)* / `en` | Cartesia Sonic model, voice id, and language when `tts.provider = "cartesia"` (persona-only) |
 | `dev.mock` | `false` | Swap LLM/TTS/STT for fakes — exercise the loop with zero API calls (restart to apply) |
+
+> **OpenAI-compatible LLM (`llm.provider = "openai"`).** One implementation covers **OpenAI, Groq,
+> DeepSeek, and OpenRouter** — only `[openai].base_url` and the model ids differ (see the presets in
+> `config.toml`). It's a **cloud** provider, so it's fine in-game and the [cost router](#cost-router-router)
+> tiers it via `[openai.tiers].{cheap,standard,premium}`. Tool calling (the checklist voice commands)
+> works; there is **no web-search** on this path (Anthropic-only). Needs `OPENAI_API_KEY` (env var or
+> `OpenAIAPIKey.txt` — shared with the OpenAI TTS provider). A request error degrades the turn to text,
+> never crashing the loop.

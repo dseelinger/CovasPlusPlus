@@ -26,7 +26,12 @@ def make_llm(cfg: dict) -> LLMProvider:
     if name == "anthropic":
         from .anthropic_llm import AnthropicLLM
         return AnthropicLLM(cfg)
-    raise ValueError(f"Unknown [llm].provider: {name!r} (use 'anthropic' or 'ollama')")
+    if name == "openai":
+        # OpenAI-compatible (OpenAI/Groq/DeepSeek/OpenRouter) — one impl, base_url selects the
+        # endpoint; the router tiers it via [openai].tiers (issue #12, cloud path is fine in-game).
+        from .openai_llm import OpenAILLM
+        return OpenAILLM(cfg)
+    raise ValueError(f"Unknown [llm].provider: {name!r} (use 'anthropic', 'openai', or 'ollama')")
 
 
 def make_tts(cfg: dict, *, mixer=None) -> TTSProvider:  # noqa: ANN001

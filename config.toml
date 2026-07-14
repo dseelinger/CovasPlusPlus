@@ -277,6 +277,14 @@ input = 1.0
 output = 5.0
 cache_write = 2.0
 cache_read = 0.10
+# OpenAI provider (#12) rough rates so the usage log shows a cost (TUNE / add rows for the model you
+# use — Groq/DeepSeek/OpenRouter ids differ; an unlisted model just estimates $0.00).
+[pricing."gpt-4o-mini"]
+input = 0.15
+output = 0.60
+[pricing."gpt-4o"]
+input = 2.50
+output = 10.0
 
 
 [router]
@@ -633,8 +641,34 @@ port = 8765
 # ============================================================================
 
 [llm]
-# Which LLM answers. "anthropic" (cloud, Claude) or "ollama" (local, e.g. Qwen).
+# Which LLM answers. "anthropic" (cloud, Claude — the default), "openai" (any OpenAI-compatible
+# cloud endpoint: OpenAI/Groq/DeepSeek/OpenRouter — see [openai]), or "ollama" (local, e.g. Qwen —
+# OUT-OF-GAME only; a local model competes with ED for the GPU). Cloud providers are fine in-game
+# and are tiered by the cost router (see [router]).
 provider = "anthropic"
+
+[openai]
+# OpenAI-compatible LLM (issue #12) — ONE implementation for OpenAI, Groq, DeepSeek, and OpenRouter:
+# only `base_url` + the model ids differ. Select it with [llm].provider = "openai". Tool calling
+# (the checklist voice commands) works; there is no web-search tool on this path (Anthropic-only).
+#
+# The key comes from the OPENAI_API_KEY environment variable (takes precedence, and is SHARED with
+# the OpenAI TTS provider) or this git-ignored file (copy OpenAIAPIKey.txt.example). NEVER commit it.
+#   OpenAI:     base_url = "https://api.openai.com/v1"          (default)
+#   Groq:       base_url = "https://api.groq.com/openai/v1"     model = "llama-3.3-70b-versatile"
+#   DeepSeek:   base_url = "https://api.deepseek.com/v1"        model = "deepseek-chat"
+#   OpenRouter: base_url = "https://openrouter.ai/api/v1"       model = "openai/gpt-4o-mini"
+base_url     = "https://api.openai.com/v1"
+api_key_file = "OpenAIAPIKey.txt"
+model        = "gpt-4o-mini"
+
+[openai.tiers]
+# The cost router's tier -> model map for the OpenAI provider (issue #11). The router picks a tier
+# (cheap/standard/premium) and these name the model. Omit a key to reuse [openai].model. Set these
+# to the model ids of whatever endpoint base_url points at (Groq/DeepSeek/OpenRouter names differ).
+cheap    = "gpt-4o-mini"
+standard = "gpt-4o"
+premium  = "gpt-4o"
 
 [ollama]
 # Local LLM via Ollama. Start it with `ollama serve`; pull a model first.

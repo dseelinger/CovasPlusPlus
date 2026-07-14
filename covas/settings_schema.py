@@ -32,7 +32,7 @@ CACHE_TTLS = ["5m", "1h"]
 ROUTER_PINS = ["", "cheap", "standard", "premium", "haiku", "sonnet", "opus"]
 PAD_SIZES = ["S", "M", "L", "any"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
-LLM_PROVIDERS = ["anthropic", "ollama"]
+LLM_PROVIDERS = ["anthropic", "openai", "ollama"]
 # cartesia is PERSONA-only (a premium low-latency persona voice, #18) — it is intentionally NOT in
 # CAST_PROVIDERS (not offered for the NPC/comms/chatter cast).
 TTS_PROVIDERS = ["elevenlabs", "piper", "edge", "azure", "openai", "cartesia"]
@@ -365,9 +365,20 @@ SCHEMA: list[Setting] = [
     # --- Providers ---------------------------------------------------------
     Setting("llm.provider", ("llm", "provider"), "enum",
             "LLM provider", "Providers",
-            "Which LLM answers. anthropic (cloud) or ollama (local, out-of-game only).",
+            "Which LLM answers. anthropic (cloud, Claude), openai (any OpenAI-compatible cloud: "
+            "OpenAI/Groq/DeepSeek/OpenRouter), or ollama (local, out-of-game only).",
             default="anthropic", options=LLM_PROVIDERS,
             phrasings=("llm provider",)),
+    Setting("openai.base_url", ("openai", "base_url"), "string",
+            "OpenAI LLM base URL", "Providers",
+            "OpenAI-compatible chat/completions endpoint when LLM provider = openai. Default is "
+            "OpenAI; point it at Groq/DeepSeek/OpenRouter. Key from OPENAI_API_KEY or the key file.",
+            default="https://api.openai.com/v1", phrasings=("openai llm base url",)),
+    Setting("openai.model", ("openai", "model"), "string",
+            "OpenAI LLM model", "Providers",
+            "Model when LLM provider = openai and the router is off/unset, e.g. gpt-4o-mini. Per-tier "
+            "models live in [openai.tiers] in config.toml.",
+            default="gpt-4o-mini", phrasings=("openai llm model", "openai model")),
     Setting("tts.provider", ("tts", "provider"), "enum",
             "TTS provider", "Providers",
             "Which voice speaks. edge (free edge-tts neural voices — the default; no SLA, falls "

@@ -304,6 +304,40 @@
       ]
     },
     {
+      "id": "openai-compatible-llm-provider",
+      "title": "OpenAI-compatible LLM provider — OpenAI/Groq/DeepSeek/OpenRouter (issue #12)",
+      "section": "4. Cost router",
+      "tags": [
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "An OpenAI (or compatible) API key: export `OPENAI_API_KEY` (or paste into `OpenAIAPIKey.txt`); internet access. Set `[llm].provider = \"openai\"` and restart. For the alt-endpoint step, a Groq or OpenRouter key + `[openai].base_url`.",
+      "expected": "COVAS answers via the OpenAI-compatible endpoint; the router tiers it (OpenAI model ids in the `[router]` line); tool calling (checklist) works over delta-assembled tool_calls; switching base_url to Groq/OpenRouter still works; a missing key/bad base_url degrades the turn to text without crashing.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[llm].provider = \"openai\"` (default base_url/model = OpenAI gpt-4o-mini), export `OPENAI_API_KEY`, restart, speak a turn -> COVAS answers via OpenAI; `[router]` line shows the OpenAI model (e.g. `[cheap] gpt-4o-mini`) and `[usage]` shows token counts."
+        },
+        {
+          "id": "s2",
+          "text": "Tool calling: \"What's my next objective?\" / \"Mark fuel scooping complete.\" -> the checklist tool fires (log shows the tool call) and COVAS confirms."
+        },
+        {
+          "id": "s3",
+          "text": "Escalation: \"Think hard about ...\" -> router line shows `[standard]` with the `[openai.tiers].standard` model; a premium wake phrase -> `[premium]`."
+        },
+        {
+          "id": "s4",
+          "text": "Alt endpoint: point `[openai].base_url` at Groq (`https://api.groq.com/openai/v1`, model `llama-3.3-70b-versatile`) or OpenRouter with that service's key, restart -> conversation still works through the same provider."
+        },
+        {
+          "id": "s5",
+          "text": "Fail-soft: clear the key (or set a bad `base_url`) -> the turn degrades to text and the loop returns to IDLE; restore -> it works again. No crash."
+        }
+      ]
+    },
+    {
       "id": "ed-context-answers",
       "title": "Context-aware answers come from live telemetry",
       "section": "5. ED monitoring & callouts",
