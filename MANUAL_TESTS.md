@@ -492,6 +492,23 @@ Notes:
 
 Notes:
 
+### 18.11 Cartesia (Sonic) low-latency persona voice (issue #18)  🎮 ED 🔊 HW 🌍 NET 📋 FILE
+> A **low-latency premium PERSONA** voice (Cartesia Sonic) — a snappier alternative to ElevenLabs for
+> COVAS's own voice; it **streams** so the first audio starts fast. **Persona-only** (not a cast
+> provider). Needs `CARTESIA_API_KEY` (env var or `CartesiaAPIKey.txt`) and a voice id.
+- [ ] **Persona voice:** set `[tts].provider = "cartesia"`, a valid `[cartesia].voice` id (from
+  play.cartesia.ai), export `CARTESIA_API_KEY`, restart, speak a turn → COVAS replies in the Cartesia
+  voice, and audio starts **noticeably fast** (low time-to-first-audio).
+- [ ] **Barge-in:** while COVAS is speaking a long Cartesia reply, tap push-to-talk → speech stops
+  promptly (streaming cancel), loop returns to LISTENING/IDLE.
+- [ ] **Persona-only:** set `[audio.voices].cast_provider = "cartesia"` → it has **no effect** on the
+  cast (Cartesia isn't a cast backend); the cast keeps using its own provider. COVAS's own voice is
+  unaffected.
+- [ ] **Fail-soft:** clear `CARTESIA_API_KEY` (or blank `[cartesia].voice`) and speak → the reply
+  degrades to **text** and the loop returns to IDLE; restore → the voice returns. No crash.
+
+Notes:
+
 ---
 
 ## 19. Packaged build — install, first-run wizard & updates (I1–I9)  📦 🖥️ 🔊 HW 🌍 NET

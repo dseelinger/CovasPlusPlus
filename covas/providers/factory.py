@@ -64,6 +64,10 @@ def make_tts(cfg: dict, *, mixer=None) -> TTSProvider:  # noqa: ANN001
         # OpenAI-compatible TTS — a cheap cloud persona voice; base_url is configurable.
         from .openai_tts import OpenAITTS
         return OpenAITTS(cfg, mixer=mixer)
+    if name == "cartesia":
+        # Cartesia (Sonic) — a low-latency PREMIUM persona voice (persona-eligible only, #18).
+        from .cartesia_tts import CartesiaTTS
+        return CartesiaTTS(cfg, mixer=mixer)
     raise ValueError(
         f"Unknown [tts].provider: {name!r} "
-        "(use 'edge', 'elevenlabs', 'piper', 'azure', or 'openai')")
+        "(use 'edge', 'elevenlabs', 'piper', 'azure', 'openai', or 'cartesia')")

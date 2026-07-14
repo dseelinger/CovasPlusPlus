@@ -107,6 +107,12 @@ a persona or a *supplemental* cast voice than a large diverse cast. Needs `OPENA
 voices with pool entries `provider = "openai"`, `ref = "<voice>"`. A key/service problem makes those
 cast voices **fall silent** (never crashes the loop).
 
+!!! note "Cartesia is persona-only"
+    The **Cartesia** (`cartesia`) low-latency voice is a **persona** provider — a snappier alternative
+    to ElevenLabs for COVAS's *own* voice ([tts].provider). It is **not** registered for the cast, so
+    `cast_provider = "cartesia"` (or a per-role override) has no effect. See
+    [Personas & voice](../using/personas-voice.md#low-latency-premium-voice-via-cartesia-cartesia).
+
 ## Drop-in content
 
 Audio and line content is **drop-in**: on startup COVAS++ scans a set of convention folders and

@@ -32,7 +32,9 @@ ROUTER_PINS = ["", "haiku", "sonnet", "opus"]
 PAD_SIZES = ["S", "M", "L", "any"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
 LLM_PROVIDERS = ["anthropic", "ollama"]
-TTS_PROVIDERS = ["elevenlabs", "piper", "edge", "azure", "openai"]
+# cartesia is PERSONA-only (a premium low-latency persona voice, #18) — it is intentionally NOT in
+# CAST_PROVIDERS (not offered for the NPC/comms/chatter cast).
+TTS_PROVIDERS = ["elevenlabs", "piper", "edge", "azure", "openai", "cartesia"]
 CAST_PROVIDERS = ["piper", "elevenlabs", "edge", "azure", "openai"]
 
 # Sentinels for enum options that can only be resolved at runtime (from config
@@ -368,7 +370,8 @@ SCHEMA: list[Setting] = [
             "TTS provider", "Providers",
             "Which voice speaks. edge (free edge-tts neural voices — the default; no SLA, falls "
             "back to piper), azure (official Azure Neural, free tier + SLA), openai (cheap cloud, "
-            "OpenAI-compatible), elevenlabs (cloud, premium), or piper (local, offline, free).",
+            "OpenAI-compatible), cartesia (low-latency premium persona), elevenlabs (cloud, "
+            "premium), or piper (local, offline, free).",
             default="edge", options=TTS_PROVIDERS,
             phrasings=("tts provider", "voice provider")),
     Setting("edge.voice", ("edge", "voice"), "string",
@@ -410,6 +413,20 @@ SCHEMA: list[Setting] = [
             "Optional free-text tone/delivery steer, honored by newer models (gpt-4o-mini-tts), "
             "ignored by older (tts-1). Blank = the voice's default.",
             default="", phrasings=("openai instructions", "openai tone")),
+    Setting("cartesia.model", ("cartesia", "model"), "string",
+            "Cartesia model", "Providers",
+            "Cartesia Sonic model when TTS provider = cartesia (a low-latency premium PERSONA "
+            "voice), e.g. sonic-2. Key comes from CARTESIA_API_KEY or the key file.",
+            default="sonic-2", phrasings=("cartesia model", "sonic model")),
+    Setting("cartesia.voice", ("cartesia", "voice"), "string",
+            "Cartesia voice id", "Providers",
+            "Cartesia voice id when TTS provider = cartesia (required — get one from the Cartesia "
+            "voice library at play.cartesia.ai or GET /voices).",
+            default="", phrasings=("cartesia voice", "sonic voice")),
+    Setting("cartesia.language", ("cartesia", "language"), "string",
+            "Cartesia language", "Providers",
+            "Synthesis language (BCP-47 primary subtag) for the Cartesia voice, e.g. en.",
+            default="en", phrasings=("cartesia language",)),
 
     # --- Control panel -----------------------------------------------------
     Setting("ui.host", ("ui", "host"), "string",

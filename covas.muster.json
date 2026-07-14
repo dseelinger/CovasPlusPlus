@@ -1412,6 +1412,37 @@
       ]
     },
     {
+      "id": "cartesia-low-latency-persona",
+      "title": "Cartesia (Sonic) low-latency persona voice (issue #18)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "A Cartesia API key + a voice id: export `CARTESIA_API_KEY` (or paste it into `CartesiaAPIKey.txt`) and set `[cartesia].voice` to a voice id from play.cartesia.ai; internet access. ED running.",
+      "expected": "Cartesia speaks COVAS's PERSONA voice with low time-to-first-audio (streams) when `[tts].provider = \"cartesia\"`; barge-in stops it promptly; it is persona-only (no effect on the cast); a missing key/voice degrades the persona to text — the loop never crashes.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[tts].provider = \"cartesia\"` with a valid `[cartesia].voice` id and `CARTESIA_API_KEY`, restart, speak a turn -> COVAS replies in the Cartesia voice and audio starts noticeably fast (low latency)."
+        },
+        {
+          "id": "s2",
+          "text": "While COVAS speaks a long Cartesia reply, tap push-to-talk -> speech stops promptly (streaming cancel) and the loop returns to LISTENING/IDLE."
+        },
+        {
+          "id": "s3",
+          "text": "Set `[audio.voices].cast_provider = \"cartesia\"` -> it has NO effect on the cast (Cartesia is persona-only, not a cast backend); the cast keeps its own provider; COVAS's own voice is unaffected."
+        },
+        {
+          "id": "s4",
+          "text": "Break it: clear `CARTESIA_API_KEY` (or blank `[cartesia].voice`) and speak -> the reply degrades to text and the loop returns to IDLE; restore -> the voice returns. No crash either way."
+        }
+      ]
+    },
+    {
       "id": "fresh-install-native-wizard",
       "title": "Fresh install shows the first-run wizard IN THE NATIVE WINDOW",
       "section": "19. Packaged build",

@@ -95,11 +95,11 @@ See [Personas & voice](using/personas-voice.md).
 | `personality.custom_dir` | `personalities/custom` | Where your saved custom personas live (git-ignored) |
 | `personality.campaign_file` | `campaign.txt` | Your personal Commander facts (git-ignored) |
 
-## Text-to-speech (`[elevenlabs]`, `[tts]`, `[piper]`, `[edge]`, `[azure]`, `[openai_tts]`)
+## Text-to-speech (`[elevenlabs]`, `[tts]`, `[piper]`, `[edge]`, `[azure]`, `[openai_tts]`, `[cartesia]`)
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `tts.provider` | `edge` | Which voice speaks: `edge` (free neural, no key/SLA — falls back to Piper; the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud, OpenAI-compatible), `elevenlabs` (cloud, premium), or `piper` (local, free) |
+| `tts.provider` | `edge` | Which voice speaks: `edge` (free neural, no key/SLA — falls back to Piper; the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud, OpenAI-compatible), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `elevenlabs.model` | `eleven_flash_v2_5` | ElevenLabs TTS model (flash = low latency) |
 | `elevenlabs.voice_id` | *(Sarah)* | Which ElevenLabs voice speaks |
 | `elevenlabs.speed` | `1.0` | Speaking speed, clamped to `1.0`–`1.2` |
@@ -113,9 +113,13 @@ See [Personas & voice](using/personas-voice.md).
 | `openai_tts.model` | `gpt-4o-mini-tts` | OpenAI TTS model (`gpt-4o-mini-tts` cheap, or `tts-1`) |
 | `openai_tts.voice` | `alloy` | OpenAI voice name (alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer, verse) |
 | `openai_tts.instructions` | *(blank)* | Optional tone/delivery steer (newer models only, e.g. gpt-4o-mini-tts) |
+| `cartesia.model` | `sonic-2` | Cartesia Sonic model for `tts.provider = "cartesia"` (low-latency premium **persona** voice) |
+| `cartesia.voice` | *(blank)* | Cartesia voice id (**required** for `cartesia` — get one from play.cartesia.ai or `GET /voices`) |
+| `cartesia.language` | `en` | Synthesis language (BCP-47 primary subtag) for the Cartesia voice |
 | `elevenlabs.api_key_file` | `ElevenLabsAPIKey.txt` | Where the ElevenLabs key is read from (git-ignored) |
 | `azure.api_key_file` | `AzureSpeechKey.txt` | Where the Azure Speech key is read from — or set `AZURE_SPEECH_KEY` (git-ignored) |
 | `openai_tts.api_key_file` | `OpenAIAPIKey.txt` | Where the OpenAI key is read from — or set `OPENAI_API_KEY` (git-ignored) |
+| `cartesia.api_key_file` | `CartesiaAPIKey.txt` | Where the Cartesia key is read from — or set `CARTESIA_API_KEY` (git-ignored) |
 
 > **Edge (`edge-tts`) is optional and not load-bearing.** It uses an undocumented, no-SLA Microsoft
 > endpoint that periodically breaks; when it's down the persona voice falls back to Piper (or degrades
@@ -130,6 +134,11 @@ See [Personas & voice](using/personas-voice.md).
 > best as a persona or a supplemental cast voice. `base_url` is configurable, so any OpenAI-compatible
 > endpoint works. Needs `OPENAI_API_KEY` (env var or `OpenAIAPIKey.txt`) — the env var is shared with a
 > future OpenAI LLM provider.
+>
+> **Cartesia (`cartesia`)** is a **low-latency premium persona** voice (Cartesia Sonic) — a snappier
+> alternative to ElevenLabs for COVAS's own voice; it **streams** so the first audio starts fast. It's
+> **persona-only** — not offered for the NPC/comms/chatter cast. Needs `CARTESIA_API_KEY` (env var or
+> `CartesiaAPIKey.txt`) and a `voice` id.
 
 ## Conversation (`[conversation]`)
 
@@ -289,8 +298,9 @@ voice-cast pool live in the same sections — see the comments in `config.toml`.
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `llm.provider` | `anthropic` | `anthropic` (cloud) or `ollama` (local, out-of-game only) |
-| `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `elevenlabs` (cloud, premium), or `piper` (local, free) |
+| `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `azure.region` / `azure.voice` / `azure.style` | `eastus` / `en-US-AriaNeural` / *(blank)* | Azure Neural region, voice ShortName, and optional SSML style when `tts.provider = "azure"` |
 | `openai_tts.base_url` / `.model` / `.voice` / `.instructions` | OpenAI / `gpt-4o-mini-tts` / `alloy` / *(blank)* | OpenAI-compatible endpoint, model, voice, and optional tone steer when `tts.provider = "openai"` |
+| `cartesia.model` / `.voice` / `.language` | `sonic-2` / *(blank)* / `en` | Cartesia Sonic model, voice id, and language when `tts.provider = "cartesia"` (persona-only) |
 | `dev.mock` | `false` | Swap LLM/TTS/STT for fakes — exercise the loop with zero API calls (restart to apply) |
