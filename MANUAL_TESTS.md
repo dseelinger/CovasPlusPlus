@@ -558,6 +558,31 @@ Notes:
 > snapshot between passes. A partial dev-machine shortcut: delete `%APPDATA%\COVAS++` + the HF
 > model cache to re-exercise the wizard (does **not** prove the no-runtimes case).
 
+### 19.0 Provider bundle & default-voice self-test (issue #20)  📦 🔊 HW 🌍 NET
+> The multi-provider epic (#10) added swappable providers imported **lazily** from
+> `covas/providers/factory.py`, and **Edge (`edge-tts`) is the default TTS**. A lazy import the
+> freeze misses would ship a bundle whose default voice silently degrades to text — so the freeze
+> MUST bundle `edge_tts` + its `aiohttp` stack and prove it. `covas.spec` `collect_all`s them and
+> `--selftest` imports the third-party `edge_tts` plus every provider module.
+- [ ] **Frozen self-test (build machine):** `.\build.ps1 -Installer -SelfTest` → the freeze
+  completes and the frozen `COVAS++.exe --selftest` prints `SELFTEST OK …incl. …edge_tts` and exits
+  0. A missing bundle fails the build **loudly** instead of shipping. This proves `edge_tts` /
+  `aiohttp` **and** `covas.providers.{edge_tts,azure_tts,openai_tts,cartesia_tts,piper_tts,elevenlabs_tts,openai_llm,gemini_llm,ollama_llm}`
+  are all in the bundle.
+- [ ] 📋 **Size delta:** note the onedir folder MB and `COVAS++ Setup.exe` MB the build prints; the
+  `aiohttp` stack (~10 pkgs) should add only a few MB next to av/onnxruntime — record here: ____.
+  (Measured at v0.5.0: onedir **264.4 MB**, Setup.exe **74.7 MB**; the `aiohttp`+`edge_tts` files
+  total **~3 MB uncompressed** → **~1–2 MB** of the installer — negligible, as expected.)
+- [ ] **Default Edge voice actually plays (not just imports):** launch the packaged `COVAS++.exe`
+  with the **default** `[tts].provider = "edge"`, speak a turn → COVAS replies in the **Edge neural
+  voice** (audible speech, not the text-only fallback), with **zero** ElevenLabs usage.
+- [ ] **Other cloud providers construct in the frozen app:** in turn, set `[tts].provider` to
+  `azure` / `openai` / `cartesia` and `[llm].provider` to `openai` / `gemini` (each with a valid
+  key), relaunch, speak a turn → each **constructs and speaks without an `ImportError`** (they ride
+  `requests`, already bundled — low risk, but confirm).
+
+Notes:
+
 ### 19.1 Install (clean VM)  📦 🖥️
 - [ ] Download **`COVAS++ Setup.exe`** from the Releases page → SmartScreen shows *"unknown publisher"* → **More info → Run anyway** installs (documented, expected).
 - [ ] The installer runs **per-user with NO admin/UAC prompt** (installs to `%LOCALAPPDATA%\Programs\COVAS++`).
