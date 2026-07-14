@@ -108,6 +108,10 @@ class AudioLayer:
         # to a synth through the app's own TTS provider (today's single-voice behaviour).
         self._cast_synth = cast_synth or (
             lambda voice, text: self.tts.synth_pcm(text, voice.ref or None))
+        # The famous-filtered live EL voice list, cached from the first successful fetch so a later
+        # settings change (which rebuilds via apply_settings, without re-fetching) still seeds the
+        # random default pool instead of collapsing the whole cast to the single persona voice.
+        self._el_voices: Optional[list[dict]] = None
         self._cast: VoiceCast = build_cast(cfg, synth=self._cast_synth)
         self._clock = clock
 
@@ -365,8 +369,14 @@ class AudioLayer:
         """Rebuild the cast from current config, reusing the synth backends. `el_voices` (the
         famous-filtered live list) feeds the exclusion hook AND seeds the random default pool.
         The voice memories are re-pooled but KEEP their live assignments (so the EL-list fetch or a
-        settings change doesn't wipe the current system's comms voices or the player LRU)."""
-        self._cast = build_cast(self.cfg, synth=self._cast_synth, el_voices=el_voices)
+        settings change doesn't wipe the current system's comms voices or the player LRU).
+
+        A fresh `el_voices` list is CACHED; a rebuild without one (e.g. from apply_settings on a
+        settings change) reuses the cache, so toggling a setting can't collapse the random default
+        pool to the single persona voice."""
+        if el_voices is not None:
+            self._el_voices = el_voices
+        self._cast = build_cast(self.cfg, synth=self._cast_synth, el_voices=self._el_voices)
         persona = self._cast.persona()
         for mem in (self._comms_voices, self._player_voices, self._chatter_voices):
             mem.set_pool(self._cast.pool, fallback=persona)
