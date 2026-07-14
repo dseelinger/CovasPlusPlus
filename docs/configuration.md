@@ -95,11 +95,11 @@ See [Personas & voice](using/personas-voice.md).
 | `personality.custom_dir` | `personalities/custom` | Where your saved custom personas live (git-ignored) |
 | `personality.campaign_file` | `campaign.txt` | Your personal Commander facts (git-ignored) |
 
-## Text-to-speech (`[elevenlabs]`, `[tts]`, `[piper]`, `[edge]`, `[azure]`)
+## Text-to-speech (`[elevenlabs]`, `[tts]`, `[piper]`, `[edge]`, `[azure]`, `[openai_tts]`)
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `tts.provider` | `edge` | Which voice speaks: `edge` (free neural, no key/SLA — falls back to Piper; the default), `azure` (official Azure Neural, free tier + SLA), `elevenlabs` (cloud, premium), or `piper` (local, free) |
+| `tts.provider` | `edge` | Which voice speaks: `edge` (free neural, no key/SLA — falls back to Piper; the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud, OpenAI-compatible), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `elevenlabs.model` | `eleven_flash_v2_5` | ElevenLabs TTS model (flash = low latency) |
 | `elevenlabs.voice_id` | *(Sarah)* | Which ElevenLabs voice speaks |
 | `elevenlabs.speed` | `1.0` | Speaking speed, clamped to `1.0`–`1.2` |
@@ -109,8 +109,13 @@ See [Personas & voice](using/personas-voice.md).
 | `azure.region` | `eastus` | Azure Speech resource region for `tts.provider = "azure"` (must match your resource) |
 | `azure.voice` | `en-US-AriaNeural` | Azure Neural voice ShortName (same names as Edge) |
 | `azure.style` | *(blank)* | Optional SSML speaking style/emotion (voice-dependent), e.g. `cheerful`, `newscast` |
+| `openai_tts.base_url` | `https://api.openai.com/v1` | OpenAI-compatible `audio/speech` endpoint for `tts.provider = "openai"` (point at any compatible endpoint) |
+| `openai_tts.model` | `gpt-4o-mini-tts` | OpenAI TTS model (`gpt-4o-mini-tts` cheap, or `tts-1`) |
+| `openai_tts.voice` | `alloy` | OpenAI voice name (alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer, verse) |
+| `openai_tts.instructions` | *(blank)* | Optional tone/delivery steer (newer models only, e.g. gpt-4o-mini-tts) |
 | `elevenlabs.api_key_file` | `ElevenLabsAPIKey.txt` | Where the ElevenLabs key is read from (git-ignored) |
 | `azure.api_key_file` | `AzureSpeechKey.txt` | Where the Azure Speech key is read from — or set `AZURE_SPEECH_KEY` (git-ignored) |
+| `openai_tts.api_key_file` | `OpenAIAPIKey.txt` | Where the OpenAI key is read from — or set `OPENAI_API_KEY` (git-ignored) |
 
 > **Edge (`edge-tts`) is optional and not load-bearing.** It uses an undocumented, no-SLA Microsoft
 > endpoint that periodically breaks; when it's down the persona voice falls back to Piper (or degrades
@@ -120,6 +125,11 @@ See [Personas & voice](using/personas-voice.md).
 > service, with an API, an SLA, and a **free tier (~0.5M chars/month)**. Needs a Speech resource key
 > (`AZURE_SPEECH_KEY` env var or `AzureSpeechKey.txt`) + its `region`. No ToS/reliability asterisk —
 > the shippable low/zero-cost way to give the cast big voice variety.
+>
+> **OpenAI-compatible TTS (`openai`)** is a **cheap cloud** voice — a small fixed voice set, so it's
+> best as a persona or a supplemental cast voice. `base_url` is configurable, so any OpenAI-compatible
+> endpoint works. Needs `OPENAI_API_KEY` (env var or `OpenAIAPIKey.txt`) — the env var is shared with a
+> future OpenAI LLM provider.
 
 ## Conversation (`[conversation]`)
 
@@ -259,7 +269,7 @@ The optional [atmospheric audio layer](audio/ambient-audio.md). **All off by def
 | `audio.chatter.min_seconds` | `45` | Fastest gap between chatter lines (busiest systems) |
 | `audio.chatter.max_seconds` | `240` | Slowest gap between chatter lines (barely-populated) |
 | `audio.chatter.full_population` | `1000000000` | Population at/above which chatter runs at the min gap |
-| `audio.voices.cast_provider` | `elevenlabs` | Default TTS for the NPC/comms/chatter cast: `elevenlabs` (random voices, burns credits), `piper` (local, free), `edge` (free neural, no key/SLA), or `azure` (official Azure Neural, free tier + SLA) |
+| `audio.voices.cast_provider` | `elevenlabs` | Default TTS for the NPC/comms/chatter cast: `elevenlabs` (random voices, burns credits), `piper` (local, free), `edge` (free neural, no key/SLA), `azure` (official Azure Neural, free tier + SLA), or `openai` (cheap cloud) |
 | `audio.voices.providers.*` | *(unset)* | Per-role provider overrides (`comms`/`chatter`/`player`/`interdiction`); fall back to `cast_provider`. Persona uses `[tts].provider` |
 | `audio.voices.random_el` | `true` | With no pool set, cast from random ElevenLabs voices (minus the COVAS voice) |
 | `audio.comms.voices.{male,female,default}` | *(blank)* | Legacy per-logical-voice ElevenLabs pins (superseded by the random cast) |
@@ -279,7 +289,8 @@ voice-cast pool live in the same sections — see the comments in `config.toml`.
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `llm.provider` | `anthropic` | `anthropic` (cloud) or `ollama` (local, out-of-game only) |
-| `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `elevenlabs` (cloud, premium), or `piper` (local, free) |
+| `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `azure.region` / `azure.voice` / `azure.style` | `eastus` / `en-US-AriaNeural` / *(blank)* | Azure Neural region, voice ShortName, and optional SSML style when `tts.provider = "azure"` |
+| `openai_tts.base_url` / `.model` / `.voice` / `.instructions` | OpenAI / `gpt-4o-mini-tts` / `alloy` / *(blank)* | OpenAI-compatible endpoint, model, voice, and optional tone steer when `tts.provider = "openai"` |
 | `dev.mock` | `false` | Swap LLM/TTS/STT for fakes — exercise the loop with zero API calls (restart to apply) |

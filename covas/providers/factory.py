@@ -60,5 +60,10 @@ def make_tts(cfg: dict, *, mixer=None) -> TTSProvider:  # noqa: ANN001
         # Official Azure Neural TTS — the reliable, free-tier sibling of Edge (real API + SLA).
         from .azure_tts import AzureTTS
         return AzureTTS(cfg, mixer=mixer)
+    if name == "openai":
+        # OpenAI-compatible TTS — a cheap cloud persona voice; base_url is configurable.
+        from .openai_tts import OpenAITTS
+        return OpenAITTS(cfg, mixer=mixer)
     raise ValueError(
-        f"Unknown [tts].provider: {name!r} (use 'edge', 'elevenlabs', 'piper', or 'azure')")
+        f"Unknown [tts].provider: {name!r} "
+        "(use 'edge', 'elevenlabs', 'piper', 'azure', or 'openai')")

@@ -687,6 +687,25 @@ voice = "en-US-AriaNeural"
 # Blank = the voice's neutral default. An unsupported style is ignored by the service.
 style = ""
 
+[openai_tts]
+# OpenAI-compatible TTS — a CHEAP cloud voice (modest voice count; best as a persona or a
+# supplemental cast voice). Select it with [tts].provider = "openai" or [audio.voices].cast_provider
+# = "openai" / a per-role override. `base_url` is configurable, so any OpenAI-compatible endpoint
+# (OpenAI, a proxy, a local server) works with the same code.
+#
+# The key comes from the OPENAI_API_KEY environment variable (takes precedence — and is the natural
+# way to SHARE one key with a future OpenAI LLM provider) or this git-ignored file (copy
+# OpenAIAPIKey.txt.example). NEVER commit the key.
+base_url     = "https://api.openai.com/v1"
+api_key_file = "OpenAIAPIKey.txt"
+# TTS model + voice. gpt-4o-mini-tts is the current cheap model; "tts-1" is the classic alternative.
+# Voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer, verse.
+model = "gpt-4o-mini-tts"
+voice = "alloy"
+# Optional free-text tone/delivery steer, honored by newer models (gpt-4o-mini-tts), ignored by
+# older ones (tts-1). Blank = the voice's default. e.g. "Calm, professional ship-computer tone."
+instructions = ""
+
 
 [dev]
 # Dev-mode mock. When ON, the LLM/TTS/STT are swapped for fakes (canned text, no

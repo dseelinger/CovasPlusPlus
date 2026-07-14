@@ -1381,6 +1381,37 @@
       ]
     },
     {
+      "id": "openai-compatible-tts-provider",
+      "title": "OpenAI-compatible TTS — cheap cloud voice (issue #16)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "An OpenAI (or compatible) API key: export `OPENAI_API_KEY` (or paste it into `OpenAIAPIKey.txt`); internet access. Audio layer ON with the cast enabled for the cast check; ED running.",
+      "expected": "OpenAI speaks COVAS's persona voice over the audio/speech API when `[tts].provider = \"openai\"`; the optional `instructions` steer is honored by newer models; OpenAI voices are cast-eligible; a missing key or bad base_url degrades the persona to text and cast OpenAI voices to silence — the loop never crashes.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[tts].provider = \"openai\"` (and `[openai_tts].voice`, e.g. `nova`), export `OPENAI_API_KEY`, restart, and speak a turn -> COVAS replies in the chosen OpenAI voice."
+        },
+        {
+          "id": "s2",
+          "text": "Set `[openai_tts].model = \"gpt-4o-mini-tts\"` with `[openai_tts].instructions = \"Calm, professional ship-computer tone\"`, restart, speak -> the delivery reflects the instruction; switching to `tts-1` still speaks (instruction ignored)."
+        },
+        {
+          "id": "s3",
+          "text": "Set `[audio.voices].cast_provider = \"openai\"` (or `[audio.voices.providers].chatter = \"openai\"`), restart, fly/dock in a populated system -> ambient chatter/comms speak in OpenAI voices (a small set, so speakers repeat sooner)."
+        },
+        {
+          "id": "s4",
+          "text": "Break it: clear `OPENAI_API_KEY` (or set a bad `[openai_tts].base_url`) and speak -> the reply degrades to text and the loop returns to IDLE (cast OpenAI voices fall silent); restore -> voices return. No crash either way."
+        }
+      ]
+    },
+    {
       "id": "fresh-install-native-wizard",
       "title": "Fresh install shows the first-run wizard IN THE NATIVE WINDOW",
       "section": "19. Packaged build",

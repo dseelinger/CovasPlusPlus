@@ -83,6 +83,7 @@ _DATA_PATH_FIELDS = (
     ("anthropic", "api_key_file"),
     ("elevenlabs", "api_key_file"),
     ("azure", "api_key_file"),
+    ("openai_tts", "api_key_file"),
     ("checklist", "file"),
     ("logging", "dir"),
     ("piper", "model"),

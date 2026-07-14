@@ -81,6 +81,17 @@ optionally an SSML speaking style in `[azure].style` (e.g. `cheerful`, `newscast
 If the key/region is missing or the service errors, the persona degrades to text and cast voices fall
 silent — it never crashes the loop.
 
+### Cheap cloud voice via OpenAI (`openai`)
+
+Set `[tts].provider = "openai"` to speak through an **OpenAI-compatible** `audio/speech` endpoint — a
+**cheap** cloud voice with a small, fixed voice set (great as a persona, or a supplemental cast voice).
+Provide `OPENAI_API_KEY` (env var, or paste into `OpenAIAPIKey.txt` — the same key a future OpenAI LLM
+provider will use). Pick a voice in `[openai_tts].voice` (`alloy`, `nova`, `shimmer`, …), a model in
+`[openai_tts].model` (`gpt-4o-mini-tts` is cheap; `tts-1` also works), and optionally a tone steer in
+`[openai_tts].instructions` (honored by newer models). `[openai_tts].base_url` is configurable, so any
+OpenAI-compatible endpoint works. A missing key or service error degrades the persona to text (cast
+voices fall silent) — it never crashes the loop.
+
 ## Turning personality off
 
 Say *"turn personality off"* (or toggle it on the Settings page) and replies become plain and
@@ -93,8 +104,9 @@ neutral — no in-character address or campaign context. Turn it back on the sam
 | `personality.enabled` | Whether the in-character system prompt is used at all |
 | `elevenlabs.voice_id` | Which ElevenLabs voice speaks |
 | `elevenlabs.speed` | Speaking speed, 1.0–1.2× |
-| `tts.provider` | `edge` (free neural, default), `azure` (free-tier neural + SLA), `elevenlabs` (cloud), or `piper` (local, free) |
+| `tts.provider` | `edge` (free neural, default), `azure` (free-tier neural + SLA), `openai` (cheap cloud), `elevenlabs` (cloud), or `piper` (local, free) |
 | `edge.voice` | Edge voice ShortName when `tts.provider = edge` (e.g. `en-US-AriaNeural`) |
 | `azure.region` / `azure.voice` / `azure.style` | Azure region, voice ShortName, and optional SSML style when `tts.provider = azure` |
+| `openai_tts.base_url` / `.model` / `.voice` / `.instructions` | OpenAI-compatible endpoint, model, voice, and optional tone steer when `tts.provider = openai` |
 
 See the [Configuration reference](../configuration.md) for the full list.

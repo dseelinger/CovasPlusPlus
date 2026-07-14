@@ -475,6 +475,23 @@ Notes:
 
 Notes:
 
+### 18.10 OpenAI-compatible TTS — cheap cloud voice (issue #16)  🎮 ED 🔊 HW 🌍 NET 📋 FILE
+> A **cheap cloud** voice over an OpenAI-compatible `audio/speech` endpoint (small fixed voice set —
+> best as a persona or supplemental cast voice). Needs `OPENAI_API_KEY` (env var or `OpenAIAPIKey.txt`);
+> `[openai_tts].base_url` is configurable for compatible endpoints.
+- [ ] **Persona voice:** set `[tts].provider = "openai"` (and `[openai_tts].voice`, e.g. `nova`), export
+  `OPENAI_API_KEY`, restart, speak a turn → COVAS replies in the chosen OpenAI voice.
+- [ ] **Model + tone:** try `[openai_tts].model = "tts-1"` (works) and `gpt-4o-mini-tts` with
+  `[openai_tts].instructions = "Calm, professional ship-computer tone"` → the newer model reflects the
+  instruction; `tts-1` ignores it (still speaks).
+- [ ] **Cast-eligible:** set `[audio.voices].cast_provider = "openai"` (or a per-role override), restart,
+  fly/dock in a populated system → ambient chatter/comms use OpenAI voices (a small set, so speakers
+  repeat sooner than Edge/Azure).
+- [ ] **Fail-soft:** clear `OPENAI_API_KEY` (or set a bad `base_url`) and speak → the reply degrades to
+  **text** and the loop returns to IDLE (cast OpenAI voices fall silent); restore → voices return.
+
+Notes:
+
 ---
 
 ## 19. Packaged build — install, first-run wizard & updates (I1–I9)  📦 🖥️ 🔊 HW 🌍 NET
