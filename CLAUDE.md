@@ -29,10 +29,13 @@ on-hardware testing.
 ## Architecture (where things live)
 - `covas/app.py` — orchestration: PTT handling, threading, cancellation, worker loop.
 - `covas/providers/` — the swappable seam. `base.py` = Protocols (LLM/TTS/STT);
-  `factory.py` builds the one named in config. In-game LLM is always Anthropic
-  (`anthropic_llm`), tiered Haiku/Sonnet/Opus by the router. `ollama_llm` exists for
-  offline/out-of-game use only — NOT the in-game path (a local LLM competes with ED for
-  the GPU). TTS = `elevenlabs_tts` or local `piper_tts`; `whisper_stt` wraps STT.
+  `factory.py` builds the one named in config. The in-game LLM path is **provider-agnostic**
+  (issue #11): any CLOUD LLM is fine there — Anthropic (`anthropic_llm`) today, OpenAI/Gemini
+  next — and the router picks a canonical tier (cheap/standard/premium) that each provider's
+  `[<provider>].tiers` map turns into a model id. Only LOCAL models (`ollama_llm`) stay OFF the
+  in-game path — a useful local model competes with ED for the GPU (not an API limitation), so
+  it's for offline/out-of-game use. TTS = `edge_tts` (default) / `azure_tts` / `openai_tts` /
+  `cartesia_tts` (persona) / `elevenlabs_tts` / local `piper_tts`; `whisper_stt` wraps STT.
 - `covas/llm.py` — Anthropic streaming (prompt caching + tools live here).
 - `covas/checklist.py` — the checklist model; tools exposed to the LLM.
 - `covas/events.py` — `EventBus` (thread-safe pub/sub). This is the spine; new inputs

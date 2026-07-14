@@ -287,8 +287,12 @@ cache_read = 0.10
 # (currently Sonnet), so nothing changes until you flip this to true. Turn it on once
 # you've eyeballed a few sessions and are happy with Haiku-by-default.
 enabled = true
-# Tier model ids. default = the Haiku workhorse (banter, acks, checklist reads);
-# escalate = Sonnet (depth/analysis, current-data turns); premium = Opus (explicit ask).
+# Tier model ids for the ANTHROPIC provider (the tier->model map, issue #11). The router picks a
+# canonical tier — cheap/standard/premium — and these map it to a model: default = the Haiku
+# workhorse (banter, acks, checklist reads); escalate = Sonnet (depth/analysis, current-data turns);
+# premium = Opus (explicit ask). A DIFFERENT [llm].provider ignores these and uses its own map in
+# [<provider>].tiers.{cheap,standard,premium} (or a single [<provider>].model) — the same routing
+# policy below then drives it. The router-off model is [anthropic].model (or [<provider>].model).
 default_model  = "claude-haiku-4-5"
 escalate_model = "claude-sonnet-5"
 premium_model  = "claude-opus-4-8"

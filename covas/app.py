@@ -1226,8 +1226,9 @@ class App:
             # live cfg so UI overrides apply; off by default -> the fixed [anthropic] tier.
             router = Router.from_cfg(self.cfg)
             route = router.decide(text)
-            self._log("router", f"{route.model} max_tokens={route.max_tokens} — {route.reason}")
-            self.bus.publish({"type": "router", "model": route.model,
+            self._log("router",
+                      f"[{route.tier}] {route.model} max_tokens={route.max_tokens} — {route.reason}")
+            self.bus.publish({"type": "router", "model": route.model, "tier": route.tier,
                               "max_tokens": route.max_tokens, "reason": route.reason})
 
             # ED context (DESIGN §5): if monitoring is on and the turn references game

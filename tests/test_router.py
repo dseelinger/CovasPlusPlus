@@ -31,8 +31,9 @@ def test_routine_turn_lands_on_haiku():
     r = _router()
     route = r.decide("What's my next objective, COVAS?")
     assert route.model == HAIKU
+    assert route.tier == "cheap"
     assert route.max_tokens == 1024
-    assert "Haiku" in route.reason
+    assert "cheap tier" in route.reason
 
 
 @pytest.mark.parametrize("text", [
@@ -87,7 +88,8 @@ def test_context_needs_web_flag_escalates_without_a_phrase():
 def test_use_opus_override_selects_opus():
     route = _router().decide("Use opus for this, please.")
     assert route.model == OPUS
-    assert "Opus" in route.reason
+    assert route.tier == "premium"
+    assert "premium tier" in route.reason
 
 
 def test_premium_override_beats_escalation_signals():
@@ -155,7 +157,7 @@ def test_disabled_router_uses_fixed_model_for_every_turn():
     r = Router(RouterConfig(enabled=False, fixed_model=SONNET, base_max_tokens=1024))
     for text in ("think hard", "use opus", "analyze the latest data", "hi"):
         route = r.decide(text)
-        assert route == Route(SONNET, 1024, "router off — fixed tier")
+        assert route == Route(SONNET, 1024, "router off — fixed tier", "fixed")
 
 
 # ---- matching robustness ----------------------------------------------------
@@ -196,6 +198,62 @@ def test_from_cfg_missing_anthropic_uses_dataclass_defaults():
     r = Router.from_cfg({})
     assert r.cfg.base_max_tokens == 1024
     assert r.cfg.fixed_model == "claude-sonnet-5"
+
+
+# ---- provider-agnostic tier map (issue #11) --------------------------------
+def test_tiers_property_and_canonical_pins():
+    r = _router()
+    assert r.cfg.tiers == {"cheap": HAIKU, "standard": SONNET, "premium": OPUS}
+    # canonical tier tokens and the Anthropic-flavored aliases both resolve
+    assert r.cfg.model_for_tier("cheap") == HAIKU
+    assert r.cfg.model_for_tier("standard") == SONNET
+    assert r.cfg.model_for_tier("premium") == OPUS
+    assert r.cfg.model_for_tier("haiku") == HAIKU and r.cfg.model_for_tier("opus") == OPUS
+    assert r.cfg.model_for_tier("nope") is None
+
+
+def test_decide_reports_canonical_tier():
+    r = _router()
+    assert r.decide("what's next?").tier == "cheap"
+    assert r.decide("think hard").tier == "standard"
+    assert r.decide("use opus").tier == "premium"
+    assert Router(RouterConfig(enabled=False, fixed_model=SONNET)).decide("hi").tier == "fixed"
+
+
+def test_anthropic_provider_map_unchanged_from_router_section():
+    # The default (anthropic) provider still maps tiers from [router].*_model + [anthropic].model.
+    cfg = {
+        "llm": {"provider": "anthropic"},
+        "anthropic": {"model": "claude-opus-4-8", "max_tokens": 777},
+        "router": {"enabled": True, "default_model": "h", "escalate_model": "s",
+                   "premium_model": "o"},
+    }
+    r = Router.from_cfg(cfg)
+    assert r.cfg.tiers == {"cheap": "h", "standard": "s", "premium": "o"}
+    assert r.cfg.fixed_model == "claude-opus-4-8"    # router-off model is [anthropic].model
+    assert r.cfg.base_max_tokens == 777
+
+
+def test_generic_provider_tier_map_from_its_own_section():
+    # A non-Anthropic provider advertises its own tier map; [router].*_model is NOT used for it.
+    cfg = {
+        "llm": {"provider": "openai"},
+        "router": {"enabled": True, "default_model": "claude-haiku-4-5"},  # ignored for openai
+        "openai": {"model": "gpt-4o-mini",
+                   "tiers": {"cheap": "gpt-4o-mini", "standard": "gpt-4o", "premium": "o1"}},
+    }
+    r = Router.from_cfg(cfg)
+    assert r.cfg.tiers == {"cheap": "gpt-4o-mini", "standard": "gpt-4o", "premium": "o1"}
+    assert r.cfg.fixed_model == "gpt-4o-mini"        # router-off = [openai].model
+    assert r.decide("think hard").model == "gpt-4o"  # same policy, provider's model
+
+
+def test_generic_provider_without_tiers_uses_single_model_for_all():
+    cfg = {"llm": {"provider": "ollama"}, "router": {"enabled": True},
+           "ollama": {"model": "qwen3"}}
+    r = Router.from_cfg(cfg)
+    assert r.cfg.tiers == {"cheap": "qwen3", "standard": "qwen3", "premium": "qwen3"}
+    assert r.decide("use opus").model == "qwen3"      # every tier -> the one local model
 
 
 # ---- strip_control: keep the control phrase out of the model's input --------

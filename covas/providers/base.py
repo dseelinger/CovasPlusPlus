@@ -12,6 +12,28 @@ and calls on_event(kind, data) for side channels:
     on_event("usage",    dict)    -> per-call token counts + $ estimate (cloud only)
 `data` is a str for every kind except "usage", which passes a dict — hence the
 `object` payload type below. This lets app.py consume any provider identically.
+
+Adding a new LLM provider (issue #11 — the plumbing is provider-agnostic). A provider
+NORMALIZES its native API onto this one contract so `app.py` never special-cases it:
+  * **Tiering is a parameter, not a provider.** `model`/`max_tokens` are the cost router's
+    per-turn choice; the router picks a canonical tier (cheap/standard/premium) and the
+    provider's own `[<provider>].tiers` map turns that into a concrete model id (see
+    `router._provider_tiers`). One `stream_reply`, any tier.
+  * **Tool calling** — translate the shared `tools` JSON-Schema list into the provider's
+    native tool format, run calls via `tool_handler(name, args) -> str`, and feed results back.
+  * **Streaming text/thinking** — yield ("text", …) for spoken output; route any reasoning to
+    on_event("thinking", …) so it's kept OUT of the spoken text (never yield it as "text").
+  * **Usage/$ accounting** — after the call, emit on_event("usage", dict) with the provider-
+    agnostic shape: {model, input_tokens, output_tokens, cache_creation_input_tokens,
+    cache_read_input_tokens, cost_usd}. Reuse `llm.estimate_cost(model, usage, pricing)` for the
+    dollar figure so every provider costs out of the same `[pricing]` table.
+  * **Cancellation** — check the `cancel` Event between chunks and stop promptly (barge-in).
+  * **Fail soft** — a provider/tool error must not crash the loop; the app already guards, but
+    don't swallow so much that a misconfig is undiagnosable.
+
+In-game policy (issue #11): any CLOUD LLM (Anthropic today; OpenAI/Gemini next) is fine on the
+in-game path — the router tiers it for cost. Only LOCAL models (Ollama) are kept off the in-game
+path, because a useful local model fights Elite Dangerous for the GPU, not because of the API.
 """
 from __future__ import annotations
 
