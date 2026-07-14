@@ -24,11 +24,16 @@ import sounddevice as sd
 import soundfile as sf
 
 # Cue TYPES (folder names). Extensible — add a type here + a covas/assets/cues/<type>/ folder.
-CUE_TYPES = ("listen", "processing", "completed", "failure")
+#   listen/processing/completed/failure — one-shot ticks at each turn stage.
+#   thinking — a SOFT, LOOPING bed that fills the silence WHILE COVAS transcribes/thinks/searches
+#     (issue #5): a one-shot tick acknowledges receipt, but nothing else fills the multi-second
+#     THINKING wait, so a slow turn can read as "the AI ignored me". This loops until the reply
+#     starts (or cancel/failure), stopped via stop_loop().
+CUE_TYPES = ("listen", "processing", "completed", "failure", "thinking")
 # play() names -> cue type. Keeps the loop's existing call sites (and intuitive synonyms) working
 # after the listen/completed/failure rename.
 _CUE_ALIASES = {"listening": "listen", "done": "completed", "complete": "completed",
-                "failed": "failure", "fail": "failure"}
+                "failed": "failure", "fail": "failure", "working": "thinking"}
 CUE_AUDIO_EXTS = (".wav", ".ogg", ".flac", ".mp3")
 
 
@@ -89,11 +94,19 @@ class CuePlayer:
     (C9), cues route through it on the ALERT bus so the mixer is the single device owner and
     a cue can't fight the voice stream over the device."""
 
-    def __init__(self, cfg: dict, *, mixer=None, bus: str = "alert") -> None:  # noqa: ANN001
+    def __init__(self, cfg: dict, *, mixer=None, bus: str = "alert",
+                 sleep=None) -> None:  # noqa: ANN001
         self.cues: dict[str, list[tuple[np.ndarray, int]]] = {}
         self._mixer = mixer
         self._bus = bus
         self._mix_sr = int((cfg.get("audio", {}) or {}).get("mix_sample_rate", 16000))
+        # Looping "thinking" bed lifecycle (issue #5). One loop at a time; guarded so start/stop
+        # from the key-hook thread and the worker thread can't race. `sleep` is injectable so a
+        # unit test can drive the loop without real-time waits.
+        self._sleep = sleep or time.sleep
+        self._loop_lock = threading.Lock()
+        self._loop_thread: threading.Thread | None = None
+        self._loop_stop: threading.Event | None = None
         user_base, asset_base = cue_roots(cfg)
         try:
             ensure_cue_skeleton(user_base)
@@ -129,7 +142,77 @@ class CuePlayer:
         if wait:
             sd.wait()
 
+    def _play_once(self, data: np.ndarray, sr: int) -> float:
+        """Route one preloaded cue buffer to the mixer bus (or the legacy device) and return its
+        duration in seconds, so the loop can wait it out before re-triggering."""
+        if self._mixer is not None:
+            from .mixer import to_float_mono
+            buf = to_float_mono(data)
+            self._mixer.submit(self._bus, buf, sr)
+            return buf.shape[0] / float(sr) if sr else 0.2
+        sd.play(data, sr)
+        return data.shape[0] / float(sr) if sr else 0.2
+
+    def start_loop(self, name: str) -> None:
+        """Start a SOFT looping bed (issue #5) — play the cue's files on repeat until stop_loop().
+        Idempotent: a second call while a loop runs is a no-op. A cue type with no files is silent
+        (no thread spawned), preserving the fail-soft rule."""
+        with self._loop_lock:
+            if self._loop_thread is not None and self._loop_thread.is_alive():
+                return
+            group = self.cues.get(_CUE_ALIASES.get(name, name)) or []
+            if not group:
+                return
+            stop = threading.Event()
+            self._loop_stop = stop
+            self._loop_thread = threading.Thread(
+                target=self._loop_worker, args=(name, stop), name="cue-thinking-loop",
+                daemon=True)
+            self._loop_thread.start()
+
+    def _loop_worker(self, name: str, stop: threading.Event) -> None:
+        """Play the cue on repeat until `stop` is set. Waits out each clip (interruptibly) before
+        re-triggering, so the bed is continuous but a stop takes effect within one clip length."""
+        while not stop.is_set():
+            group = self.cues.get(_CUE_ALIASES.get(name, name)) or []
+            if not group:
+                return
+            data, sr = random.choice(group)
+            try:
+                dur = self._play_once(data, sr)
+            except Exception:  # noqa: BLE001 — a playback glitch must not kill the loop thread
+                dur = 0.2
+            # Interruptible wait: returns immediately once stop is set (Event.wait), so the bed
+            # ends promptly on reply-start / cancel / failure rather than after a full clip.
+            if self._wait_stop(stop, max(dur, 0.05)):
+                return
+
+    def _wait_stop(self, stop: threading.Event, seconds: float) -> bool:
+        """Wait up to `seconds` or until `stop` is set; True if stopped. Uses the injected sleep in
+        tests (so no real time passes) and the Event otherwise."""
+        if self._sleep is time.sleep:
+            return stop.wait(seconds)
+        self._sleep(seconds)
+        return stop.is_set()
+
+    def stop_loop(self) -> None:
+        """Stop the looping bed and drop its audio immediately. Safe to call when no loop runs."""
+        with self._loop_lock:
+            thread, stop = self._loop_thread, self._loop_stop
+            self._loop_thread = None
+            self._loop_stop = None
+        if stop is not None:
+            stop.set()
+        # Drop whatever the bed already queued so it doesn't bleed over the next cue / the reply.
+        if self._mixer is not None:
+            self._mixer.clear_bus(self._bus)
+        else:
+            sd.stop()
+        if thread is not None and thread.is_alive() and thread is not threading.current_thread():
+            thread.join(timeout=1.0)
+
     def stop(self) -> None:
+        self.stop_loop()   # a general "stop cues" also kills the looping bed (issue #5)
         if self._mixer is not None:
             self._mixer.clear_bus(self._bus)
             return

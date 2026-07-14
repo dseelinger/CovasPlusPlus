@@ -206,6 +206,38 @@
       ]
     },
     {
+      "id": "cues-thinking-bed",
+      "title": "Soft 'thinking' bed fills the wait and stops on every exit (issue #5)",
+      "section": "2. Sound cues",
+      "tags": [
+        "HW"
+      ],
+      "requires": "App running with mic + speakers. `[audio].thinking_bed = true` (default).",
+      "expected": "After the one-shot processing tick, a soft looping bed fills the transcribe/think/search wait and stops the instant the reply speaks, on tap-cancel, on barge-in, and on failure — never bleeding over the answer or doubling with the completed/failure cue. The toggle silences it (leaving just the tick), and a drop-in sounds/thinking/ file overrides the default.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Ask a slow question (e.g. 'Give me the full history of the Empire.'). After the processing tick you hear a soft, LOW, looping bed under the wait; it stops the instant COVAS starts speaking."
+        },
+        {
+          "id": "s2",
+          "text": "Repeat and tap `[` mid-think (cancel), and separately barge in by holding `[` while it works: the bed stops cleanly each time (no bleed over the next capture)."
+        },
+        {
+          "id": "s3",
+          "text": "Press+release without speaking (failure): the bed stops and you hear only the failure cue (no overlap)."
+        },
+        {
+          "id": "s4",
+          "text": "Say 'turn the thinking sound off' (or toggle Thinking sound on the Settings page) -> the next slow turn plays only the single processing tick. Turn it back on -> the bed returns."
+        },
+        {
+          "id": "s5",
+          "text": "Drop a loopable .wav into sounds/thinking/, restart -> your file loops during the wait; empty the folder -> the shipped default bed returns."
+        }
+      ]
+    },
+    {
       "id": "cancel-barge-in",
       "title": "Tap-to-cancel, barge-in, and panel CANCEL all interrupt",
       "section": "3. Cancel & barge-in",

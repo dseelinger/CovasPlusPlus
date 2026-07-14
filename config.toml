@@ -37,6 +37,13 @@ mix_sample_rate = 16000
 # comms/chatter/SFX/music on their buses), and the ambient layer becomes available (each part
 # still has its own enable below). Turn this on first, then enable the parts you want.
 enabled = true
+# Soft "thinking" bed (issue #5): a gentle, low, looping sound that fills the silence WHILE COVAS
+# transcribes/thinks/searches, so a slow turn doesn't feel like it was ignored. It's a UI CUE
+# (works whether or not the atmospheric mixer above is on), plays under a drop-in folder like the
+# other cues (sounds/thinking/ overrides the shipped default; empty falls back), and stops the
+# instant the reply starts or you cancel. Set false to keep just the single one-shot "processing"
+# tick. This is a NON-VERBAL bed — never a spoken "let me look that up".
+thinking_bed = true
 
 
 [audio.buses]

@@ -37,6 +37,11 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 STATES = ("Idle", "Listening", "Transcribing", "Thinking", "Searching", "Speaking")
+# States where COVAS is heads-down WORKING on a spoken turn — the window the soft "thinking" bed
+# (issue #5) fills. Entering one (arms, enabled) starts the bed; entering any OTHER state stops it,
+# which is what wires the stop into every exit path (reply -> Speaking, cancel/error -> Idle,
+# barge-in -> Listening) through the single set_state chokepoint.
+_WORKING_STATES = frozenset({"Transcribing", "Thinking", "Searching"})
 
 
 def _pop_path(d: dict, path: tuple) -> None:
@@ -167,6 +172,9 @@ class App:
         self.ptt_held = False
         self._ptt_t0 = 0.0  # key-down time, for tap-vs-hold detection
         self.state = "Idle"
+        # Armed for the duration of a USER (PTT) turn, so the "thinking" bed (issue #5) fills the
+        # wait for those turns only — never a proactive callout (which has no "did it hear me" gap).
+        self._bed_armed = False
         self._quit = threading.Event()
 
         # Proactive callouts (DESIGN §5): the companion initiates speech on notable ED
@@ -930,8 +938,26 @@ class App:
             pass
         self.bus.publish({"type": "log", "who": who, "text": text})
 
+    def _thinking_bed_enabled(self) -> bool:
+        """The soft "thinking" bed toggle ([audio].thinking_bed, default on). Read live so a
+        Settings change applies to the next turn without a restart."""
+        return bool((self.cfg.get("audio", {}) or {}).get("thinking_bed", True))
+
     def set_state(self, state: str, extra: str = "") -> None:
         self.state = state
+        # Drive the soft "thinking" bed (issue #5) off the single state chokepoint: start it when a
+        # user turn enters a WORKING state, stop it on entering any other state. Because every exit
+        # path (reply->Speaking, cancel/error->Idle, barge-in->Listening) funnels through here, the
+        # bed can never be orphaned. Fail-soft — a cue glitch must not break the state transition.
+        try:
+            if state in _WORKING_STATES:
+                if self._bed_armed and self._thinking_bed_enabled():
+                    self.cues.start_loop("thinking")
+            else:
+                self.cues.stop_loop()
+                self._bed_armed = False
+        except Exception:  # noqa: BLE001
+            pass
         label = f"[{state}] {extra}".rstrip()
         print("\n>> " + label, flush=True)
         self.bus.publish({"type": "status", "state": state, "extra": extra})
@@ -965,6 +991,10 @@ class App:
             self.set_state("Idle", "cancelled")
             return
         self.cues.play("processing")
+        # Arm the soft "thinking" bed for THIS user turn (issue #5): the one-shot processing tick
+        # above acknowledges receipt; the bed then fills the transcribe/think/search wait. The
+        # worker's first set_state("Transcribing") starts it; any exit stops it (see set_state).
+        self._bed_armed = True
         cancel = threading.Event()
         self.active_cancel = cancel
         self.worker = threading.Thread(
@@ -1249,6 +1279,9 @@ class App:
             if cancel.is_set():
                 self.set_state("Idle")
                 return
+            # Reply is ready: silence the "thinking" bed BEFORE the completed chime so the two
+            # don't overlap, then chime and speak (set_state("Speaking") is the belt-and-braces stop).
+            self.cues.stop_loop()
             self.cues.play("done", wait=True)
             if cancel.is_set():
                 self.set_state("Idle")

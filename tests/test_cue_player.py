@@ -105,7 +105,7 @@ class _StubMixer:
         pass
 
 
-def _player_with(tmp_path, monkeypatch, *, user_files, asset_files):
+def _player_with(tmp_path, monkeypatch, *, user_files, asset_files, sleep=None):
     """Build a CuePlayer whose asset root is a tmp COVAS_APP_DIR and whose user root is
     content_root/sounds, populated per the given {type: [freqs]} maps."""
     app_root = tmp_path / "app"
@@ -118,7 +118,7 @@ def _player_with(tmp_path, monkeypatch, *, user_files, asset_files):
             _wav(data_root / "sounds" / ctype / f"u{i}.wav", freq=f, ms=30 + 10 * i)
     monkeypatch.setenv("COVAS_APP_DIR", str(app_root))
     cfg = {"audio": {"content_root": str(data_root), "mix_sample_rate": 16000}}
-    return CuePlayer(cfg, mixer=_StubMixer())
+    return CuePlayer(cfg, mixer=_StubMixer(), sleep=sleep)
 
 
 def test_cueplayer_loads_defaults_when_no_override(tmp_path, monkeypatch):
@@ -153,3 +153,89 @@ def test_cueplayer_silent_type_is_noop(tmp_path, monkeypatch):
     p = _player_with(tmp_path, monkeypatch, user_files={}, asset_files={})
     p.play("failed")                         # no files anywhere -> no submit, no error
     assert p._mixer.submitted == []
+
+
+# ---- looping "thinking" bed (issue #5): start/stop lifecycle --------------------------------
+
+def test_thinking_is_a_cue_type_with_a_shipped_default():
+    from covas.audio import CUE_TYPES, _CUE_ALIASES
+    assert "thinking" in CUE_TYPES
+    assert _CUE_ALIASES.get("working") == "thinking"     # intuitive synonym
+
+
+def test_start_loop_repeats_until_stopped(tmp_path, monkeypatch):
+    """The bed plays on repeat: with an injected (no-wait) sleep, it re-triggers each pass and
+    keeps going until stop_loop() — here the 3rd pass stops it, so exactly 3 clips were routed."""
+    import threading
+    holder = {"n": 0, "player": None}
+    done = threading.Event()
+
+    def fake_sleep(_secs):
+        holder["n"] += 1
+        if holder["n"] >= 3:
+            holder["player"].stop_loop()     # stop from within the loop thread (no self-join)
+            done.set()
+
+    p = _player_with(tmp_path, monkeypatch, user_files={},
+                     asset_files={"thinking": [120, 140]}, sleep=fake_sleep)
+    holder["player"] = p
+    p.start_loop("thinking")
+    assert done.wait(2.0)                     # loop reached its 3rd pass and stopped (no real time)
+    assert len(p._mixer.submitted) == 3       # three clips routed to the bus, then it halted
+    assert all(bus == "alert" for bus, _buf, _sr in p._mixer.submitted)
+    assert p._loop_thread is None             # cleaned up
+
+
+def test_start_loop_silent_type_spawns_no_thread(tmp_path, monkeypatch):
+    p = _player_with(tmp_path, monkeypatch, user_files={}, asset_files={})  # no thinking files
+    p.start_loop("thinking")
+    assert p._loop_thread is None             # nothing to loop -> no thread, fail-soft
+    assert p._mixer.submitted == []
+
+
+def test_start_loop_is_idempotent(tmp_path, monkeypatch):
+    """A second start_loop while one runs is a no-op (one bed at a time)."""
+    import threading
+    inside = threading.Event()
+    gate = threading.Event()
+    idents = set()
+
+    def fake_sleep(_secs):
+        idents.add(threading.current_thread().ident)
+        inside.set()
+        gate.wait(1.0)                        # hold the worker so we can try to start again
+
+    p = _player_with(tmp_path, monkeypatch, user_files={},
+                     asset_files={"thinking": [120]}, sleep=fake_sleep)
+    p.start_loop("thinking")
+    first = p._loop_thread
+    assert inside.wait(2.0)                    # worker is running, parked in fake_sleep
+    p.start_loop("thinking")                   # should NOT spawn a second worker
+    assert p._loop_thread is first
+    gate.set()
+    p.stop_loop()
+    assert idents == {first.ident}             # only ever one loop thread ran
+
+
+def test_stop_loop_without_running_is_safe(tmp_path, monkeypatch):
+    p = _player_with(tmp_path, monkeypatch, user_files={}, asset_files={"thinking": [100]})
+    p.stop_loop()                             # nothing running -> no error, no submit
+    assert p._mixer.submitted == []
+
+
+def test_stop_also_stops_the_loop(tmp_path, monkeypatch):
+    """The general stop() also tears the bed down (belt-and-braces on the cancel path)."""
+    import threading
+    import time as _time
+    entered = threading.Event()
+
+    def fake_sleep(_secs):
+        entered.set()
+        _time.sleep(0.005)                     # brief yield; worker re-checks stop each pass
+
+    p = _player_with(tmp_path, monkeypatch, user_files={},
+                     asset_files={"thinking": [120]}, sleep=fake_sleep)
+    p.start_loop("thinking")
+    assert entered.wait(2.0)
+    p.stop()                                    # not stop_loop — the general stop tears it down too
+    assert p._loop_thread is None

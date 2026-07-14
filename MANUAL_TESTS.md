@@ -86,19 +86,28 @@ Notes:
 > Cues are drop-in **folders**, not config paths. Shipped originals live in
 > `covas/assets/cues/<type>/`; your overrides go in `<data dir>/sounds/<type>/` (project root in a
 > source run; `%APPDATA%\COVAS++\sounds\` when packaged). Types: `listen` / `processing` /
-> `completed` / `failure`.
+> `completed` / `failure` / `thinking`.
 - [ ] **Out of the box (no user cues):** press to talk → you hear the **shipped default** `listen`
       chirp; on release a **processing** tick; a ready **completed** cue before speech.
 - [ ] **Failure:** press and release **without speaking** → you hear the **failure** cue and the log notes no speech was detected.
 - [ ] No spoken "looking it up / GalNet" filler ever plays — a processing beep covers searches.
 - [ ] **Open cues folder:** in the panel, click **Open cues folder** → Explorer opens
-      `<data dir>\sounds\` with `listen/ processing/ completed/ failure/` subfolders (each with a README).
+      `<data dir>\sounds\` with `listen/ processing/ completed/ failure/ thinking/` subfolders (each with a README).
 - [ ] **Override + rotation:** drop **2–3** of your own `.wav`s into `sounds/listen/`, restart →
       the press-to-talk cue now plays **your** files and **varies** across presses (your set
       **replaced** the default; any count works).
 - [ ] **Fallback:** empty `sounds/listen/` again, restart → the **shipped default** `listen` cue returns.
 - [ ] **Interdiction sting default:** with `[audio.interdiction].enabled` and no user sting, an
       interdiction plays the shipped original **sting** (not silence).
+- [ ] **Thinking bed fills the wait (issue #5):** ask a slow question (*"Give me the full history of
+      the Empire."*). After the one-shot `processing` tick you hear a **soft, looping** bed under the
+      wait; it **stops the instant speech begins**. Confirm it also stops cleanly on **tap-cancel**,
+      **barge-in**, and a **failure** (no double-up with the `completed`/`failure` cue).
+- [ ] **Thinking bed toggle:** *"turn the thinking sound off"* (or the **Thinking sound** row on the
+      Settings page) → the next slow turn plays only the single `processing` tick, no looping bed.
+      Turn it back on and the bed returns.
+- [ ] **Thinking bed override:** drop a loopable `.wav` into `sounds/thinking/`, restart → your file
+      loops during the wait; empty the folder → the shipped default bed returns.
 
 Notes:
 

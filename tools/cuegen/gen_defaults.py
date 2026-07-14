@@ -12,6 +12,8 @@ Cue families (design INSTALLER_DESIGN.md §"Shippable default assets"):
   * processing = low, unobtrusive tick (played while the LLM thinks / searches)
   * completed  = resolved rising interval (answer ready, just before speech)
   * failure    = soft descending minor (no speech heard, or a service error)
+  * thinking   = a soft, LOOPING bed that fills the wait while COVAS works (issue #5) — designed
+                 to loop seamlessly (starts/ends at silence) and sit well under everything else
   * interdiction_sting = an original alert sting (bundled fallback for the C8 cue)
 Each family ships a few originals so the folder-discovery rotation is visible out of the box.
 """
@@ -99,6 +101,43 @@ def failure_low() -> np.ndarray:  # E4 -> D4, small descending step, softer/dull
     return _interval(E4, D4, 0.16, 0.32, brightness=0.4, vib_depth=0.003)
 
 
+# --- thinking: a SOFT looping bed (issue #5) — must not distract, must loop seamlessly ---
+def _thinking_bed(root: float, dur: float, *, lfo_hz: float, detune_cents: float = 7.0,
+                  peak: float = 1.0) -> np.ndarray:
+    """A low, breathing drone: two detuned low partials + a soft octave, under a slow amplitude
+    LFO so it 'pulses' gently. Windowed with equal cosine fades at BOTH ends (and a whole number
+    of LFO cycles) so consecutive plays loop without a click. Deliberately dull (few harmonics),
+    low, and quiet — it fills the wait, it doesn't demand attention."""
+    n = int(SR * dur)
+    t = np.linspace(0, dur, n, endpoint=False)
+    d = 2 ** (detune_cents / 1200)
+
+    def osc(f: float) -> np.ndarray:
+        # Just a hint of 2nd harmonic for warmth; no bright upper partials.
+        ph = 2 * np.pi * f * t
+        return np.sin(ph) + 0.18 * np.sin(2 * ph)
+
+    sig = osc(root) + 0.7 * osc(root * d) + 0.7 * osc(root / d) + 0.35 * osc(root * 2)
+    # Slow tremolo (never dips to full silence, so the bed stays present).
+    lfo = 0.7 + 0.3 * (0.5 - 0.5 * np.cos(2 * np.pi * lfo_hz * t))
+    sig = sig * lfo
+    # Symmetric cosine fade at both boundaries -> seamless re-trigger (no edge click).
+    edge = min(int(SR * 0.20), n // 2)
+    win = np.ones(n)
+    ramp = 0.5 - 0.5 * np.cos(np.linspace(0, np.pi, edge))
+    win[:edge] = ramp
+    win[-edge:] = ramp[::-1]
+    return sig * win * peak
+
+
+def thinking_pulse() -> np.ndarray:  # ~2.4 s, gentle 0.5 Hz breath around a low A
+    return _thinking_bed(110.0, 2.4, lfo_hz=0.8333)   # 2 full LFO cycles over 2.4 s
+
+
+def thinking_hum() -> np.ndarray:    # ~3.0 s, slower breath a fifth below
+    return _thinking_bed(146.83, 3.0, lfo_hz=0.6667, detune_cents=9.0)  # 2 cycles over 3.0 s
+
+
 # --- interdiction sting: an original alert (bright, urgent, but short) ---
 def interdiction_sting() -> np.ndarray:
     """A tense two-tone alert: a bright tone bent up into a held dissonant partner."""
@@ -127,13 +166,18 @@ _FAMILIES = {
     "completed": {"done_fifth.wav": completed_fifth, "done_octave.wav": completed_octave,
                   "done_fourth.wav": completed_fourth},
     "failure": {"fail_minor.wav": failure_minor_third, "fail_low.wav": failure_low},
+    "thinking": {"thinking_pulse.wav": thinking_pulse, "thinking_hum.wav": thinking_hum},
     "interdiction_sting": {"interdiction_sting.wav": interdiction_sting},
 }
+
+# The soft bed sits WELL under the one-shot cues (peak 0.5) — a quieter target so it never
+# competes with COVAS or the chimes when it loops.
+_PEAKS = {"thinking": 0.22}
 
 
 if __name__ == "__main__":
     print(f"Writing shipped default cues under {CUES} :")
     for cue_type, gens in _FAMILIES.items():
         for fname, fn in gens.items():
-            _save(cue_type, fname, fn())
+            _save(cue_type, fname, fn(), peak=_PEAKS.get(cue_type, 0.5))
     print("Done. (listen/ is LOCKED and untouched.)")

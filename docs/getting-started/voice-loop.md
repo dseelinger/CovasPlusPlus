@@ -7,8 +7,9 @@ minute and makes everything else obvious.
 
 1. **Hold** the push-to-talk key (<kbd>[</kbd> by default) and speak. The moment you press, a
    **listening** chirp plays and your microphone is captured — for as long as you hold.
-2. **Release.** A **processing** chirp plays. Your speech is transcribed **locally** by
-   faster-whisper — nothing leaves your PC just to turn your voice into text.
+2. **Release.** A **processing** chirp plays, then a soft **thinking** bed fades in and hums
+   gently underneath while COVAS works. Your speech is transcribed **locally** by faster-whisper —
+   nothing leaves your PC just to turn your voice into text.
 3. The transcript goes to Claude with your personality, your recent conversation, and — only when
    the question needs it — a compact snapshot of your live game state.
 4. When the reply is ready, a **done** chirp plays and the answer is **spoken aloud** in your
@@ -39,13 +40,22 @@ looking at the screen:
 | Cue | When it plays |
 |-----|---------------|
 | **listen** | The instant you press to talk (before you even speak) |
-| **processing** | While it's working — transcribing, thinking, or searching the web |
+| **processing** | A one-shot tick the moment you release — "got it" |
+| **thinking** | A soft, looping bed that **fills the whole wait** while it transcribes / thinks / searches |
 | **completed** | The moment an answer is ready, just before speech plays |
 | **failure** | Any failure — no speech heard, or a service error |
+
+The **thinking** bed is the audio equivalent of a spinning "loading" icon: after the one-shot
+*processing* tick, it hums gently under the moment so a slow turn never feels like COVAS ignored
+you, and it **stops the instant** the reply starts speaking (or you cancel / barge in). It's soft
+and non-verbal by design — never a spoken "let me look that up." Prefer just the single tick?
+Turn it off with **"turn the thinking sound off"** or the **Thinking sound** toggle on the Settings
+page (`[audio].thinking_bed`).
 
 Cues are **drop-in folders**, not config paths. COVAS++ ships original defaults, so you hear
 chirps out of the box. Each cue type is a folder; a **random** file from it plays each time, so
 you add variety just by dropping in more files (1 file or 50 — no config edit, no fixed count).
+Drop your own loopable audio into `sounds/thinking/` to replace the default bed.
 
 To use your **own** cues, click **Open cues folder** in the control panel (or open
 `<data dir>/sounds/` yourself) and drop audio into the matching `sounds/<type>/` folder:

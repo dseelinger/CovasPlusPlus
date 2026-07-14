@@ -380,6 +380,16 @@ SCHEMA: list[Setting] = [
             "Port the local control panel serves on. Restart to apply.",
             default=8765, min=1, max=65535, phrasings=("control panel port",)),
 
+    # --- Sound cues --------------------------------------------------------
+    Setting("audio.thinking_bed", ("audio", "thinking_bed"), "bool",
+            "Thinking sound", "Sound cues",
+            "Soft looping sound that fills the wait while COVAS transcribes/thinks/searches, so a "
+            "slow turn doesn't feel ignored. Off = just the single processing tick. Stops when the "
+            "reply starts or you cancel.",
+            default=True, phrasings=("thinking sound", "working sound", "thinking bed",
+                                     "the thinking cue"),
+            example="turn the thinking sound off"),
+
     # --- Ambient audio (C1-C9) --------------------------------------------
     # The atmospheric audio layer: a shared bus mixer + space chatter, comms voices, and music.
     # The master switch is restart-level (it builds the mixer at launch); the rest apply live.

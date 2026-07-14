@@ -61,6 +61,90 @@ def test_full_turn_transcribes_streams_and_speaks(tmp_path):
     assert app.state == "Idle"
 
 
+class _RecCues:
+    """A stand-in for CuePlayer that records the loop lifecycle calls (issue #5)."""
+
+    def __init__(self):
+        self.events: list[tuple] = []
+
+    def start_loop(self, name):
+        self.events.append(("start", name))
+
+    def stop_loop(self):
+        self.events.append(("stop",))
+
+    def play(self, name, wait=False):
+        self.events.append(("play", name))
+
+    def stop(self):
+        self.events.append(("stop_all",))
+
+    @property
+    def starts(self):
+        return [e for e in self.events if e[0] == "start"]
+
+    @property
+    def stops(self):
+        return [e for e in self.events if e[0] == "stop"]
+
+
+def _armed_app(tmp_path):
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=FakeLLM(), tts=FakeTTS())
+    app.cues = _RecCues()
+    return app
+
+
+def test_thinking_bed_starts_on_working_state_when_armed(tmp_path):
+    app = _armed_app(tmp_path)
+    app._bed_armed = True
+    app.set_state("Transcribing")
+    assert app.cues.starts == [("start", "thinking")]   # armed + working -> bed on
+
+
+def test_thinking_bed_not_started_when_unarmed(tmp_path):
+    """A proactive-style Thinking (no PTT turn) never starts the bed."""
+    app = _armed_app(tmp_path)
+    app._bed_armed = False
+    app.set_state("Thinking")
+    assert app.cues.starts == []
+
+
+def test_thinking_bed_stops_and_disarms_on_speaking(tmp_path):
+    app = _armed_app(tmp_path)
+    app._bed_armed = True
+    app.set_state("Thinking")                           # started
+    app.set_state("Speaking")                           # reply begins -> stop + disarm
+    assert app.cues.stops and app._bed_armed is False
+
+
+def test_thinking_bed_stops_on_cancel_to_idle(tmp_path):
+    app = _armed_app(tmp_path)
+    app._bed_armed = True
+    app.set_state("Thinking")
+    app.set_state("Idle", "cancelled")                  # cancel/failure path
+    assert app.cues.stops and app._bed_armed is False
+
+
+def test_thinking_bed_disabled_by_config(tmp_path):
+    app = _armed_app(tmp_path)
+    app.cfg["audio"]["thinking_bed"] = False            # toggle off -> just the one-shot tick
+    app._bed_armed = True
+    app.set_state("Thinking")
+    assert app.cues.starts == []
+
+
+def test_thinking_bed_full_turn_lifecycle(tmp_path):
+    """A full PTT turn: armed -> bed starts during work -> stops by the time we're Idle again."""
+    app = _make_app(tmp_path, stt=FakeSTT(text="hi"),
+                    llm=FakeLLM(text="Hello, Commander."), tts=FakeTTS())
+    app.cues = _RecCues()
+    app._bed_armed = True                               # on_ptt_up arms this before the worker
+    app._process(object(), threading.Event())
+    kinds = [e[0] for e in app.cues.events]
+    assert "start" in kinds and "stop" in kinds         # bed ran, then was torn down
+    assert app._bed_armed is False and app.state == "Idle"
+
+
 def test_quit_signal_wiring(tmp_path):
     """Ctrl+Alt+Q -> request_quit() sets the event; wait_for_quit() unblocks on it and
     shutdown() cleans up without raising. The web UI relies on this bridge because Flask

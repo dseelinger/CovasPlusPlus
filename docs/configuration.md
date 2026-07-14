@@ -117,10 +117,16 @@ See [Personas & voice](using/personas-voice.md).
 
 Local sounds played instantly at each stage — see [The voice loop](getting-started/voice-loop.md#sound-cues).
 There is **no `[sound_cues]` config section**: cues are resolved by folder. Cue types are
-`listen`, `processing`, `completed`, `failure`, each a folder holding any number of audio files
-(a random one plays). COVAS++ ships originals under `covas/assets/cues/<type>/`; drop your own
-into `<data dir>/sounds/<type>/` to replace a type's default set (use **Open cues folder** in the
-control panel). Empty a folder to fall back; the app runs fine either way.
+`listen`, `processing`, `completed`, `failure`, and `thinking`, each a folder holding any number of
+audio files (a random one plays). COVAS++ ships originals under `covas/assets/cues/<type>/`; drop
+your own into `<data dir>/sounds/<type>/` to replace a type's default set (use **Open cues folder**
+in the control panel). Empty a folder to fall back; the app runs fine either way.
+
+The `thinking` type is special: it's a soft bed that **loops** while COVAS transcribes/thinks/
+searches (issue #5), filling the wait between "prompt received" and "reply starts," and stops the
+instant the reply speaks or you cancel. Files you drop into `sounds/thinking/` should loop cleanly.
+Turn the whole bed off with `[audio].thinking_bed = false` (or the **Thinking sound** Settings row /
+*"turn the thinking sound off"*) to keep just the one-shot `processing` tick.
 
 > **Upgrading from an old `[sound_cues]` config?** The per-file arrays are ignored now. Move (or
 > re-drop) your files into `sounds/listen/`, `sounds/processing/`, `sounds/completed/`, and
