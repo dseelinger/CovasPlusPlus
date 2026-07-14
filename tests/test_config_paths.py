@@ -57,6 +57,7 @@ def test_all_path_fields_resolved():
                         "campaign_file": "campaign.txt", "custom_dir": "personalities/custom"},
         "anthropic": {"api_key_file": "AnthropicAPIKey.txt"},
         "elevenlabs": {"api_key_file": "ElevenLabsAPIKey.txt"},
+        "azure": {"api_key_file": "AzureSpeechKey.txt"},
         "checklist": {"file": "ultimate_checklist.md"},
         "logging": {"dir": "logs"},
         "piper": {"model": "voices/en.onnx"},

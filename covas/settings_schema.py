@@ -32,8 +32,8 @@ ROUTER_PINS = ["", "haiku", "sonnet", "opus"]
 PAD_SIZES = ["S", "M", "L", "any"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
 LLM_PROVIDERS = ["anthropic", "ollama"]
-TTS_PROVIDERS = ["elevenlabs", "piper", "edge"]
-CAST_PROVIDERS = ["piper", "elevenlabs", "edge"]
+TTS_PROVIDERS = ["elevenlabs", "piper", "edge", "azure"]
+CAST_PROVIDERS = ["piper", "elevenlabs", "edge", "azure"]
 
 # Sentinels for enum options that can only be resolved at runtime (from config
 # or a live API). The web/voice layer supplies the concrete list; when it can't
@@ -367,7 +367,8 @@ SCHEMA: list[Setting] = [
     Setting("tts.provider", ("tts", "provider"), "enum",
             "TTS provider", "Providers",
             "Which voice speaks. edge (free edge-tts neural voices — the default; no SLA, falls "
-            "back to piper), elevenlabs (cloud, premium), or piper (local, offline, free).",
+            "back to piper), azure (official Azure Neural, free tier + SLA), elevenlabs (cloud, "
+            "premium), or piper (local, offline, free).",
             default="edge", options=TTS_PROVIDERS,
             phrasings=("tts provider", "voice provider")),
     Setting("edge.voice", ("edge", "voice"), "string",
@@ -375,6 +376,21 @@ SCHEMA: list[Setting] = [
             "Edge (edge-tts) persona voice ShortName when TTS provider = edge, e.g. "
             "en-US-AriaNeural. List them with: python -m edge_tts --list-voices.",
             default="en-US-AriaNeural", phrasings=("edge voice", "edge tts voice")),
+    Setting("azure.region", ("azure", "region"), "string",
+            "Azure region", "Providers",
+            "Azure Speech resource region when TTS provider = azure, e.g. eastus, westus2, uksouth. "
+            "Must match your resource. Key comes from AZURE_SPEECH_KEY or [azure].api_key_file.",
+            default="eastus", phrasings=("azure region", "azure speech region")),
+    Setting("azure.voice", ("azure", "voice"), "string",
+            "Azure voice", "Providers",
+            "Azure Neural persona voice ShortName when TTS provider = azure (same names as Edge), "
+            "e.g. en-US-AriaNeural.",
+            default="en-US-AriaNeural", phrasings=("azure voice", "azure tts voice")),
+    Setting("azure.style", ("azure", "style"), "string",
+            "Azure speaking style", "Providers",
+            "Optional SSML speaking style/emotion for the Azure voice (voice-dependent), e.g. "
+            "cheerful, newscast, chat. Blank = the voice's neutral default.",
+            default="", phrasings=("azure style", "azure speaking style", "voice style")),
 
     # --- Control panel -----------------------------------------------------
     Setting("ui.host", ("ui", "host"), "string",
@@ -469,9 +485,9 @@ SCHEMA: list[Setting] = [
     Setting("audio.voices.cast_provider", ("audio", "voices", "cast_provider"), "enum",
             "Cast provider", "Ambient audio",
             "Default TTS for the NPC/comms/chatter voice cast: 'elevenlabs' (random voices, burns "
-            "credits), 'piper' (local, free), or 'edge' (free edge-tts neural voices — no key, no "
-            "SLA). Per-role overrides live in [audio.voices.providers] in config.toml. COVAS itself "
-            "always uses your persona voice ([tts].provider).",
+            "credits), 'piper' (local, free), 'edge' (free edge-tts neural voices — no key, no SLA), "
+            "or 'azure' (official Azure Neural, free tier + SLA). Per-role overrides live in "
+            "[audio.voices.providers] in config.toml. COVAS itself uses your persona ([tts].provider).",
             default="elevenlabs", options=CAST_PROVIDERS,
             phrasings=("cast provider", "voice cast provider", "npc voice provider"),
             example="set the cast provider to piper"),

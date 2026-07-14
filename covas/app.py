@@ -299,6 +299,7 @@ class App:
         cs = CastSynth(el_synth=el_synth, piper_loader=self._load_piper_voice,
                        log=lambda m: self._log("audio", m))
         self._register_edge_cast(cs)
+        self._register_azure_cast(cs)
         return cs
 
     def _register_edge_cast(self, cast_synth) -> None:  # noqa: ANN001 — a CastSynth
@@ -314,6 +315,18 @@ class App:
                 "edge", lambda text, ref: edge.synth_pcm(text, ref or None))
         except Exception as e:  # noqa: BLE001 — optional provider; never block the cast
             self._log("audio", f"Edge cast provider unavailable: {e}")
+
+    def _register_azure_cast(self, cast_synth) -> None:  # noqa: ANN001 — a CastSynth
+        """Register official Azure Neural TTS as a cast-eligible backend (issue #17) — the reliable,
+        free-tier sibling of Edge. Any NPC/comms/chatter role can use it. Fail-soft: a synth error
+        (no key, service down) is caught by CastSynth and the voice degrades to silence."""
+        try:
+            from .providers.azure_tts import AzureTTS
+            azure = AzureTTS(self.cfg)
+            cast_synth.registry.register(
+                "azure", lambda text, ref: azure.synth_pcm(text, ref or None))
+        except Exception as e:  # noqa: BLE001 — optional provider; never block the cast
+            self._log("audio", f"Azure cast provider unavailable: {e}")
 
     def _load_piper_voice(self, model_path: str):
         """Load a Piper model as a cast voice (lazy, one per path). Returns an object with

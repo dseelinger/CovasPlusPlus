@@ -458,6 +458,23 @@ Notes:
 
 Notes:
 
+### 18.9 Azure Neural TTS — reliable free-tier sibling of Edge (issue #17)  🎮 ED 🔊 HW 🌍 NET 📋 FILE
+> **Official Azure Neural TTS** — the *same* voices as Edge, but with a real API, an **SLA**, and a
+> **free monthly tier (~0.5M chars)**. No ToS/reliability asterisk. Needs a Speech resource: create one
+> in the Azure portal, then set `AZURE_SPEECH_KEY` (or paste the key into `AzureSpeechKey.txt`) and
+> `[azure].region` to match it.
+- [ ] **Persona voice:** set `[tts].provider = "azure"` (and `[azure].voice`, e.g. `en-US-GuyNeural`),
+  restart, speak a turn → COVAS replies in the chosen Azure voice.
+- [ ] **Speaking style:** set `[azure].style = "cheerful"` (on a voice that supports it), restart, speak
+  → the delivery changes; an unsupported style is ignored (still speaks).
+- [ ] **Cast-eligible:** set `[audio.voices].cast_provider = "azure"` (or `[audio.voices.providers].chatter
+  = "azure"`), restart, fly/dock in a populated system → ambient chatter/comms use distinct Azure voices.
+- [ ] **Fail-soft:** with `[tts].provider = "azure"` and a **wrong region or missing key**, speak → the
+  reply degrades to **text** and the loop returns to IDLE (cast Azure voices fall silent); fix the
+  key/region → voices return. No crash either way.
+
+Notes:
+
 ---
 
 ## 19. Packaged build — install, first-run wizard & updates (I1–I9)  📦 🖥️ 🔊 HW 🌍 NET

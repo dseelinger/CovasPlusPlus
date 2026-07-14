@@ -1350,6 +1350,37 @@
       ]
     },
     {
+      "id": "azure-neural-tts-provider",
+      "title": "Azure Neural TTS — reliable free-tier sibling of Edge (issue #17)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "An Azure Speech resource: set `AZURE_SPEECH_KEY` (or paste the key into `AzureSpeechKey.txt`) and `[azure].region` to match it; internet access. Audio layer ON with the cast enabled for the cast check; ED running.",
+      "expected": "Azure speaks COVAS's persona voice (same voices as Edge) with a real API/SLA when `[tts].provider = \"azure\"`; an optional `[azure].style` changes delivery; Azure voices are cast-eligible; a wrong region or missing key degrades the persona to text and cast Azure voices to silence — the loop never crashes.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[tts].provider = \"azure\"` (and `[azure].voice`, e.g. `en-US-GuyNeural`), ensure the key + region are set, restart, and speak a turn -> COVAS replies in the chosen Azure voice."
+        },
+        {
+          "id": "s2",
+          "text": "Set `[azure].style = \"cheerful\"` on a style-capable voice, restart, speak -> the delivery changes; an unsupported style is ignored (still speaks)."
+        },
+        {
+          "id": "s3",
+          "text": "Set `[audio.voices].cast_provider = \"azure\"` (or `[audio.voices.providers].chatter = \"azure\"`), restart, fly/dock in a populated system -> ambient chatter/comms speak in distinct Azure voices."
+        },
+        {
+          "id": "s4",
+          "text": "Break it: set a WRONG `[azure].region` (or clear the key) and speak -> the reply degrades to text and the loop returns to IDLE (cast Azure voices fall silent); restore the correct key/region -> voices return. No crash either way."
+        }
+      ]
+    },
+    {
       "id": "fresh-install-native-wizard",
       "title": "Fresh install shows the first-run wizard IN THE NATIVE WINDOW",
       "section": "19. Packaged build",

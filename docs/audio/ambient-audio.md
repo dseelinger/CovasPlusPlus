@@ -59,8 +59,9 @@ play session**:
     The cast now defaults to **ElevenLabs**, which burns credits on every comms/chatter line. To go
     back to the free, game-friendly local path, set `[audio.voices].cast_provider = "piper"` and add
     Piper `.onnx` entries to `[audio.voices].pool` (or set `random_el = false` for a single voice).
-    For **free neural** voices with hundreds of distinct speakers and no key, set
-    `cast_provider = "edge"` (see below) — perfect for keeping ambient chatter off your ElevenLabs bill.
+    For **free neural** voices with hundreds of distinct speakers, set `cast_provider = "edge"` (no
+    key) or `cast_provider = "azure"` (free tier + SLA) — see below — perfect for keeping ambient
+    chatter off your ElevenLabs bill.
 
 ### Per-role providers (the voice ladder)
 
@@ -71,13 +72,13 @@ default). COVAS's own **persona** voice is not a cast role — it stays on `[tts
 
 ```toml
 [audio.voices.providers]
-chatter = "edge"         # free neural voices for throwaway ambient lines (no key, no credits)
+chatter = "azure"        # free-tier neural voices for throwaway ambient lines (SLA-backed)
 comms   = "elevenlabs"   # premium voices for station/NPC comms
 ```
 
 This is the seam additional voice providers plug into: each registers under its name and becomes
-selectable for any role — a ladder from free/local Piper through free-neural Edge and cheap cloud to
-premium, mirroring the LLM cost router.
+selectable for any role — a ladder from free/local Piper through free-neural Edge/Azure and cheap
+cloud to premium, mirroring the LLM cost router.
 
 **`edge` (edge-tts) — free neural voices, no key.** The `edge` provider speaks through Microsoft
 Edge's "Read Aloud" Azure Neural voices: hundreds of distinct voices, no API key, and no ElevenLabs
@@ -89,8 +90,15 @@ credits — ideal for the NPC/comms/chatter cast. Pin explicit voices by adding 
     no SLA**, and it periodically breaks when Microsoft rotates its anti-abuse tokens. Cast Edge
     voices **fall silent** when the endpoint is down (they never crash the loop), and the COVAS
     persona voice on `[tts].provider = "edge"` **falls back to Piper**. Keep **Piper** as your
-    guaranteed free floor; official **Azure Neural TTS** (same voices, with an API + SLA) is the
-    dependable version for later.
+    guaranteed free floor; for the same voices without the asterisk, use **Azure** ↓.
+
+**`azure` — the reliable sibling of Edge (free tier + SLA).** The `azure` provider uses **official
+Azure Neural TTS**: the *same* voices as Edge, but over the Speech service with a real API, an SLA,
+and a **free monthly tier (~0.5M characters)** — the shippable way to give the cast big voice variety
+at low/zero cost, with no ToS/reliability asterisk. Needs a Speech resource **key** (`AZURE_SPEECH_KEY`
+env var or `AzureSpeechKey.txt`) and **region** (`[azure].region`). Set `cast_provider = "azure"` or a
+per-role override, and pin explicit voices with pool entries `provider = "azure"`, `ref = "<ShortName>"`.
+A key/region/service problem makes those cast voices **fall silent** (never crashes the loop).
 
 ## Drop-in content
 
