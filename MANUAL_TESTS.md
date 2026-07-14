@@ -313,6 +313,12 @@ Notes:
 - [ ] The Live Log has a **Conversation / All** toggle. **Conversation** (default) shows only your utterances and COVAS replies; **All** shows status/thinking/search/usage/system lines too.
 - [ ] Switch to Conversation → status/thinking/usage lines **hide**; the choice **persists** across a reload.
 
+### 14.5a Live Log — select & copy (issue #6)
+- [ ] **Selection survives new lines:** during an active session (lines still arriving), **scroll up** and drag-select an older line → the selection is **not** lost and the view does **not** jump to the bottom while you're scrolled up / selecting. Scroll back to the bottom → auto-scroll **resumes**.
+- [ ] **Copy button honours the filter:** in **Conversation** mode click **Copy** (log header) → clipboard holds **only** the timestamped Commander/COVAS lines (paste to check). Switch to **All**, Copy again → status/thinking/search/`[router]`/`[usage]`/system lines are included too. Text is clean `HH:MM:SS  who: text` — no HTML.
+- [ ] **Per-line copy:** hover a line → a small **⎘** button appears; click it → just that line is on the clipboard (shows ✓ briefly).
+- [ ] 🖥️ **Native window:** repeat the selection + Copy checks in the **packaged app's** window (not just the browser build) — selection highlights and both copy paths work there too.
+
 ### 14.6 Checklist editor (N10) — http://127.0.0.1:8765/checklist 🌍 NET (CDN)
 > Edits the SAME `ultimate_checklist.md` the voice loop uses. Use a **throwaway** line.
 - [ ] The tab renders the checklist as **rendered markdown** (headings, checkboxes) — not a plain textarea. The header shows the file name; ☑ checklist links exist on the panel and settings headers.

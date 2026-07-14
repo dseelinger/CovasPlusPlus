@@ -22,6 +22,11 @@ behind-the-scenes lines (routing decisions, usage/cost, status, searches) — al
 - **Log filter** — a **Conversation / All** toggle. *Conversation* (the default) shows just your
   utterances and the replies; *All* also shows status, thinking, search, and usage/cost lines. Your
   choice persists across reloads.
+- **Selecting & copying** — the log is fully selectable. Scroll up (or start a selection) and
+  auto-scroll **pauses** so a new line can't yank the view or drop your selection; it resumes once
+  you're back at the bottom. The **Copy** link in the log header copies the whole log to the
+  clipboard, **respecting the current filter** (so *Conversation* copies only utterances and
+  replies as clean, timestamped plain text). Hover any line for a per-line **⎘ copy** button.
 
 ## Settings page — `/settings`
 

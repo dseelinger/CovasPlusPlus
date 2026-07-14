@@ -29,9 +29,19 @@
   .toggle.on .knob{left:28px}
   button.cancel{width:100%;margin-top:8px;padding:12px;background:#3a1414;color:#ff9d9d;border:1px solid #7a2a2a;border-radius:6px;font-family:inherit;letter-spacing:2px;cursor:pointer;font-size:14px}
   button.cancel:hover{background:#521a1a}
-  .log{height:62vh;overflow-y:auto;background:#080b10;border:1px solid var(--edge);border-radius:6px;padding:10px;font-size:13px;line-height:1.5}
-  .log .line{margin:2px 0;white-space:pre-wrap;word-break:break-word}
+  .log{height:62vh;overflow-y:auto;background:#080b10;border:1px solid var(--edge);border-radius:6px;padding:10px;font-size:13px;line-height:1.5;
+       -webkit-user-select:text;user-select:text;cursor:text}
+  /* Make selection clearly visible on the dark log, and force it on in the packaged webview. */
+  .log ::selection{background:#2a4a6a;color:#fff}
+  .log .line{position:relative;margin:2px 0;white-space:pre-wrap;word-break:break-word;padding-right:26px}
   .log .ts{color:#4a5666}
+  /* Per-line copy affordance, revealed on hover. user-select:none keeps its glyph out of a manual
+     text selection so a dragged selection stays clean. */
+  .linecopy{position:absolute;top:0;right:0;display:none;padding:1px 5px;font-size:11px;line-height:1.4;
+       background:#12202c;color:var(--accent2);border:1px solid var(--edge);border-radius:4px;cursor:pointer;
+       font-family:inherit;-webkit-user-select:none;user-select:none}
+  .log .line:hover .linecopy{display:inline-block}
+  .linecopy:hover{background:#162836}
   .who-Commander{color:var(--accent2)} .who-COVAS{color:var(--accent)} .who-system{color:var(--muted);font-style:italic}
   .who-thinking{color:#ffb020;font-style:italic}
   .ev-status{color:#8aa0b8} .ev-status b{color:#fff}
@@ -116,7 +126,7 @@
   </div>
 
   <div class="card">
-    <h2>Live Log <span class="logfilter"><a id="fConv">Conversation</a> · <a id="fAll">All</a></span></h2>
+    <h2>Live Log <span class="logfilter"><a id="copyLog" title="Copy the log to the clipboard (respects the filter)">Copy</a> · <a id="fConv">Conversation</a> · <a id="fAll">All</a></span></h2>
     <div class="log" id="log"></div>
   </div>
 </div>
@@ -138,24 +148,86 @@ function setStatus(state, extra){
 function pad(n){return n<10?"0"+n:n;}
 function tstr(ts){const d=new Date((ts||Date.now()/1000)*1000);return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());}
 
-function addLog(ev){
+// Every rendered log line, as clean plain text (+ conv flag), so Copy reconstructs from DATA —
+// not innerText — and honours the Conversation/All filter exactly like the view does.
+const LOG = [];
+
+function atBottom(el){ return el.scrollHeight - el.scrollTop - el.clientHeight < 24; }
+// True while the user is actively selecting text inside the log — we must NOT auto-scroll then,
+// or the moving viewport drops the in-progress selection.
+function hasLogSelection(){
+  const sel = window.getSelection && window.getSelection();
+  if(!sel || sel.isCollapsed || !sel.rangeCount) return false;
   const log = $("log");
+  return log.contains(sel.anchorNode) || log.contains(sel.focusNode);
+}
+
+function addLog(ev){
+  if(ev.type !== "log" && ev.type !== "status") return;
+  const log = $("log");
+  // Stick to the bottom ONLY if we were already at the bottom and nothing is being selected —
+  // so scrolling up to read/copy older lines, or a selection in progress, suspends auto-scroll.
+  const stick = atBottom(log) && !hasLogSelection();
+  const ts = tstr(ev.ts);
   const div = document.createElement("div");
-  div.className = "line";
+  let plain, conv = false;
   if(ev.type === "log"){
+    div.className = "line";
     // "Conversation" filter keeps only Commander utterances and COVAS replies.
-    if(ev.who === "Commander" || ev.who === "COVAS") div.classList.add("conv");
-    div.innerHTML = '<span class="ts">'+tstr(ev.ts)+'</span> ' +
+    conv = (ev.who === "Commander" || ev.who === "COVAS");
+    if(conv) div.classList.add("conv");
+    div.innerHTML = '<span class="ts">'+ts+'</span> ' +
       '<span class="who-'+ev.who+'">'+ev.who+':</span> ' +
       escapeHtml(ev.text);
-  } else if(ev.type === "status"){
+    plain = ts + "  " + ev.who + ": " + (ev.text || "");
+  } else {
     div.className = "line ev-status";
-    div.innerHTML = '<span class="ts">'+tstr(ev.ts)+'</span> » <b>'+ev.state+'</b>'+(ev.extra?' · '+escapeHtml(ev.extra):'');
-  } else return;
+    div.innerHTML = '<span class="ts">'+ts+'</span> » <b>'+ev.state+'</b>'+(ev.extra?' · '+escapeHtml(ev.extra):'');
+    plain = ts + "  » " + ev.state + (ev.extra ? " · " + ev.extra : "");
+  }
+  addLineCopy(div, plain);
+  LOG.push({conv, plain});
   log.appendChild(div);
-  log.scrollTop = log.scrollHeight;
+  if(stick) log.scrollTop = log.scrollHeight;
 }
 function escapeHtml(s){return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+// ---- clipboard: Clipboard API with a legacy execCommand fallback (same pattern the app uses
+//      elsewhere for copying systems), so Copy works in the packaged native window too. ----
+async function copyText(text){
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  }catch(e){ /* fall through to the legacy path */ }
+  try{
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.top = "-1000px"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  }catch(e){ return false; }
+}
+function currentLogMode(){ return $("log").classList.contains("conv-only") ? "conversation" : "all"; }
+function copyLog(){
+  const all = currentLogMode() === "all";
+  const text = LOG.filter(e => all || e.conv).map(e => e.plain).join("\n");
+  return copyText(text);
+}
+// A small per-line copy button, revealed on hover (see .linecopy). Copies just that line's text.
+function addLineCopy(div, plain){
+  const b = document.createElement("button");
+  b.className = "linecopy"; b.type = "button"; b.title = "Copy this line"; b.textContent = "⎘";
+  b.onclick = async (e) => {
+    e.stopPropagation();
+    const ok = await copyText(plain);
+    b.textContent = ok ? "✓" : "✗";
+    clearTimeout(b._t); b._t = setTimeout(() => b.textContent = "⎘", 1200);
+  };
+  div.appendChild(b);
+}
 
 function opt(v,t){const o=document.createElement("option");o.value=v;o.textContent=t||v;return o;}
 
@@ -315,6 +387,12 @@ function initLogFilter(){
   };
   $("fConv").onclick = () => apply("conversation");
   $("fAll").onclick = () => apply("all");
+  $("copyLog").onclick = async () => {
+    const el = $("copyLog");
+    const ok = await copyLog();
+    el.textContent = ok ? "Copied ✓" : "Copy failed";
+    clearTimeout(el._t); el._t = setTimeout(() => el.textContent = "Copy", 1500);
+  };
   let saved = "conversation";
   try{ saved = localStorage.getItem("logFilter") || "conversation"; }catch(e){}
   apply(saved);
