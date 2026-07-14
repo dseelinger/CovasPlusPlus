@@ -51,6 +51,21 @@ Prefer a **free, fully-local voice**? Switch `[tts].provider` to **Piper**. Pipe
 alongside the game at no cost — the voice is good, if not quite as smooth as ElevenLabs. See
 [Install & setup](../getting-started/install.md#run-fully-local-no-cloud).
 
+### Free neural voices via Edge (`edge`)
+
+Want free voices that sound closer to the cloud? Set `[tts].provider = "edge"` to speak through
+**Microsoft Edge's "Read Aloud" neural voices** (the `edge-tts` project) — hundreds of voices, **no
+API key**. Set `[edge].voice` to a voice ShortName (e.g. `en-US-GuyNeural`); browse the catalog with
+`python -m edge_tts --list-voices`. Edge is especially handy for the [voice cast](../audio/ambient-audio.md#the-voice-cast)
+so ambient chatter never burns ElevenLabs credits.
+
+> ⚠ **Optional, not load-bearing.** `edge-tts` rides an **undocumented** endpoint Microsoft intends
+> for the Edge browser: it's **ToS-gray**, has **no SLA**, and periodically breaks when Microsoft
+> rotates its anti-abuse tokens. When it's unavailable, COVAS's persona voice **falls back to Piper**
+> (if `[piper].model` is set, else it degrades to text), and cast Edge voices fall silent — **Piper
+> stays the guaranteed free floor.** Official **Azure Neural TTS** (the same voices with an API +
+> SLA + free tier) is the version to actually depend on when that arrives.
+
 ## Turning personality off
 
 Say *"turn personality off"* (or toggle it on the Settings page) and replies become plain and
@@ -63,6 +78,7 @@ neutral — no in-character address or campaign context. Turn it back on the sam
 | `personality.enabled` | Whether the in-character system prompt is used at all |
 | `elevenlabs.voice_id` | Which ElevenLabs voice speaks |
 | `elevenlabs.speed` | Speaking speed, 1.0–1.2× |
-| `tts.provider` | `elevenlabs` (cloud) or `piper` (local, free) |
+| `tts.provider` | `elevenlabs` (cloud), `piper` (local, free), or `edge` (free neural, no SLA) |
+| `edge.voice` | Edge voice ShortName when `tts.provider = edge` (e.g. `en-US-AriaNeural`) |
 
 See the [Configuration reference](../configuration.md) for the full list.

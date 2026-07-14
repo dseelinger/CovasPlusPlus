@@ -640,7 +640,8 @@ temperature = 0.7
 think       = true          # route <think>/thinking output away from speech
 
 [tts]
-# Which voice speaks. "elevenlabs" (cloud) or "piper" (local, offline, free).
+# Which voice speaks (COVAS's OWN persona voice). "elevenlabs" (cloud), "piper" (local, offline,
+# free), or "edge" (FREE neural voices via edge-tts — see [edge] below; falls back to Piper).
 provider = "elevenlabs"
 
 [piper]
@@ -649,6 +650,21 @@ provider = "elevenlabs"
 # then set model to the resulting .onnx (its .onnx.json must sit beside it).
 # Relative paths are resolved against the project root.
 model = ""
+
+[edge]
+# Edge "Read Aloud" neural TTS via edge-tts — FREE, no API key, hundreds of voices. Great for the
+# NPC/comms/chatter CAST so ambient chatter never burns ElevenLabs credits (set
+# [audio.voices].cast_provider = "edge", or a per-role override in [audio.voices.providers]).
+#
+# ⚠ OPTIONAL / NOT LOAD-BEARING. edge-tts rides an UNDOCUMENTED endpoint Microsoft intends for the
+# Edge browser: it is ToS-gray, has NO SLA, and periodically breaks when Microsoft rotates its
+# anti-abuse tokens. When it's down, COVAS's persona voice fails soft to Piper (if [piper].model is
+# set) and cast voices fall silent — Piper stays the guaranteed free floor. Official Azure Neural
+# TTS (same voices, with an API + SLA) is the version to actually depend on.
+#
+# `voice` is the persona/status voice ShortName used when [tts].provider = "edge". Browse the full
+# catalog with:  .venv\Scripts\python.exe -m edge_tts --list-voices
+voice = "en-US-AriaNeural"
 
 
 [dev]

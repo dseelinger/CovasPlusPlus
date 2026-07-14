@@ -1319,6 +1319,37 @@
       ]
     },
     {
+      "id": "edge-tts-free-provider",
+      "title": "Edge (edge-tts) free neural voices — persona + cast, fail-soft to Piper (issue #15)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "`edge-tts` installed (`pip install -r requirements.txt`); internet access. For the persona-fallback check, set `[piper].model` to a downloaded `.onnx`. Audio layer ON with the cast enabled for the cast check; ED running.",
+      "expected": "Edge speaks COVAS's persona voice for free (no ElevenLabs credits, no key) when `[tts].provider = \"edge\"`; Edge voices are cast-eligible for NPC/comms/chatter; when the endpoint is unavailable the persona voice falls back to Piper (or degrades to text if no Piper model) and cast Edge voices fall silent — the loop never crashes.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[tts].provider = \"edge\"` (optionally set `[edge].voice`, e.g. `en-US-GuyNeural`), restart, and speak a turn -> COVAS replies in the chosen Edge voice with no ElevenLabs usage."
+        },
+        {
+          "id": "s2",
+          "text": "Set `[audio.voices].cast_provider = \"edge\"` (or `[audio.voices.providers].chatter = \"edge\"`), restart, fly/dock in a populated system -> ambient chatter/comms speak in distinct free Edge voices."
+        },
+        {
+          "id": "s3",
+          "text": "With `[tts].provider = \"edge\"` and a valid `[piper].model` set, disconnect the network (or block the endpoint) and speak -> the persona voice falls back to local Piper; reconnect -> Edge resumes. With NO Piper model, a dead endpoint degrades to text and the loop returns to IDLE."
+        },
+        {
+          "id": "s4",
+          "text": "Browse the catalog: `.venv\\Scripts\\python.exe -m edge_tts --list-voices` lists hundreds of voices; a ShortName from it works as `[edge].voice` or a cast pool `ref`."
+        }
+      ]
+    },
+    {
       "id": "fresh-install-native-wizard",
       "title": "Fresh install shows the first-run wizard IN THE NATIVE WINDOW",
       "section": "19. Packaged build",

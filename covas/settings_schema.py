@@ -32,8 +32,8 @@ ROUTER_PINS = ["", "haiku", "sonnet", "opus"]
 PAD_SIZES = ["S", "M", "L", "any"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
 LLM_PROVIDERS = ["anthropic", "ollama"]
-TTS_PROVIDERS = ["elevenlabs", "piper"]
-CAST_PROVIDERS = ["piper", "elevenlabs"]
+TTS_PROVIDERS = ["elevenlabs", "piper", "edge"]
+CAST_PROVIDERS = ["piper", "elevenlabs", "edge"]
 
 # Sentinels for enum options that can only be resolved at runtime (from config
 # or a live API). The web/voice layer supplies the concrete list; when it can't
@@ -366,9 +366,15 @@ SCHEMA: list[Setting] = [
             phrasings=("llm provider",)),
     Setting("tts.provider", ("tts", "provider"), "enum",
             "TTS provider", "Providers",
-            "Which voice speaks. elevenlabs (cloud) or piper (local, offline, free).",
+            "Which voice speaks. elevenlabs (cloud), piper (local, offline, free), or edge "
+            "(free edge-tts neural voices — optional, no SLA, falls back to piper).",
             default="elevenlabs", options=TTS_PROVIDERS,
             phrasings=("tts provider", "voice provider")),
+    Setting("edge.voice", ("edge", "voice"), "string",
+            "Edge voice", "Providers",
+            "Edge (edge-tts) persona voice ShortName when TTS provider = edge, e.g. "
+            "en-US-AriaNeural. List them with: python -m edge_tts --list-voices.",
+            default="en-US-AriaNeural", phrasings=("edge voice", "edge tts voice")),
 
     # --- Control panel -----------------------------------------------------
     Setting("ui.host", ("ui", "host"), "string",
@@ -463,8 +469,9 @@ SCHEMA: list[Setting] = [
     Setting("audio.voices.cast_provider", ("audio", "voices", "cast_provider"), "enum",
             "Cast provider", "Ambient audio",
             "Default TTS for the NPC/comms/chatter voice cast: 'elevenlabs' (random voices, burns "
-            "credits) or 'piper' (local, free). Per-role overrides live in [audio.voices.providers] "
-            "in config.toml. COVAS itself always uses your ElevenLabs persona voice ([tts].provider).",
+            "credits), 'piper' (local, free), or 'edge' (free edge-tts neural voices — no key, no "
+            "SLA). Per-role overrides live in [audio.voices.providers] in config.toml. COVAS itself "
+            "always uses your persona voice ([tts].provider).",
             default="elevenlabs", options=CAST_PROVIDERS,
             phrasings=("cast provider", "voice cast provider", "npc voice provider"),
             example="set the cast provider to piper"),

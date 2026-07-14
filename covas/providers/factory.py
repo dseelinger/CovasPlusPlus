@@ -43,4 +43,17 @@ def make_tts(cfg: dict, *, mixer=None) -> TTSProvider:  # noqa: ANN001
     if name == "elevenlabs":
         from .elevenlabs_tts import ElevenLabsTTS
         return ElevenLabsTTS(cfg, mixer=mixer)
-    raise ValueError(f"Unknown [tts].provider: {name!r} (use 'elevenlabs' or 'piper')")
+    if name == "edge":
+        # Edge (edge-tts) is FREE but rides an undocumented, no-SLA endpoint (see edge_tts.py).
+        # It's never load-bearing: fail soft to Piper when a local voice is configured, so a broken
+        # endpoint degrades to the guaranteed free floor instead of to text.
+        from .edge_tts import EdgeTTS
+        fallback = None
+        if str(cfg.get("piper", {}).get("model", "")).strip():
+            try:
+                from .piper_tts import PiperTTS
+                fallback = PiperTTS(cfg, mixer=mixer)
+            except Exception:  # noqa: BLE001 — no Piper floor available; degrade to text instead
+                fallback = None
+        return EdgeTTS(cfg, mixer=mixer, fallback=fallback)
+    raise ValueError(f"Unknown [tts].provider: {name!r} (use 'elevenlabs', 'piper', or 'edge')")

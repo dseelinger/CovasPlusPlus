@@ -7,6 +7,7 @@ soundfile>=0.12           # read wav/mp3/flac cue files (libsndfile)
 numpy>=1.26               # audio buffers
 keyboard>=0.13.5          # global push-to-talk / cancel hotkeys (press+release, combos)
 requests>=2.31            # ElevenLabs REST calls (voices, models, TTS stream)
+edge-tts>=7.0             # OPTIONAL free neural TTS (Edge Read-Aloud); no SLA — Piper is the floor
 # --- Phase 3 (web UI) — installed now so we don't stop later ---
 flask>=3.0                # localhost control panel
 flask-sock>=0.7           # websocket for live log/status push
