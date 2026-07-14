@@ -92,6 +92,20 @@ provider will use). Pick a voice in `[openai_tts].voice` (`alloy`, `nova`, `shim
 OpenAI-compatible endpoint works. A missing key or service error degrades the persona to text (cast
 voices fall silent) — it never crashes the loop.
 
+### Low-latency premium voice via Cartesia (`cartesia`)
+
+Want the **snappiest** persona voice? Set `[tts].provider = "cartesia"` to use **Cartesia Sonic** — a
+premium alternative to ElevenLabs tuned for very low **time-to-first-audio**, which is what a live
+companion feels most. It **streams**, so COVAS starts talking sooner. This is a **persona-only** voice —
+it's deliberately *not* offered for the NPC/comms/chatter cast (it's premium, and its value is the live
+reply, not background chatter). Provide `CARTESIA_API_KEY` (env var or `CartesiaAPIKey.txt`) and a
+**voice id** in `[cartesia].voice` (browse the library at [play.cartesia.ai](https://play.cartesia.ai)
+or `GET https://api.cartesia.ai/voices`); set the model in `[cartesia].model` (e.g. `sonic-2`). A
+missing key/voice or service error degrades the persona to text — it never crashes the loop.
+
+> **Alternative:** Deepgram **Aura** is a comparable low-latency option; Cartesia Sonic was chosen to
+> start. The provider seam makes adding Aura later a drop-in.
+
 ## Turning personality off
 
 Say *"turn personality off"* (or toggle it on the Settings page) and replies become plain and
@@ -104,9 +118,10 @@ neutral — no in-character address or campaign context. Turn it back on the sam
 | `personality.enabled` | Whether the in-character system prompt is used at all |
 | `elevenlabs.voice_id` | Which ElevenLabs voice speaks |
 | `elevenlabs.speed` | Speaking speed, 1.0–1.2× |
-| `tts.provider` | `edge` (free neural, default), `azure` (free-tier neural + SLA), `openai` (cheap cloud), `elevenlabs` (cloud), or `piper` (local, free) |
+| `tts.provider` | `edge` (free neural, default), `azure` (free-tier neural + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud), or `piper` (local, free) |
 | `edge.voice` | Edge voice ShortName when `tts.provider = edge` (e.g. `en-US-AriaNeural`) |
 | `azure.region` / `azure.voice` / `azure.style` | Azure region, voice ShortName, and optional SSML style when `tts.provider = azure` |
 | `openai_tts.base_url` / `.model` / `.voice` / `.instructions` | OpenAI-compatible endpoint, model, voice, and optional tone steer when `tts.provider = openai` |
+| `cartesia.model` / `.voice` / `.language` | Cartesia Sonic model, voice id, and language when `tts.provider = cartesia` (persona-only) |
 
 See the [Configuration reference](../configuration.md) for the full list.

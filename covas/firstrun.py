@@ -110,6 +110,15 @@ def openai_key(cfg: dict) -> str | None:
     return _read_key(_key_path(cfg, "openai_tts"))
 
 
+def cartesia_key(cfg: dict) -> str | None:
+    """The Cartesia key, env var first (an exported CARTESIA_API_KEY wins for a source-run dev),
+    else the key file under data_dir."""
+    env = os.environ.get("CARTESIA_API_KEY")
+    if env and env.strip():
+        return env.strip()
+    return _read_key(_key_path(cfg, "cartesia"))
+
+
 def save_anthropic_key(cfg: dict, key: str) -> None:
     _write_key(_key_path(cfg, "anthropic"), key)
 

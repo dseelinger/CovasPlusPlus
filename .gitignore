@@ -9,6 +9,7 @@ ElevenLabsAPIKey.txt
 AnthropicAPIKey.txt
 AzureSpeechKey.txt
 OpenAIAPIKey.txt
+CartesiaAPIKey.txt
 *.key
 .env
 .env.*

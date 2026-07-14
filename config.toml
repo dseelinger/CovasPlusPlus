@@ -706,6 +706,23 @@ voice = "alloy"
 # older ones (tts-1). Blank = the voice's default. e.g. "Calm, professional ship-computer tone."
 instructions = ""
 
+[cartesia]
+# Cartesia (Sonic) — a LOW-LATENCY PREMIUM persona voice: a snappier (faster time-to-first-audio)
+# alternative to ElevenLabs for COVAS's OWN voice. Select it with [tts].provider = "cartesia". This
+# is a PERSONA voice only — it is NOT offered for the NPC/comms/chatter cast (premium; its value is
+# the live reply, not background chatter). Streams so the first audio starts fast.
+# (Deepgram Aura is the documented alternative; Sonic was picked to start.)
+#
+# The key comes from the CARTESIA_API_KEY environment variable (takes precedence) or this git-ignored
+# file (copy CartesiaAPIKey.txt.example). NEVER commit the key.
+api_key_file = "CartesiaAPIKey.txt"
+# Sonic model + a Cartesia VOICE ID (required — get one from the Cartesia voice library / API; the
+# voice list is at https://play.cartesia.ai or GET https://api.cartesia.ai/voices).
+model = "sonic-2"
+voice = ""
+# Synthesis language (BCP-47 primary subtag), e.g. "en".
+language = "en"
+
 
 [dev]
 # Dev-mode mock. When ON, the LLM/TTS/STT are swapped for fakes (canned text, no
