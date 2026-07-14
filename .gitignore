@@ -10,6 +10,7 @@ AnthropicAPIKey.txt
 AzureSpeechKey.txt
 OpenAIAPIKey.txt
 CartesiaAPIKey.txt
+GeminiAPIKey.txt
 *.key
 .env
 .env.*

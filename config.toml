@@ -285,6 +285,14 @@ output = 0.60
 [pricing."gpt-4o"]
 input = 2.50
 output = 10.0
+# Gemini provider (#13) rough rates (TUNE — add rows for the model you use; an unlisted model
+# estimates $0.00). Flash is the cheap/default tier; Pro is for depth.
+[pricing."gemini-2.5-flash"]
+input = 0.30
+output = 2.50
+[pricing."gemini-2.5-pro"]
+input = 1.25
+output = 10.0
 
 
 [router]
@@ -642,7 +650,8 @@ port = 8765
 
 [llm]
 # Which LLM answers. "anthropic" (cloud, Claude — the default), "openai" (any OpenAI-compatible
-# cloud endpoint: OpenAI/Groq/DeepSeek/OpenRouter — see [openai]), or "ollama" (local, e.g. Qwen —
+# cloud endpoint: OpenAI/Groq/DeepSeek/OpenRouter — see [openai]), "gemini" (Google Gemini native
+# API, function calling + Search grounding — see [gemini]), or "ollama" (local, e.g. Qwen —
 # OUT-OF-GAME only; a local model competes with ED for the GPU). Cloud providers are fine in-game
 # and are tiered by the cost router (see [router]).
 provider = "anthropic"
@@ -669,6 +678,25 @@ model        = "gpt-4o-mini"
 cheap    = "gpt-4o-mini"
 standard = "gpt-4o"
 premium  = "gpt-4o"
+
+[gemini]
+# Google Gemini on the NATIVE API (issue #13) — function calling (checklist voice commands) plus
+# Google-Search GROUNDING that parallels web search (gated by [web_search].enabled). Select it with
+# [llm].provider = "gemini". A cheap/fast Flash default tier makes it a strong low-cost option.
+#
+# The key comes from the GEMINI_API_KEY environment variable (or GOOGLE_API_KEY), else this
+# git-ignored file (copy GeminiAPIKey.txt.example). Get a free key at https://aistudio.google.com.
+# NEVER commit the key. `base_url` rarely changes.
+base_url     = "https://generativelanguage.googleapis.com/v1beta"
+api_key_file = "GeminiAPIKey.txt"
+model        = "gemini-2.5-flash"
+
+[gemini.tiers]
+# The router's tier -> model map for Gemini (issue #11): Flash for cheap/default banter, Pro for
+# depth. Omit a key to reuse [gemini].model.
+cheap    = "gemini-2.5-flash"
+standard = "gemini-2.5-pro"
+premium  = "gemini-2.5-pro"
 
 [ollama]
 # Local LLM via Ollama. Start it with `ollama serve`; pull a model first.

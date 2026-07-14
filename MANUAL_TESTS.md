@@ -150,6 +150,25 @@ Notes:
 
 Notes:
 
+### 4.2 Gemini LLM provider (issue #13)  🔊 HW 🌍 NET 📋 FILE
+> Google Gemini on the **native** API — tool calling + Google-Search **grounding** + a cheap Flash
+> default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash/Pro). Needs `GEMINI_API_KEY` (or
+> `GOOGLE_API_KEY`, or `GeminiAPIKey.txt`). Restart after switching `[llm].provider`.
+- [ ] **Conversation:** set `[llm].provider = "gemini"`, export `GEMINI_API_KEY`, restart, speak a turn
+  → COVAS answers via Gemini; `[router]` line shows the Gemini model (e.g. `[cheap] gemini-2.5-flash`)
+  and `[usage]` shows token counts.
+- [ ] **Tool calling works:** *"What's my next objective?"* / *"Mark fuel scooping complete."* → the
+  checklist tool fires (log shows the tool call) and COVAS confirms.
+- [ ] **Search grounding:** with `[web_search].enabled = true`, ask something current
+  (*"What's the latest on the Thargoid war?"*) → the log shows a **`Searching…`** side-channel line
+  (grounding queries) and the answer reflects live info.
+- [ ] **Escalation tiers:** *"Think hard…"* → the router line shows `[standard]` with the
+  `[gemini.tiers].standard` (Pro) model.
+- [ ] **Fail-soft:** clear the key → the turn degrades to text and the loop returns to IDLE; restore →
+  it works again. No crash.
+
+Notes:
+
 ## 5. ED monitoring, proactive & route callouts  🎮 ED 🔊 HW
 > Requires `[elite].enabled = true` and ED running. Fly around so there's live telemetry.
 
