@@ -60,6 +60,23 @@ play session**:
     back to the free, game-friendly local path, set `[audio.voices].cast_provider = "piper"` and add
     Piper `.onnx` entries to `[audio.voices].pool` (or set `random_el = false` for a single voice).
 
+### Per-role providers (the voice ladder)
+
+Every cast voice is synthesized through a small **provider registry**, so each cast **role** can use
+a different TTS provider. Set overrides in `[audio.voices.providers]`; roles you don't list fall back
+to `cast_provider`. Roles: `comms`, `chatter`, `player`, `interdiction` (and `cast` = the pool
+default). COVAS's own **persona** voice is not a cast role — it stays on `[tts].provider`.
+
+```toml
+[audio.voices.providers]
+chatter = "piper"        # free local voices for throwaway ambient lines
+comms   = "elevenlabs"   # premium voices for station/NPC comms
+```
+
+This is the seam additional voice providers (Edge, OpenAI, Azure, Cartesia) plug into: each registers
+under its name and becomes selectable for any role — a ladder from free/local Piper through cheap
+cloud to premium, mirroring the LLM cost router.
+
 ## Drop-in content
 
 Audio and line content is **drop-in**: on startup COVAS++ scans a set of convention folders and

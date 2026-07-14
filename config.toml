@@ -117,6 +117,14 @@ random_el     = true
 #   ref      = "voices/en_US-ryan-high.onnx"  # a Piper .onnx path, or an EL voice_id
 #   gender   = "male"                         # "male" / "female" / "neutral" (gendered NPCs match)
 pool = []
+# Per-role provider override (issue #14, optional/advanced). Each cast ROLE can use a DIFFERENT
+# TTS provider; roles you don't list fall back to `cast_provider` above. Roles: comms, chatter,
+# player, interdiction (and "cast" = the pool default). COVAS's OWN persona voice is [tts].provider,
+# not a cast role. Every provider registers in the same registry, so a voice ladder is possible —
+# free local Piper for chatter, premium ElevenLabs for station comms, etc. Example:
+#   [audio.voices.providers]
+#   chatter = "piper"
+#   comms   = "elevenlabs"
 
 [audio.chatter]
 # Space-chatter FREQUENCY (C6). Chatter is POPULATED-ONLY (it never fires out in empty/unpopulated

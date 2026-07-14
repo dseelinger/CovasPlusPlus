@@ -1293,6 +1293,32 @@
       ]
     },
     {
+      "id": "audio-cast-provider-registry",
+      "title": "Per-role cast providers via the TTS registry (issue #14)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "FILE"
+      ],
+      "requires": "Audio layer ON with the cast enabled; ED running. Edit `[audio.voices.providers]` in `config.toml`. Have Piper `.onnx` voices in `[audio.voices].pool` for the local-voice check.",
+      "expected": "Cast voices route through a provider registry so each role picks its provider. Default behaviour is unchanged; a `[audio.voices.providers]` override makes a role use a different provider (e.g. Piper chatter + ElevenLabs comms); COVAS's persona voice is unaffected; a role with no working backend falls silent, not crashing.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With NO `[audio.voices.providers]` set, fly/dock in a populated system -> the cast sounds exactly as before (regression check); COVAS still uses your ElevenLabs persona voice."
+        },
+        {
+          "id": "s2",
+          "text": "Add `[audio.voices.providers]` with `chatter = \"piper\"` and `comms = \"elevenlabs\"` (plus Piper `.onnx` entries in `[audio.voices].pool`), restart -> ambient CHATTER is spoken by local Piper voices (no EL credits) while station/NPC COMMS stay on ElevenLabs."
+        },
+        {
+          "id": "s3",
+          "text": "Point a role at a provider with no working backend (e.g. `comms = \"piper\"` with an empty pool) -> those lines fall silent; the audio layer and your COVAS replies keep working (fail-soft)."
+        }
+      ]
+    },
+    {
       "id": "fresh-install-native-wizard",
       "title": "Fresh install shows the first-run wizard IN THE NATIVE WINDOW",
       "section": "19. Packaged build",

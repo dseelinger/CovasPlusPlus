@@ -245,7 +245,8 @@ The optional [atmospheric audio layer](audio/ambient-audio.md). **All off by def
 | `audio.chatter.min_seconds` | `45` | Fastest gap between chatter lines (busiest systems) |
 | `audio.chatter.max_seconds` | `240` | Slowest gap between chatter lines (barely-populated) |
 | `audio.chatter.full_population` | `1000000000` | Population at/above which chatter runs at the min gap |
-| `audio.voices.cast_provider` | `elevenlabs` | TTS for the NPC/comms/chatter cast: `elevenlabs` (random voices, burns credits) or `piper` (local, free) |
+| `audio.voices.cast_provider` | `elevenlabs` | Default TTS for the NPC/comms/chatter cast: `elevenlabs` (random voices, burns credits) or `piper` (local, free) |
+| `audio.voices.providers.*` | *(unset)* | Per-role provider overrides (`comms`/`chatter`/`player`/`interdiction`); fall back to `cast_provider`. Persona uses `[tts].provider` |
 | `audio.voices.random_el` | `true` | With no pool set, cast from random ElevenLabs voices (minus the COVAS voice) |
 | `audio.comms.voices.{male,female,default}` | *(blank)* | Legacy per-logical-voice ElevenLabs pins (superseded by the random cast) |
 

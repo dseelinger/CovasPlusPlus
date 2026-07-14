@@ -418,6 +418,27 @@ on in config (or the Settings page) before testing.
 
 Notes:
 
+### 18.7 Per-role cast providers (issue #14)  🎮 ED 🔊 HW 📋 FILE
+> Every cast voice now routes through a **provider registry**, so each cast role can use a different
+> TTS provider. This is behaviour-preserving by default — the first check is a regression check.
+- [ ] **Default unchanged:** with no `[audio.voices.providers]` set, the cast sounds exactly as
+  before (comms/chatter/player cast from `cast_provider`); COVAS's own voice is still your ElevenLabs
+  persona.
+- [ ] **Per-role override:** add to `config.toml` →
+  ```toml
+  [audio.voices.providers]
+  chatter = "piper"
+  comms   = "elevenlabs"
+  ```
+  (add Piper `.onnx` entries to `[audio.voices].pool` so chatter has local voices), restart → ambient
+  **chatter** is spoken by **local Piper** voices (no ElevenLabs credits) while **station/NPC comms**
+  stay on **ElevenLabs**. COVAS's persona voice is unaffected either way.
+- [ ] **Fail-soft:** point a role at a provider with no working backend (e.g. `comms = "piper"` with
+  an empty pool / no model) → those lines fall silent rather than crashing the audio layer; the rest
+  keeps working.
+
+Notes:
+
 ---
 
 ## 19. Packaged build — install, first-run wizard & updates (I1–I9)  📦 🖥️ 🔊 HW 🌍 NET
