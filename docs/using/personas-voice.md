@@ -39,7 +39,9 @@ your campaign.
 
 ## The spoken voice
 
-By default COVAS++ speaks with an **ElevenLabs** cloud voice. You control:
+By default COVAS++ speaks with a **free Edge neural voice** (`[tts].provider = "edge"`, see below) —
+no key, no per-word cost. Prefer the **premium ElevenLabs** cloud voice instead? Set
+`[tts].provider = "elevenlabs"`; then you control:
 
 - **Which voice** speaks — pick from your ElevenLabs library (Settings → Text-to-speech, or by
   voice: *"use the George voice"*).
@@ -47,9 +49,9 @@ By default COVAS++ speaks with an **ElevenLabs** cloud voice. You control:
   clamped so you can't push it out of range). Nudge it on the Settings page or say
   *"set the voice speed to 1.1."*
 
-Prefer a **free, fully-local voice**? Switch `[tts].provider` to **Piper**. Piper runs on your CPU
-alongside the game at no cost — the voice is good, if not quite as smooth as ElevenLabs. See
-[Install & setup](../getting-started/install.md#run-fully-local-no-cloud).
+Prefer a **free, fully-local voice** with no external service at all? Switch `[tts].provider` to
+**Piper**. Piper runs on your CPU alongside the game at no cost — the voice is good, if not quite as
+smooth as ElevenLabs. See [Install & setup](../getting-started/install.md#run-fully-local-no-cloud).
 
 ### Free neural voices via Edge (`edge`)
 
