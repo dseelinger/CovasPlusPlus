@@ -366,9 +366,9 @@ SCHEMA: list[Setting] = [
             phrasings=("llm provider",)),
     Setting("tts.provider", ("tts", "provider"), "enum",
             "TTS provider", "Providers",
-            "Which voice speaks. elevenlabs (cloud), piper (local, offline, free), or edge "
-            "(free edge-tts neural voices — optional, no SLA, falls back to piper).",
-            default="elevenlabs", options=TTS_PROVIDERS,
+            "Which voice speaks. edge (free edge-tts neural voices — the default; no SLA, falls "
+            "back to piper), elevenlabs (cloud, premium), or piper (local, offline, free).",
+            default="edge", options=TTS_PROVIDERS,
             phrasings=("tts provider", "voice provider")),
     Setting("edge.voice", ("edge", "voice"), "string",
             "Edge voice", "Providers",

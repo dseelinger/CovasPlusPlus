@@ -640,9 +640,11 @@ temperature = 0.7
 think       = true          # route <think>/thinking output away from speech
 
 [tts]
-# Which voice speaks (COVAS's OWN persona voice). "elevenlabs" (cloud), "piper" (local, offline,
-# free), or "edge" (FREE neural voices via edge-tts — see [edge] below; falls back to Piper).
-provider = "elevenlabs"
+# Which voice speaks (COVAS's OWN persona voice). "edge" (FREE neural voices via edge-tts — see
+# [edge] below; the default), "elevenlabs" (cloud, premium), or "piper" (local, offline, free).
+# NOTE: Edge is free but rides an undocumented, no-SLA endpoint (see [edge]); set [piper].model so
+# a broken endpoint falls back to local Piper instead of degrading to text.
+provider = "edge"
 
 [piper]
 # Local neural TTS. Download a voice on this machine, e.g.:

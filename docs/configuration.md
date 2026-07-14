@@ -99,7 +99,7 @@ See [Personas & voice](using/personas-voice.md).
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `tts.provider` | `elevenlabs` | Which voice speaks: `elevenlabs` (cloud), `piper` (local, free), or `edge` (free neural, no key/SLA — falls back to Piper) |
+| `tts.provider` | `edge` | Which voice speaks: `edge` (free neural, no key/SLA — falls back to Piper; the default), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `elevenlabs.model` | `eleven_flash_v2_5` | ElevenLabs TTS model (flash = low latency) |
 | `elevenlabs.voice_id` | *(Sarah)* | Which ElevenLabs voice speaks |
 | `elevenlabs.speed` | `1.0` | Speaking speed, clamped to `1.0`–`1.2` |
@@ -270,6 +270,6 @@ voice-cast pool live in the same sections — see the comments in `config.toml`.
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `llm.provider` | `anthropic` | `anthropic` (cloud) or `ollama` (local, out-of-game only) |
-| `tts.provider` | `elevenlabs` | `elevenlabs` (cloud), `piper` (local, free), or `edge` (free neural, no key/SLA) |
+| `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `dev.mock` | `false` | Swap LLM/TTS/STT for fakes — exercise the loop with zero API calls (restart to apply) |
