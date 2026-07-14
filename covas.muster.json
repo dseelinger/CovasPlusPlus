@@ -338,6 +338,40 @@
       ]
     },
     {
+      "id": "gemini-llm-provider",
+      "title": "Gemini LLM provider — native API, tool calling + Search grounding (issue #13)",
+      "section": "4. Cost router",
+      "tags": [
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "A Gemini API key (free from aistudio.google.com): export `GEMINI_API_KEY` (or `GOOGLE_API_KEY`, or paste into `GeminiAPIKey.txt`); internet access. Set `[llm].provider = \"gemini\"` and restart. For grounding, `[web_search].enabled = true`.",
+      "expected": "COVAS answers via Gemini; the router tiers it (Flash cheap / Pro depth in the `[router]` line); checklist tool calling works; with web search on, Google-Search grounding surfaces a Searching side-channel line; a missing key degrades the turn to text without crashing.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[llm].provider = \"gemini\"`, export `GEMINI_API_KEY`, restart, speak a turn -> COVAS answers via Gemini; `[router]` line shows the model (e.g. `[cheap] gemini-2.5-flash`) and `[usage]` shows token counts."
+        },
+        {
+          "id": "s2",
+          "text": "Tool calling: \"What's my next objective?\" / \"Mark fuel scooping complete.\" -> the checklist tool fires (log shows the tool call) and COVAS confirms."
+        },
+        {
+          "id": "s3",
+          "text": "Grounding: with `[web_search].enabled = true`, ask \"What's the latest on the Thargoid war?\" -> the log shows a `Searching...` side-channel line (grounding queries) and the answer reflects live info."
+        },
+        {
+          "id": "s4",
+          "text": "Escalation: \"Think hard about ...\" -> router line shows `[standard]` with the `[gemini.tiers].standard` (Pro) model."
+        },
+        {
+          "id": "s5",
+          "text": "Fail-soft: clear the key -> the turn degrades to text and the loop returns to IDLE; restore -> it works again. No crash."
+        }
+      ]
+    },
+    {
       "id": "ed-context-answers",
       "title": "Context-aware answers come from live telemetry",
       "section": "5. ED monitoring & callouts",

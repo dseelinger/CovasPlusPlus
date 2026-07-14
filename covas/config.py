@@ -85,6 +85,7 @@ _DATA_PATH_FIELDS = (
     ("azure", "api_key_file"),
     ("openai_tts", "api_key_file"),
     ("openai", "api_key_file"),
+    ("gemini", "api_key_file"),
     ("cartesia", "api_key_file"),
     ("checklist", "file"),
     ("logging", "dir"),

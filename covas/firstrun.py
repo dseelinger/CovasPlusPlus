@@ -111,6 +111,16 @@ def openai_key(cfg: dict) -> str | None:
     return _read_key(_key_path(cfg, "openai")) or _read_key(_key_path(cfg, "openai_tts"))
 
 
+def gemini_key(cfg: dict) -> str | None:
+    """The Gemini key, env var first (GEMINI_API_KEY, then the more general GOOGLE_API_KEY that a
+    Google-Cloud dev may already have exported), else the key file under data_dir."""
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        env = os.environ.get(name)
+        if env and env.strip():
+            return env.strip()
+    return _read_key(_key_path(cfg, "gemini"))
+
+
 def cartesia_key(cfg: dict) -> str | None:
     """The Cartesia key, env var first (an exported CARTESIA_API_KEY wins for a source-run dev),
     else the key file under data_dir."""

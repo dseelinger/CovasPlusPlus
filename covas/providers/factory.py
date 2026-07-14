@@ -31,7 +31,13 @@ def make_llm(cfg: dict) -> LLMProvider:
         # endpoint; the router tiers it via [openai].tiers (issue #12, cloud path is fine in-game).
         from .openai_llm import OpenAILLM
         return OpenAILLM(cfg)
-    raise ValueError(f"Unknown [llm].provider: {name!r} (use 'anthropic', 'openai', or 'ollama')")
+    if name == "gemini":
+        # Gemini native API — function calling + Google Search grounding; tiered via [gemini].tiers
+        # (Flash/Pro). Issue #13; cloud path is fine in-game.
+        from .gemini_llm import GeminiLLM
+        return GeminiLLM(cfg)
+    raise ValueError(
+        f"Unknown [llm].provider: {name!r} (use 'anthropic', 'openai', 'gemini', or 'ollama')")
 
 
 def make_tts(cfg: dict, *, mixer=None) -> TTSProvider:  # noqa: ANN001

@@ -303,8 +303,9 @@ voice-cast pool live in the same sections — see the comments in `config.toml`.
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `llm.provider` | `anthropic` | `anthropic` (cloud, Claude), `openai` (any OpenAI-compatible cloud — OpenAI/Groq/DeepSeek/OpenRouter), or `ollama` (local, out-of-game only) |
+| `llm.provider` | `anthropic` | `anthropic` (cloud, Claude), `openai` (any OpenAI-compatible cloud — OpenAI/Groq/DeepSeek/OpenRouter), `gemini` (Google Gemini native — function calling + Search grounding), or `ollama` (local, out-of-game only) |
 | `openai.base_url` / `.model` | OpenAI / `gpt-4o-mini` | OpenAI-compatible `chat/completions` endpoint + router-off model when `llm.provider = "openai"`; per-tier models live in `[openai.tiers]` |
+| `gemini.model` | `gemini-2.5-flash` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash/Pro) live in `[gemini.tiers]` |
 | `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `azure.region` / `azure.voice` / `azure.style` | `eastus` / `en-US-AriaNeural` / *(blank)* | Azure Neural region, voice ShortName, and optional SSML style when `tts.provider = "azure"` |
@@ -319,3 +320,11 @@ voice-cast pool live in the same sections — see the comments in `config.toml`.
 > works; there is **no web-search** on this path (Anthropic-only). Needs `OPENAI_API_KEY` (env var or
 > `OpenAIAPIKey.txt` — shared with the OpenAI TTS provider). A request error degrades the turn to text,
 > never crashing the loop.
+>
+> **Gemini LLM (`llm.provider = "gemini"`).** Google Gemini on the **native** API — strong **tool
+> calling** plus Google-Search **grounding** (surfaced like web search when `web_search.enabled` is on),
+> and a cheap/fast **Flash** default tier (Pro for depth) via `[gemini.tiers]`. Cloud, so in-game is
+> fine. Needs `GEMINI_API_KEY` (or `GOOGLE_API_KEY`, env var or `GeminiAPIKey.txt`) — a free key comes
+> from [Google AI Studio](https://aistudio.google.com). Fail soft: a request error degrades the turn to
+> text. (Combining function calling + grounding needs a Gemini 2.x model; older models may reject the
+> combo — turn `web_search.enabled` off for those.)
