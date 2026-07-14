@@ -1,44 +1,58 @@
 """Cost router — per-turn cloud model tiering policy (DESIGN §4).
 
-This module is *policy only*: given the spoken text and a little context, it decides
-which Anthropic model and `max_tokens` a turn should use, and *why*. It holds no
-provider logic and makes no network calls, so it's pure and unit-testable — the whole
-point is that tuning cost never touches the LLM/loop code.
+This module is *policy only*: given the spoken text and a little context, it decides which
+**tier** a turn should use (and the concrete model id + `max_tokens`), and *why*. It holds no
+provider logic and makes no network calls, so it's pure and unit-testable — the whole point is
+that tuning cost never touches the LLM/loop code.
 
-Tiers (deterministic first cut):
-  - default  -> Haiku : in-cockpit banter, acks, checklist reads, status readouts.
-  - escalate -> Sonnet: turns needing current/web data, depth/analysis, or a wake
-    phrase ("think hard", "ask the big brain").
-  - premium  -> Opus  : only on an explicit override ("use opus").
-A manual pin (UI toggle) forces a tier regardless of the text. An explicit
-"full breakdown"-style request raises `max_tokens` so a long answer isn't truncated
-mid-sentence over TTS.
+**Provider-agnostic (issue #11).** The router picks one of three canonical tiers; the concrete
+model id for each tier comes from the ACTIVE `[llm].provider`'s tier map, so the *same* policy
+drives Anthropic, OpenAI, Gemini, … — only the tier→model mapping differs per provider:
+  - `cheap`    (default)  : in-cockpit banter, acks, checklist reads, status readouts.
+  - `standard` (escalate) : turns needing current/web data, depth/analysis, or a wake phrase
+    ("think hard", "ask the big brain").
+  - `premium`             : only on an explicit override ("use opus" / "use the big model").
+For **Anthropic** the map is `[router].{default,escalate,premium}_model` (Haiku/Sonnet/Opus) and
+the router-off model is `[anthropic].model` — unchanged, so Anthropic users see no difference. Any
+other provider advertises its map via `[<provider>].tiers.{cheap,standard,premium}` (or a single
+`[<provider>].model` for all tiers); see `_provider_tiers`. This is the seam #12 (OpenAI) and #13
+(Gemini) plug into.
 
-Extension point: a future cheap-classifier pass (a Haiku turn that tags the request
-cheap/premium) would slot in as an alternative to the phrase rules in `decide()` —
-leave the seam, don't build it yet.
+A manual pin (UI toggle) forces a tier regardless of the text. An explicit "full breakdown"-style
+request raises `max_tokens` so a long answer isn't truncated mid-sentence over TTS.
+
+Extension point: a future cheap-classifier pass (a cheap-tier turn that tags the request
+cheap/premium) would slot in as an alternative to the phrase rules in `decide()` — leave the seam,
+don't build it yet.
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 
+# The three canonical, provider-agnostic tiers the policy chooses between (plus "fixed" = the
+# router-off single model). A provider maps each of these to one of its model ids.
+CHEAP, STANDARD, PREMIUM = "cheap", "standard", "premium"
+TIERS = (CHEAP, STANDARD, PREMIUM)
+
 
 @dataclass(frozen=True)
 class Route:
-    """The routing decision for one turn: which model, its token cap, and an
-    explainable reason (logged so the rules can be tuned from real transcripts)."""
+    """The routing decision for one turn: the chosen `tier`, the concrete `model` that tier maps
+    to for the active provider, its token cap, and an explainable reason (logged so the rules can
+    be tuned from real transcripts). `tier` is one of TIERS, or "fixed" when the router is off."""
     model: str
     max_tokens: int
     reason: str
+    tier: str = ""
 
 
-# Tier tokens accepted by the manual pin (UI toggle / context override), each mapped to
-# the RouterConfig attribute holding that tier's model id. Friendly aliases included.
+# Pin/alias tokens accepted from the UI toggle or a per-turn context, each mapped to a CANONICAL
+# tier. Anthropic-flavored aliases (haiku/sonnet/opus) are kept so existing pins keep working.
 _TIER_ALIASES = {
-    "haiku": "default_model", "default": "default_model", "cheap": "default_model",
-    "sonnet": "escalate_model", "escalate": "escalate_model",
-    "opus": "premium_model", "premium": "premium_model",
+    CHEAP: CHEAP, "default": CHEAP, "haiku": CHEAP,
+    STANDARD: STANDARD, "escalate": STANDARD, "sonnet": STANDARD,
+    PREMIUM: PREMIUM, "opus": PREMIUM,
 }
 
 
@@ -101,8 +115,12 @@ class RouterConfig:
     @classmethod
     def from_cfg(cls, cfg: dict) -> "RouterConfig":
         r = cfg.get("router", {}) or {}
-        a = cfg.get("anthropic", {}) or {}
-        base_max = int(a.get("max_tokens", 1024))
+        # base_max_tokens is a reply-length policy (kept from [anthropic].max_tokens, which always
+        # exists as the base cap); the tier->model map + router-off model come from the ACTIVE
+        # provider so the same policy works for any LLM (issue #11).
+        base_max = int((cfg.get("anthropic", {}) or {}).get("max_tokens", 1024))
+        provider = str((cfg.get("llm", {}) or {}).get("provider", "anthropic")).strip().lower()
+        tiers, fixed = _provider_tiers(cfg, provider)
 
         def phrases(key: str, default: list[str]) -> list[str]:
             v = r.get(key)
@@ -111,10 +129,10 @@ class RouterConfig:
         d = cls()  # for phrase defaults
         return cls(
             enabled=bool(r.get("enabled", False)),
-            default_model=str(r.get("default_model", d.default_model)),
-            escalate_model=str(r.get("escalate_model", d.escalate_model)),
-            premium_model=str(r.get("premium_model", d.premium_model)),
-            fixed_model=str(a.get("model", d.fixed_model)),
+            default_model=tiers[CHEAP],
+            escalate_model=tiers[STANDARD],
+            premium_model=tiers[PREMIUM],
+            fixed_model=fixed,
             base_max_tokens=base_max,
             full_breakdown_max_tokens=int(
                 r.get("full_breakdown_max_tokens", max(base_max, d.full_breakdown_max_tokens))
@@ -127,10 +145,48 @@ class RouterConfig:
             full_breakdown_phrases=phrases("full_breakdown_phrases", d.full_breakdown_phrases),
         )
 
+    @property
+    def tiers(self) -> dict:
+        """The canonical tier -> model id map for the active provider."""
+        return {CHEAP: self.default_model, STANDARD: self.escalate_model,
+                PREMIUM: self.premium_model}
+
+    def tier_for(self, token: str) -> str | None:
+        """Resolve a pin/alias token ("cheap"/"haiku"/"sonnet"/"opus"/… ) to a CANONICAL tier."""
+        return _TIER_ALIASES.get(_norm(token))
+
     def model_for_tier(self, tier: str) -> str | None:
-        """Resolve a tier token ("haiku"/"sonnet"/"opus" + aliases) to its model id."""
-        attr = _TIER_ALIASES.get(_norm(tier))
-        return getattr(self, attr) if attr else None
+        """Resolve a tier token (canonical or an alias) to its model id for the active provider."""
+        canon = self.tier_for(tier)
+        return self.tiers.get(canon) if canon else None
+
+
+def _provider_tiers(cfg: dict, provider: str) -> "tuple[dict, str]":
+    """The tier→model map + the router-off `fixed` model for the ACTIVE llm provider (issue #11).
+
+    Anthropic keeps reading `[router].{default,escalate,premium}_model` + `[anthropic].model`, so
+    nothing changes for existing Anthropic users. Any OTHER cloud provider advertises its own map
+    via `[<provider>].tiers.{cheap,standard,premium}` (or a single `[<provider>].model` used for
+    every tier); the router-off model is `[<provider>].model`. Pure — no I/O. This is the seam the
+    OpenAI (#12) and Gemini (#13) LLM providers plug into. `[llm].provider` names the active one.
+    """
+    d = RouterConfig()
+    if provider == "anthropic":
+        r = cfg.get("router", {}) or {}
+        a = cfg.get("anthropic", {}) or {}
+        return ({CHEAP: str(r.get("default_model", d.default_model)),
+                 STANDARD: str(r.get("escalate_model", d.escalate_model)),
+                 PREMIUM: str(r.get("premium_model", d.premium_model))},
+                str(a.get("model", d.fixed_model)))
+    # Generic provider: its own [<provider>] section carries the map (or one shared model).
+    p = cfg.get(provider, {}) or {}
+    model = str(p.get("model", "")).strip() or d.fixed_model
+    t = p.get("tiers", {}) or {}
+
+    def pick(k: str) -> str:
+        return str(t.get(k, "")).strip() or model
+
+    return ({CHEAP: pick(CHEAP), STANDARD: pick(STANDARD), PREMIUM: pick(PREMIUM)}, model)
 
 
 class Router:
@@ -151,7 +207,7 @@ class Router:
         when routing is off. `max_tokens` defaults to the base cap; callers pass a small
         value for one-sentence callouts."""
         cap = self.cfg.base_max_tokens if max_tokens is None else int(max_tokens)
-        return Route(self.cfg.default_model, cap, "proactive — cheap tier")
+        return Route(self.cfg.default_model, cap, "proactive — cheap tier", CHEAP)
 
     def strip_control(self, text: str) -> str:
         """Remove pure tier-control phrases (the escalate/premium wake phrases) from the
@@ -186,10 +242,10 @@ class Router:
         c = self.cfg
         context = context or {}
 
-        # OFF: behave exactly like the fixed [anthropic].model default. One code path
+        # OFF: behave exactly like the fixed provider model default. One code path
         # for on/off keeps the decision logged either way.
         if not c.enabled:
-            return Route(c.fixed_model, c.base_max_tokens, "router off — fixed tier")
+            return Route(c.fixed_model, c.base_max_tokens, "router off — fixed tier", "fixed")
 
         t = _norm(text)
 
@@ -202,15 +258,16 @@ class Router:
         # Manual pin (UI toggle or per-turn context) forces a tier, highest priority.
         pin = _norm(context.get("pin", "") or c.pin)
         if pin:
-            model = c.model_for_tier(pin)
-            if model:
-                return Route(model, max_tokens, f"pinned to {pin}{cap_note}")
+            canon = c.tier_for(pin)
+            if canon:
+                return Route(c.tiers[canon], max_tokens, f"pinned to {pin}{cap_note}", canon)
 
-        # Explicit Opus override — the only path to the premium tier.
+        # Explicit override — the only path to the premium tier.
         if (m := _matched(t, c.premium_phrases)):
-            return Route(c.premium_model, max_tokens, f"override: '{m}' -> Opus{cap_note}")
+            return Route(c.premium_model, max_tokens,
+                         f"override: '{m}' -> premium tier{cap_note}", PREMIUM)
 
-        # Escalate to Sonnet when the turn earns it. Collect every reason so the log
+        # Escalate to the standard tier when the turn earns it. Collect every reason so the log
         # explains *why* it escalated (tune the phrase lists from real transcripts).
         reasons: list[str] = []
         if (m := _matched(t, c.escalate_phrases)):
@@ -223,7 +280,7 @@ class Router:
             reasons.append(f"current/web data '{m}'")
         if reasons:
             return Route(c.escalate_model, max_tokens,
-                         "escalate -> Sonnet: " + ", ".join(reasons) + cap_note)
+                         "escalate -> standard tier: " + ", ".join(reasons) + cap_note, STANDARD)
 
-        # Default: the cheap workhorse.
-        return Route(c.default_model, max_tokens, "default -> Haiku" + cap_note)
+        # Default: the cheap workhorse tier.
+        return Route(c.default_model, max_tokens, "default -> cheap tier" + cap_note, CHEAP)

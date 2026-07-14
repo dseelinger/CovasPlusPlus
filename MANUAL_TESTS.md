@@ -120,13 +120,13 @@ Notes:
 Notes:
 
 ## 4. Cost router — cheap by default, escalates on demand  🔊 HW 🌐 PANEL
-> Verify each turn via the session log's two lines: a **`[router] <model> max_tokens=N — <reason>`** line and a **`[usage] in=… out=… ~$0.00XX [<model>]`** line. (Requires `[router].enabled = true`.)
-- [ ] **Banter uses the cheap tier:** *"Morning, COVAS — how's it going?"* → router line shows **`claude-haiku-4-5`**; cost a fraction of a cent.
-- [ ] **"Think hard" escalates:** *"Think hard about the best way to break in a new ship."* → **`claude-sonnet-5`**.
-- [ ] **Depth phrase escalates:** *"Walk me through the pros and cons of a fuel scoop."* → Sonnet.
-- [ ] **Explicit premium:** *"Use Opus for this — summarize the Thargoid war."* → **`claude-opus-4-8`**.
+> Verify each turn via the session log's two lines: a **`[router] [<tier>] <model> max_tokens=N — <reason>`** line (the `[cheap]`/`[standard]`/`[premium]` tier prefix is from issue #11) and a **`[usage] in=… out=… ~$0.00XX [<model>]`** line. (Requires `[router].enabled = true`.)
+- [ ] **Banter uses the cheap tier:** *"Morning, COVAS — how's it going?"* → router line shows **`[cheap] claude-haiku-4-5`**; cost a fraction of a cent.
+- [ ] **"Think hard" escalates:** *"Think hard about the best way to break in a new ship."* → **`[standard] claude-sonnet-5`**.
+- [ ] **Depth phrase escalates:** *"Walk me through the pros and cons of a fuel scoop."* → `[standard]` Sonnet.
+- [ ] **Explicit premium:** *"Use Opus for this — summarize the Thargoid war."* → **`[premium] claude-opus-4-8`**.
 - [ ] **Full breakdown raises the cap:** *"Give me the full breakdown of the engineering process."* → higher `max_tokens` (2048).
-- [ ] (Optional) 🌐 Set the router **pin** in Settings and confirm the router line reflects it.
+- [ ] (Optional) 🌐 Set the router **pin** in Settings (`cheap`/`standard`/`premium`, or `haiku`/`sonnet`/`opus`) and confirm the router line's tier + model reflect it.
 
 Notes:
 

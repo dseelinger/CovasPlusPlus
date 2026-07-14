@@ -275,23 +275,23 @@
         "GUI"
       ],
       "requires": "`[router].enabled = true`; app running; panel open (read the `[router]` and `[usage]` log lines).",
-      "expected": "Each turn logs a `[router] <model> max_tokens=N — <reason>` line and a `[usage] … [<model>]` line; banter uses Haiku, depth/\"think hard\" escalates to Sonnet, explicit \"use Opus\" uses Opus, and \"full breakdown\" raises max_tokens.",
+      "expected": "Each turn logs a `[router] [<tier>] <model> max_tokens=N — <reason>` line (the tier prefix is from issue #11) and a `[usage] … [<model>]` line; banter uses [cheap] Haiku, depth/\"think hard\" escalates to [standard] Sonnet, explicit \"use Opus\" uses [premium] Opus, and \"full breakdown\" raises max_tokens.",
       "steps": [
         {
           "id": "s1",
-          "text": "Banter cheap tier: \"Morning, COVAS — how's it going?\" → router line shows `claude-haiku-4-5`; cost a fraction of a cent."
+          "text": "Banter cheap tier: \"Morning, COVAS — how's it going?\" → router line shows `[cheap] claude-haiku-4-5`; cost a fraction of a cent."
         },
         {
           "id": "s2",
-          "text": "\"Think hard about the best way to break in a new ship.\" → `claude-sonnet-5`."
+          "text": "\"Think hard about the best way to break in a new ship.\" → `[standard] claude-sonnet-5`."
         },
         {
           "id": "s3",
-          "text": "Depth phrase: \"Walk me through the pros and cons of a fuel scoop.\" → Sonnet."
+          "text": "Depth phrase: \"Walk me through the pros and cons of a fuel scoop.\" → [standard] Sonnet."
         },
         {
           "id": "s4",
-          "text": "Explicit premium: \"Use Opus for this — summarize the Thargoid war.\" → `claude-opus-4-8`."
+          "text": "Explicit premium: \"Use Opus for this — summarize the Thargoid war.\" → `[premium] claude-opus-4-8`."
         },
         {
           "id": "s5",
@@ -299,7 +299,7 @@
         },
         {
           "id": "s6",
-          "text": "(Optional) Set the router pin in Settings and confirm the router line reflects it."
+          "text": "(Optional) Set the router pin in Settings (`cheap`/`standard`/`premium`, or `haiku`/`sonnet`/`opus`) and confirm the router line's tier + model reflect it."
         }
       ]
     },

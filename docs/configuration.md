@@ -66,15 +66,21 @@ Routes each turn to the cheapest capable model, escalating only when a turn earn
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `router.enabled` | `true` | Turn the tiering router on |
-| `router.default_model` | `claude-haiku-4-5` | The cheap workhorse tier |
-| `router.escalate_model` | `claude-sonnet-5` | The escalation tier (depth/analysis, current data) |
-| `router.premium_model` | `claude-opus-4-8` | The premium tier (explicit ask only) |
-| `router.pin` | *(blank)* | Force every turn to `haiku`, `sonnet`, or `opus`; blank = let the rules decide |
+| `router.default_model` | `claude-haiku-4-5` | The **cheap** tier's model (Anthropic provider) |
+| `router.escalate_model` | `claude-sonnet-5` | The **standard** tier's model (depth/analysis, current data) |
+| `router.premium_model` | `claude-opus-4-8` | The **premium** tier's model (explicit ask only) |
+| `router.pin` | *(blank)* | Force every turn to a tier — `cheap`/`standard`/`premium` (or the aliases `haiku`/`sonnet`/`opus`); blank = let the rules decide |
 | `router.full_breakdown_max_tokens` | `2048` | Raised reply cap for an explicit "full breakdown" turn |
 
 The escalation phrases (`escalate_phrases`, `depth_phrases`, `web_phrases`, `premium_phrases`,
 `full_breakdown_phrases`) are lists you can tune — the words that bump a turn to a higher tier or
 raise the length cap.
+
+> **Provider-agnostic tiers.** The router picks a canonical **tier** — `cheap` / `standard` /
+> `premium` — and the model comes from the active `[llm].provider`'s tier map. For Anthropic that's
+> the three `router.*_model` settings above (and `[anthropic].model` when the router is off). A
+> different provider supplies its own map via `[<provider>].tiers.{cheap,standard,premium}` (or a
+> single `[<provider>].model`), so the same routing policy works for any cloud LLM.
 
 ## Web search (`[web_search]`)
 

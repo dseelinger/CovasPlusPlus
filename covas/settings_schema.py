@@ -28,7 +28,8 @@ WHISPER_DEVICES = ["cpu", "cuda"]
 WHISPER_COMPUTE = ["int8", "float16", "float32"]
 THINKING_TIERS = ["Off", "Low", "Medium", "High", "Extra", "Max"]
 CACHE_TTLS = ["5m", "1h"]
-ROUTER_PINS = ["", "haiku", "sonnet", "opus"]
+# Canonical tiers (issue #11) plus the Anthropic-flavored aliases the router still accepts.
+ROUTER_PINS = ["", "cheap", "standard", "premium", "haiku", "sonnet", "opus"]
 PAD_SIZES = ["S", "M", "L", "any"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
 LLM_PROVIDERS = ["anthropic", "ollama"]
@@ -142,10 +143,11 @@ SCHEMA: list[Setting] = [
             example="turn the router on"),
     Setting("router.pin", ("router", "pin"), "enum",
             "Force a tier", "Cost router",
-            "Pin every turn to one tier. Blank = let the rules decide.",
+            "Pin every turn to one tier: cheap/standard/premium (aliases haiku/sonnet/opus). "
+            "Blank = let the rules decide.",
             default="", options=ROUTER_PINS,
             phrasings=("tier pin", "force a tier", "pin the tier"),
-            example="pin the tier to sonnet"),
+            example="pin the tier to standard"),
     Setting("router.full_breakdown_max_tokens", ("router", "full_breakdown_max_tokens"), "int",
             "Full-breakdown tokens", "Cost router",
             "Raised reply cap for an explicit 'full breakdown' request.",
