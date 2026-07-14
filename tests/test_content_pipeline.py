@@ -50,7 +50,7 @@ def test_load_content_maps_the_tree(tmp_path):
     assert b.sfx["space_radiation"] == []                    # folder absent -> silent
     assert len(b.music["deep_space"]) == 1 and b.music["nebula"] == []
     assert b.chatter["station_traffic"] == ["Traffic is heavy today.", "Docking lanes are full."]
-    assert b.chatter["deep_space_musing"] == []              # no file -> falls back to default later
+    assert b.chatter["populated_musing"] == []              # no file -> falls back to default later
     assert b.threat == ["Contact, hostile.", "Brace!"]
 
 
@@ -72,8 +72,8 @@ def test_overlay_replaces_samples_and_phrasings_when_present(tmp_path):
     assert len(by_name["thargoid_voices"].samples) == 2      # folder samples applied
     assert by_name["station_traffic"].phrasings == ("Traffic is heavy today.", "Docking lanes are full.")
     # a category with no drop-in file keeps its shipped default pool
-    assert by_name["deep_space_musing"].phrasings == next(
-        c.phrasings for c in chatter_cues() if c.name == "deep_space_musing")
+    assert by_name["populated_musing"].phrasings == next(
+        c.phrasings for c in chatter_cues() if c.name == "populated_musing")
 
 
 def test_merged_music_library_combines_config_and_folder(tmp_path):
@@ -100,7 +100,7 @@ def test_content_status_states(tmp_path):
     assert rows[("sfx", "thargoid_voices")]["state"] == "custom" and rows[("sfx", "thargoid_voices")]["count"] == 2
     assert rows[("sfx", "space_radiation")]["state"] == "silent"          # no default, no files
     assert rows[("chatter", "station_traffic")]["state"] == "custom"
-    assert rows[("chatter", "deep_space_musing")]["state"] == "default"   # built-in pool
+    assert rows[("chatter", "populated_musing")]["state"] == "default"   # built-in pool
     assert rows[("threat", "interdiction_threat")]["state"] == "custom"
 
 

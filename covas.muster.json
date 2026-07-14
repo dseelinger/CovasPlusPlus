@@ -1133,21 +1133,25 @@
     },
     {
       "id": "audio-chatter-sfx-interdiction",
-      "title": "Space chatter, SFX, and interdiction sting layers (C6/C8)",
+      "title": "Space chatter: populated-only, population-scaled frequency, random voices (C6/C8)",
       "section": "18. Audio subsystem",
       "tags": [
         "GAME",
         "HW"
       ],
-      "requires": "`[audio.cues].enabled` and `[audio.interdiction].enabled` ON; ED running.",
-      "expected": "Flying/docking produces occasional rate-limited ambient chatter that never over-talks; an interdiction plays the layered sting + threat line + pirate line.",
+      "requires": "`[audio.cues].enabled` and `[audio.interdiction].enabled` ON; ED running; an ElevenLabs key.",
+      "expected": "Chatter plays only in populated systems (silent in empty/unpopulated space), is more frequent in denser systems, and each line uses a different random voice; an interdiction plays the layered sting + threat line + pirate line.",
       "steps": [
         {
           "id": "s1",
-          "text": "With `[audio.cues].enabled`, fly/dock around → occasional ambient chatter (rate-limited, never over-talking)."
+          "text": "In a POPULATED system → occasional ambient chatter (rate-limited, never over-talking). Jump to an UNPOPULATED / deep-space system → chatter goes silent (populated-only)."
         },
         {
           "id": "s2",
+          "text": "Compare a dense (billions) vs a sparse (thousands) populated system → chatter is noticeably more frequent in the dense one. Lowering `[audio.chatter].min_seconds` speeds it up. Each chatter line uses a different random voice."
+        },
+        {
+          "id": "s3",
           "text": "Trigger an interdiction → the layered sting + threat line + pirate line."
         }
       ]
@@ -1175,25 +1179,30 @@
     },
     {
       "id": "audio-voice-cast",
-      "title": "Voice cast pool: distinct + stable NPC voices, COVAS stays ElevenLabs (C10)",
+      "title": "Voice cast: random EL voices, sticky per system, players persist, Piper fallback (C10+)",
       "section": "18. Audio subsystem",
       "tags": [
-        "HW"
+        "HW",
+        "GAME"
       ],
-      "requires": "`[audio.voices].cast_provider = \"piper\"` with a few `[[audio.voices.pool]]` entries (provider/ref/gender; `ref` = local `.onnx`). Audio layer ON.",
-      "expected": "Two different NPCs sound different and the same speaker sounds the same across the session; COVAS keeps your ElevenLabs persona voice (no EL credits for NPC lines); honorific/gender + player-DM voice rules hold; an unusable EL/famous voice is never selected.",
+      "requires": "Defaults (`cast_provider = \"elevenlabs\"`, `random_el = true`, empty pool) with an ElevenLabs key. Audio layer ON.",
+      "expected": "Comms speakers get distinct random EL voices that stay stable within a system and re-cast on a jump; players keep a stable voice across the session (and across jumps); the cast is distinct from the COVAS persona; setting `cast_provider = \"piper\"` reverts to free local voices.",
       "steps": [
         {
           "id": "s1",
-          "text": "Receive comms from two different NPCs/stations → they sound different, and the SAME speaker sounds the same across the session."
+          "text": "Receive comms from two different NPCs/stations → they sound different (random EL voices), and the SAME speaker sounds the same for as long as you're in that system. Cast voices are distinct from your COVAS persona voice."
         },
         {
           "id": "s2",
-          "text": "COVAS still uses your ElevenLabs voice (persona) while the cast runs on Piper (no ElevenLabs credits burned for NPC lines)."
+          "text": "Jump to a new system → that speaker (or a new one) is re-cast to a fresh random voice (comms voices reset on a jump)."
         },
         {
           "id": "s3",
-          "text": "A male-honorific NPC (\"Mr\", \"Sir\") gets a male cast voice; a player DM uses the fixed player voice; an ElevenLabs ™/famous voice is never selected."
+          "text": "In a wing/multicrew/operation, each player keeps a stable, distinct voice — including across system jumps (last 25 players remembered)."
+        },
+        {
+          "id": "s4",
+          "text": "Set `[audio.voices].cast_provider = \"piper\"` with a few `[[audio.voices.pool]]` `.onnx` entries → the cast reverts to free local Piper voices; an ElevenLabs ™/famous voice is never selected."
         }
       ]
     },

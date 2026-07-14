@@ -13,6 +13,7 @@ then routed; it is never in the realtime audio path.
 """
 from __future__ import annotations
 
+import random
 import threading
 import time
 from dataclasses import replace
@@ -20,7 +21,7 @@ from typing import Callable, Optional
 
 from ..capabilities.base import HelpMeta, Slot
 from .buses import ALERT, AMBIENT, COMMS, COVAS, MUSIC
-from .chatter import ChatterPlayer, chatter_cues
+from .chatter import ChatterPlayer, chatter_cues, chatter_interval
 from .comms import capture
 from .content import (
     ContentBundle,
@@ -39,7 +40,14 @@ from .governor import CueGovernor, GovernorConfig
 from .mixer import pcm16_to_float, speak_on_bus
 from .music import MusicDirector
 from .variants import CommsVoicer, make_variant_generator
+from .voice_memory import StickyVoicePool
 from .voices import VoiceCast, build_cast
+
+# Journal arrival events that carry the current system + its Population; used to re-cast the
+# comms voices per system and to scale chatter frequency by population.
+_ARRIVAL_EVENTS = frozenset({"FSDJump", "CarrierJump", "Location"})
+# How many recent players keep a stable random voice (a wing/operation's worth).
+_PLAYER_VOICE_MEMORY = 25
 
 
 def _default_sting() -> str:
@@ -101,6 +109,22 @@ class AudioLayer:
         self._cast_synth = cast_synth or (
             lambda voice, text: self.tts.synth_pcm(text, voice.ref or None))
         self._cast: VoiceCast = build_cast(cfg, synth=self._cast_synth)
+        self._clock = clock
+
+        # Random-but-sticky voice memories over the cast pool (C10+). Comms speakers are re-cast
+        # per system (cleared on a jump); players keep a session-long voice via an LRU. Chatter is
+        # cast fresh per line (below). All degrade to the persona voice on an empty pool.
+        self._rng = random.Random()
+        self._comms_voices = StickyVoicePool(
+            self._cast.pool, rng=self._rng, fallback=self._cast.persona())
+        self._player_voices = StickyVoicePool(
+            self._cast.pool, rng=self._rng, capacity=_PLAYER_VOICE_MEMORY,
+            fallback=self._cast.persona())
+        self._chatter_voices = StickyVoicePool(
+            self._cast.pool, rng=self._rng, fallback=self._cast.persona())
+        # Live game state that drives chatter frequency + comms re-casting.
+        self._population: Optional[float] = None
+        self._system: str = ""
 
         audio = cfg.get("audio", {}) or {}
         # Runtime toggles, seeded from config. The governor's own `enabled` ([audio.cues]) gates
@@ -128,7 +152,8 @@ class AudioLayer:
         chatter_flavor = bool((audio.get("cues", {}) or {}).get("flavor", False))
         comms_variants = bool((audio.get("comms", {}) or {}).get("variants", False))
         chatter_gen = _text_generator(llm, cheap_model) if (llm is not None and chatter_flavor) else None
-        self._chatter = ChatterPlayer(self._speak_bus, generate=chatter_gen)
+        self._chatter = ChatterPlayer(self._speak_bus, generate=chatter_gen,
+                                      min_interval=self._chatter_interval, clock=clock)
         self._sfx = SfxPlayer(self._play_sample)
         self._driver = CueDriver(self._registry, self._engine, self._governor,
                                  self._dispatch_play, context=ed_ctx, clock=clock)
@@ -160,6 +185,19 @@ class AudioLayer:
         web/settings readout can show what still needs content."""
         return content_status(self._content)
 
+    # -- system arrival: population (chatter scaling) + comms re-casting --------
+    def _note_arrival(self, event: dict) -> None:
+        """Fold a system-arrival event: remember the system's Population (drives chatter frequency)
+        and, when the STAR SYSTEM changes, forget the comms speaker->voice map so the new system's
+        speakers get freshly-cast random voices. Player voices persist across jumps (session LRU)."""
+        pop = event.get("Population")
+        if isinstance(pop, (int, float)) and not isinstance(pop, bool):
+            self._population = float(pop)
+        sysname = str(event.get("StarSystem") or "").strip()
+        if sysname and sysname != self._system:
+            self._system = sysname
+            self._comms_voices.clear()
+
     # -- fuel for the driver ----------------------------------------------------
     def _fuel(self) -> Optional[float]:
         if self._ed_ctx is None:
@@ -180,14 +218,34 @@ class AudioLayer:
             self._log(f"voice synth/play failed: {e}")
             return False
 
+    def _chatter_interval(self) -> Optional[float]:
+        """Current required seconds between chatter lines, scaled by the live system population
+        (see chatter.chatter_interval). Read live so a Settings-page change applies immediately."""
+        ch = (self.cfg.get("audio", {}) or {}).get("chatter", {}) or {}
+        return chatter_interval(
+            float(ch.get("min_seconds", 45.0)),
+            float(ch.get("max_seconds", 240.0)),
+            self._population,
+            float(ch.get("full_population", 1_000_000_000.0)),
+        )
+
     def _speak_bus(self, text: str, bus: str) -> bool:
-        """Speak a chatter line on its bus with a stable chatter cast voice."""
-        return self._submit_voice(self._cast.assign("chatter"), text, bus)
+        """Speak a chatter line on its bus with a FRESH RANDOM cast voice per line, so the ambient
+        radio sounds like many different anonymous speakers."""
+        return self._submit_voice(self._chatter_voices.random(), text, bus)
 
     def _comms_play(self, text: str, record) -> bool:  # noqa: ANN001 — a VoiceableComms
-        """Voice a gated comms line: the cast picks the voice from the sender identity (player
-        DMs get the fixed player voice), routed to its provider on the radio-treated comms bus."""
-        return self._submit_voice(self._cast.for_record(record), text, COMMS)
+        """Voice a gated comms line with a random-but-sticky voice: a real player keeps one voice
+        for the session (LRU of the last 25), an NPC/station speaker keeps one for as long as we're
+        in this system (re-cast on a jump). Routed to its provider on the radio-treated comms bus."""
+        if getattr(record, "kind", "") == "player":
+            voice = self._player_voices.assign(getattr(record, "sender", "") or "player")
+        else:
+            hint = getattr(record, "voice", "") or ""
+            hint = hint if hint in ("male", "female") else None
+            identity = getattr(record, "sender", "") or getattr(record, "channel", "") or "npc"
+            voice = self._comms_voices.assign(identity, gender_hint=hint)
+        return self._submit_voice(voice, text, COMMS)
 
     def _play_sample(self, sample: str, bus: str) -> bool:
         try:
@@ -243,6 +301,8 @@ class AudioLayer:
             if not isinstance(event, dict) or event.get("type") != "ed_event":
                 return  # only real game events drive the audio layer, not log/status/usage
             name = event.get("event")
+            if name in _ARRIVAL_EVENTS:
+                self._note_arrival(event)
             if name == "ReceiveText":
                 if self.comms_on and not self.muted:
                     rec = capture(event)
@@ -303,8 +363,13 @@ class AudioLayer:
 
     def rebuild_cast(self, el_voices=None) -> None:  # noqa: ANN001 — list[dict] of EL voices
         """Rebuild the cast from current config, reusing the synth backends. `el_voices` (the
-        famous-filtered live list) feeds the exclusion hook so an unusable voice is dropped."""
+        famous-filtered live list) feeds the exclusion hook AND seeds the random default pool.
+        The voice memories are re-pooled but KEEP their live assignments (so the EL-list fetch or a
+        settings change doesn't wipe the current system's comms voices or the player LRU)."""
         self._cast = build_cast(self.cfg, synth=self._cast_synth, el_voices=el_voices)
+        persona = self._cast.persona()
+        for mem in (self._comms_voices, self._player_voices, self._chatter_voices):
+            mem.set_pool(self._cast.pool, fallback=persona)
 
     def apply_settings(self) -> None:
         """Re-read config after a settings change: bus volumes/treatment, enable toggles, and the

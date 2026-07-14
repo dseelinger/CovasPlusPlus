@@ -362,25 +362,34 @@ on in config (or the Settings page) before testing.
   the Open-play **local/wing chatter is NOT voiced** (the fail-closed gate). Repeated station spam
   isn't re-read every jump (template dedup).
 
-### 18.3 Space chatter + SFX + interdiction (C6/C8)
-- [ ] 🎮 With `[audio.cues].enabled`, fly/dock around → occasional ambient **chatter** (rate-limited,
-  never over-talking). 🎮 Trigger an **interdiction** → the layered sting + threat line + pirate line.
+### 18.3 Space chatter — populated-only + population-scaled frequency (C6)
+- [ ] 🎮 With `[audio.cues].enabled`, sit in a **populated** system → occasional ambient **chatter**
+  (rate-limited, never over-talking). Jump to an **unpopulated / deep-space** system → chatter goes
+  **silent** (populated-only). 🎮 Trigger an **interdiction** → the layered sting + threat + pirate line.
+- [ ] 🎮 Compare a **dense** system (population in the billions) with a **sparse** one (a few
+  thousand) → chatter is noticeably **more frequent** in the dense one. Then lower
+  `[audio.chatter].min_seconds` (or `full_population`) → chatter speeds up. Confirm each chatter line
+  uses a **different random voice**.
 
 ### 18.4 Voice controls + live settings (C9)
 - [ ] 🔊 By voice: *"mute the chatter"*, *"quiet the comms"*, *"turn the music down"*, *"turn the
   music up"*, *"stop the music"*, *"silence all the background audio"*, *"turn the ambient audio
   back on"* → each takes effect; your own replies are unaffected.
-- [ ] 🌐 On the **Settings** page, change a bus **volume** or toggle **comms/chatter/music** →
-  applies live (no restart). The **master** `audio.enabled` and comms **voice pickers** persist.
+- [ ] 🌐 On the **Settings → Ambient audio** page, change a bus **volume**, the **cast provider**,
+  **random ElevenLabs voices**, or the **chatter min/max seconds** / **full-population** → applies
+  live (no restart). The **master** `audio.enabled` persists.
 
-### 18.5 Voice cast (C10)
-- [ ] 🔊 Configure a Piper cast pool: `[audio.voices].cast_provider = "piper"` and add a few
-  `[[audio.voices.pool]]` entries (each `provider`/`ref`/`gender`; `ref` = a local `.onnx` path).
-  Then receive comms from **two different NPCs/stations** → they sound **different**, and the SAME
-  speaker sounds the **same** across the session. Confirm **COVAS still uses your ElevenLabs voice**
-  (persona) while the cast runs on Piper (no ElevenLabs credits burned for NPC lines).
-- [ ] A **male-honorific** NPC ("Mr", "Sir") gets a male cast voice; a **player DM** uses the fixed
-  player voice. A voice you can't use (an ElevenLabs ™/famous voice) is never selected.
+### 18.5 Voice cast — random, persistent voices (C10+)
+- [ ] 🔊 With the defaults (`cast_provider = "elevenlabs"`, `random_el = true`, empty pool) and an
+  ElevenLabs key, receive comms from **two different NPCs/stations** → they sound **different**
+  (random voices from your library), and the **same** speaker sounds the **same** for the whole time
+  you're in that system. **Jump to a new system** → that speaker (or a new one) is **re-cast** to a
+  fresh random voice. Confirm the cast voices are **distinct from your COVAS persona voice**.
+- [ ] 🎮 In a **wing / multicrew / operation**, confirm each **player** keeps a **stable, distinct**
+  voice — including **across system jumps** (the last 25 players are remembered).
+- [ ] 🔊 Set `[audio.voices].cast_provider = "piper"` with a few `[[audio.voices.pool]]` `.onnx`
+  entries → the cast reverts to **free local Piper** voices (no ElevenLabs credits). A voice you
+  can't use (an ElevenLabs ™/famous voice) is never selected.
 
 ### 18.6 Drop-in content (C11)
 - [ ] On first run with the layer enabled, confirm the skeleton appears: **`audio/sfx/<cue>/`**,

@@ -15,7 +15,7 @@ big, entirely optional subsystem, and it's **off by default.**
 | Part | What it adds | Toggle |
 |------|--------------|--------|
 | **Comms voices** | Voices the game's comms-panel lines (NPC/station messages and direct player DMs) over a radio-treated bus | `audio.comms.enabled` (on by default *within* the layer) |
-| **Space chatter & SFX** | Occasional context-driven ambient chatter and sound effects | `audio.cues.enabled` |
+| **Space chatter & SFX** | Occasional ambient radio chatter (**populated systems only**) and sound effects | `audio.cues.enabled` |
 | **Ambient music** | Context-crossfaded background music from your own local tracks | `music.enabled` |
 | **Interdiction cue** | A layered "pirate interdiction" moment — a warning sting, your companion's threat line, and the pirate's line | `audio.interdiction.enabled` |
 
@@ -32,14 +32,33 @@ that's then validated and routed, never live audio. Two consequences you'll noti
 - **The Open-play firehose is dropped.** Local/wing chatter and anything it can't clearly attribute
   is *not* voiced — the gate fails closed. Repeated station lines aren't re-read every jump either.
 
+## Space chatter
+
+Ambient chatter is the sound of *other people* — station traffic, patrols, market buzz — so it only
+plays in **populated systems**; out in empty or unpopulated space it stays quiet. How often it
+speaks **scales with the system's population**: a busy hub chatters near the fast end, a sparse
+outpost near the slow end. You set the two bounds — `[audio.chatter].min_seconds` (busiest systems)
+and `max_seconds` (barely-populated) — and lower `full_population` to make more systems feel lively.
+All three are on the Settings page.
+
 ## Voices for the cast
 
-Everything the audio layer speaks (NPCs, comms, chatter) gets a voice from a configurable pool,
-assigned so that **different speakers sound different** and the **same speaker stays consistent**
-across a session. By default the cast runs on **local Piper** (free, no cloud credits) while your
-own companion keeps its ElevenLabs persona voice — so the ambient cast doesn't cost you anything.
-You can point specific comms voices (male / female / default) at particular ElevenLabs voices if you
-prefer.
+Everything the audio layer speaks (NPCs, comms, chatter) gets a voice from a pool of **random
+ElevenLabs voices**, drawn automatically from your ElevenLabs library (minus your companion's own
+voice, so the cast always sounds like someone else). Voices are **random but consistent within a
+play session**:
+
+- **NPC / station** speakers keep one voice for as long as you're in a system, then get re-cast when
+  you **jump** — the liner captain here sounds the same all the way through, a different captain in
+  the next system sounds different.
+- **Players** keep their voice for the whole session (the last 25 commanders are remembered), so a
+  wing or an operation keeps stable per-person voices.
+- **Chatter** picks a fresh random voice per line, so the background radio sounds like many people.
+
+!!! warning "This uses ElevenLabs credits"
+    The cast now defaults to **ElevenLabs**, which burns credits on every comms/chatter line. To go
+    back to the free, game-friendly local path, set `[audio.voices].cast_provider = "piper"` and add
+    Piper `.onnx` entries to `[audio.voices].pool` (or set `random_el = false` for a single voice).
 
 ## Drop-in content
 

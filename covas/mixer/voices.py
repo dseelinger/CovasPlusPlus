@@ -1,16 +1,20 @@
 """Voice cast (C10) — deterministic identity->voice assignment + provider routing.
 
-Everything the audio layer speaks gets a voice from a configurable POOL, assigned DETERMINISTICALLY
-by a stable identity key (a ReceiveText sender, a station/NPC name), so different speakers sound
-different but the SAME speaker stays consistent across a session — no randomness. Routing keeps
-COVAS on ElevenLabs (the persona voice) while the NPC/comms/chatter CAST uses local Piper by
-default (free, runs beside the game, no ElevenLabs burn), with ElevenLabs as an opt-in override.
+Everything the audio layer speaks gets a voice from a configurable POOL. `VoiceCast.assign()` is
+DETERMINISTIC (a stable identity -> a stable pool voice) and still backs the interdiction cue; the
+comms/chatter/player paths in the AudioLayer layer a random-but-sticky memory over the same pool
+(see `voice_memory.StickyVoicePool`). Routing keeps COVAS on the ElevenLabs persona voice while the
+NPC/comms/chatter CAST now defaults to ElevenLabs too (random voices per the user's request) — set
+`[audio.voices].cast_provider = "piper"` (with local .onnx pool entries) to go back to the free,
+game-friendly local path.
 
 Three pieces, split so the assignment is pure/offline-testable and only real synthesis needs
 providers:
   * `Voice` — (provider, ref, gender). `VoiceCast` — the pure pool + `assign()` + `for_record()`.
   * `build_cast()` — builds the pool from [audio.voices], applying the exclusion hook so an
     unusable voice (an ElevenLabs 'famous'/™ voice) can never be selected — in the pool OR picker.
+    When no pool is configured and `random_el` is on, it seeds a RANDOM default pool from the live
+    ElevenLabs library (minus the persona voice) so the cast has many distinct voices out of the box.
   * `CastSynth` — routes a chosen Voice to the right provider (ElevenLabs voice_id / a cached
     Piper model) to produce PCM. Injected, so the default test run never loads a model or hits
     the network. A synth failure fails soft to silence.
@@ -46,7 +50,7 @@ class VoiceCast:
     (DM) voices + an injected `synth`. Deterministic: same identity -> same voice."""
 
     def __init__(self, pool, *, persona: Voice, player: Voice,
-                 cast_provider: str = PIPER,
+                 cast_provider: str = EL,
                  synth: Optional[Callable[[Voice, str], tuple[bytes, int]]] = None) -> None:
         self._pool = list(pool)
         self._persona = persona
@@ -105,9 +109,14 @@ def build_cast(
     allowed `el_voices` list (which already filters 'famous'/™ voices at elevenlabs.list_voices)
     is dropped, as is anything the injected `exclude` predicate flags — so an unusable voice can
     never be selected. COVAS's persona is [elevenlabs].voice_id; the player DM voice is
-    [audio.voices].player_ref, else the first male pool voice, else the persona."""
+    [audio.voices].player_ref, else the first male pool voice, else the persona.
+
+    RANDOM DEFAULT POOL: when no pool is configured in [audio.voices].pool and `random_el` is on
+    (the default) and the live `el_voices` list is available, the pool is seeded from the whole
+    ElevenLabs library MINUS the persona voice — so the comms/chatter/player cast has many
+    distinct random voices with zero configuration, and always sounds like someone other than COVAS."""
     v = (cfg.get("audio", {}) or {}).get("voices", {}) or {}
-    cast_provider = str(v.get("cast_provider", PIPER)).lower()
+    cast_provider = str(v.get("cast_provider", EL)).lower()
     allowed_el = ({x["voice_id"] for x in el_voices} if el_voices is not None else None)
     extra = exclude or (lambda _voice: False)
 
@@ -116,6 +125,9 @@ def build_cast(
             if voice.ref not in allowed_el:
                 return True
         return bool(extra(voice))
+
+    persona = Voice(EL, str((cfg.get("elevenlabs", {}) or {}).get("voice_id", "")).strip(),
+                    "neutral")
 
     pool: list[Voice] = []
     for e in (v.get("pool", []) or []):
@@ -127,8 +139,18 @@ def build_cast(
         if voice.ref and not _excluded(voice):
             pool.append(voice)
 
-    persona = Voice(EL, str((cfg.get("elevenlabs", {}) or {}).get("voice_id", "")).strip(),
-                    "neutral")
+    # No configured pool -> seed a random default pool from the live EL library (minus the persona
+    # and the injected excludes). Only possible once el_voices has been fetched; until then the
+    # pool is empty and the cast degrades to the single persona voice (see `assign`).
+    random_el = bool(v.get("random_el", True))
+    if not pool and random_el and el_voices is not None:
+        for e in el_voices:
+            vid = str((e or {}).get("voice_id", "")).strip()
+            if not vid or vid == persona.ref:
+                continue
+            voice = Voice(EL, vid, "neutral")
+            if not extra(voice):
+                pool.append(voice)
     player_ref = str(v.get("player_ref", "")).strip()
     if player_ref:
         player = Voice(cast_provider, player_ref, "male")

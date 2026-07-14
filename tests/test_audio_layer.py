@@ -85,10 +85,61 @@ def test_variants_off_means_verbatim_comms():
     assert tier == TIER_VERBATIM and text == "Proceed to pad 7."
 
 
-def _voiceable(msg):
+def _voiceable(msg, sender="Control", channel="npc"):
     from covas.mixer import evaluate
-    return evaluate({"event": "ReceiveText", "Channel": "npc",
-                     "From_Localised": "Control", "Message": msg})
+    return evaluate({"event": "ReceiveText", "Channel": channel,
+                     "From_Localised": sender, "Message": msg})
+
+
+def _pool(*ids):
+    return [{"provider": "elevenlabs", "ref": vid, "gender": "neutral"} for vid in ids]
+
+
+def _layer_pooled(pool_ids=("VA", "VB", "VC", "VD")):
+    """A layer with a configured EL voice pool, so the cast picks real voice ids we can observe
+    via the fake TTS (voice_id == the chosen Voice.ref)."""
+    cfg = {"elevenlabs": {"voice_id": "PERSONA"},
+           "audio": {"mix_sample_rate": 16000, "cues": {"enabled": True},
+                     "comms": {"enabled": True},
+                     "voices": {"cast_provider": "elevenlabs", "pool": list(_pool(*pool_ids))}}}
+    return AudioLayer(cfg, BusMixer(cfg), _FakeTTS(), ed_ctx=None, llm=None), None
+
+
+# ---- random-but-sticky cast (C10+) ---------------------------------------------------------
+
+def test_comms_voice_is_sticky_within_a_system():
+    layer, _ = _layer_pooled()
+    layer._comms_play("Docking granted.", _voiceable("Docking granted.", sender="Station Control"))
+    first = layer.tts.said[-1][1]
+    assert first in {"VA", "VB", "VC", "VD"}                 # a pool voice, not the persona
+    layer._comms_play("Proceed to pad 7.", _voiceable("Proceed to pad 7.", sender="Station Control"))
+    assert layer.tts.said[-1][1] == first                   # same speaker -> same voice
+
+
+def test_comms_voices_recast_on_system_jump_and_population_captured():
+    layer, _ = _layer_pooled()
+    layer._comms_play("Hello.", _voiceable("Hello.", sender="Station Control"))
+    assert len(layer._comms_voices._assigned) == 1          # noqa: SLF001
+    layer.on_event({"type": "ed_event", "event": "FSDJump",
+                    "StarSystem": "Sol", "Population": 4200})
+    assert layer._comms_voices._assigned == {}              # noqa: SLF001 — new system, fresh cast
+    assert layer._population == 4200.0
+
+
+def test_player_voice_persists_across_a_system_jump():
+    layer, _ = _layer_pooled()
+    layer._comms_play("gg", _voiceable("gg", sender="CMDR Ada", channel="player"))
+    voice = layer.tts.said[-1][1]
+    layer.on_event({"type": "ed_event", "event": "FSDJump",
+                    "StarSystem": "Sol", "Population": 4200})
+    layer._comms_play("wp", _voiceable("wp", sender="CMDR Ada", channel="player"))
+    assert layer.tts.said[-1][1] == voice                   # players keep their voice across jumps
+
+
+def test_chatter_uses_a_pool_voice_per_line():
+    layer, _ = _layer_pooled()
+    assert layer._speak_bus("Traffic's steady.", "comms") is True
+    assert layer.tts.said[-1][1] in {"VA", "VB", "VC", "VD"}
 
 
 # ---- voice controls ------------------------------------------------------------------------

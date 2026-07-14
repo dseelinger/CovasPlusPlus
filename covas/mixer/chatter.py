@@ -11,19 +11,43 @@ companion honest (the help discipline, applied to audio):
     noun and the player falls back to the pool. The LLM only ever yields text that is validated
     then routed — it is never in the realtime audio path.
 
-Governed by C3 (cooldowns + the global rate cap) so chatter never over-talks.
+Governed by C3 (cooldowns + the global rate cap) so chatter never over-talks. On top of that,
+chatter is POPULATED-ONLY and POPULATION-SCALED: every cue is eligible only in an inhabited
+system, and how often it actually speaks is throttled by a min/max seconds-between-lines window
+that slides with the system's population (a busy hub chatters near the min gap; a sparse outpost
+near the max). See `chatter_interval` + the `min_interval` gate on `ChatterPlayer`.
 """
 from __future__ import annotations
 
+import math
 import re
+import time
 from typing import Callable, Optional
 
 from .buses import COMMS
 from .cues import Cue
-from .eligibility import DEEP_SPACE, NORMAL_SPACE, POPULATED, SUPERCRUISE, UNPOPULATED
+from .eligibility import POPULATED
 
 _WORD = re.compile(r"[A-Za-z']+")
 _SENTENCE = re.compile(r"[.!?]+")
+
+
+def chatter_interval(min_s: float, max_s: float, population: Optional[float],
+                     full_population: float) -> Optional[float]:
+    """The current required seconds-BETWEEN-chatter-lines, scaled by system population.
+
+    A dense system (population >= `full_population`) chatters at the fast `min_s` gap; a sparse
+    one stretches toward the slow `max_s` gap; an UNPOPULATED (or unknown) system returns None =
+    "never" (chatter is populated-only anyway, so this is a belt-and-braces gate). The scale is
+    logarithmic because ED populations span many orders of magnitude (a few thousand to tens of
+    billions), so a linear map would peg almost everything to the sparse end. Pure + testable."""
+    if population is None or population <= 0:
+        return None
+    lo, hi = (min_s, max_s) if min_s <= max_s else (max_s, min_s)
+    full = full_population if full_population and full_population > 1 else 10.0
+    factor = math.log10(max(population, 1.0)) / math.log10(full)
+    factor = 0.0 if factor < 0.0 else (1.0 if factor > 1.0 else factor)
+    return hi - factor * (hi - lo)
 
 
 def _has_proper_noun(text: str) -> bool:
@@ -72,6 +96,11 @@ class ChatterPlayer:
         returning True only if playback started;
       * `generate(prompt) -> str` — the LLM flavor generator (None => pool-only). Used ONLY for
         fact_bearing=False cues, and only if the result passes `is_flavor_safe`.
+      * `min_interval() -> float | None` — the current required seconds between chatter lines
+        (see `chatter_interval`); None => no extra gate. This is the FREQUENCY control on top of
+        the C3 governor: a line is suppressed (and, crucially, does NOT burn the governor budget,
+        since a False return leaves the cue un-fired) until this much time has elapsed. `clock`
+        supplies monotonic time so the gate is testable.
     """
 
     def __init__(
@@ -79,12 +108,17 @@ class ChatterPlayer:
         speak: Callable[[str, str], bool],
         *,
         generate: Optional[Callable[[str], str]] = None,
+        min_interval: Optional[Callable[[], Optional[float]]] = None,
+        clock: Callable[[], float] = time.monotonic,
         log: Optional[Callable[[str], None]] = None,
     ) -> None:
         self._speak = speak
         self._generate = generate
+        self._min_interval = min_interval
+        self._clock = clock
         self._log = log
         self._rot: dict[str, int] = {}   # per-cue pool rotation pointer
+        self._last_spoken: float = float("-inf")  # monotonic time of the last chatter line
 
     def line_for(self, cue: Cue) -> tuple[str, str]:
         """(text, source) where source is 'flavor' (validated LLM) or 'pool' (deterministic
@@ -99,12 +133,26 @@ class ChatterPlayer:
         # fact-bearing, no generator, or rejected flavor -> the curated pool, rotated.
         return cue.phrasing_at(self._rot.get(cue.name, 0)), "pool"
 
+    def _frequency_ok(self, now: float) -> bool:
+        """The population-scaled frequency gate: True unless a chatter line spoke too recently.
+        Checked BEFORE `line_for` so a suppressed turn never touches the (paid) LLM generator."""
+        if self._min_interval is None:
+            return True
+        gap = self._min_interval()
+        if gap is None:      # unknown/unpopulated -> no chatter this turn
+            return False
+        return (now - self._last_spoken) >= gap
+
     def __call__(self, cue: Cue) -> bool:
+        now = self._clock()
+        if not self._frequency_ok(now):
+            return False
         text, source = self.line_for(cue)
         if not text.strip():
             return False
         started = bool(self._speak(text, cue.bus))
         if started:
+            self._last_spoken = now
             if source == "pool":
                 self._rot[cue.name] = self._rot.get(cue.name, 0) + 1
             if self._log is not None:
@@ -113,9 +161,11 @@ class ChatterPlayer:
 
 
 # ---- the shipped chatter categories ---------------------------------------------------------
-# Eligibility is a function of state: station traffic only where there are stations (populated);
-# deep-space musings only out in the black. All ride the Comms bus (radio-flavored) and are
-# throttled by their own cooldown plus the global C3 governor.
+# POPULATED-ONLY: every chatter cue is eligible only in an inhabited system (Population > 0). The
+# ambient radio buzz is the sound of *other people* — station traffic, patrols, market talk — so
+# out in the empty black there is deliberately nothing to say. All ride the Comms bus
+# (radio-flavored), are throttled by their own cooldown plus the global C3 governor, and are then
+# frequency-gated + population-scaled by `chatter_interval` (see ChatterPlayer.min_interval).
 def chatter_cues() -> list[Cue]:
     return [
         Cue(
@@ -124,29 +174,32 @@ def chatter_cues() -> list[Cue]:
                 "Traffic's steady around here.",
                 "Plenty of ships on the scope today.",
                 "Docking lanes are busy.",
+                "Comms are lively this shift.",
             ),
         ),
         Cue(
-            "supercruise_ambient", COMMS, {SUPERCRUISE}, cooldown_s=100.0, fact_bearing=True,
+            "system_patrol", COMMS, {POPULATED}, cooldown_s=110.0, fact_bearing=True,
             phrasings=(
-                "Cruise is holding smooth.",
-                "Frame shift steady.",
+                "Security's running patrols nearby.",
+                "Authority vessels holding station.",
+                "Local patrol's keeping the lanes clear.",
             ),
         ),
         Cue(
-            "deep_space_musing", COMMS, {DEEP_SPACE, UNPOPULATED}, cooldown_s=150.0,
+            "market_buzz", COMMS, {POPULATED}, cooldown_s=130.0, fact_bearing=True,
+            phrasings=(
+                "Haulers coming and going all day.",
+                "Trade's moving briskly hereabouts.",
+                "Cargo lanes are humming.",
+            ),
+        ),
+        Cue(
+            "populated_musing", COMMS, {POPULATED}, cooldown_s=150.0,
             fact_bearing=False,   # pure atmosphere -> LLM permitted (validated), pool fallback
             phrasings=(
-                "Quiet out here. Just us and the dark.",
-                "Long way from anywhere.",
-                "Nothing but starlight for company.",
-            ),
-        ),
-        Cue(
-            "open_space_idle", COMMS, {NORMAL_SPACE}, cooldown_s=120.0, fact_bearing=False,
-            phrasings=(
-                "All quiet on the scope.",
-                "Smooth flying.",
+                "Nice to have some company out here.",
+                "Feels good to be somewhere lived-in.",
+                "Always a buzz around people.",
             ),
         ),
     ]

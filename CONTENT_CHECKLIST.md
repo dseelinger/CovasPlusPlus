@@ -40,10 +40,10 @@ C11 migrates it to the folder above.)*
 Keep these **fact-free flavor** — nothing checkable. They are template lines, not AI-generated,
 so they must never assert a game fact (system name, price, count, etc.).
 
-- [ ] 📄 `content/chatter/deep_space_musing.txt` — reflective, solo-in-the-black flavor
-- [ ] 📄 `content/chatter/open_space_idle.txt` — idle open-space chatter
-- [ ] 📄 `content/chatter/station_traffic.txt` — busy-system / station traffic chatter
-- [ ] 📄 `content/chatter/supercruise_ambient.txt` — supercruise ambient lines
+- [ ] 📄 `content/chatter/station_traffic.txt` — busy-system / station traffic chatter (populated only)
+- [ ] 📄 `content/chatter/system_patrol.txt` — local security / patrol chatter (populated only)
+- [ ] 📄 `content/chatter/market_buzz.txt` — trade / hauler chatter (populated only)
+- [ ] 📄 `content/chatter/populated_musing.txt` — "nice to have company" flavor (populated only)
 - [ ] 📄 `content/interdiction_threat.txt` — the assistant's threat-assessment lines
 
 ## 4. Voices (for the C10 voice cast)

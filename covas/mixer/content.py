@@ -25,7 +25,7 @@ AUDIO_EXTS = (".wav", ".ogg", ".flac")
 MUSIC_EXTS = (".wav", ".ogg", ".flac", ".mp3")
 
 SFX_CUES = ("thargoid_voices", "space_radiation", "hyperspace_weirdness", "interdiction_sting")
-CHATTER_CATEGORIES = ("deep_space_musing", "open_space_idle", "station_traffic", "supercruise_ambient")
+CHATTER_CATEGORIES = ("station_traffic", "system_patrol", "market_buzz", "populated_musing")
 MUSIC_CONTEXTS = ("deep_space", "populated", "unpopulated", "nebula", "near_star",
                   "combat_adjacent", "scooping_fuel", "default")
 

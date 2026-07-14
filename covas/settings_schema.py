@@ -452,16 +452,41 @@ SCHEMA: list[Setting] = [
             phrasings=("default comms voice", "neutral comms voice")),
     Setting("audio.voices.cast_provider", ("audio", "voices", "cast_provider"), "enum",
             "Cast provider", "Ambient audio",
-            "TTS for the NPC/comms/chatter voice cast: 'piper' (local, free) or 'elevenlabs' "
-            "(burns credits). COVAS itself always uses your ElevenLabs persona voice.",
-            default="piper", options=CAST_PROVIDERS,
+            "TTS for the NPC/comms/chatter voice cast: 'elevenlabs' (random voices, burns credits) "
+            "or 'piper' (local, free). COVAS itself always uses your ElevenLabs persona voice.",
+            default="elevenlabs", options=CAST_PROVIDERS,
             phrasings=("cast provider", "voice cast provider", "npc voice provider"),
             example="set the cast provider to piper"),
+    Setting("audio.voices.random_el", ("audio", "voices", "random_el"), "bool",
+            "Random ElevenLabs voices", "Ambient audio",
+            "When no voice pool is configured, cast comms/chatter from RANDOM voices in your "
+            "ElevenLabs library (minus the COVAS voice). Off = a single voice unless you set a pool.",
+            default=True, phrasings=("random voices", "random elevenlabs voices", "random cast"),
+            example="turn random voices off"),
     Setting("audio.voices.player_ref", ("audio", "voices", "player_ref"), "string",
             "Player-DM voice", "Ambient audio",
-            "Voice for direct player DMs — a Piper .onnx path or an ElevenLabs voice id. Blank = "
-            "the first male pool voice, else your persona voice.",
+            "Fixed voice for direct player DMs — a Piper .onnx path or an ElevenLabs voice id. "
+            "Blank = each player keeps a random session voice (last 25 remembered).",
             default="", phrasings=("player dm voice", "player comms voice")),
+    Setting("audio.chatter.min_seconds", ("audio", "chatter", "min_seconds"), "float",
+            "Chatter min gap", "Ambient audio",
+            "Shortest gap between space-chatter lines, used in the BUSIEST populated systems. "
+            "Chatter is populated-only and scales toward the max gap as population thins.",
+            default=45.0, min=5.0, max=600.0, unit="s",
+            phrasings=("chatter minimum gap", "fastest chatter", "chatter min seconds"),
+            example="set the chatter min gap to 30 seconds"),
+    Setting("audio.chatter.max_seconds", ("audio", "chatter", "max_seconds"), "float",
+            "Chatter max gap", "Ambient audio",
+            "Longest gap between space-chatter lines, used in barely-populated systems.",
+            default=240.0, min=5.0, max=1800.0, unit="s",
+            phrasings=("chatter maximum gap", "slowest chatter", "chatter max seconds"),
+            example="set the chatter max gap to 5 minutes"),
+    Setting("audio.chatter.full_population", ("audio", "chatter", "full_population"), "int",
+            "Chatter full-population", "Ambient audio",
+            "Population at/above which chatter runs at the min gap. Lower it to make more systems "
+            "feel busy (the scale is logarithmic).",
+            default=1000000000, min=1000, max=100000000000, unit="people",
+            phrasings=("chatter full population", "chatter population threshold")),
 
     # --- Developer ---------------------------------------------------------
     Setting("dev.mock", ("dev", "mock"), "bool",

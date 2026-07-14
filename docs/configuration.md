@@ -231,13 +231,17 @@ The optional [atmospheric audio layer](audio/ambient-audio.md). **All off by def
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `audio.enabled` | `false` | Master switch (restart to apply) |
-| `audio.cues.enabled` | `false` | Space chatter & SFX |
+| `audio.cues.enabled` | `false` | Space chatter (populated systems only) & SFX |
 | `audio.comms.enabled` | `true` | Comms voices (within the layer) |
 | `music.enabled` | `false` | Ambient music (needs local track files) |
 | `audio.interdiction.enabled` | `false` | The layered pirate-interdiction cue |
 | `audio.buses.*.volume_db` | *(varies)* | Per-bus volume trims (COVAS, comms, ambient, music, alert) |
-| `audio.voices.cast_provider` | `piper` | TTS for the NPC/comms cast: `piper` (local, free) or `elevenlabs` |
-| `audio.comms.voices.{male,female,default}` | *(blank)* | ElevenLabs voices for comms lines |
+| `audio.chatter.min_seconds` | `45` | Fastest gap between chatter lines (busiest systems) |
+| `audio.chatter.max_seconds` | `240` | Slowest gap between chatter lines (barely-populated) |
+| `audio.chatter.full_population` | `1000000000` | Population at/above which chatter runs at the min gap |
+| `audio.voices.cast_provider` | `elevenlabs` | TTS for the NPC/comms/chatter cast: `elevenlabs` (random voices, burns credits) or `piper` (local, free) |
+| `audio.voices.random_el` | `true` | With no pool set, cast from random ElevenLabs voices (minus the COVAS voice) |
+| `audio.comms.voices.{male,female,default}` | *(blank)* | Legacy per-logical-voice ElevenLabs pins (superseded by the random cast) |
 
 The comms radio treatment (band limits, static, compression), the SFX/music track lists, and the
 voice-cast pool live in the same sections — see the comments in `config.toml`.

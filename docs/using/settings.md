@@ -19,6 +19,7 @@ change a setting either way and it lands in the same place (`overrides.json`, la
 | *"Use the George voice."* | Switches the ElevenLabs voice |
 | *"Set thinking to high."* | Raises the thinking depth |
 | *"Set the voice speed to 1.1."* | Speeds up speech (clamped to 1.0–1.2×) |
+| *"Set the chatter min gap to 30 seconds."* | Makes space chatter more frequent in busy systems |
 | *"Turn web search off."* | Disables automatic web search |
 | *"What's my Whisper model set to?"* | Reads back the current value |
 

@@ -45,6 +45,7 @@ from .chatter import (
     ChatterPlayer,
     build_chatter_prompt,
     chatter_cues,
+    chatter_interval,
     is_flavor_safe,
     register_chatter,
 )
@@ -74,6 +75,7 @@ from .music import (
     register_music,
 )
 from .runtime import AudioControlsCapability, AudioLayer
+from .voice_memory import StickyVoicePool
 from .voices import CastSynth, Voice, VoiceCast, build_cast
 from .variants import (
     CommsVoicer,
@@ -140,6 +142,7 @@ __all__ = [
     "ChatterPlayer",
     "build_chatter_prompt",
     "chatter_cues",
+    "chatter_interval",
     "is_flavor_safe",
     "register_chatter",
     "MUSIC_CONTEXTS",
@@ -167,6 +170,7 @@ __all__ = [
     "Voice",
     "VoiceCast",
     "build_cast",
+    "StickyVoicePool",
     "ContentBundle",
     "content_status",
     "ensure_skeleton",

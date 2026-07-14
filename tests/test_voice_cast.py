@@ -106,6 +106,32 @@ def test_injected_exclude_predicate_drops_a_voice():
     assert all(v.ref != "v0.onnx" for v in cast.pool)
 
 
+# ---- random ElevenLabs default pool --------------------------------------------------------
+
+def test_empty_pool_seeds_random_el_library_minus_persona():
+    # No configured pool + random_el (default) + a live EL list -> the whole library (minus the
+    # persona voice) becomes the random cast pool, all on ElevenLabs.
+    cast = build_cast(_cfg([], persona="PERSONA_ID"),
+                      el_voices=[{"voice_id": "PERSONA_ID"}, {"voice_id": "A"}, {"voice_id": "B"}])
+    refs = {v.ref for v in cast.pool}
+    assert refs == {"A", "B"}                          # persona excluded
+    assert all(v.provider == EL for v in cast.pool)
+
+
+def test_random_el_off_keeps_the_single_persona_voice():
+    cfg = _cfg([], persona="PERSONA_ID")
+    cfg["audio"]["voices"]["random_el"] = False
+    cast = build_cast(cfg, el_voices=[{"voice_id": "A"}, {"voice_id": "B"}])
+    assert cast.pool == []                             # opted out -> no random pool
+    assert cast.assign("anyone").ref == "PERSONA_ID"   # degrades to the persona
+
+
+def test_configured_pool_suppresses_random_seeding():
+    pool = [{"provider": "elevenlabs", "ref": "PINNED", "gender": "neutral"}]
+    cast = build_cast(_cfg(pool), el_voices=[{"voice_id": "PINNED"}, {"voice_id": "OTHER"}])
+    assert {v.ref for v in cast.pool} == {"PINNED"}    # explicit pool wins over the library
+
+
 # ---- CastSynth provider routing ------------------------------------------------------------
 
 class _FakePiper:
