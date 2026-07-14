@@ -84,6 +84,7 @@ _DATA_PATH_FIELDS = (
     ("elevenlabs", "api_key_file"),
     ("azure", "api_key_file"),
     ("openai_tts", "api_key_file"),
+    ("openai", "api_key_file"),
     ("cartesia", "api_key_file"),
     ("checklist", "file"),
     ("logging", "dir"),

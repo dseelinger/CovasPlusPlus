@@ -130,6 +130,26 @@ Notes:
 
 Notes:
 
+### 4.1 OpenAI-compatible LLM provider (issue #12)  🔊 HW 🌍 NET 📋 FILE
+> One provider covers **OpenAI, Groq, DeepSeek, OpenRouter** — only `[openai].base_url` + model ids
+> differ. A *cloud* LLM, so it's fine in-game and the router tiers it via `[openai.tiers]`. Needs
+> `OPENAI_API_KEY` (env var or `OpenAIAPIKey.txt`). Restart after switching `[llm].provider`.
+- [ ] **Conversation:** set `[llm].provider = "openai"` (default `base_url`/`model` = OpenAI
+  `gpt-4o-mini`), restart, speak a turn → COVAS answers via OpenAI; the `[router]` line shows the
+  OpenAI model (e.g. `[cheap] gpt-4o-mini`) and `[usage]` shows token counts (+ a cost if priced).
+- [ ] **Tool calling works:** *"What's my next objective?"* / *"Mark fuel scooping complete."* → the
+  checklist tool fires (log shows the tool call) and COVAS confirms — proving delta-assembled
+  `tool_calls` are handled.
+- [ ] **Escalation tiers:** *"Think hard…"* → the router line shows `[standard]` with the
+  `[openai.tiers].standard` model; *"use opus/the big model"* wake phrase → `[premium]`.
+- [ ] **Alt endpoint (the "one provider" claim):** point `[openai].base_url` at **Groq**
+  (`https://api.groq.com/openai/v1`, model `llama-3.3-70b-versatile`) **or** OpenRouter, with that
+  service's key, restart → conversation still works through the same provider.
+- [ ] **Fail-soft:** clear the key (or set a bad `base_url`) → the turn degrades to text and the loop
+  returns to IDLE; restore → it works again. No crash.
+
+Notes:
+
 ## 5. ED monitoring, proactive & route callouts  🎮 ED 🔊 HW
 > Requires `[elite].enabled = true` and ED running. Fly around so there's live telemetry.
 

@@ -59,6 +59,7 @@ def test_all_path_fields_resolved():
         "elevenlabs": {"api_key_file": "ElevenLabsAPIKey.txt"},
         "azure": {"api_key_file": "AzureSpeechKey.txt"},
         "openai_tts": {"api_key_file": "OpenAIAPIKey.txt"},
+        "openai": {"api_key_file": "OpenAIAPIKey.txt"},
         "cartesia": {"api_key_file": "CartesiaAPIKey.txt"},
         "checklist": {"file": "ultimate_checklist.md"},
         "logging": {"dir": "logs"},
