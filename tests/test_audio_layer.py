@@ -142,6 +142,22 @@ def test_chatter_uses_a_pool_voice_per_line():
     assert layer.tts.said[-1][1] in {"VA", "VB", "VC", "VD"}
 
 
+def test_settings_rebuild_keeps_the_random_el_pool():
+    # Regression: with no configured pool, the random default pool is seeded from the live EL list
+    # fetched at startup. A later settings change rebuilds via apply_settings WITHOUT re-fetching;
+    # that must reuse the cached EL list, not collapse the whole cast back to the single persona.
+    cfg = {"elevenlabs": {"voice_id": "PERSONA"},
+           "audio": {"mix_sample_rate": 16000, "cues": {"enabled": True},
+                     "comms": {"enabled": True},
+                     "voices": {"cast_provider": "elevenlabs"}}}  # no pool -> random default
+    layer = AudioLayer(cfg, BusMixer(cfg), _FakeTTS(), ed_ctx=None, llm=None)
+    layer.rebuild_cast(el_voices=[{"voice_id": "PERSONA"}, {"voice_id": "A"}, {"voice_id": "B"}])
+    assert {v.ref for v in layer._cast.pool} == {"A", "B"}       # noqa: SLF001 — seeded, minus persona
+
+    layer.apply_settings()                                       # e.g. user toggled a setting
+    assert {v.ref for v in layer._cast.pool} == {"A", "B"}       # noqa: SLF001 — pool survives, not just PERSONA
+
+
 # ---- voice controls ------------------------------------------------------------------------
 
 def test_control_tool_toggles_layer_state():
