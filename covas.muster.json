@@ -122,7 +122,7 @@
         "FILE"
       ],
       "requires": "Control panel open (native window or browser).",
-      "expected": "Clicking Open cues folder opens the OS file manager on `<data dir>\\sounds\\` containing `listen\\ processing\\ completed\\ failure\\` subfolders, each with a `README.txt`. The button shows 'opened'.",
+      "expected": "Clicking Open cues folder opens the OS file manager on `<data dir>\\sounds\\` containing `listen\\ processing\\ completed\\ failure\\ thinking\\` subfolders, each with a `README.txt`. The button shows 'opened'.",
       "steps": [
         {
           "id": "s1",
@@ -134,7 +134,7 @@
         },
         {
           "id": "s3",
-          "text": "It contains `listen`, `processing`, `completed`, `failure` folders, each with a README.txt explaining drop-in cues."
+          "text": "It contains `listen`, `processing`, `completed`, `failure`, `thinking` folders, each with a README.txt explaining drop-in cues."
         }
       ]
     },
@@ -727,8 +727,8 @@
       "tags": [
         "HW"
       ],
-      "requires": "App running (native window, browser UI, or headless). Know the expected version from `covas/__version__.py` (currently 0.1.0).",
-      "expected": "COVAS speaks the running version, e.g. \"I'm running COVAS++ version 0.1.0.\", matching covas/__version__.py exactly.",
+      "requires": "App running (native window, browser UI, or headless). Know the expected version from `covas/__version__.py` (currently 0.3.1).",
+      "expected": "COVAS speaks the running version, e.g. \"I'm running COVAS++ version 0.3.1.\", matching covas/__version__.py exactly.",
       "steps": [
         {
           "id": "s1",
