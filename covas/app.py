@@ -296,8 +296,24 @@ class App:
                 el_synth = self.tts.synth_pcm
         except Exception:  # noqa: BLE001 — no EL available; EL voices fall to silence
             el_synth = None
-        return CastSynth(el_synth=el_synth, piper_loader=self._load_piper_voice,
-                         log=lambda m: self._log("audio", m))
+        cs = CastSynth(el_synth=el_synth, piper_loader=self._load_piper_voice,
+                       log=lambda m: self._log("audio", m))
+        self._register_edge_cast(cs)
+        return cs
+
+    def _register_edge_cast(self, cast_synth) -> None:  # noqa: ANN001 — a CastSynth
+        """Register the FREE Edge (edge-tts) provider as a cast-eligible backend (issue #15), so any
+        NPC/comms/chatter role can use it without touching CastSynth. The cast Edge provider has NO
+        fallback — a broken endpoint fails soft to SILENCE for a background line (CastSynth catches
+        the error), never to COVAS's own voice. Fail-soft: if edge-tts isn't importable we simply
+        don't register, and an 'edge' voice degrades to silence."""
+        try:
+            from .providers.edge_tts import EdgeTTS
+            edge = EdgeTTS(self.cfg)
+            cast_synth.registry.register(
+                "edge", lambda text, ref: edge.synth_pcm(text, ref or None))
+        except Exception as e:  # noqa: BLE001 — optional provider; never block the cast
+            self._log("audio", f"Edge cast provider unavailable: {e}")
 
     def _load_piper_voice(self, model_path: str):
         """Load a Piper model as a cast voice (lazy, one per path). Returns an object with

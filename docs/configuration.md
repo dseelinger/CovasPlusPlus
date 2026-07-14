@@ -95,17 +95,22 @@ See [Personas & voice](using/personas-voice.md).
 | `personality.custom_dir` | `personalities/custom` | Where your saved custom personas live (git-ignored) |
 | `personality.campaign_file` | `campaign.txt` | Your personal Commander facts (git-ignored) |
 
-## Text-to-speech (`[elevenlabs]`, `[tts]`, `[piper]`)
+## Text-to-speech (`[elevenlabs]`, `[tts]`, `[piper]`, `[edge]`)
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `tts.provider` | `elevenlabs` | Which voice speaks: `elevenlabs` (cloud) or `piper` (local, free) |
+| `tts.provider` | `elevenlabs` | Which voice speaks: `elevenlabs` (cloud), `piper` (local, free), or `edge` (free neural, no key/SLA — falls back to Piper) |
 | `elevenlabs.model` | `eleven_flash_v2_5` | ElevenLabs TTS model (flash = low latency) |
 | `elevenlabs.voice_id` | *(Sarah)* | Which ElevenLabs voice speaks |
 | `elevenlabs.speed` | `1.0` | Speaking speed, clamped to `1.0`–`1.2` |
 | `elevenlabs.output_format` | `pcm_16000` | Audio format (low-latency, cancellable — change only if you know why) |
 | `piper.model` | *(blank)* | Path to a local Piper `.onnx` voice (for `tts.provider = "piper"`) |
+| `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName for `tts.provider = "edge"` (list: `python -m edge_tts --list-voices`) |
 | `elevenlabs.api_key_file` | `ElevenLabsAPIKey.txt` | Where the ElevenLabs key is read from (git-ignored) |
+
+> **Edge (`edge-tts`) is optional and not load-bearing.** It uses an undocumented, no-SLA Microsoft
+> endpoint that periodically breaks; when it's down the persona voice falls back to Piper (or degrades
+> to text) and cast Edge voices fall silent. Keep a Piper model configured as the guaranteed free floor.
 
 ## Conversation (`[conversation]`)
 
@@ -245,7 +250,7 @@ The optional [atmospheric audio layer](audio/ambient-audio.md). **All off by def
 | `audio.chatter.min_seconds` | `45` | Fastest gap between chatter lines (busiest systems) |
 | `audio.chatter.max_seconds` | `240` | Slowest gap between chatter lines (barely-populated) |
 | `audio.chatter.full_population` | `1000000000` | Population at/above which chatter runs at the min gap |
-| `audio.voices.cast_provider` | `elevenlabs` | Default TTS for the NPC/comms/chatter cast: `elevenlabs` (random voices, burns credits) or `piper` (local, free) |
+| `audio.voices.cast_provider` | `elevenlabs` | Default TTS for the NPC/comms/chatter cast: `elevenlabs` (random voices, burns credits), `piper` (local, free), or `edge` (free neural, no key) |
 | `audio.voices.providers.*` | *(unset)* | Per-role provider overrides (`comms`/`chatter`/`player`/`interdiction`); fall back to `cast_provider`. Persona uses `[tts].provider` |
 | `audio.voices.random_el` | `true` | With no pool set, cast from random ElevenLabs voices (minus the COVAS voice) |
 | `audio.comms.voices.{male,female,default}` | *(blank)* | Legacy per-logical-voice ElevenLabs pins (superseded by the random cast) |
@@ -265,5 +270,6 @@ voice-cast pool live in the same sections — see the comments in `config.toml`.
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `llm.provider` | `anthropic` | `anthropic` (cloud) or `ollama` (local, out-of-game only) |
-| `tts.provider` | `elevenlabs` | `elevenlabs` (cloud) or `piper` (local, free) |
+| `tts.provider` | `elevenlabs` | `elevenlabs` (cloud), `piper` (local, free), or `edge` (free neural, no key/SLA) |
+| `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `dev.mock` | `false` | Swap LLM/TTS/STT for fakes — exercise the loop with zero API calls (restart to apply) |

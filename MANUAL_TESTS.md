@@ -439,6 +439,25 @@ Notes:
 
 Notes:
 
+### 18.8 Edge (edge-tts) free neural voices (issue #15)  🎮 ED 🔊 HW 🌍 NET 📋 FILE
+> **Free** neural TTS via `edge-tts` (Edge "Read Aloud" Azure voices) — hundreds of voices, **no
+> key**, so ambient chatter never burns ElevenLabs credits. ⚠ It rides an **undocumented, no-SLA**
+> endpoint that periodically breaks — it's **optional and never load-bearing**; **Piper** stays the
+> guaranteed free floor. Install it first: `pip install -r requirements.txt`.
+- [ ] **Persona voice:** set `[tts].provider = "edge"` (optionally `[edge].voice = "en-US-GuyNeural"`),
+  restart, speak a turn → COVAS replies in the Edge voice with **zero** ElevenLabs usage.
+- [ ] **Cast-eligible:** set `[audio.voices].cast_provider = "edge"` (or a per-role
+  `[audio.voices.providers].chatter = "edge"`), restart, fly/dock in a populated system → ambient
+  chatter/comms speak in distinct free Edge voices; COVAS's persona voice is unaffected.
+- [ ] **Fail-soft to Piper:** with `[tts].provider = "edge"` **and** a valid `[piper].model`,
+  disconnect the network (or block the endpoint) and speak → the persona voice **falls back to local
+  Piper**; reconnect → Edge resumes. With **no** Piper model, a dead endpoint degrades to **text** and
+  the loop returns to IDLE. Cast Edge voices fall **silent** on failure (never crash).
+- [ ] **Catalog:** `.venv\Scripts\python.exe -m edge_tts --list-voices` lists the voices; a ShortName
+  works as `[edge].voice` or a `[[audio.voices.pool]]` `ref`.
+
+Notes:
+
 ---
 
 ## 19. Packaged build — install, first-run wizard & updates (I1–I9)  📦 🖥️ 🔊 HW 🌍 NET
