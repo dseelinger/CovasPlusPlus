@@ -35,8 +35,13 @@ datas += collect_data_files("covas")
 
 # Native/heavy deps PyInstaller under-collects (bundled DLLs, lazily-imported submodules, data).
 # collect_all grabs binaries + datas + submodules for each.
+#   * edge_tts + aiohttp: the DEFAULT TTS provider (issue #15) is imported LAZILY (inside
+#     EdgeTTS.__init__ / make_tts), so static analysis can miss it — and if it's missing from the
+#     freeze the shipped app's default voice silently degrades to text. collect_all + the --selftest
+#     import below make the freeze include it and FAIL LOUDLY if it doesn't. (The other cloud
+#     providers — azure/openai/cartesia/gemini — ride `requests`, already bundled, so no entry here.)
 for _pkg in ("ctranslate2", "sounddevice", "soundfile", "faster_whisper", "onnxruntime",
-             "webview", "av"):
+             "webview", "av", "edge_tts", "aiohttp"):
     _d, _b, _h = collect_all(_pkg)
     datas += _d
     binaries += _b
