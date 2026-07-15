@@ -252,6 +252,7 @@ See [Keybind automation](automation/keybinds.md). **Off by default** — it send
 | `keybinds.confirm_window` | `60` | Seconds an armed action stays confirmable |
 | `keybinds.binds_file` | *(blank)* | Override the auto-detected bindings file |
 | `keybinds.allowlist` | `["landing_gear"]` | The only macros the companion may run. Opt in more by name — Tier-1 ship-systems (#31): `cargo_scoop`, `night_vision`, `ship_lights`, `hud_mode`, `pips_engines`, `pips_weapons`, `pips_systems`, `pips_balance` |
+| `keybinds.allowlist` | `["landing_gear"]` | The only macros the companion may run. Add flight/nav actions (#30) to opt in: `throttle_zero`/`throttle_50`/`throttle_100`, `frame_shift_drive`, `supercruise`, `hyperspace`, `flight_assist`, `select_target_ahead`, `cycle_next_target`/`cycle_previous_target`, `target_next_route_system`, `nav_lock` — see [Keybind automation](automation/keybinds.md#tier-1-flight-navigation-actions-30) |
 
 ## Auto-honk (`[honk]`)
 

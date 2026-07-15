@@ -231,6 +231,16 @@ Notes:
 - [ ] **Combat guard still applies:** with a benign toggle allowlisted, get **interdicted / into danger** and ask for it → **refuses** (benign toggles aren't exempt from the combat guard).
 - [ ] **Mode gating:** **disembark** (on foot) and ask for cargo scoop → **refuses** ("only works in your ship") and isn't offered. Back in the ship it fires.
 - [ ] **Unbound control:** if the matching ED control is on a HOTAS/mouse only (no keyboard bind), asking for it → "bind it to a key" message; nothing fires.
+### 6.1a Flight / nav actions (#30 — opt in via `[keybinds].allowlist`)
+> Off by default. For each action you want, add its name to `allowlist` **and** bind the matching control to a **key** in ED. Do these **parked/docked** first, then in open space with a clear area. Combat guard + mode gate still apply to every one.
+- [ ] **Benign fires immediately:** allowlist `throttle_zero`; *"COVAS, cut the throttle."* → throttle drops to zero **at once** (no separate confirm), reply "Throttle at zero". Same for `throttle_50` / `throttle_100`.
+- [ ] **Targeting (benign):** allowlist `cycle_next_target` + `select_target_ahead`; *"target the ship ahead"* then *"cycle to the next target"* → target reticle changes immediately each time.
+- [ ] **Route target (benign):** with a route plotted, allowlist `target_next_route_system`; *"target the next system in my route"* → the next route system is selected immediately.
+- [ ] **Consequential arms-and-confirms:** allowlist `supercruise`; *"engage supercruise"* → **armed but not done**; on a separate *"confirm"* it fires. Same shape for `frame_shift_drive`, `hyperspace`, and `flight_assist`.
+- [ ] **Combat guard:** in danger/interdiction, any flight action **refuses**; with `[elite]` OFF it refuses too.
+- [ ] **Mode gate — fighter:** deploy a **ship-launched fighter**; `throttle_*` and target cycling are still offered, but `supercruise` / `hyperspace` / `frame_shift_drive` / `target_next_route_system` / `nav_lock` are **not** (main-ship only) and refuse if asked.
+- [ ] **Unbound token:** allowlist `nav_lock` but leave **WingNavLock** unbound in ED → asking to toggle nav lock says to **bind it in-game**; nothing fires.
+- [ ] **Off-allowlist still refused:** an action you did **not** add (e.g. `hyperspace` when only `throttle_zero` is allowlisted) → won't do it.
 
 ### 6.2 Auto-honk (N5 + K2 — `[honk].enabled = true`, **on by default**)
 > Fires the Discovery Scanner shortly after you jump into a **new** system — no button press, and **no fire-group setup**. Bind the Discovery Scanner's fire to a **key** in ED (a HOTAS/mouse-only bind can't be pressed; a keyboard secondary, even with a modifier, is fine). At launch the log reports "Auto-honk ON …" or a "bind it in-game" warning.

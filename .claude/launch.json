@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "COVAS++ Control Panel",
+      "runtimeExecutable": ".venv\\Scripts\\python.exe",
+      "runtimeArgs": ["run_covas_ui.py"],
+      "port": 8765
+    },
+    {
+      "name": "Docs site (MkDocs)",
+      "runtimeExecutable": ".venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "mkdocs", "serve", "-a", "127.0.0.1:8000"],
+      "port": 8000
+    }
+  ]
+}

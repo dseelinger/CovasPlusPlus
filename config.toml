@@ -572,6 +572,19 @@ confirm_window = 60
 # fire immediately — no confirmation): cargo_scoop, night_vision, ship_lights, hud_mode,
 # pips_engines, pips_weapons, pips_systems, pips_balance. Each needs the matching control bound
 # to a KEY in Elite Dangerous. Example: allowlist = ["landing_gear", "cargo_scoop", "ship_lights"]
+# for others. Default ships exactly one: landing_gear (toggle). Add any of the names below to
+# opt each action in (default OFF keeps behavior unchanged/safe). The action must also be bound
+# to a KEY in Elite Dangerous; an unbound one degrades to a spoken "bind it in-game" message.
+#
+# Tier-1 flight/nav batch (#30) — main-ship (some also in a ship-launched fighter):
+#   throttle_zero, throttle_50, throttle_100      — set throttle (benign, fires immediately)
+#   frame_shift_drive                             — engage FSD / jump    (arm-and-confirm)
+#   supercruise, hyperspace                       — engage SC / jump     (arm-and-confirm)
+#   flight_assist                                 — toggle flight assist (arm-and-confirm)
+#   select_target_ahead, cycle_next_target, cycle_previous_target  — targeting (benign)
+#   target_next_route_system                      — target next route system (benign)
+#   nav_lock                                      — toggle nav lock      (benign)
+# e.g. allowlist = ["landing_gear", "throttle_zero", "target_next_route_system"]
 allowlist = ["landing_gear"]
 
 

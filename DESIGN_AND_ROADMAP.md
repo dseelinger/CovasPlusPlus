@@ -478,6 +478,17 @@ the registry was built for. Docking request has **no** direct keybind (it's a pa
 later panel batch / #32), so it's deliberately excluded. Crucially, the **default allowlist is
 unchanged** (`["landing_gear"]`): these macros ship registered but off, opt-in per name — so
 default safety/behaviour is identical to the prototype.
+### Implemented — Tier-1 flight/nav action batch (#30)
+The first *new* batch on the #29 seam, proving the "action batch = module + data, not a
+capability edit" claim: `keybinds/actions/flight.py` registers throttle (`SetSpeedZero/50/100`),
+FSD/supercruise/hyperspace (`HyperSuperCombination`/`Supercruise`/`Hyperspace`), flight assist
+(`ToggleFlightAssist`), targeting (`SelectTarget`, `CycleNext/PreviousTarget`), next-route-system
+target (`TargetNextRouteSystem`), and nav-lock (`WingNavLock`). Throttle + targeting also carry
+`MODE_FIGHTER` (a fighter flies and targets); FSD/route/nav-lock are main-ship only. Consequential
+actions (jump/supercruise/flight-assist) keep `confirm_required=True`; benign, repeatable ones
+(throttle set, target cycling, nav-lock) set it `False` to fire immediately — all still behind the
+allowlist + combat + mode guards. **None are in the default allowlist** — each is opt-in via
+`[keybinds].allowlist`, so default behavior is unchanged. `KeybindCapability` was not touched.
 
 ### Implemented — auto-honk (`[honk]`, default off, N5)
 The second keybind-driven action, and the first PROACTIVE one — fire the Discovery Scanner
