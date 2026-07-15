@@ -466,6 +466,19 @@ and **data**, not new branches in the capability or the loop:
   The `secondary` option is the escape hatch for a Commander who deliberately parks COVAS's
   keyboard binds on the Secondary slot.
 
+### Implemented — Tier-1 ship-systems batch (`keybinds/actions/ship_systems.py`, #31)
+The first action batch to *use* the registry lever: a new module registering eight benign,
+repeatable main-ship toggles — cargo scoop (`ToggleCargoScoop`), night vision
+(`NightVisionToggle`), ship lights (`ShipSpotLightToggle`), HUD combat/analysis
+(`PlayerHUDModeToggle`), and the four power-pip taps (`IncreaseEngines/Weapons/SystemsPower`,
+`ResetPowerDistribution`). Each is `modes={mainship}` and `confirm_required=False` (harmless and
+repeatable → fires immediately, still behind allowlist + combat + mode guards). `KeybindCapability`
+is untouched — the batch is a module + one import in `actions/__init__.py`, exactly the fan-out
+the registry was built for. Docking request has **no** direct keybind (it's a panel action → a
+later panel batch / #32), so it's deliberately excluded. Crucially, the **default allowlist is
+unchanged** (`["landing_gear"]`): these macros ship registered but off, opt-in per name — so
+default safety/behaviour is identical to the prototype.
+
 ### Implemented — auto-honk (`[honk]`, default off, N5)
 The second keybind-driven action, and the first PROACTIVE one — fire the Discovery Scanner
 ("honk") on arrival in a new system, no button press (`covas/capabilities/honk_capability.py`).

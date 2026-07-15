@@ -567,7 +567,11 @@ binding_preference = "primary"
 # Seconds an armed action stays confirmable before it expires for safety.
 confirm_window = 60
 # Allowlist of macro names the companion may run — the ONLY actions permitted, even if asked
-# for others. The prototype ships exactly one: landing_gear (toggle).
+# for others. Ships exactly one by default: landing_gear (toggle). Add a name below to opt a
+# macro in. Available Tier-1 ship-systems macros (#31, benign single-tap main-ship toggles,
+# fire immediately — no confirmation): cargo_scoop, night_vision, ship_lights, hud_mode,
+# pips_engines, pips_weapons, pips_systems, pips_balance. Each needs the matching control bound
+# to a KEY in Elite Dangerous. Example: allowlist = ["landing_gear", "cargo_scoop", "ship_lights"]
 allowlist = ["landing_gear"]
 
 

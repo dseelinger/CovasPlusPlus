@@ -3,9 +3,10 @@
 > *"I can toggle your landing gear on a separate spoken confirmation, with a combat safety check —
 > say 'abort' any time to cancel."*
 
-This is the **one** ship control COVAS++ will physically press for you: **toggle landing gear**.
-It's a deliberately small, heavily-guarded prototype — the point is to prove one reliable, safe
-keystroke before anything more.
+Out of the box COVAS++ will physically press exactly **one** ship control for you: **toggle
+landing gear**. It's a deliberately small, heavily-guarded prototype — the point is to prove one
+reliable, safe keystroke before anything more. You can opt additional benign toggles in via the
+allowlist (see [Tier-1 ship-systems actions](#tier-1-ship-systems-actions-31) below).
 
 **Example:** *"toggle my landing gear"*
 
@@ -17,8 +18,8 @@ keystroke before anything more.
 
 Every safeguard is on by default:
 
-- **Allowlist** — only explicitly permitted macros can run. The prototype allows exactly one:
-  `landing_gear`. Ask for anything else ("deploy hardpoints") and it won't do it.
+- **Allowlist** — only explicitly permitted macros can run. The default allows exactly one:
+  `landing_gear`. Ask for anything you haven't allowlisted ("deploy hardpoints") and it won't do it.
 - **Separate-turn confirmation** — asking arms the action but does **not** fire it. You must
   confirm on a *separate* command. The model can't arm and fire in one breath, by design.
 - **Combat / interdiction guard** — it refuses to touch controls while you're in danger or being
@@ -47,6 +48,38 @@ Three voice commands are involved:
 | `toggle_landing_gear` | Arms the landing-gear toggle (doesn't fire) |
 | `confirm_keybind` | Confirms and executes the armed action (refused in the same turn it was armed) |
 | `abort_keybinds` | Hard abort — cancels anything armed and releases every held key |
+
+## Tier-1 ship-systems actions (#31)
+
+Beyond landing gear, COVAS++ ships a batch of **benign, repeatable main-ship toggles** — but
+they're **off until you opt each one in** via the allowlist. They're benign (harmless and
+repeatable), so they **fire immediately** on request rather than arming-and-confirming; the
+combat/interdiction guard and mode gating still apply. None fire while you're on foot, in the
+SRV, or in a fighter.
+
+| Say something like | Macro name (allowlist) | ED control it presses |
+|--------------------|------------------------|-----------------------|
+| *"toggle my cargo scoop"* | `cargo_scoop` | Toggle Cargo Scoop |
+| *"night vision"* | `night_vision` | Night Vision |
+| *"ship lights"* | `ship_lights` | Ship Spotlight |
+| *"switch HUD to analysis mode"* | `hud_mode` | HUD Combat/Analysis toggle |
+| *"pips to engines"* | `pips_engines` | Increase Engines Power (one pip) |
+| *"pips to weapons"* | `pips_weapons` | Increase Weapons Power (one pip) |
+| *"pips to systems"* | `pips_systems` | Increase Systems Power (one pip) |
+| *"balance the pips"* | `pips_balance` | Reset Power Distribution (2/2/2) |
+
+Each pip command adds **one** pip, so ask a few times to fill a bank. **Docking request** isn't
+here — it's a panel action with no direct keybind (a later panel batch handles it).
+
+To enable one, add its **macro name** to `[keybinds].allowlist` in `config.toml` and bind the
+matching control to a **key** in Elite Dangerous:
+
+```toml
+[keybinds]
+allowlist = ["landing_gear", "cargo_scoop", "ship_lights", "pips_engines"]
+```
+
+Anything you don't list stays off — COVAS won't press it even if asked.
 
 ## It reads *your* bindings
 
