@@ -480,6 +480,15 @@ SCHEMA: list[Setting] = [
             "Synthesis language (BCP-47 primary subtag) for the Cartesia voice, e.g. en.",
             default="en", phrasings=("cartesia language",)),
 
+    # --- Companion HUD -----------------------------------------------------
+    Setting("hud.enabled", ("hud", "enabled"), "bool",
+            "Companion HUD overlay", "Companion HUD",
+            "Show a small transparent, always-on-top overlay with my voice-loop state, your "
+            "current checklist step, and route progress. Off by default; needs a desktop "
+            "(no effect headless).",
+            default=False, phrasings=("hud", "the hud", "overlay", "hud overlay"),
+            example="turn the HUD on"),
+
     # --- Control panel -----------------------------------------------------
     Setting("ui.host", ("ui", "host"), "string",
             "Control panel host", "Control panel",

@@ -171,6 +171,34 @@ The rendering-approach spike (#46) landed these decisions (full writeup + PoCs i
   on-hardware placement/legibility iteration) + the `openvr` dep. **Spike only — no product
   commitment yet; the 2D and VR builds are separate sub-issues under epic #40.**
 
+**Shipped — the 2D overlay (issue #47).** The flat-screen surface is now built as
+`covas/capabilities/hud_capability.py`, following the spike verbatim (stdlib `tkinter`,
+transparent + always-on-top + click-through) and the project's "pure core + injected I/O"
+discipline:
+
+- **`HudModel` — the pure data adapter (unit-tested, headless).** It folds EventBus events
+  (`status` → voice-loop state; `log` "COVAS" lines prefixed `(proactive)`/`(route)` → last
+  callout; `ed_event` `NavRoute`/`FSDTarget`/`FSDJump`/`NavRouteClear` → a `RouteTracker` for
+  jumps-remaining + next-star-scoopable) plus two **injected getters** (the checklist line, the
+  parsed NavRoute) into an immutable `HudSnapshot` of the four display fields. No tkinter, no
+  file I/O of its own — the whole adapter is exercised offline with crafted events + fakes; the
+  window is never opened in the default suite.
+- **`HudView` — the thin tkinter sink, guarded.** Created only when the HUD is enabled AND a
+  display is available (`make_view` returns `None` otherwise — headless/CI safe). Every Tk call
+  runs on the view's own thread; the outside world only flips thread-safe `show`/`hide`/`close`
+  flags that a periodic on-thread poll applies, sidestepping Tkinter's single-thread rule
+  without cross-thread `after()`.
+- **`HudCapability` — always registered so the toggle works live.** It advertises no LLM tools
+  (a non-interactive view) and only feeds the model from the bus. Visibility is reconciled
+  against `[hud].enabled` by a **direct** `App._reconcile_hud()` call from
+  `_after_settings_change` — so the toggle (Settings page or the voice `set_setting` path,
+  projecting from the same `hud.enabled` schema entry) does not depend on the event pump. The
+  shared event pump is started only when the HUD is actually enabled (a disabled HUD adds no
+  thread; existing "no ambient feature → no pump" behaviour is preserved).
+- **Off by default, fail-soft.** `[hud].enabled = false`; a missing toolkit/display, or any Tk
+  error, degrades to "no overlay" and logs — it never crosses into the voice loop. **The VR
+  sub-issue (#48) is still open** and reuses the same `HudModel`.
+
 ---
 
 ## 4. Cloud model tiering strategy

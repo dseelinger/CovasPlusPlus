@@ -378,6 +378,14 @@ The optional [atmospheric audio layer](audio/ambient-audio.md). **All off by def
 The comms radio treatment (band limits, static, compression), the SFX/music track lists, and the
 voice-cast pool live in the same sections — see the comments in `config.toml`.
 
+## Companion HUD (`[hud]`)
+
+See [Companion HUD](using/hud.md). **Off by default.**
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `hud.enabled` | `false` | Show the transparent, always-on-top 2D overlay (voice-loop state, checklist step, route progress, last callout). Toggle from Settings or by voice; needs a desktop |
+
 ## Control panel (`[ui]`)
 
 | Setting | Default | What it does |
