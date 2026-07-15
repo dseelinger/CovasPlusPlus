@@ -20,6 +20,7 @@ from . import settings_schema as schema
 from .audio import CuePlayer, Recorder
 from .listen import VadListener
 from .wake import WakeWordGate
+from .reflex_spotter import PhraseSpotter
 from .events import EventBus
 from .checklist import Checklist
 from .capabilities import CapabilityRegistry
@@ -179,6 +180,11 @@ class App:
         self.worker: threading.Thread | None = None
         self.ptt_held = False
         self._ptt_t0 = 0.0  # key-down time, for tap-vs-hold detection
+        # Second PTT for the Tier-2 reflex FAST PATH (issue #38): a capture on this key is spotted
+        # locally against the fixed phrase vocabulary and, on a hit, fires the reflex WITHOUT the
+        # LLM (routing through the same #36 guard/executor). Default unbound -> the hook never
+        # installs, so the main PTT + conversation path are untouched.
+        self.reflex_held = False
         self.state = "Idle"
         # Armed for the duration of a USER (PTT) turn, so the "thinking" bed (issue #5) fills the
         # wait for those turns only — never a proactive callout (which has no "did it hear me" gap).
@@ -1411,6 +1417,84 @@ class App:
         )
         self.worker.start()
 
+    # ---- Tier-2 reflex FAST PATH (second PTT, issue #38) ------------------
+    def on_reflex_ptt_down(self) -> None:
+        """The reflex second-PTT was pressed. Same barge-in as the main PTT (interrupt anything in
+        flight, flip to Listening under the proactive lock) — but this capture is destined for the
+        local phrase-spotter fast path, not a conversation turn."""
+        with self._proactive_lock:
+            self._interrupt()
+            self.set_state("Listening", "reflex")
+        self.recorder.start()
+        self.cues.play("listening")
+
+    def on_reflex_ptt_up(self) -> None:
+        """Reflex second-PTT released — dispatch the capture down the fast path."""
+        audio = self.recorder.stop()
+        self._dispatch_reflex(audio)
+
+    def _dispatch_reflex(self, audio) -> None:
+        """Run the reflex fast path on the worker thread: local transcribe -> phrase-spot -> on a
+        MATCH fire the reflex immediately through the #36 guard+executor (no LLM); on NO MATCH hand
+        the same capture to the normal conversation turn so the second PTT never eats an ordinary
+        request. Mirrors :meth:`_dispatch_utterance`'s worker/cancel setup so cancellation and
+        barge-in behave identically."""
+        self.cues.play("processing")
+        cancel = threading.Event()
+        self.active_cancel = cancel
+        self.worker = threading.Thread(
+            target=self._process_reflex, args=(audio, cancel), daemon=True)
+        self.worker.start()
+
+    def _process_reflex(self, audio, cancel: threading.Event) -> None:
+        """Worker for the reflex second-PTT (issue #38). Transcribes locally, runs the pure
+        :class:`PhraseSpotter` over the transcript, then:
+
+          * **match** -> fires the named reflex via :meth:`ReflexCapability.fire_reflex` — the SAME
+            allowlist + combat-permissive guard + shared executor + hard abort as the LLM tool path
+            (#36). NO LLM round-trip, so latency is ~STT time only; the spoken result is just
+            after-the-fact feedback (the keypress already went out).
+          * **no match** (or reflexes disabled) -> falls through to a normal conversation turn on
+            the SAME capture via :meth:`_dispatch_utterance`, so the second PTT still works as an
+            ordinary talk key.
+
+        Fail soft: any error returns to Idle and never crashes the loop."""
+        try:
+            if cancel.is_set():
+                return
+            self.set_state("Transcribing", "reflex")
+            text = self.stt.transcribe(audio)
+            if cancel.is_set():
+                return
+            if not text:
+                self.cues.play("failed")
+                self.set_state("Idle", "(no speech detected)")
+                return
+
+            action = PhraseSpotter.from_cfg(self.cfg).match(text)
+            self._log("reflex-spot", f"{text!r} -> {action or 'no match'}")
+
+            if action is None or self.reflex is None:
+                # Not a snap call (no keyword) — or reflexes aren't enabled. Fall through to the
+                # normal turn so this key still behaves like an ordinary push-to-talk.
+                print(f"\nCommander (reflex miss): {text}")
+                self._dispatch_utterance(audio)
+                return
+
+            # A spotted reflex: fire it IMMEDIATELY via the #36 path (guard + executor + abort).
+            result = self.reflex.fire_reflex(action)
+            self._log("reflex", f"phrase-spot fired {action}: {result}")
+            self.bus.publish({"type": "log", "who": "system", "text": f"Reflex: {result}"})
+            self.set_state("Speaking", "reflex")
+            try:
+                self._speak(result, cancel)   # spoken feedback; the keypress already fired
+            except Exception:  # noqa: BLE001 — feedback is best-effort, never fail the reflex on it
+                pass
+            self.set_state("Idle")
+        except Exception as e:  # noqa: BLE001 — keep the loop alive on any failure
+            self.cues.play("failed")
+            self.set_state("Idle", f"reflex error: {e}")
+
     # ---- hands-free / VAD listen (issue #63) ------------------------------
     def _on_vad_speech_start(self) -> None:
         """Speech onset in continuous mode = barge-in, exactly like on_ptt_down: interrupt any
@@ -1853,7 +1937,13 @@ class App:
         ptt_codes = _resolve_codes(keys["push_to_talk"])
         cancel_key = str(keys.get("cancel", "")).strip()
         cancel_codes = _resolve_codes(cancel_key) if cancel_key else set()
-        print(f"(PTT scan codes {sorted(ptt_codes)}, cancel {sorted(cancel_codes) or 'tap-PTT'})")
+        # Second PTT for the Tier-2 reflex fast path (issue #38). Default unbound = the hook never
+        # fires. Subtract the main PTT/cancel codes so a mis-configuration (same key) can never
+        # double-dispatch — the main PTT keeps priority and the reflex hook simply doesn't engage.
+        reflex_key = str((self.cfg.get("reflex", {}) or {}).get("ptt", "")).strip()
+        reflex_codes = (_resolve_codes(reflex_key) - ptt_codes - cancel_codes) if reflex_key else set()
+        print(f"(PTT scan codes {sorted(ptt_codes)}, cancel {sorted(cancel_codes) or 'tap-PTT'}, "
+              f"reflex {sorted(reflex_codes) or 'unbound'})")
 
         def on_key(e):  # noqa: ANN001
             if e.scan_code in ptt_codes:
@@ -1863,6 +1953,15 @@ class App:
                 elif e.event_type == "up" and self.ptt_held:
                     self.ptt_held = False
                     self.on_ptt_up()
+            elif e.scan_code in reflex_codes:
+                # Reflex fast-path capture (issue #38) — separate from the main PTT so a snap combat
+                # call isn't queued behind the conversation turn.
+                if e.event_type == "down" and not self.reflex_held:
+                    self.reflex_held = True
+                    self.on_reflex_ptt_down()
+                elif e.event_type == "up" and self.reflex_held:
+                    self.reflex_held = False
+                    self.on_reflex_ptt_up()
             elif e.scan_code in cancel_codes and e.event_type == "down":
                 self.on_cancel()
 
@@ -1990,7 +2089,9 @@ def _banner(cfg: dict) -> str:
     ed = "ON" if cfg.get("elite", {}).get("enabled") else "OFF"
     pro = "ON" if cfg.get("proactive", {}).get("enabled") else "OFF"
     kb = "ON" if cfg.get("keybinds", {}).get("enabled") else "OFF"
-    reflex = "ON" if cfg.get("reflex", {}).get("enabled") else "OFF"
+    reflex_on = cfg.get("reflex", {}).get("enabled")
+    reflex_ptt = str((cfg.get("reflex", {}) or {}).get("ptt", "")).strip()
+    reflex = ("ON" if reflex_on else "OFF") + (f" (fast-PTT [{reflex_ptt}])" if reflex_ptt else "")
     honk = "ON" if cfg.get("honk", {}).get("enabled") else "OFF"
     nav = "ON" if cfg.get("nav", {}).get("enabled") else "OFF"
     return (

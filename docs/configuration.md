@@ -300,6 +300,7 @@ separate, *combat-permissive* policy (the inverse of `[keybinds]`): it fires def
 | `reflex.enabled` | `false` | Master switch |
 | `reflex.combat_guard` | `true` | Permit reflexes only while in danger/interdiction; always refuse dangerous actions (leave on) |
 | `reflex.allowlist` | `[]` | Reflex names allowed to fire (separate from `keybinds.allowlist`). Add `"chaff"` to opt in |
+| `reflex.ptt` | `""` | Second push-to-talk for the **instant fast path** — a snap *"chaff!"* on this key fires locally with **no LLM round-trip** (same guard/abort). Bind a **different** key than `keys.push_to_talk`; **blank** disables it. A non-combat phrase on it falls through to a normal turn |
 
 ## Auto-honk (`[honk]`)
 

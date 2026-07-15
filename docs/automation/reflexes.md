@@ -46,6 +46,31 @@ and the keybind allowlist (`landing_gear`) is untouched.
 - **Hard abort** — say **"abort"** any time to release every held key immediately. Reflexes share
   the same key executor as your keybinds and auto-honk, so one abort covers all three.
 
+## Instant reflexes — the second push-to-talk
+
+Asking through the assistant ("fire chaff") works, but it takes a full think-and-reply round-trip.
+When something's shooting at you, that's too slow. So COVAS++ has a **fast path**: bind a **second
+push-to-talk** to `[reflex].ptt` and a snap **"chaff!"** on that key fires **locally** — matched
+against a small fixed combat vocabulary straight on the transcript, with **no LLM round-trip**.
+Latency is roughly just the speech-to-text time (a heartbeat), and the call never waits behind a
+normal conversation turn.
+
+- **Bind a *different* key** than your normal talk key (a spare HOTAS button via JoyToKey works
+  well). Blank (the default) disables it — nothing extra is installed.
+- **What it hears** (say any synonym): **chaff** — *"chaff"*, *"flares"*, *"decoy"*, *"break lock"*;
+  **heat sink** — *"heat"*, *"heat sink"*, *"dump heat"*; **shield cell** — *"shields"*,
+  *"shield cell"*, *"cell"*; **boost** — *"boost"*, *"punch it"*; **abort** — *"abort"*, *"stop"*,
+  *"cancel"*, *"release"* (releases every held key, instantly).
+- **It routes through the exact same safety** as above — the combat-permissive guard, the
+  allowlist, and the hard abort. The fast path is *faster*, not *looser*: chaff still only fires
+  while you're in danger, and dangerous actions are still off-limits.
+- **Say anything that isn't a combat keyword** on that key and it simply **falls through to a normal
+  turn** — so it doubles as an ordinary talk key if you mis-hit it.
+
+Today the same one reflex — **chaff** — is wired to fire (heat sink, shield cell, and boost are
+recognised by the spotter but not yet pressed). It requires `[reflex].enabled` and `chaff` in the
+allowlist, exactly like the assistant path.
+
 ## Settings
 
 | Setting | What it does |
@@ -53,6 +78,7 @@ and the keybind allowlist (`landing_gear`) is untouched.
 | `reflex.enabled` | Master switch (**off** by default) |
 | `reflex.combat_guard` | Permit reflexes only while in danger/interdiction; always refuse dangerous actions (leave on) |
 | `reflex.allowlist` | Reflex names allowed to fire — ships **empty**; add `"chaff"` to opt in |
+| `reflex.ptt` | Second push-to-talk for the instant fast path — a snap *"chaff!"* fires locally with no LLM. Bind a **different** key than the talk key; **blank** disables it |
 
 Requires [game-state monitoring](../elite/monitoring.md) (`[elite].enabled = true`) — the guard must
 read your status to confirm you're in danger before firing. See the
@@ -60,9 +86,11 @@ read your status to confirm you're in danger before firing. See the
 
 ## Roadmap
 
-The chaff reflex is the foundation, not the finish line. Two follow-ups build on this guard:
+The chaff reflex is the foundation, not the finish line. The **instant hotword** fast path (the
+second push-to-talk above) is already here. One follow-up still builds on this guard:
 
 - **Auto-reflexes** — fire chaff automatically the moment your status flips to *in danger*, no
   command needed.
-- **Instant hotword** — a local *"chaff!"* phrase-spotter that fires in well under a second,
-  bypassing the assistant round-trip.
+
+Heat sink, shield cell, and boost are recognised by the phrase-spotter and the guard today; wiring
+each to actually press its key follows the same pattern as chaff.

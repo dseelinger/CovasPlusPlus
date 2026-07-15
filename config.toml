@@ -731,6 +731,20 @@ combat_guard = true
 # The action must also be bound to a KEY in Elite Dangerous; an unbound one degrades to a spoken
 # "bind it in-game" message. Example: allowlist = ["chaff"]
 allowlist = []
+# SECOND push-to-talk for the reflex FAST PATH (issue #38). Bind this to a DIFFERENT key/button
+# than [keys].push_to_talk. A capture on this key is transcribed locally and matched against a
+# FIXED combat vocabulary (no LLM) — on a hit the reflex fires in ~STT time (a heartbeat), routed
+# through the SAME combat-permissive guard + hard abort as above; on a miss it falls through to a
+# normal conversation turn, so this key still works as an ordinary talk key. Default BLANK =
+# disabled (no second hook installed; the main PTT is untouched). Requires [reflex].enabled and an
+# allowlisted+bound reflex to actually fire. `keyboard`-library key name, e.g. ptt = "]".
+# Fixed vocabulary (say any synonym on the reflex key):
+#   chaff     — "chaff", "flares", "decoy", "break lock"
+#   heat_sink — "heat", "heat sink", "dump heat"      [policy-recognized; wiring lands with #37+]
+#   shields   — "shields", "shield cell", "cell"      [policy-recognized]
+#   boost     — "boost", "punch it"                   [policy-recognized]
+#   abort     — "abort", "stop", "cancel", "release"  (shared hard abort — releases every held key)
+ptt = ""
 
 
 [honk]
