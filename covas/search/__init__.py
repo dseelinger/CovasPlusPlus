@@ -24,6 +24,9 @@ from .spansh import (Http, NavError, RequestsHttp, distance_sort, execute_search
 from .categories import (BODIES, CATEGORIES, CategorySpec, ParamSpec, StationRecord,
                          SystemRecord, UnknownParamError, build_filters, build_query,
                          category, parse_results, parse_stations, parse_systems)
+from .routes import (RICHES_ROUTE_URL, ROUTE_URL, RESULTS_URL, TRADE_ROUTE_URL, RoutePlotter,
+                     RouteWaypoint, TradeHop, build_galaxy_request, build_trade_request,
+                     parse_galaxy_route, parse_trade_route, stale_age_caveat, submit_and_poll)
 
 __all__ = [
     "BODIES",
@@ -31,6 +34,19 @@ __all__ = [
     "CategorySpec",
     "Http",
     "NavError",
+    "RESULTS_URL",
+    "RICHES_ROUTE_URL",
+    "ROUTE_URL",
+    "RoutePlotter",
+    "RouteWaypoint",
+    "TRADE_ROUTE_URL",
+    "TradeHop",
+    "build_galaxy_request",
+    "build_trade_request",
+    "parse_galaxy_route",
+    "parse_trade_route",
+    "stale_age_caveat",
+    "submit_and_poll",
     "ParamSpec",
     "RequestsHttp",
     "StationRecord",

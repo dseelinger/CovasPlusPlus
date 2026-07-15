@@ -361,6 +361,16 @@ SCHEMA: list[Setting] = [
             "How many nearest matches to fetch; the closest is the answer.",
             default=50, min=1, max=500, unit="results",
             phrasings=("category search size",)),
+    Setting("route_plan.enabled", ("route_plan", "enabled"), "bool",
+            "Trade-route planner", "Navigation & search",
+            "Voice: 'plan me a trade route from here'. Plans a Spansh trade loop and copies the "
+            "next stop to your clipboard for the galaxy map.",
+            default=False, phrasings=("trade route planner", "route planner")),
+    Setting("route_plan.default_max_hops", ("route_plan", "default_max_hops"), "int",
+            "Trade route hops", "Navigation & search",
+            "Default number of hops when planning a trade loop (if you don't say).",
+            default=4, min=1, max=20, unit="hops",
+            phrasings=("trade route hops",)),
 
     # --- Providers ---------------------------------------------------------
     Setting("llm.provider", ("llm", "provider"), "enum",
