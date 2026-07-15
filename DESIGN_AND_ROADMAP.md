@@ -285,6 +285,12 @@ ED continuously writes game state to disk — the same source other Elite Danger
 
 Design the watcher to publish events **only**; capabilities decide what to *do* with them. That keeps monitoring reusable for both conversation grounding and future automation.
 
+### Implemented — on-foot / SRV awareness (#54)
+Awareness + callouts extend into the Odyssey **on-foot** and **SRV** modes COVAS++ was previously silent in, reusing the same `game_mode` signal (#29) and the existing proactive discipline — no new loop branches, no bypassed cooldowns.
+- **Context folding.** `EDContext` gains on-foot vitals (`oxygen`, `health`, `temperature`, `gravity`, from Status.json's Odyssey fields — cleared to `None` on re-boarding so nothing lingers), SRV `srv_hull` (fed by the journal: `LaunchSRV` → 1.0, `HullDamage` **only while `game_mode == srv`**, `DockSRV` → cleared), and exobiology sampling progress (`ScanOrganic` genus + samples-logged, kept **off** the cached summary as structured/rare state). `summary()` voices the on-foot/SRV vitals only in the matching mode so a ship flight isn't cluttered.
+- **Proactive callouts** ride the existing `ProactivePolicy` whitelist + cooldowns: `ScanOrganic` ("sample two of three logged — one more to analyse"), status-derived `OxygenLow`/`HealthLow` (a downward threshold crossing, since oxygen/health have no ED flag), and journal-derived `SrvHullLow` ("hull's getting low"). All default-on in the whitelist but still gated by `[proactive].enabled` (off by default) and both cooldowns.
+- **Read tools** mirror the ship reads: `OnFootSrvCapability` serves `on_foot_status`, `srv_status`, and `bio_scan_progress` ("how many samples do I need") as free local reads.
+
 ### Context delivery — decided (inline injection, not the cached system prompt)
 The "feed it into the system prompt (cached!)" note above turned out to be a cache **anti**-pattern: the prompt cache breakpoints sit on the personality block *and* the last tool, so anything added to `system` lives inside the cached prefix — a context line that changes as you fly would bust the tools cache every turn (the exact re-send cost we're trying to kill). Two things resolve it:
 

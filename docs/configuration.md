@@ -257,7 +257,7 @@ See [Proactive callouts](elite/proactive-callouts.md).
 | `proactive.min_interval` | `20` | Minimum seconds between any two callouts |
 | `proactive.cooldown` | `120` | Seconds before the same event type may re-announce |
 | `proactive.max_tokens` | `120` | Reply length cap for a callout |
-| `[proactive.events]` | *(see file)* | Per-event whitelist (`FSDJump`, `Docked`, `MissionCompleted`, `LowFuel`, `Overheating`, `Died`) |
+| `[proactive.events]` | *(see file)* | Per-event whitelist (`FSDJump`, `Docked`, `MissionCompleted`, `LowFuel`, `Overheating`, `Died`, plus on-foot/SRV: `ScanOrganic`, `OxygenLow`, `HealthLow`, `SrvHullLow`) |
 
 ## Route callouts (`[route]`)
 

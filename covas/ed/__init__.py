@@ -17,12 +17,13 @@ from .detector import ContextDetector, ContextRef
 from .engineers import (ENGINEERS, Engineer, EngineerStatus, find_by_specialty,
                         find_engineer, parse_engineer_progress, status_for)
 from .journal import (JournalWatcher, apply_carrier_event, apply_journal_event,
-                      default_journal_dir, describe_journal_event, parse_journal_line,
-                      resolve_journal_dir)
+                      apply_scan_organic, default_journal_dir, describe_journal_event,
+                      parse_journal_line, resolve_journal_dir, srv_hull_transitions)
 from .route import RouteStep, RouteTracker, is_scoopable, read_navroute
 from .modes import (GAME_MODES, MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV)
 from .status import (StatusWatcher, apply_status, decode_flags, describe_transition,
-                     flag_transitions, game_mode_from_flags, status_path)
+                     flag_transitions, game_mode_from_flags, low_vital_transitions,
+                     status_path)
 
 __all__ = [
     "ContextDetector",
@@ -39,8 +40,11 @@ __all__ = [
     "StatusWatcher",
     "apply_carrier_event",
     "apply_journal_event",
+    "apply_scan_organic",
     "apply_status",
     "decode_flags",
+    "low_vital_transitions",
+    "srv_hull_transitions",
     "default_journal_dir",
     "describe_journal_event",
     "describe_transition",

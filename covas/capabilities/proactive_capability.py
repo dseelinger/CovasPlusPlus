@@ -36,6 +36,11 @@ DEFAULT_EVENTS: dict[str, bool] = {
     "LowFuel": True,         # fuel dropped below 25%
     "Overheating": True,     # ship > 100% heat
     "Died": True,
+    # On-foot / SRV awareness (#54) — same cooldown/whitelist discipline as the rest.
+    "ScanOrganic": True,     # exobiology sample logged ("one more to analyse")
+    "OxygenLow": True,       # on-foot suit oxygen below 25%
+    "HealthLow": True,       # on-foot health critical
+    "SrvHullLow": True,      # SRV hull dropped below 30%
 }
 
 # A qualifying event won't re-fire for this many seconds (per event type), and no two

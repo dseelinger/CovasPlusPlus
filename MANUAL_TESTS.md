@@ -246,6 +246,25 @@ Notes:
 
 Notes:
 
+### 5.2a On-foot / SRV awareness & callouts (#54)  🎮 ED (Odyssey)
+> Requires `[elite].enabled = true`. Callout checks also need `[proactive].enabled = true`. Needs **Odyssey** (on-foot) and a ship with an SRV bay. Read-tool checks work without proactive.
+
+Read tools (any time, no PTT-free callout needed):
+
+- [ ] **On foot:** disembark, then *"how's my oxygen?"* / *"am I okay out here?"* → reports **oxygen / health / temperature / gravity** from live telemetry.
+- [ ] **SRV:** deploy the SRV, then *"SRV status."* / *"how's the buggy?"* → reports **SRV hull** and cargo.
+- [ ] **Exobiology:** with the Genetic Sampler, log a sample of an organism, then *"how many samples do I need?"* → reports the **genus and samples-so-far** (e.g. "1 of 3 — 2 more needed"). After the third (Analyse), it reports **complete**.
+- [ ] **Mode-appropriate:** the on-foot/SRV readings only make sense in their mode; back in the ship they clear (a stale oxygen reading shouldn't linger).
+
+Proactive callouts (`[proactive].enabled = true`; each fires only when idle, throttled, mutable):
+
+- [ ] **Bio sample:** log your **second** sample of an organism → a callout like *"sample two of three — one more to analyse."*
+- [ ] **Oxygen low:** let on-foot oxygen fall **below ~25%** → an *"oxygen's getting low"* callout (once — cooldown-gated, no repeat while it stays low).
+- [ ] **SRV hull low:** take the SRV **below ~30% hull** → a *"hull's getting low"* callout.
+- [ ] **Mute applies:** with the proactive mute on ("stop the callouts"), none of the above speak.
+
+Notes:
+
 ### 5.3 Route callouts (N4 — `[route].enabled = true`)  🎮 ED
 > Plot a multi-jump galaxy-map route first (writes `NavRoute.json`). These go through the proactive path — spoken only when idle, cancelable, and silenced by the proactive mute too.
 - [ ] **Scoopable heads-up:** as you lock/enter the next jump, COVAS says whether the next star is **scoopable** ("Next star's scoopable." / "…isn't scoopable. Top off your fuel if you're low.").

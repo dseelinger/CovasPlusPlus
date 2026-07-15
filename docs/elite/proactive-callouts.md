@@ -21,6 +21,15 @@ Out of the box, these events can produce a line (each individually toggleable):
 | `LowFuel` | Fuel dropping below ~25% |
 | `Overheating` | Ship over 100% heat |
 | `Died` | The bad one |
+| `ScanOrganic` | Logging an exobiology sample — *"one more to analyse"* |
+| `OxygenLow` | On-foot suit oxygen below ~25% |
+| `HealthLow` | On-foot health critical |
+| `SrvHullLow` | SRV hull dropping below ~30% |
+
+The last four cover the Odyssey **on-foot** and **SRV** modes (see
+[On-foot & SRV awareness](monitoring.md#on-foot-srv-awareness)) — the same never-chatty
+discipline applies: they're whitelisted by default but only speak when `[proactive].enabled`,
+and both cooldowns still gate them.
 
 Lines are short, in-character, and generated on the **cheap tier**, so callouts stay inexpensive.
 

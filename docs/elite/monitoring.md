@@ -25,6 +25,12 @@ files other community tools read.
 | *"How's my fuel?"* | Fuel level and percentage |
 | *"Am I docked?"* / *"What ship am I in?"* | Current flight/ship status |
 | *"What did I just do?"* / *"Check my logs."* | Your recent notable journal events |
+| *"How's my oxygen?"* / *"Am I okay out here?"* | On-foot suit oxygen, health, temperature, gravity |
+| *"SRV status."* / *"How's the buggy?"* | SRV hull integrity and cargo |
+| *"How many samples do I need?"* | Exobiology sampling progress for the current organism |
+
+The last three cover the Odyssey **on-foot** and **SRV** modes — see
+[On-foot & SRV awareness](#on-foot-srv-awareness) below.
 
 These are answered from **real telemetry**, not a guess — and the trivial ones don't even need a
 full round-trip, so they're quick and cheap.
@@ -49,6 +55,21 @@ A rolling snapshot the companion can reference at any time:
 The watchers only ever *publish* what they see; they never initiate speech on their own. Turning
 your live state into spoken callouts is a separate, opt-in feature — see
 [Proactive callouts](proactive-callouts.md).
+
+## On-foot & SRV awareness
+
+Awareness follows you out of the pilot's seat. When you disembark or drop into the SRV, COVAS++
+picks up the modes it used to be silent in:
+
+- **On foot** — suit **oxygen** and **health**, external **temperature**, and local **gravity**
+  (from Status.json's Odyssey fields). Ask *"how's my oxygen"* or *"am I okay out here."*
+- **SRV** — **hull** integrity and cargo. Ask *"SRV status"* or *"how's the buggy."*
+- **Exobiology** — which organism you're sampling and how many of the three Genetic Sampler
+  samples are logged. Ask *"how many samples do I need."*
+
+These are free local reads, only meaningful in the matching mode (on foot, or driving the SRV).
+Turn them into unprompted heads-ups — *"one more sample to analyse,"* *"oxygen's getting low,"*
+*"SRV hull's low"* — with [proactive callouts](proactive-callouts.md).
 
 ## Settings
 

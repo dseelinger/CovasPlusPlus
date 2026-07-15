@@ -19,7 +19,24 @@ from .context import EDContext
 from .engineers import parse_engineer_progress
 from .loadout import parse_loadout
 from .materials import parse_materials
+from .modes import MODE_SRV
+from .status import describe_transition
 from .stored import parse_stored_ships, parse_stored_modules
+
+# SRV hull integrity (0..1) below which a proactive "hull's getting low" callout is worth it
+# (#54). Status.json has no SRV hull field, so it comes from the journal HullDamage event while
+# driving; srv_hull_transitions() fires only on a downward crossing (see the journal watcher).
+SRV_HULL_LOW = 0.30
+
+
+def srv_hull_transitions(old: float | None, new: float | None) -> list[str]:
+    """['SrvHullLow'] when SRV hull just crossed BELOW the alert threshold, else []. Fires only
+    on a genuine downward crossing (prior known and at/above threshold), so a steady-low hull
+    doesn't re-alert and a fresh SRV (unknown prior) establishes a baseline silently."""
+    if (isinstance(new, (int, float)) and new < SRV_HULL_LOW
+            and isinstance(old, (int, float)) and old >= SRV_HULL_LOW):
+        return ["SrvHullLow"]
+    return []
 
 # ED's journals live under the Windows user profile. Resolved at runtime (never a
 # hardcoded C:\Users\... path — see the repo guardrails) so it's portable per machine.
@@ -164,6 +181,16 @@ def _cargo(e: dict) -> dict:
     return {"cargo": float(e["Count"])} if isinstance(e.get("Count"), (int, float)) else {}
 
 
+def _launch_srv(_e: dict) -> dict:
+    # Deployed from the ship — a fresh SRV at full hull (#54). Actual damage arrives via
+    # HullDamage while driving; DockSRV clears it back to None.
+    return {"srv_hull": 1.0}
+
+
+def _dock_srv(_e: dict) -> dict:
+    return {"srv_hull": None}
+
+
 _HANDLERS: dict[str, Callable[[dict], dict]] = {
     "LoadGame": _load_game,
     "Loadout": _loadout,
@@ -176,7 +203,31 @@ _HANDLERS: dict[str, Callable[[dict], dict]] = {
     "SupercruiseExit": _supercruise_exit,
     "FuelScoop": _fuel_scoop,
     "Cargo": _cargo,
+    "LaunchSRV": _launch_srv,
+    "DockSRV": _dock_srv,
 }
+
+
+# ScanType progression for exobiology sampling (#54): three scans complete one organism.
+# "Log" registers the first sample, "Sample" the second, "Analyse" the third (which awards
+# the credits). We map ScanType -> samples-logged so "how many more do I need" is answerable.
+_SCAN_ORGANIC_SAMPLES = {"Log": 1, "Sample": 2, "Analyse": 3}
+_BIO_REQUIRED = 3
+
+
+def apply_scan_organic(ctx: EDContext, event: dict) -> None:
+    """Fold a `ScanOrganic` event into the exobiology-sampling state on `ctx` (#54). Tracks the
+    genus and how many of the three samples are logged (derived from ScanType). The completing
+    'Analyse' leaves samples == required so the read tool can report 'complete'."""
+    if event.get("event") != "ScanOrganic":
+        return
+    scan_type = str(event.get("ScanType") or "")
+    samples = _SCAN_ORGANIC_SAMPLES.get(scan_type)
+    if samples is None:
+        return
+    genus = event.get("Genus_Localised") or event.get("Genus")
+    species = event.get("Species_Localised") or event.get("Species")
+    ctx.set_bio_scan(genus, samples, required=_BIO_REQUIRED, species=species)
 
 
 def apply_journal_event(ctx: EDContext, event: dict) -> dict:
@@ -188,8 +239,18 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     # Collected/Discarded nudge counts between snapshots. Single-writer (this thread), so the
     # read-modify-write on a delta is race-free.
     apply_materials_event(ctx, event)
+    # Exobiology sampling (#54) is structured state off the flat _FIELDS patch — fold it apart,
+    # like materials, so ScanOrganic tracks genus + sample count without a context field.
+    apply_scan_organic(ctx, event)
     handler = _HANDLERS.get(name)
     patch = handler(event) if handler is not None else {}
+    # HullDamage carries the hull of whatever the Commander is piloting (ship/fighter/SRV) with
+    # no discriminator, so only treat it as SRV hull (#54) when game_mode says we're driving the
+    # SRV — otherwise a main-ship hit would masquerade as SRV damage. Merged into the returned
+    # patch so the watcher's crossing detection sees the new value.
+    if name == "HullDamage" and isinstance(event.get("Health"), (int, float)):
+        if ctx.snapshot().get("game_mode") == MODE_SRV:
+            patch = {**patch, "srv_hull": float(event["Health"])}
     if patch:
         ctx.update(**patch)
     # A few events carry structured state beyond the flat "current context" patch and have no
@@ -305,6 +366,21 @@ def _mission_name(e: dict) -> str:
     return e.get("LocalisedName") or e.get("Name") or "a mission"
 
 
+def _scan_organic_phrase(e: dict) -> str | None:
+    """Spoken phrase for a `ScanOrganic` sample (#54), keyed on ScanType so the count is
+    self-contained: Log = 1st sample, Sample = 2nd, Analyse = final. None for an unrecognised
+    ScanType (so it isn't logged as a bare 'ScanOrganic')."""
+    samples = _SCAN_ORGANIC_SAMPLES.get(str(e.get("ScanType") or ""))
+    if samples is None:
+        return None
+    genus = e.get("Genus_Localised") or e.get("Genus") or "an organism"
+    if samples >= _BIO_REQUIRED:
+        return f"Analysed {genus} — exobiology sample complete"
+    remaining = _BIO_REQUIRED - samples
+    tail = "one more to analyse" if remaining == 1 else f"{remaining} more to go"
+    return f"Sample {samples} of {_BIO_REQUIRED} of {genus} logged — {tail}"
+
+
 _DESCRIBERS: dict[str, Callable[[dict], str]] = {
     "FSDJump": lambda e: f"Jumped to {e.get('StarSystem', 'a new system')}",
     "CarrierJump": lambda e: f"Carrier-jumped to {e.get('StarSystem', 'a new system')}",
@@ -312,6 +388,8 @@ _DESCRIBERS: dict[str, Callable[[dict], str]] = {
     "Undocked": lambda e: f"Undocked from {e.get('StationName', 'the station')}",
     "Touchdown": lambda e: "Touched down on a surface",
     "Liftoff": lambda e: "Lifted off",
+    "LaunchSRV": lambda e: "Deployed the SRV",
+    "DockSRV": lambda e: "Docked the SRV",
     "MissionAccepted": lambda e: f"Accepted mission: {_mission_name(e)}",
     "MissionCompleted": lambda e: f"Completed mission: {_mission_name(e)}",
     "MissionFailed": lambda e: f"Failed mission: {_mission_name(e)}",
@@ -325,10 +403,13 @@ _DESCRIBERS: dict[str, Callable[[dict], str]] = {
 
 def describe_journal_event(event: dict) -> str | None:
     """Short spoken phrase for a notable journal event, or None if it's not log-worthy.
-    Scan is special-cased to only surface a deliberate detailed scan (not auto-scan spam)."""
+    Scan/ScanOrganic are special-cased so only meaningful ones surface (a deliberate detailed
+    scan, or a recognised exobiology sample — not auto-scan spam)."""
     name = event.get("event", "")
     if name == "Scan" and event.get("ScanType") == "Detailed" and event.get("BodyName"):
         return f"Scanned {event['BodyName']}"
+    if name == "ScanOrganic":
+        return _scan_organic_phrase(event)
     describer = _DESCRIBERS.get(name)
     return describer(event) if describer else None
 
@@ -362,6 +443,9 @@ class JournalWatcher(threading.Thread):
         self._f = None
         self._path: Path | None = None
         self._buf = ""
+        # Previous SRV hull, for downward-crossing detection of the SrvHullLow callout (#54).
+        # None until a LaunchSRV / HullDamage sets it, so the first reading is a silent baseline.
+        self._last_srv_hull: float | None = None
 
     def stop(self) -> None:
         self._stop.set()
@@ -417,10 +501,25 @@ class JournalWatcher(threading.Thread):
             ev = parse_journal_line(line)
             if ev is None:
                 continue
-            apply_journal_event(self.ctx, ev)
+            patch = apply_journal_event(self.ctx, ev)
             apply_carrier_event(self.ctx, ev)
             self._record(ev)
             self._publish(ev)
+            self._srv_hull_alert(ev, patch)
+
+    def _srv_hull_alert(self, event: dict, patch: dict) -> None:
+        """Publish a derived `SrvHullLow` ed_event when SRV hull crossed below the threshold on
+        this event (#54). Kept in the watcher (not apply_journal_event) because it needs the
+        prior value; the raw HullDamage event carries no low-hull signal of its own."""
+        if "srv_hull" not in patch:
+            return
+        new = patch["srv_hull"]
+        for name in srv_hull_transitions(self._last_srv_hull, new):
+            self.bus.publish({"type": "ed_event", "event": name})
+            desc = describe_transition(name)
+            if desc:
+                self.ctx.record(name, desc, event.get("timestamp"))
+        self._last_srv_hull = new
 
     def _record(self, event: dict) -> None:
         """Add a notable event to the shared recent-events feed (no-op for spammy ones)."""
