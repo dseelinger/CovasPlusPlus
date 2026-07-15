@@ -466,6 +466,20 @@ and **data**, not new branches in the capability or the loop:
   The `secondary` option is the escape hatch for a Commander who deliberately parks COVAS's
   keyboard binds on the Secondary slot.
 
+### Implemented — SRV / buggy action batch (Tier-1, #35)
+The first *multi-macro* batch to land on the #29 registry seam, and the proof the lever works:
+a **new `keybinds/actions/srv.py` module plus one import line** — no edit to `KeybindCapability`.
+It registers the useful, non-combat SRV controls, every one `modes=frozenset({MODE_SRV})` so
+they're advertised and runnable **only while driving the buggy** (never flying or on foot; the
+gate is re-checked at confirm). The benign in-cockpit toggles (`drive_assist`, `srv_headlights`,
+`srv_night_vision`, `srv_cargo_scoop`, `srv_auto_brake`) set `confirm_required=False` and fire on
+a single command; `recall_ship` (summon/dismiss the mothership) is disruptive so it keeps
+`confirm_required=True` and arms-and-confirms like landing gear. Action tokens are the ED `.binds`
+buggy element names (including ED's own misspelling `AutoBreakBuggyButton`); **SRV weapons and the
+turret are deliberately excluded**. None are in the default allowlist — the Commander opts each in
+by name. *Beats-competitors:* EDCoPilot/COVAS:NEXT narrate the SRV but don't press its controls;
+COVAS++ drives the buggy's convenience controls hands-free behind the full safety layer.
+
 ### Implemented — auto-honk (`[honk]`, default off, N5)
 The second keybind-driven action, and the first PROACTIVE one — fire the Discovery Scanner
 ("honk") on arrival in a new system, no button press (`covas/capabilities/honk_capability.py`).

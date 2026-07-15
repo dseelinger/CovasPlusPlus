@@ -567,7 +567,11 @@ binding_preference = "primary"
 # Seconds an armed action stays confirmable before it expires for safety.
 confirm_window = 60
 # Allowlist of macro names the companion may run — the ONLY actions permitted, even if asked
-# for others. The prototype ships exactly one: landing_gear (toggle).
+# for others. Ships default to landing_gear (toggle). Opt each extra macro in BY NAME.
+# SRV / buggy batch (#35), offered only while driving the SRV: drive_assist, srv_headlights,
+#   srv_night_vision, srv_cargo_scoop, srv_auto_brake (benign toggles), and recall_ship
+#   (summons/dismisses your ship — arms-and-confirms). e.g.
+#   allowlist = ["landing_gear", "drive_assist", "srv_headlights", "recall_ship"]
 allowlist = ["landing_gear"]
 
 

@@ -7,5 +7,6 @@ is its own module, imported here for its registration side effect. A Phase-1 act
 from __future__ import annotations
 
 from . import ship  # noqa: F401 — imported for the register() side effect
+from . import srv   # noqa: F401 — SRV / buggy batch (#35)
 
-__all__ = ["ship"]
+__all__ = ["ship", "srv"]

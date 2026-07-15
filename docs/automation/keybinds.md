@@ -48,6 +48,37 @@ Three voice commands are involved:
 | `confirm_keybind` | Confirms and executes the armed action (refused in the same turn it was armed) |
 | `abort_keybinds` | Hard abort — cancels anything armed and releases every held key |
 
+## SRV / buggy controls (opt-in)
+
+Beyond landing gear, COVAS++ can press the useful **SRV** controls while you're driving the
+surface buggy. They're **mode-gated to the SRV** — offered *only* while you're actually driving,
+never while flying the ship or on foot — and each must be added to the allowlist by name (none
+are on by default). EDCoPilot/COVAS:NEXT narrate the SRV but don't drive its controls; this
+toggles them hands-free behind the same safety layer.
+
+| Macro name | Does | Confirmation |
+|------------|------|--------------|
+| `drive_assist` | Toggle SRV drive assist | Fires immediately (benign) |
+| `srv_headlights` | Toggle headlights | Fires immediately (benign) |
+| `srv_night_vision` | Toggle night vision | Fires immediately (benign) |
+| `srv_cargo_scoop` | Toggle cargo scoop | Fires immediately (benign) |
+| `srv_auto_brake` | Toggle auto-brake | Fires immediately (benign) |
+| `recall_ship` | Recall / dismiss your ship | **Arms-and-confirms** (disruptive) |
+
+The benign toggles just flip a convenience state, so with `require_confirmation` on they still
+fire on a single command (they're covered by the allowlist, combat and mode guards). **Recall/dismiss
+ship** summons or sends away your mothership, so it always arms-and-confirms like landing gear.
+
+To enable, add the ones you want to `[keybinds].allowlist` — for example:
+
+```toml
+allowlist = ["landing_gear", "drive_assist", "srv_headlights", "srv_night_vision", "srv_cargo_scoop", "srv_auto_brake", "recall_ship"]
+```
+
+Combat controls (SRV weapons and the turret) are deliberately **not** exposed. As always, the
+matching ED bindings (Drive Assist, Headlights, Night Vision, Cargo Scoop, Auto Brake, Recall/Dismiss
+Ship) must be bound to a **key** in-game for COVAS to press them.
+
 ## It reads *your* bindings
 
 COVAS++ reads your **actual** Elite Dangerous key bindings (it resolves your active preset and pulls
