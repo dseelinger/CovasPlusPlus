@@ -19,6 +19,7 @@ from .config import load_config, load_overrides, save_overrides, deep_merge, moc
 from . import settings_schema as schema
 from .audio import CuePlayer, Recorder
 from .listen import VadListener
+from .wake import WakeWordGate
 from .events import EventBus
 from .checklist import Checklist
 from .capabilities import CapabilityRegistry
@@ -1317,10 +1318,12 @@ class App:
             return
         self._dispatch_utterance(audio)
 
-    def _dispatch_utterance(self, audio) -> None:
+    def _dispatch_utterance(self, audio, *, wake_gated: bool = False) -> None:
         """Run ONE turn on the worker thread for a captured utterance. Shared by PTT release
         and the hands-free VAD listener (issue #63) so both drive the exact same
-        transcribe→LLM→TTS + cancellation path."""
+        transcribe→LLM→TTS + cancellation path. ``wake_gated`` (issue #64) is set ONLY by the
+        continuous path: when a wake word is configured, the worker must confirm the transcript
+        carries it before running the turn. PTT never sets it, so a deliberate press is ungated."""
         self.cues.play("processing")
         # Arm the soft "thinking" bed for THIS user turn (issue #5): the one-shot processing tick
         # above acknowledges receipt; the bed then fills the transcribe/think/search wait. The
@@ -1329,7 +1332,8 @@ class App:
         cancel = threading.Event()
         self.active_cancel = cancel
         self.worker = threading.Thread(
-            target=self._process, args=(audio, cancel), daemon=True
+            target=self._process, args=(audio, cancel), kwargs={"wake_gated": wake_gated},
+            daemon=True,
         )
         self.worker.start()
 
@@ -1348,10 +1352,12 @@ class App:
 
     def _on_vad_utterance(self, audio) -> None:
         """A completed hands-free utterance: dispatch it down the shared turn path. Skipped
-        while PTT is held so a physical hold wins and we never double-fire a turn."""
+        while PTT is held so a physical hold wins and we never double-fire a turn. Marked
+        ``wake_gated`` (issue #64) so the worker enforces the wake word (when one is set)
+        before this ambient capture becomes a turn — PTT stays ungated."""
         if self.ptt_held:
             return
-        self._dispatch_utterance(audio)
+        self._dispatch_utterance(audio, wake_gated=True)
 
     def _listen_mode(self) -> str:
         return str(self.cfg.get("listen", {}).get("mode", "ptt")).strip().lower()
@@ -1583,7 +1589,7 @@ class App:
         if len(self.history) > cap:
             self.history = self.history[-cap:]
 
-    def _process(self, audio, cancel: threading.Event) -> None:
+    def _process(self, audio, cancel: threading.Event, *, wake_gated: bool = False) -> None:
         try:
             if cancel.is_set():
                 return
@@ -1595,6 +1601,24 @@ class App:
                 self.cues.play("failed")
                 self.set_state("Idle", "(no speech detected)")
                 return
+
+            # Wake-word gate (issue #64). ONLY the hands-free path is gated (``wake_gated``);
+            # a deliberate PTT press is always honoured. When a wake word is configured, an
+            # ambient capture must carry it or the turn is dropped BEFORE the LLM — so continuous
+            # mode isn't triggered by every stray utterance. The phrase is stripped from what the
+            # model sees. Disabled (empty wake_word) -> armed passes straight through unchanged.
+            if wake_gated:
+                gate = WakeWordGate.from_cfg(self.cfg)
+                if gate.enabled:
+                    res = gate.check(text)
+                    self._log("wake", res.reason)
+                    if not res.armed or not res.text:
+                        # No wake word (false trigger) or wake word only (nothing to answer):
+                        # drop the turn quietly and return to Idle — no tokens spent.
+                        self.set_state("Idle", "(no wake word)")
+                        return
+                    text = res.text  # run the turn on the stripped command
+
             print(f"\nCommander: {text}")
             self._log("Commander", text)
 

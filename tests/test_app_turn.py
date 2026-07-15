@@ -443,3 +443,85 @@ def test_memory_recall_off_when_disabled(tmp_path):
     assert app.memory is None
     app._process(object(), threading.Event())
     assert llm.last_user == "do you remember my main ship?"
+
+
+# --- wake-word gate (#64): gates the CONTINUOUS path only; PTT bypasses it -------------
+
+def _wake_cfg(tmp_path, phrase: str = "COVAS") -> dict:
+    cfg = _cfg(tmp_path)
+    cfg["listen"] = {"wake_word": phrase}
+    return cfg
+
+
+def test_continuous_utterance_without_wake_word_is_dropped(tmp_path):
+    """A hands-free (wake_gated) capture that lacks the wake word never reaches the LLM — no
+    turn, no history, back to Idle. This is the whole point of the gate."""
+    llm = FakeLLM(text="ok")
+    app = App(_wake_cfg(tmp_path), stt=FakeSTT(text="what's my fuel?"),
+              llm=llm, tts=FakeTTS())
+    app._process(object(), threading.Event(), wake_gated=True)
+    assert llm.model_seen is None            # LLM never called
+    assert app.history == []                 # nothing stored
+    assert app.tts.spoken == []              # nothing spoken
+    assert app.state == "Idle"
+
+
+def test_continuous_utterance_with_wake_word_runs_and_strips_it(tmp_path):
+    """When the capture carries the wake word, the turn runs and the wake word is stripped
+    from what the model sees / what's stored."""
+    llm = FakeLLM(text="Half a tank, Commander.")
+    app = App(_wake_cfg(tmp_path), stt=FakeSTT(text="COVAS, what's my fuel?"),
+              llm=llm, tts=FakeTTS())
+    app._process(object(), threading.Event(), wake_gated=True)
+    assert llm.model_seen is not None        # LLM was called
+    assert app.history[0] == {"role": "user", "content": "what's my fuel?"}
+    assert app.tts.spoken == ["Half a tank, Commander."]
+
+
+def test_ptt_utterance_bypasses_the_wake_gate(tmp_path):
+    """A deliberate PTT turn (the _process default, wake_gated=False) runs even without the
+    wake word — PTT is never gated, so hands-on always works regardless of continuous config."""
+    llm = FakeLLM(text="ok")
+    app = App(_wake_cfg(tmp_path), stt=FakeSTT(text="what's my fuel?"),
+              llm=llm, tts=FakeTTS())
+    app._process(object(), threading.Event())   # PTT path: wake_gated defaults False
+    assert llm.model_seen is not None            # ran despite no wake word
+    assert app.history[0] == {"role": "user", "content": "what's my fuel?"}
+
+
+def test_continuous_wake_word_only_capture_is_dropped(tmp_path):
+    """A capture that is JUST the wake word has no command — drop it (armed but empty)."""
+    llm = FakeLLM(text="ok")
+    app = App(_wake_cfg(tmp_path), stt=FakeSTT(text="COVAS."),
+              llm=llm, tts=FakeTTS())
+    app._process(object(), threading.Event(), wake_gated=True)
+    assert llm.model_seen is None
+    assert app.history == []
+    assert app.state == "Idle"
+
+
+def test_continuous_unaffected_when_wake_word_disabled(tmp_path):
+    """Empty wake_word (the default) -> the gate is off and continuous mode behaves exactly as
+    issue #63 shipped: any capture runs, text unchanged."""
+    llm = FakeLLM(text="ok")
+    cfg = _cfg(tmp_path)
+    cfg["listen"] = {"wake_word": ""}
+    app = App(cfg, stt=FakeSTT(text="what's my fuel?"), llm=llm, tts=FakeTTS())
+    app._process(object(), threading.Event(), wake_gated=True)
+    assert llm.model_seen is not None
+    assert app.history[0] == {"role": "user", "content": "what's my fuel?"}
+
+
+def test_vad_utterance_dispatches_wake_gated(tmp_path):
+    """The continuous callback marks its dispatch wake_gated=True (the wiring that makes the
+    gate apply to hands-free captures); a helper records the flag passed to _dispatch_utterance."""
+    app = App(_wake_cfg(tmp_path), stt=FakeSTT(), llm=FakeLLM(), tts=FakeTTS())
+    seen = {}
+
+    def _capture(audio, *, wake_gated=False):
+        seen["wake_gated"] = wake_gated
+
+    app._dispatch_utterance = _capture  # type: ignore[method-assign]
+    app.ptt_held = False
+    app._on_vad_utterance(object())
+    assert seen == {"wake_gated": True}

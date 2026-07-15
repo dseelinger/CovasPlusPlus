@@ -148,6 +148,29 @@ Notes:
 
 Notes:
 
+## 3b. Wake word — hands-free gating (issue #64 — `[listen].wake_word`)  🔊 HW 🎧 headset 🌐 PANEL
+> Off by default (blank). Only affects **continuous** mode; PTT is never gated. Set a wake word by
+> voice (*"set the wake word to COVAS"*), on the Settings page (**Wake word** under *Voice input*), or
+> in `config.toml` (`[listen].wake_word`). Turn on continuous mode first (section 3a).
+- [ ] **Set it by voice:** in continuous mode, hold `[` and say *"set the wake word to COVAS."* The
+      log/Settings show the wake word is now `COVAS`.
+- [ ] **Armed turn:** hands off the keyboard, say *"COVAS, what time is it? Keep it short."* → the turn
+      runs normally and the reply plays. The transcript printed as **Commander:** has the wake word
+      **stripped** (it reads *"what time is it? ..."*, not *"COVAS, ..."*).
+- [ ] **Stray utterance dropped:** with the wake word still set, say something WITHOUT it (e.g. talk to
+      someone else in the room, *"is dinner ready yet?"*) → the log shows **`[listen] wake word 'COVAS'
+      not heard`** and **NO turn runs** (no Thinking, no reply, no cost).
+- [ ] **Wake word only:** say just *"COVAS."* on its own → it returns to Idle (nothing to answer), no
+      LLM call.
+- [ ] **Fuzzy tolerance:** say the call sign slightly off (*"Kovas, what's my fuel?"*) → with
+      `wake_word_fuzzy` on (default) it still arms and answers. (Set it off to require an exact match.)
+- [ ] **PTT bypasses the gate:** with the wake word set, **hold `[`** and just ask a question WITHOUT
+      the wake word → the PTT turn runs normally (a deliberate press is never gated).
+- [ ] **Clear it:** *"clear the wake word"* (blank) → continuous mode again runs on any capture, exactly
+      as section 3a.
+
+Notes:
+
 ## 4. Cost router — cheap by default, escalates on demand  🔊 HW 🌐 PANEL
 > Verify each turn via the session log's two lines: a **`[router] [<tier>] <model> max_tokens=N — <reason>`** line (the `[cheap]`/`[standard]`/`[premium]` tier prefix is from issue #11) and a **`[usage] in=… out=… ~$0.00XX [<model>]`** line. (Requires `[router].enabled = true`.)
 - [ ] **Banter uses the cheap tier:** *"Morning, COVAS — how's it going?"* → router line shows **`[cheap] claude-haiku-4-5`**; cost a fraction of a cent.

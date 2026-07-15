@@ -62,6 +62,45 @@ The gate is a simple, local **energy** detector — no cloud, no extra dependenc
     A headset (or a push-to-talk setup) avoids that. If you must use speakers, raise
     `energy_threshold` and keep the volume modest.
 
+## Wake word (optional)
+
+Continuous mode runs a turn on **anything** the gate captures — including things you say to
+someone else in the room. To avoid that, set a **wake word**: an arming phrase (like `COVAS`)
+that a hands-free capture must contain before it becomes a turn. It's **off by default** and only
+affects continuous mode — **push-to-talk is never gated**, so a deliberate press always runs.
+
+With a wake word set, a hands-free capture only reaches the model if you said the phrase, and the
+phrase is **stripped** before your words go to the LLM (so it doesn't hear its own name):
+
+- *"COVAS, what's my fuel?"* → runs the turn on **"what's my fuel?"**
+- *"is dinner ready yet?"* (to someone else) → **dropped**, no turn, no cost
+- *"COVAS"* on its own → nothing to answer, so it just returns to Idle
+
+Because the check runs on the **local** Whisper transcript, a false trigger costs **nothing** — the
+drop happens before any cloud call.
+
+=== "By voice"
+
+    Say **"set the wake word to COVAS"**. To turn it off again, **"clear the wake word"** (set it
+    blank).
+
+=== "Settings page"
+
+    Under *Voice input*, set **Wake word** to your phrase (blank = off).
+
+=== "config.toml"
+
+    ```toml
+    [listen]
+    wake_word = "COVAS"     # blank (default) = off; only affects continuous mode
+    wake_word_fuzzy = true  # tolerate STT slips like "Kovas"/"Covis"
+    ```
+
+!!! tip "Fuzzy matching forgives mistranscriptions"
+    A short call sign is easy for speech-to-text to hear a letter off ("Kovas", "Covis"). With
+    **`wake_word_fuzzy`** on (the default), those near-misses still arm the turn, so a single slip
+    doesn't swallow your command. Turn it off to require an exact (still case-insensitive) match.
+
 ## Which should I use?
 
 - **Push-to-talk** (default) — precise, zero false triggers, great with a busy mic or open speakers.
