@@ -42,6 +42,8 @@
   select,input[type=text],input[type=number],input[type=password]{background:#0c1119;color:var(--text);border:1px solid var(--edge);
     border-radius:5px;padding:7px 9px;font-family:inherit;font-size:13px;min-width:200px}
   input[type=number]{min-width:120px;text-align:right}
+  /* Compact type-to-filter box that sits beside a voice <select> (issue #26). */
+  input.voicefilter{min-width:120px;max-width:150px;font-size:12px}
   input.invalid,select.invalid{border-color:var(--err)}
   .unit{color:var(--muted);font-size:12px;min-width:52px}
   .toggle{position:relative;width:50px;height:26px;background:#222c38;border-radius:20px;cursor:pointer;
@@ -198,6 +200,8 @@ function buildControl(control, s){
     for(const o of optionsFor(s)) sel.appendChild(new Option(o.label,o.value));
     sel.value = s.value; if(sel.value!==String(s.value)) sel.appendChild(new Option(s.value,s.value)), sel.value=s.value;
     sel.onchange=()=>edit(s.key, sel.value);
+    // Voice lists can be long — give any *_voices picker a type-to-filter box (issue #26).
+    if(s.options_source && s.options_source.indexOf("voices")>=0) control.appendChild(voiceFilter(sel));
     control.appendChild(sel); return;
   }
   if(s.type==="int"||s.type==="float"){
@@ -215,6 +219,22 @@ function buildControl(control, s){
   inp.placeholder = s.type==="path" ? "(default location)" : "";
   inp.oninput=()=>edit(s.key, inp.value);
   control.appendChild(inp);
+}
+
+// A compact text box that filters a native <select>'s options by case-insensitive substring of the
+// visible label. 3+ chars filters; fewer (or empty) restores the full list (issue #26). Reusable for
+// any voice picker (@elevenlabs_voices today; persona/voice-cast later). The selected option stays
+// visible so the current pick can't disappear behind the filter.
+function voiceFilter(sel){
+  const f=document.createElement("input");
+  f.type="text"; f.className="voicefilter"; f.autocomplete="off"; f.spellcheck=false;
+  f.placeholder="Filter…";
+  f.oninput=()=>{
+    const q=f.value.trim().toLowerCase();
+    const active=q.length>=3;
+    for(const o of sel.options) o.hidden = active && !o.selected && !o.textContent.toLowerCase().includes(q);
+  };
+  return f;
 }
 
 function findSetting(key){
