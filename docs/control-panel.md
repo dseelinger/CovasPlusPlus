@@ -37,6 +37,10 @@ inline help:
 - **Filter box** — type to narrow the list to matching settings. It matches a setting's section,
   title, or description (case-insensitive substring) and hides sections with no matches. Filtering
   kicks in at 3+ characters; shorter or empty shows everything.
+- **Voice-list filter** — the **ElevenLabs voice** picker (long lists) has its own little filter box
+  beside it. Type 3+ characters to narrow the dropdown to voices whose name or category contains the
+  text (case-insensitive); shorter or empty restores the full list. The same box appears next to the
+  **ElevenLabs voice** dropdown on the main control panel.
 - **Change & save** — edit values, then **Save changes** writes them to `overrides.json`
   (`config.toml` stays pristine).
 - **Per-setting reset** — a changed setting shows a **Reset** button that reverts it to the default

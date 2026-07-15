@@ -355,6 +355,17 @@ Notes:
 ### 14.1 Live status & log
 - [ ] The status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, status/search lines (timestamped).
 
+### 14.1a Voice-list filter (issue #26)  🌐 PANEL 🌍 NET
+> Both voice dropdowns get a type-to-filter box: the **ElevenLabs voice** picker on the **main panel**
+> (below the dropdown) and the schema-driven **ElevenLabs voice** picker on the **Settings** page
+> (beside the dropdown). Needs an ElevenLabs key so the list actually populates.
+- [ ] **Main panel:** type **3+ characters** in the filter box under **ElevenLabs voice** → the dropdown
+      narrows to voices whose **name or category** contains the text (case-insensitive; try a category
+      word like *"cloned"* or *"premium"*). Typing **1–2 chars** filters nothing; **clearing** the box
+      restores the full list. The **currently-selected** voice stays visible even when it doesn't match.
+- [ ] **Settings page:** same behavior in the filter box **next to** the schema `@elevenlabs_voices`
+      picker — 3+ chars filters by substring, <3 clears. Picking a filtered voice still saves normally.
+
 ### 14.2 Settings page (N1) — http://127.0.0.1:8765/settings
 - [ ] The page renders **grouped sections** with the **right control per type** (toggles, dropdowns, number/sliders, text/path) and inline help.
 - [ ] **Filter box (issue #7):** type 3+ chars → the list narrows to settings whose **section, title, or description** contains the text (case-insensitive); sections with no matches hide entirely. Typing **1–2 chars** filters nothing (everything stays shown); **clearing** the box restores the full list. Verify a **section-name-only** match (e.g. type a group name that isn't in any title/help) still surfaces that section's settings.

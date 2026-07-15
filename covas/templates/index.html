@@ -20,6 +20,11 @@
   .row{display:flex;align-items:center;justify-content:space-between;margin:10px 0;gap:10px}
   .row label{color:var(--muted);font-size:13px}
   select{background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:5px;padding:6px 8px;font-family:inherit;min-width:180px}
+  /* Voice list + its type-to-filter box, stacked so the filter spans the row (issue #26). */
+  .voicerow{flex-direction:column;align-items:stretch;gap:6px}
+  .voicerow .voicehead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  input.voicefilter{background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:5px;
+       padding:6px 8px;font-family:inherit;font-size:12px;width:100%}
   .status{display:flex;align-items:center;gap:14px;margin-left:auto}
   .dot{width:16px;height:16px;border-radius:50%;background:#444;box-shadow:0 0 0 rgba(0,0,0,0)}
   .state-name{font-size:16px;letter-spacing:2px;min-width:170px}
@@ -105,7 +110,10 @@
       <div class="row"><label>Thinking depth</label><select id="thinking"></select></div>
       <div class="row"><label>Whisper model</label><select id="whisper"></select></div>
       <div class="row"><label>ElevenLabs model</label><select id="el_model"></select></div>
-      <div class="row"><label>ElevenLabs voice</label><select id="el_voice"></select></div>
+      <div class="row voicerow">
+        <div class="voicehead"><label>ElevenLabs voice</label><select id="el_voice"></select></div>
+        <input type="text" id="el_voice_filter" class="voicefilter" placeholder="Filter voices (3+ chars)…" autocomplete="off">
+      </div>
       <div class="row"><label>Voice speed</label><input type="range" id="speed" min="1.0" max="1.2" step="0.05"><span class="speedval" id="speedVal">1.0×</span></div>
       <div class="row"><label>Personality</label><div class="toggle" id="personality"><div class="knob"></div></div></div>
       <button class="cancel" id="cancelBtn">■ CANCEL / STOP</button>
@@ -231,6 +239,16 @@ function addLineCopy(div, plain){
 
 function opt(v,t){const o=document.createElement("option");o.value=v;o.textContent=t||v;return o;}
 
+// Type-to-filter a native <select>'s options by case-insensitive substring of the visible label
+// (name + category, so "any word" matches). 3+ chars filters; fewer (or empty) restores the full
+// list (issue #26). The selected option always stays visible so the current pick can't vanish.
+function filterOptions(sel, raw){
+  const q = (raw||"").trim().toLowerCase();
+  const active = q.length >= 3;
+  for(const o of sel.options)
+    o.hidden = active && !o.selected && !o.textContent.toLowerCase().includes(q);
+}
+
 function post(body){
   return fetch("/api/settings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
 }
@@ -269,6 +287,7 @@ async function init(){
       const name = e.target.selectedOptions[0].textContent.split(" [")[0];
       post({el_voice:e.target.value, el_voice_name:name});
     };
+    $("el_voice_filter").oninput = e => filterOptions($("el_voice"), e.target.value);
   }catch(err){
     $("el_model").appendChild(opt("", "(fetch failed)"));
     $("el_voice").appendChild(opt("", "(fetch failed)"));
