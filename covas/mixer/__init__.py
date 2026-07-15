@@ -38,6 +38,7 @@ from .comms import (
     classify,
     dedup_key,
     evaluate,
+    is_channel_notice,
     is_receive_text,
     message_template,
 )
@@ -138,6 +139,7 @@ __all__ = [
     "classify",
     "dedup_key",
     "evaluate",
+    "is_channel_notice",
     "is_receive_text",
     "message_template",
     "CommsVoicer",
