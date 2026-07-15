@@ -121,6 +121,56 @@ COVAS++ is a **publicly distributed** app whose users each paste their **own** p
 - **A blob that won't decrypt here** (e.g. `%APPDATA%` copied to another PC or account) is treated as **"no key"** with a clear re-enter message, never a crash. DPAPI is Windows-only; on other platforms `protect`/`unprotect` raise and the cross-platform test suite fakes them.
 - **Threat model — in scope:** casual disclosure (a copied/synced key file, another local account, a key flashing on a stream) and a stolen unencrypted key file being usable elsewhere. **Out of scope by design:** malware or an admin/root attacker already running *as* the user — DPAPI cannot stop that, and at that point the API key is the least of the user's problems. As defense-in-depth beyond DPAPI, docs recommend **spend-capped / restricted keys** per provider.
 
+### 3.8 Companion HUD — 2D overlay + in-headset VR (spike decision, epic #40 / issue #46)
+
+A glanceable companion HUD on two surfaces: **(a)** a transparent always-on-top **2D
+window** (desktop players + a VR fallback), and **(b)** a true **in-headset VR overlay**.
+Content is state COVAS++ already has — current system/station, fuel + status, the active
+checklist item, the last proactive callout — a *glanceable panel, not an instrument suite*.
+The rendering-approach spike (#46) landed these decisions (full writeup + PoCs in
+`docs/spikes/hud-spike-46.md`):
+
+- **2D surface — stdlib `tkinter`, transparent + always-on-top.** **Zero new dependency**
+  (strongest fit with "standard library first" + the frozen PyInstaller build), and Windows'
+  `-transparentcolor` gives color-key transparency *and* click-through for free;
+  `overrideredirect` + `-topmost` do borderless always-on-top. Enough for a text/box panel.
+  A richer **PyWebView** variant (already bundled — it is the app's main window) that reuses
+  the Flask/HTML HUD markup is the documented follow-up, accepting it is opaque / not
+  click-through. PySide/Qt (~100 MB frozen) and Dear PyGui are rejected as not earning their
+  dependency weight for a companion panel.
+- **VR surface — first-party **SteamVR overlay** via `pyopenvr` (`IVROverlay`).** The one new
+  dependency **`openvr`** (BSD-3, on PyPI, bundles `openvr_api.dll`; add it *only when the VR
+  sub-issue is built*, and `collect_all("openvr")` in `covas.spec` like `av`/`onnxruntime`).
+  The enabler: `setOverlayRaw` uploads a **raw RGBA buffer from system memory — no
+  DirectX/OpenGL context** — so it is pure Python. Init as `VRApplication_Overlay` (runs
+  alongside the game); **fail soft** when SteamVR is not running. This matches how ED renders
+  VR: **ED natively speaks OpenVR/SteamVR (and Oculus SDK) — it has no native OpenXR** — so a
+  SteamVR overlay composites over the *native* ED render for the majority of PCVR players.
+- **"True OpenXR overlay" (`XR_EXTX_overlay`) is rejected.** No shipping runtime (SteamVR,
+  Oculus/Meta, WMR) implements it; it exists only as LunarG's provisional D3D11 API-layer
+  reference. The runtime-agnostic *API-layer* approach (how OpenKneeboard works) is a
+  separate C++/D3D/Vulkan product and out of scope to build.
+- **Meta Quest reach.** The SteamVR overlay reaches Quest players **running ED through
+  SteamVR** (Link/Air Link with SteamVR active, or Virtual Desktop in SteamVR mode). Quest
+  players on the **native Oculus runtime** or **OpenComposite/OpenXR** are covered by the
+  documented **2D-window + OpenKneeboard/OVR Toolkit** route (the same window-capture path
+  EDCoPilot ships) — we do not build a bespoke OpenXR API layer for them.
+- **Architecture — one renderer, two sinks.** A `HudCapability` (off by default,
+  `[hud].enabled`) subscribes to the `EventBus`, keeps a tiny provider-agnostic `HudModel`
+  snapshot, and a `HudRenderer` draws it once to an offscreen RGBA buffer. A `Flat2DOverlay`
+  sink blits it (tkinter) and a `SteamVROverlay` sink uploads it (`setOverlayRaw`); either
+  sink can be absent without affecting the other, same fail-soft discipline as the provider
+  seam. Redraw only on state change (throttled) — no always-on GPU cost.
+- **Beats-competitors thesis.** EDCoPilot/COVAS:NEXT reach VR only as a *dumb 2D-window
+  mirror* the user brings in with third-party capture tooling (OpenKneeboard + OpenComposite).
+  COVAS++ ships a **first-party, context-aware SteamVR overlay needing no third-party tool for
+  the common SteamVR case** — because we own the renderer + game state, the HUD can *react*
+  (highlight the active checklist item, flash on a callout, fade when idle) instead of
+  mirroring a window, and it composites over ED's native SteamVR render with zero extra setup.
+- **Rough effort:** 2D sub-issue ~2–3 days (no new dep); VR sub-issue ~3–5 days (most of it
+  on-hardware placement/legibility iteration) + the `openvr` dep. **Spike only — no product
+  commitment yet; the 2D and VR builds are separate sub-issues under epic #40.**
+
 ---
 
 ## 4. Cloud model tiering strategy
