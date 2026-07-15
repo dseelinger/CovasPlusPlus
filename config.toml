@@ -736,6 +736,28 @@ user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
 default_efficiency = 60
 
 
+[riches_plan]
+# Road-to-Riches planner (#42) — a sibling of the trade planner on the SAME Spansh route client.
+# Voice: "plan me a Road to Riches route". From your CURRENT system (or a start you name) plus your
+# laden jump range, it plans a chain of nearby systems with high-value UNSCANNED bodies to
+# First-Discovery-scan for exploration credits, speaks a summary (first system, how many bodies,
+# estimated first/total value), and hands the FIRST system to the galaxy map — via the CLIPBOARD
+# for now (paste it into the galaxy-map search); the in-game "set course" keybind handoff arrives
+# with the Tier-1 galaxy-map action (#32). Needs [elite].enabled for the live current-system start.
+# DEFAULT OFF — opt in.
+enabled = false
+# Sent as the HTTP User-Agent — be a polite API citizen and identify the app.
+user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
+# How far (light-years) around your start to look for scannable systems when you don't say.
+default_radius = 50.0
+# Default number of systems in the route when you don't specify one.
+default_max_results = 25
+# Skip bodies whose estimated scan value is below this (credits) when you don't say.
+default_min_value = 300000
+# Fold the extra FSS-mapping value into each body's estimated worth (matches Spansh's default).
+use_mapping_value = true
+
+
 # Location & carrier voice commands (N3) — "copy my current system" and "where's my fleet
 # carrier" — need no configuration: the PERSONAL (owned) carrier is auto-tracked from the
 # journal (name, callsign, current system via CarrierStats / CarrierLocation), pinned to the

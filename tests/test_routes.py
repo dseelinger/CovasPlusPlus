@@ -14,8 +14,9 @@ import pytest
 
 from covas.search import NavError
 from covas.search.routes import (RESULTS_URL, RoutePlotter, RouteWaypoint, build_galaxy_request,
-                                 build_trade_request, parse_galaxy_route, parse_trade_route,
-                                 stale_age_caveat, submit_and_poll)
+                                 build_riches_request, build_trade_request, parse_galaxy_route,
+                                 parse_riches_route, parse_trade_route, stale_age_caveat,
+                                 submit_and_poll)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -158,6 +159,47 @@ def test_parse_trade_route_accepts_bare_list_and_flat_nodes():
 
 def test_parse_trade_route_skips_incomplete_hop():
     assert parse_trade_route([{"commodity": "Gold"}]) == []   # no stations -> skipped
+
+
+# --- Road-to-Riches planner (shape LIVE-VERIFY) ----------------------------
+
+def test_build_riches_request():
+    q = build_riches_request(from_system="Sol", jump_range=40, radius=30, max_results=15,
+                             min_value=500_000, use_mapping_value=True, max_distance=1000)
+    assert q["reference_system"] == "Sol" and q["range"] == 40.0
+    assert q["radius"] == 30.0 and q["max_results"] == 15
+    assert q["min_value"] == 500_000 and q["use_mapping_value"] is True
+    assert q["max_distance"] == 1000 and q["loop"] is False
+
+
+def test_build_riches_request_omits_max_distance_when_unset():
+    assert "max_distance" not in build_riches_request(from_system="Sol", jump_range=40)
+
+
+def test_parse_riches_route_from_fixture():
+    body = json.loads((FIXTURES / "spansh_riches_route.json").read_text(encoding="utf-8"))
+    systems = parse_riches_route(body["result"])           # client returns body.result
+    assert len(systems) == 3
+    s0 = systems[0]
+    assert s0.system == "Hypoe Flyi HW-W e1-7966" and s0.body_count == 2
+    assert s0.total_value == 3_120_000 and s0.jumps == 0
+    assert s0.bodies[0].subtype == "Earth-like world" and s0.bodies[0].value == 2_200_000
+
+
+def test_parse_riches_route_accepts_bare_list_and_derives_total():
+    systems = parse_riches_route([{"name": "A", "bodies": [
+        {"name": "A 1", "value": 100}, {"name": "A 2", "estimated_value": 250}]}])
+    assert len(systems) == 1 and systems[0].system == "A"
+    assert systems[0].total_value == 350                   # summed when no system-level value
+
+
+def test_parse_riches_route_skips_systems_without_bodies():
+    assert parse_riches_route([{"system": "A", "bodies": []}, {"system": "B"}]) == []
+
+
+def test_parse_riches_route_empty_or_bad():
+    assert parse_riches_route(None) == []
+    assert parse_riches_route({"systems": None}) == []
 
 
 # --- freshness -------------------------------------------------------------

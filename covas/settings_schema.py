@@ -383,6 +383,17 @@ SCHEMA: list[Setting] = [
             "detours for fewer total jumps.",
             default=60, min=1, max=100, unit="%",
             phrasings=("neutron route efficiency",)),
+    Setting("riches_plan.enabled", ("riches_plan", "enabled"), "bool",
+            "Road-to-Riches planner", "Navigation & search",
+            "Voice: 'plan me a Road to Riches route'. Plans a Spansh route of nearby high-value "
+            "unscanned bodies to first-discovery-scan for credits and copies the first system to "
+            "your clipboard for the galaxy map.",
+            default=False, phrasings=("road to riches", "riches planner", "exploration route")),
+    Setting("riches_plan.default_max_results", ("riches_plan", "default_max_results"), "int",
+            "Road-to-Riches systems", "Navigation & search",
+            "Default number of systems in the route when you don't say.",
+            default=25, min=1, max=250, unit="systems",
+            phrasings=("road to riches systems",)),
 
     # --- Providers ---------------------------------------------------------
     Setting("llm.provider", ("llm", "provider"), "enum",

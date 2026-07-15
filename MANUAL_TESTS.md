@@ -356,6 +356,17 @@ Notes:
 
 Notes:
 
+## 8c. Road-to-Riches planner (#42)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
+> `[riches_plan].enabled = true` + `[elite].enabled = true`. Plans a Spansh **Road to Riches** — nearby systems of high-value UNSCANNED bodies to First-Discovery-scan — from your current system and copies the first system to the clipboard for the galaxy map. **This is the on-hardware validation of the LIVE-VERIFY Spansh Road-to-Riches request/result shape.**
+- [ ] **Plan from current system (happy path):** somewhere out in the black, *"Plan me a Road to Riches route — 40 light-year jump range."* → speaks a real first system (**start at system X, N bodies to scan worth ~V credits**) and a rough total, and says the first system was copied.
+- [ ] **⚠️ LIVE-VERIFY the riches shape:** confirm the spoken **system name / body count / values** are **real and correct** (cross-check on [spansh.co.uk/riches](https://spansh.co.uk/riches) with the same reference system + jump range). If the summary is blank/zeroed/wrong, the Spansh Road-to-Riches request or result field names have drifted — fix `build_riches_request` / `parse_riches_route` in `covas/search/routes.py` (they're isolated for exactly this).
+- [ ] **Plot handoff:** after a plan, **paste** (Ctrl-V) into the galaxy-map search box → it's the **first route system**; it sets course. (In-game auto course-set is the later keybind action #32.)
+- [ ] **Asks for jump range:** *"Plan a Road to Riches."* with no jump range → it asks for your laden jump range rather than guessing.
+- [ ] **Explicit start:** *"Plan a Road to Riches from Sol with a 30 light-year jump range."* → uses **Sol** as the reference, not your current system.
+- [ ] **Fail-soft:** with the internet briefly off, ask for a route → a spoken "couldn't reach the Road-to-Riches planner" note, and the voice loop keeps working (no crash).
+
+Notes:
+
 ## 9. Location & carriers (N3)  🎮 ED 🔊 HW 📋 clipboard
 > `[elite].enabled = true`. The owned fleet carrier is tracked from the journal (pinned to its `CarrierID`).
 - [ ] **Copy current system:** *"Copy my current system."* → copies your **current** system to the clipboard (paste to confirm).

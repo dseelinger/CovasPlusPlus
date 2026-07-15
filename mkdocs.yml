@@ -99,6 +99,7 @@ nav:
       - Signals & structures: search/signals.md
       - Trade-route planner: search/trade-routes.md
       - Neutron / long-range route: search/neutron-route.md
+      - Road-to-Riches planner: search/road-to-riches.md
   - Ship automation:
       - Keybind automation: automation/keybinds.md
       - Auto-honk: automation/auto-honk.md
