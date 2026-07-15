@@ -29,6 +29,9 @@ overrides.json
 logs/
 # personal game checklist
 ultimate_checklist.md
+# persistent memory (issue #59) — private, human-readable facts about the Commander.
+# Anchored to the repo root so it doesn't also swallow docs/memory.md etc.
+/memory/
 
 # --- Transient / local working files (scratchpad, not for the repo) ---
 # scratchpad for in-progress / one-off bug-fix prompts

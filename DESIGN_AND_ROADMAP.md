@@ -503,3 +503,53 @@ The provider seam *is* the dependency-injection boundary. Build real providers o
 - `pyproject.toml` registers the `integration` / `local` / `paid` markers and sets `addopts = "-m 'not integration'"`, so a bare `pytest` is unit-only. *(Done.)*
 - A unit-test `conftest.py` fixture blocks the network (monkeypatch `socket.socket`) so an accidental real call fails loudly instead of billing you.
 - Commands: `pytest` (unit) · `pytest -m "integration and local"` (free) · `pytest -m "integration and paid"` (costs money). Pre-commit/CI, if added, runs unit only.
+
+---
+
+## 10. Persistent memory (epic #58 — foundation #59)
+
+A companion that forgets your name between sessions doesn't feel like a companion. Persistent
+memory lets COVAS++ carry a handful of small facts about you — how you like to be addressed, your
+main ship, standing preferences — across restarts. Issue #59 is the **foundation**: the store and
+the recall API. Wiring recall into the live turn and giving the LLM a "remember this" tool is a
+later issue (#61); the foundation does **not** touch `app.py`.
+
+### The store — transparent by design (`covas/memory/store.py`)
+Facts live in a plain **JSON Lines** file, `memory.jsonl`, under the user's writable data dir
+(`[memory].dir`, default `memory/`, **git-ignored** and private). One fact per line:
+
+```json
+{"id":"…","text":"prefers the Krait Mk II for combat","type":"preference","tags":["ship"],"when":"2026-07-15T12:00:00Z"}
+```
+
+`text` is the fact; `type`/`tags`/`when` are light metadata for recall and UX. Only `text` is
+required — a user can hand-write a bare `{"text":"…"}` line. **Why per-line JSON, not one big
+array:** a single malformed line (a hand-edit typo, a half-written line from a crash) is *skipped*
+with a warning, and the rest of the memory survives — the store parses and fails soft line by line.
+`add` appends a single line (cheap to grow); `save` rewrites atomically via a temp file (for
+edits/pruning). A missing file is simply an empty memory. Nothing here ever raises into the caller.
+
+### Recall — keyword by default, embeddings opt-in (`retrieval.py`, `embedding.py`)
+`Retriever(store, embedder=None).recall(query, tags=…, limit=…)` returns the most relevant facts.
+The **default** scorer is bag-of-words token overlap with a **tag bonus** (a query word matching a
+curated tag outweighs a body-text match) — pure standard library, deterministic, **offline, free,
+zero new dependency**. An optional `tags=` hard filter gives cheap structured recall; an empty
+query returns the most recent facts.
+
+Semantic recall (matching by *meaning*, not shared words) is an **optional embedding seam** that is
+**OFF by default**. It mirrors the provider pattern: a tiny one-method `EmbeddingProvider` Protocol,
+built only when `[memory.embedding].enabled = true` names a backend, with the heavy import kept
+**lazy** inside `build_embedder` so the disabled path imports nothing extra. No backend ships in the
+foundation; enabling it without one falls back to keyword recall. A dead/failing embedder at runtime
+also degrades to keyword rather than crashing recall. Dependencies are **injected** (the store takes
+a path; the retriever takes an optional embedder), so the default `pytest` run stays hermetic — tests
+point the store at a tmp file and pass a deterministic fake embedder to exercise the similarity path.
+
+### Cost & privacy stance — and how this beats the competitors
+Two deliberate defaults, both cost- and privacy-forward:
+- **Transparent, not opaque.** Memory is a human-readable file you own, can read, edit line by line,
+  or delete — and it's git-ignored so it never leaves your machine. EDCoPilot / COVAS:NEXT keep memory
+  in an opaque, vendor-controlled store you can't inspect or hand-correct. Ours is a text file.
+- **Free by default, paid only on request.** Recall works fully offline with no API and no extra
+  dependency; embeddings (which cost money and phone home) are strictly opt-in, consistent with the
+  project's cloud-tiering cost philosophy (§4) — spend only where a turn earns it.
