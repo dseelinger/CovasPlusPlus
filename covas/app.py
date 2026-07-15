@@ -204,6 +204,11 @@ class App:
         # Route callouts (N4): proactive heads-ups while flying a plotted route (scoopable
         # star, jumps remaining, arrival). Opt-in ([route].enabled, off by default).
         self.route = None
+        # Companion HUD (issue #47): a transparent always-on-top 2D overlay of the voice-loop
+        # state + checklist step + route progress. Off by default ([hud].enabled); the
+        # capability is ALWAYS registered so the toggle (Settings/voice) works live, but the
+        # window is created only when enabled and only when a display is available.
+        self.hud = None
         self._proactive_lock = threading.Lock()
         self._pump: threading.Thread | None = None
         self._pump_q: queue.Queue | None = None
@@ -236,6 +241,9 @@ class App:
             self._start_neutron_plan()
         if self.cfg.get("riches_plan", {}).get("enabled"):
             self._start_riches_plan()
+        # Companion HUD (issue #47) — always wired so a live toggle (Settings/voice) can bring
+        # it up; the window itself stays off until [hud].enabled and a display are both present.
+        self._start_hud()
         # C9: compose the audio layer once the mixer, providers, and ED context all exist.
         if self.mixer is not None:
             self._start_audio_layer()
@@ -696,6 +704,55 @@ class App:
             self.route = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Route callouts failed to start: {e}"})
+
+    # ---- Companion HUD (issue #47) ----------------------------------------
+    def _start_hud(self) -> None:
+        """Register the always-on HUD capability and ensure the event pump is running so it
+        hears status/checklist/route/settings events. The capability keeps a pure HudModel and
+        only opens a window when [hud].enabled AND a display are present — off by default, so
+        this is inert until the Commander opts in (Settings page or 'turn the HUD on'). Fail
+        soft: any wiring problem just leaves the HUD off; it must never block startup."""
+        try:
+            from .capabilities.hud_capability import HudCapability, HudModel, checklist_line
+            from .ed import read_navroute, resolve_journal_dir
+
+            jdir = resolve_journal_dir(self.cfg)
+            model = HudModel(
+                checklist_provider=lambda: checklist_line(self.checklist),
+                load_navroute=lambda: read_navroute(jdir),
+                state=self.state,
+            )
+            self.hud = HudCapability(
+                model,
+                is_enabled=self._hud_enabled,
+                log=lambda m: self._log("hud", m))
+            self.registry.register(self.hud)
+            # A SHOWN HUD repaints from live bus events (status/checklist/route/callout), so it
+            # needs the shared event pump — but only when actually enabled. The toggle itself is
+            # driven directly (see _reconcile_hud), so a disabled HUD adds no pump thread and
+            # can still be brought up live by voice/Settings.
+            if self._hud_enabled():
+                self._start_event_pump()
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.hud = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Companion HUD failed to start: {e}"})
+
+    def _hud_enabled(self) -> bool:
+        return bool(self.cfg.get("hud", {}).get("enabled", False))
+
+    def _reconcile_hud(self) -> None:
+        """Bring the HUD window up/down after a settings change, and start the event pump when
+        it's newly enabled so a shown window has live data to repaint from. Directly invoked
+        (not via the pump) so the toggle works even when no ambient feature was running."""
+        if self.hud is None:
+            return
+        try:
+            if self._hud_enabled():
+                self._start_event_pump()  # idempotent
+            self.hud.reconcile()
+        except Exception as e:  # noqa: BLE001 — a toggle glitch must not crash the loop
+            self._log("hud", f"reconcile failed: {e}")
 
     # ---- Keybind automation (DESIGN §6) -----------------------------------
     def _start_keybinds(self) -> None:
@@ -1184,6 +1241,8 @@ class App:
         """Shared tail for update/reset: broadcast the new settings and reload
         Whisper in the background if its model/device/compute changed."""
         self.bus.publish({"type": "settings", "settings": self.public_settings()})
+        # Companion HUD (issue #47): apply an [hud].enabled toggle live (Settings page or voice).
+        self._reconcile_hud()
         # Audio settings (bus volumes, enable toggles, comms treatment) apply live.
         if self.audio is not None:
             try:
@@ -1500,6 +1559,11 @@ class App:
         """Stop the watchers/pump and close the log. Safe to call once on the way out."""
         self._stop_event_pump()
         self._stop_ed_monitoring()
+        if self.hud is not None:
+            try:
+                self.hud.shutdown()  # tear the overlay window down
+            except Exception:  # noqa: BLE001 — never let cleanup raise on exit
+                pass
         if self.mixer is not None:
             try:
                 self.mixer.stop()

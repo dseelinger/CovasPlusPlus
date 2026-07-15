@@ -58,6 +58,7 @@ the next restart** (only Whisper reloads live). Confirm each before running its 
 - [ ] `[elite].enabled = true` — ED journal/Status monitoring. **Required by** proactive/route callouts, the keybind + honk combat guard, carriers, community goals, and the live "current system" used by every search. (§5, §6, §7, §8, §9, §10)
 - [ ] `[proactive].enabled = true` — proactive callouts. (§5.2)
 - [ ] `[route].enabled = true` — Route callouts while flying a plotted route. (§5.3)
+- [ ] `[hud].enabled = true` — Companion HUD overlay (**off** by default; applies **live**, no restart). (§5a)
 - [ ] `[keybinds].enabled = true` — Landing-gear automation. Keep `require_confirmation`/`combat_guard = true`. (§6.1)
 - [ ] `[honk].enabled = true` — Auto-honk on arrival (**on** by default). No fire-group setup — it probes and backs out of a Surface-Scanner misfire. Set `[honk].trigger` only if your scanner is on secondary fire. (§6.2)
 - [ ] `[nav].enabled = true` — outfitting "find the closest module". (§7)
@@ -201,6 +202,19 @@ Notes:
 - [ ] **Arrival:** on reaching the final system it says "Arrived at <system>. Route complete." and stops.
 - [ ] **Replot:** plot a new route mid-flight → callouts follow the new route (counts reset).
 - [ ] **Mute:** with the proactive mute on ("stop the callouts"), route callouts are silent too.
+
+Notes:
+
+## 5a. Companion HUD overlay (issue #47 — `[hud].enabled`)  🖥️ 🔊 HW 🎮 ED
+> A transparent, always-on-top 2D overlay of the companion's own state. **Off by default**; the toggle applies **live** (no restart, unlike other capability toggles). Cannot be exercised offline/headless — needs Doug's desktop. Run ED **borderless/windowed** so an always-on-top window can float over it (full-screen exclusive can cover any overlay — expected).
+- [ ] **Toggle on — Settings page:** flip **Companion HUD overlay** on the [Settings page](docs/using/hud.md) → a small panel appears **top-right**, background fully transparent (desktop/game shows through), staying **on top**.
+- [ ] **Toggle on — voice:** with the HUD off, say *"turn the HUD on"* → the panel appears (settings-by-voice path). *"Turn the HUD off"* → it disappears. Toggling is live (no restart).
+- [ ] **Voice-loop state row:** hold PTT → the state row tracks **Listening → Thinking → Speaking → Idle** as you talk and COVAS replies.
+- [ ] **Checklist row:** with a checklist loaded, the row shows your next pending item + count (e.g. *"…  (2/10 done)"*); mark it done by voice → the row advances to the next pending item.
+- [ ] **Route row:** plot a multi-jump route (writes `NavRoute.json`) → the row shows **"N jumps to <dest>"**; lock the next jump → it appends **scoopable / NOT scoopable**; each jump decrements the count; arrival shows **"Arrived at <dest>"**.
+- [ ] **Callout row:** trigger a proactive or route callout (§5.2/§5.3) → the last-callout row shows that line.
+- [ ] **Click-through (Windows):** move the mouse over the panel and click → the click lands on the window/game **behind** it (the HUD is non-interactive).
+- [ ] **Fail-soft:** it never blocks startup or the voice loop; with `[hud].enabled = false` no window appears and nothing is logged as an error.
 
 Notes:
 

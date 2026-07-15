@@ -797,6 +797,19 @@ max_turns = 20
 dir = "logs"
 
 
+[hud]
+# Companion HUD (issue #47, epic #40) — a transparent, always-on-top, NON-interactive 2D
+# overlay window showing the companion-centric data COVAS++ already has: the voice-loop state
+# (listening / thinking / speaking), your current checklist step, route progress (jumps
+# remaining + whether the next star is scoopable), and the last proactive callout. Rendered
+# with stdlib tkinter (zero new dependency) per the #46 spike; on Windows it's transparent and
+# click-through, so it never intercepts input meant for the game.
+#
+# DEFAULT OFF — opt in here, from the Settings page, or by voice ("turn the HUD on"). Fails soft
+# where there's no display or toolkit (e.g. a headless box): it simply doesn't appear.
+enabled = false
+
+
 [ui]
 # Local control panel (Phase 3).
 host = "127.0.0.1"
