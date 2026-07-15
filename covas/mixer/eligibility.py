@@ -41,11 +41,17 @@ IN_FIGHTER = "in_fighter"
 POPULATED = "populated"          # arrived in an inhabited system (Population > 0)
 UNPOPULATED = "unpopulated"      # arrived in an uninhabited system (Population == 0)
 DEEP_SPACE = "deep_space"        # coarse proxy for "out in the black" = currently unpopulated
+# The Commander's OWN fleet carrier as a LOCATION context (issue #19). Unlike every token above
+# (decoded from Status flags / population), these are folded in by the audio layer from the
+# EDContext carrier tracking — "am I at, or in the same system as, the carrier I own?" — so the
+# carrier captain/tower/chatter voices become eligible exactly when the Commander is there.
+AT_OWN_CARRIER = "at_own_carrier"      # docked at the Commander's OWN fleet carrier
+NEAR_OWN_CARRIER = "near_own_carrier"  # in the SAME SYSTEM as the own carrier (docked or not)
 
 STATES: frozenset[str] = frozenset({
     DOCKED, LANDED, SUPERCRUISE, NORMAL_SPACE, HYPERSPACE, HARDPOINTS, IN_DANGER, INTERDICTED,
     OVERHEATING, SCOOPING_FUEL, NEAR_STAR, LOW_FUEL, FUEL_CRITICAL, IN_SHIP, IN_SRV, IN_FIGHTER,
-    POPULATED, UNPOPULATED, DEEP_SPACE,
+    POPULATED, UNPOPULATED, DEEP_SPACE, AT_OWN_CARRIER, NEAR_OWN_CARRIER,
 })
 
 _LOCATION_EVENTS = {"FSDJump", "Location", "CarrierJump"}
@@ -125,6 +131,10 @@ class EligibilityEngine:
     def __init__(self) -> None:
         self._flags: int | None = None
         self._journal: set[str] = set()
+        # STICKY own-carrier location context (issue #19), folded in by the audio layer from the
+        # EDContext carrier tracking (not decodable from Status flags). Stays put until the next
+        # note_carrier() — set on every ed_event the layer sees, so it tracks docking/undocking.
+        self._carrier: set[str] = set()
 
     def note_flags(self, flags: int) -> None:
         if isinstance(flags, int) and not isinstance(flags, bool):
@@ -150,9 +160,21 @@ class EligibilityEngine:
             self._flags = f
         self.note_journal(event)
 
+    def note_carrier(self, *, at_own: bool, near_own: bool) -> None:
+        """Set the sticky own-carrier location context (issue #19). `at_own` (docked at the owned
+        carrier) implies `near_own` (same system), so the captain/chatter voices eligible on
+        NEAR_OWN_CARRIER also fire while docked. Idempotent — called each ed_event."""
+        toks: set[str] = set()
+        if near_own or at_own:
+            toks.add(NEAR_OWN_CARRIER)
+        if at_own:
+            toks.add(AT_OWN_CARRIER)
+        self._carrier = toks
+
     def states(self, *, fuel_pct: float | None = None) -> frozenset[str]:
-        """The current eligibility set: flag tokens + sticky population tokens + fuel tokens."""
-        out: set[str] = set(self._journal)
+        """The current eligibility set: flag tokens + sticky population tokens + fuel tokens +
+        the sticky own-carrier location context."""
+        out: set[str] = set(self._journal) | set(self._carrier)
         if self._flags is not None:
             out |= flag_states(self._flags)
         out |= fuel_states(fuel_pct)

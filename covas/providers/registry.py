@@ -26,8 +26,9 @@ from typing import Callable, Optional
 TTSBackend = Callable[[str, str], "tuple[bytes, int]"]
 
 # Cast roles that resolve a provider. Persona/status speech is not here — it uses [tts].provider.
-# "cast" is the umbrella role build_cast() resolves for the pool's default provider.
-CAST_ROLES = ("cast", "comms", "chatter", "player", "interdiction")
+# "cast" is the umbrella role build_cast() resolves for the pool's default provider. The fleet-
+# carrier context voices (issue #19) add "captain" and "tower" (carrier chatter reuses "chatter").
+CAST_ROLES = ("cast", "comms", "chatter", "player", "interdiction", "captain", "tower")
 
 _DEFAULT_PROVIDER = "elevenlabs"
 

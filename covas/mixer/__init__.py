@@ -41,6 +41,15 @@ from .comms import (
     is_receive_text,
     message_template,
 )
+from .carrier import (
+    CarrierConfig,
+    CarrierPlayer,
+    CarrierRole,
+    apply_names,
+    build_carrier_config,
+    carrier_cues,
+    register_carrier,
+)
 from .chatter import (
     ChatterPlayer,
     build_chatter_prompt,
@@ -143,6 +152,13 @@ __all__ = [
     "chatter_interval",
     "is_flavor_safe",
     "register_chatter",
+    "CarrierConfig",
+    "CarrierPlayer",
+    "CarrierRole",
+    "apply_names",
+    "build_carrier_config",
+    "carrier_cues",
+    "register_carrier",
     "MUSIC_CONTEXTS",
     "MusicDirector",
     "MusicLibrary",

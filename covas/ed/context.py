@@ -22,6 +22,8 @@ DEFAULT_RECENT_KEPT = 25
 _FIELDS: tuple[str, ...] = (
     "system",         # current star system name
     "station",        # docked station name (None when not docked)
+    "docked_station_type",  # docked station's type, e.g. "FleetCarrier" (None when not docked)
+    "docked_market_id",     # docked station's MarketID; a carrier's == its CarrierID (own-carrier gate, #19)
     "body",           # nearest body / planet name
     "ship",           # ship type, display name (e.g. "Anaconda")
     "ship_name",      # Commander's custom ship name (e.g. "Void Runner")
@@ -63,6 +65,8 @@ class EDContext:
         self._recent: deque[dict] = deque(maxlen=max(1, int(recent_maxlen)))
         self.system: str | None = None
         self.station: str | None = None
+        self.docked_station_type: str | None = None
+        self.docked_market_id: int | None = None
         self.body: str | None = None
         self.ship: str | None = None
         self.ship_name: str | None = None
@@ -121,6 +125,26 @@ class EDContext:
         """A plain-dict copy of the carrier fields, taken under lock."""
         with self._lock:
             return {k: getattr(self, k) for k in _CARRIER_FIELDS}
+
+    def at_own_carrier(self) -> bool:
+        """True when the Commander is DOCKED at the fleet carrier they OWN (issue #19). Pinned to
+        identity, not name: the docked station must be a FleetCarrier whose MarketID equals our
+        tracked carrier_id (a carrier's CarrierID == its MarketID). Unknown carrier_id, docked
+        elsewhere, or a different (e.g. squadron) carrier -> False. Read under lock."""
+        with self._lock:
+            if not self.docked or self.carrier_id is None or self.docked_market_id is None:
+                return False
+            if str(self.docked_station_type or "").lower() != "fleetcarrier":
+                return False
+            return self.docked_market_id == self.carrier_id
+
+    def near_own_carrier(self) -> bool:
+        """True when the Commander is in the SAME STAR SYSTEM as their own carrier (issue #19),
+        whether or not docked — the looser context for ambient captain/chatter voices. False until
+        both the current system and the carrier's system are known. Read under lock."""
+        with self._lock:
+            here, there = self.system, self.carrier_system
+        return bool(here and there and here.strip().lower() == there.strip().lower())
 
     # -- ship loadout (N9) ---------------------------------------------------------------
     def set_loadout(self, snapshot) -> None:
