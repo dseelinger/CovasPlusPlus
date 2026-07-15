@@ -754,6 +754,7 @@ class App:
         soft: any wiring problem just leaves the HUD off; it must never block startup."""
         try:
             from .capabilities.hud_capability import HudCapability, HudModel, checklist_line
+            from .capabilities.vr_hud import make_vr_view
             from .ed import read_navroute, resolve_journal_dir
 
             jdir = resolve_journal_dir(self.cfg)
@@ -762,16 +763,23 @@ class App:
                 load_navroute=lambda: read_navroute(jdir),
                 state=self.state,
             )
+            # The VR overlay is a SECOND view over the same model — placement is read live from
+            # config when the sink is (lazily) created, so it reflects the current settings.
+            def _vr_factory(provider):
+                return make_vr_view(provider, self._vr_hud_placement(),
+                                    log=lambda m: self._log("hud", m))
             self.hud = HudCapability(
                 model,
                 is_enabled=self._hud_enabled,
+                vr_is_enabled=self._vr_hud_enabled,
+                vr_view_factory=_vr_factory,
                 log=lambda m: self._log("hud", m))
             self.registry.register(self.hud)
-            # A SHOWN HUD repaints from live bus events (status/checklist/route/callout), so it
-            # needs the shared event pump — but only when actually enabled. The toggle itself is
-            # driven directly (see _reconcile_hud), so a disabled HUD adds no pump thread and
-            # can still be brought up live by voice/Settings.
-            if self._hud_enabled():
+            # A SHOWN HUD (either surface) repaints from live bus events (status/checklist/route/
+            # callout), so it needs the shared event pump — but only when actually enabled. The
+            # toggle itself is driven directly (see _reconcile_hud), so a disabled HUD adds no
+            # pump thread and can still be brought up live by voice/Settings.
+            if self._hud_enabled() or self._vr_hud_enabled():
                 self._start_event_pump()
         except Exception as e:  # noqa: BLE001 — optional; never block startup
             self.hud = None
@@ -781,14 +789,24 @@ class App:
     def _hud_enabled(self) -> bool:
         return bool(self.cfg.get("hud", {}).get("enabled", False))
 
+    def _vr_hud_enabled(self) -> bool:
+        return bool(self.cfg.get("hud", {}).get("vr_enabled", False))
+
+    def _vr_hud_placement(self):
+        """Build the VR overlay placement from the live [hud] config (clamped to sane ranges)."""
+        from .capabilities.vr_hud import VrPlacement
+        hud = self.cfg.get("hud", {})
+        return VrPlacement.normalize(hud.get("vr_placement", "world"),
+                                     hud.get("vr_width_m", 0.55))
+
     def _reconcile_hud(self) -> None:
-        """Bring the HUD window up/down after a settings change, and start the event pump when
-        it's newly enabled so a shown window has live data to repaint from. Directly invoked
-        (not via the pump) so the toggle works even when no ambient feature was running."""
+        """Bring the HUD surfaces up/down after a settings change, and start the event pump when
+        either is newly enabled so a shown overlay has live data to repaint from. Directly
+        invoked (not via the pump) so the toggle works even when no ambient feature was running."""
         if self.hud is None:
             return
         try:
-            if self._hud_enabled():
+            if self._hud_enabled() or self._vr_hud_enabled():
                 self._start_event_pump()  # idempotent
             self.hud.reconcile()
         except Exception as e:  # noqa: BLE001 — a toggle glitch must not crash the loop

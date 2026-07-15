@@ -968,6 +968,24 @@ dir = "logs"
 # where there's no display or toolkit (e.g. a headless box): it simply doesn't appear.
 enabled = false
 
+# In-headset VR overlay (issue #48, epic #40) — the SAME four-field HUD as a true SteamVR
+# overlay floating in the cockpit, so VR players don't have to alt-tab to a desktop window. It
+# reuses the exact 2D adapter; only the rendering surface differs (SteamVR IVROverlay via the
+# optional `openvr` binding — pip install openvr). Independent of the 2D `enabled` above: you
+# can run either, both, or neither.
+#
+# DEFAULT OFF. Needs SteamVR running and Elite Dangerous rendering in VR through SteamVR (Link /
+# Air Link / Virtual Desktop in SteamVR mode all count). FAILS SOFT with no VR: if `openvr`
+# isn't installed or SteamVR isn't running it simply doesn't appear — no error, the 2D HUD (if
+# enabled) still works. Quest players on the native Oculus runtime / OpenComposite are covered
+# by capturing the 2D window with OpenKneeboard/OVR Toolkit (see docs/using/hud.md).
+vr_enabled = false
+# Where the panel sits: "world" (cockpit-fixed, parked in front of the seated origin — the
+# comfortable default) or "head" (locked to your view, follows where you look).
+vr_placement = "world"
+# Physical width of the overlay quad in metres (0.15–3.0). ~0.55 m reads well at arm's length.
+vr_width_m = 0.55
+
 
 [ui]
 # Local control panel (Phase 3).

@@ -561,6 +561,24 @@ SCHEMA: list[Setting] = [
             "(no effect headless).",
             default=False, phrasings=("hud", "the hud", "overlay", "hud overlay"),
             example="turn the HUD on"),
+    Setting("hud.vr_enabled", ("hud", "vr_enabled"), "bool",
+            "VR HUD overlay", "Companion HUD",
+            "Show the same HUD as a true in-headset SteamVR overlay floating in the cockpit. Off "
+            "by default; needs SteamVR running and the optional 'openvr' package. Fails soft with "
+            "no VR runtime (the panel simply doesn't appear).",
+            default=False, phrasings=("vr hud", "the vr hud", "vr overlay", "headset hud"),
+            example="turn the VR HUD on"),
+    Setting("hud.vr_placement", ("hud", "vr_placement"), "enum",
+            "VR HUD placement", "Companion HUD",
+            "Where the VR panel sits: 'world' (cockpit-fixed, parked in front — the comfortable "
+            "default) or 'head' (locked to your view, follows where you look).",
+            default="world", options=["world", "head"],
+            phrasings=("vr hud placement", "vr overlay placement")),
+    Setting("hud.vr_width_m", ("hud", "vr_width_m"), "float",
+            "VR HUD width", "Companion HUD",
+            "Physical width of the VR overlay panel in metres. ~0.55 m reads well at arm's length.",
+            default=0.55, min=0.15, max=3.0, unit="m",
+            phrasings=("vr hud width", "vr overlay size")),
 
     # --- Control panel -----------------------------------------------------
     Setting("ui.host", ("ui", "host"), "string",

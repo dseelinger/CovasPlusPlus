@@ -47,14 +47,50 @@ your mouse clicks pass to whatever is behind it.
 !!! note "Full-screen Elite Dangerous"
     An always-on-top window reliably floats over ED in **borderless / windowed** mode. True
     **full-screen exclusive** mode can cover any overlay (that's a Windows limitation, not a
-    COVAS++ one) — run ED borderless if you want the HUD visible over it. For a genuine
-    in-headset VR overlay, see the roadmap (a separate first-party SteamVR overlay is planned).
+    COVAS++ one) — run ED borderless if you want the HUD visible over it. Playing in VR? Turn on
+    the **VR overlay** below instead — it floats the same panel *inside* the headset.
+
+## In VR — the in-headset overlay
+
+The same four-row HUD can render as a true **SteamVR overlay** floating in your cockpit, so you
+never alt-tab out of the headset to see it. It shows exactly the same information as the 2D panel
+— it's the same data adapter, just a different rendering surface.
+
+!!! info "Opt-in, and separate from the 2D HUD"
+    Off by default — set `[hud].vr_enabled = true`, flip **VR HUD overlay** on the
+    [Settings page](../control-panel.md), or say *"turn the VR HUD on."* It's independent of the
+    2D overlay: run either, both, or neither.
+
+**Requirements.** The VR overlay needs:
+
+- **SteamVR running**, with Elite Dangerous rendering through it. ED natively speaks
+  OpenVR/SteamVR, so this is the default for most PCVR headsets (Valve Index, HTC Vive,
+  Windows Mixed Reality via SteamVR, etc.).
+- The optional **`openvr`** Python package. It isn't installed by default — run
+  `pip install openvr` (into the same environment) to enable the VR overlay. Without it, turning
+  the VR HUD on simply does nothing (no error) — it **fails soft**.
+
+**Placement** (both configurable on the Settings page or in `config.toml`):
+
+| Setting | What it does |
+|---------|--------------|
+| **`[hud].vr_placement`** | `world` (default) parks the panel **cockpit-fixed** in front of you; `head` **locks it to your view** so it follows where you look |
+| **`[hud].vr_width_m`** | Physical width of the panel in metres (default `0.55` — reads well at arm's length) |
+
+!!! note "Meta Quest"
+    A Quest reaches this overlay **when it runs ED through SteamVR** — Quest Link / Air Link with
+    SteamVR active, or Virtual Desktop in its SteamVR mode. On the **native Oculus runtime** or
+    **OpenComposite/OpenXR**, SteamVR isn't the compositor, so the first-party overlay won't
+    show; for those, capture the **2D window** with a generic tool like OpenKneeboard or OVR
+    Toolkit (the same route the other Elite assistants use).
 
 ## How it works
 
 The HUD is a thin **view over live state**: a pure adapter maps the EventBus status, the
-checklist model, and the plotted route into the four display fields, and a small
-[tkinter](https://docs.python.org/3/library/tkinter.html) window (Python standard library — no
-new dependency) renders them. Because the data adapter is separate from the window, the feature
-is fully testable offline, and the window is only ever created when the HUD is enabled *and* a
-display is available.
+checklist model, and the plotted route into the four display fields. That single adapter feeds
+**two rendering surfaces** — a small [tkinter](https://docs.python.org/3/library/tkinter.html)
+window (Python standard library — no new dependency) for the desktop, and a SteamVR overlay
+(via the optional `openvr` binding, rendered from a raw RGBA buffer) for the headset. Because the
+data adapter is separate from both surfaces, the feature is fully testable offline, and each
+surface is only ever created when its toggle is on *and* its runtime (a display, or SteamVR) is
+actually present — otherwise it quietly stays off.
