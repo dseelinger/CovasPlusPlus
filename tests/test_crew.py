@@ -227,6 +227,121 @@ def test_build_system_appends_crew_instruction_statically():
 
 
 # ============================================================================================
+# 3b. Crew EDITOR roster (issue #70) — CrewMember model, file load/save, persona folding,
+#     voice_ref lookup. All pure/hermetic: a tmp JSON file, no network/device.
+# ============================================================================================
+
+def test_crew_member_from_obj_accepts_string_and_table():
+    assert crew.CrewMember.from_obj("Nyx") == crew.CrewMember("Nyx", "", "")
+    m = crew.CrewMember.from_obj({"name": " Vela ", "persona": " Warm engineer. ",
+                                  "voice_ref": " VID "})
+    assert m == crew.CrewMember("Vela", "Warm engineer.", "VID")   # trimmed
+
+
+def test_crew_member_from_obj_drops_nameless_and_junk():
+    for junk in ({"persona": "no name"}, {"name": "   "}, "", 42, None, ["Nyx"]):
+        assert crew.CrewMember.from_obj(junk) is None
+
+
+def test_crew_member_persona_is_capped():
+    big = "x" * 999
+    assert len(crew.CrewMember.from_obj({"name": "N", "persona": big}).persona) == crew._MAX_PERSONA
+
+
+def test_load_members_prefers_the_roster_file(tmp_path):
+    import json
+    f = tmp_path / "crew.json"
+    f.write_text(json.dumps([{"name": "Nyx", "persona": "Terse.", "voice_ref": "V1"},
+                             {"name": "Vela"}]), encoding="utf-8")
+    cfg = {"crew": {"file": str(f), "roster": ["Ignored"]}}   # file wins over legacy roster
+    members = crew.load_members(cfg)
+    assert members == [crew.CrewMember("Nyx", "Terse.", "V1"), crew.CrewMember("Vela", "", "")]
+
+
+def test_load_members_falls_back_to_legacy_roster_when_no_file(tmp_path):
+    cfg = {"crew": {"file": str(tmp_path / "absent.json"), "roster": ["Nyx", "Nyx", "Vela"]}}
+    assert [m.name for m in crew.load_members(cfg)] == ["Nyx", "Vela"]   # deduped
+
+
+def test_load_members_supports_inline_member_tables_in_legacy_roster():
+    cfg = {"crew": {"roster": [{"name": "Nyx", "persona": "P", "voice_ref": "V"}]}}
+    assert crew.load_members(cfg) == [crew.CrewMember("Nyx", "P", "V")]
+
+
+def test_load_members_corrupt_file_degrades_to_config_fallback(tmp_path):
+    f = tmp_path / "crew.json"
+    f.write_text("{not json", encoding="utf-8")
+    cfg = {"crew": {"file": str(f), "roster": ["Backup"]}}
+    assert [m.name for m in crew.load_members(cfg)] == ["Backup"]   # never crashes
+
+
+def test_save_members_round_trips_and_is_atomic(tmp_path):
+    f = tmp_path / "sub" / "crew.json"            # parent auto-created
+    members = [crew.CrewMember("Nyx", "Terse.", "V1"), crew.CrewMember("", "dropped", "")]
+    crew.save_members(f, members)                 # nameless entry is dropped on save
+    reloaded = crew.load_members({"crew": {"file": str(f)}})
+    assert reloaded == [crew.CrewMember("Nyx", "Terse.", "V1")]
+    assert not f.with_suffix(".json.tmp").exists()  # temp file cleaned up (atomic replace)
+
+
+def test_system_instruction_folds_personas_and_stays_static(tmp_path):
+    import json
+    f = tmp_path / "crew.json"
+    f.write_text(json.dumps([{"name": "Nyx", "persona": "Sharp sensor officer"},
+                             {"name": "Vela", "persona": "Warm engineer."}]), encoding="utf-8")
+    cfg = {"crew": {"enabled": True, "file": str(f)}}
+    inst = crew.system_instruction(cfg)
+    assert "Nyx" in inst and "Vela" in inst
+    assert "Sharp sensor officer." in inst and "Warm engineer." in inst   # trailing period added
+    assert inst == crew.system_instruction(cfg)                            # cache-safe: byte-stable
+
+
+def test_system_instruction_omits_persona_clause_when_none_have_one():
+    inst = crew.system_instruction({"crew": {"enabled": True, "roster": ["Nyx"]}})
+    assert "In character:" not in inst and "Nyx" in inst
+
+
+def test_voice_ref_for_returns_explicit_ref_else_blank(tmp_path):
+    import json
+    f = tmp_path / "crew.json"
+    f.write_text(json.dumps([{"name": "Nyx", "voice_ref": "V1"}, {"name": "Vela"}]),
+                 encoding="utf-8")
+    cfg = {"crew": {"file": str(f)}}
+    assert crew.voice_ref_for(cfg, "Nyx") == "V1"    # explicit assignment
+    assert crew.voice_ref_for(cfg, "Vela") == ""     # left on auto-assign
+    assert crew.voice_ref_for(cfg, "Unknown") == ""  # not in roster -> auto
+
+
+# ============================================================================================
+# 3c. VoiceCast.for_crew — explicit voice_ref overrides the deterministic auto-assign
+# ============================================================================================
+
+def _cast(pool_refs):
+    from covas.mixer.voices import Voice, VoiceCast
+    pool = [Voice("elevenlabs", r, "neutral") for r in pool_refs]
+    return VoiceCast(pool, persona=Voice("elevenlabs", "PERSONA"),
+                     player=Voice("elevenlabs", "PLAYER"), cast_provider="elevenlabs")
+
+
+def test_for_crew_blank_ref_falls_back_to_deterministic_assign():
+    cast = _cast(["VA", "VB", "VC"])
+    # No explicit ref -> identical to assign() (same name -> same voice).
+    assert cast.for_crew("Nyx", "") == cast.assign("Nyx")
+
+
+def test_for_crew_explicit_ref_matching_pool_reuses_that_entry():
+    cast = _cast(["VA", "VB", "VC"])
+    v = cast.for_crew("Nyx", "VB")
+    assert v.ref == "VB" and v.provider == "elevenlabs"   # the pool entry, kept intact
+
+
+def test_for_crew_explicit_ref_outside_pool_routes_via_cast_provider():
+    cast = _cast(["VA"])
+    v = cast.for_crew("Nyx", "CUSTOM")
+    assert v.ref == "CUSTOM" and v.provider == "elevenlabs"   # raw ref on the cast provider
+
+
+# ============================================================================================
 # 4. AudioLayer.speak_crew — deterministic cast voice on the radio-treated comms bus
 # ============================================================================================
 
@@ -268,6 +383,20 @@ def test_speak_crew_routes_to_the_comms_bus_via_the_cast():
     assert said[0][0] in {"VA", "VB", "VC", "VD", "VE"}  # a POOL voice, not the persona
     # The line landed on the radio-treated COMMS bus (not COVAS's own clean bus).
     assert any(s["bus"] == "comms" for s in layer.mixer._sources)  # noqa: SLF001
+
+
+def test_speak_crew_honors_an_explicit_voice_ref(tmp_path):
+    # An explicit [crew].file voice_ref (issue #70) overrides the deterministic pick: Nyx is pinned
+    # to pool voice "VD" regardless of what assign() would have chosen for that name.
+    import json
+
+    said: list[tuple[str, str]] = []
+    layer = _crew_layer(said)
+    f = tmp_path / "crew.json"
+    f.write_text(json.dumps([{"name": "Nyx", "voice_ref": "VD"}]), encoding="utf-8")
+    layer.cfg["crew"] = {"file": str(f)}
+    layer.speak_crew("Nyx", "Contact.", threading.Event())
+    assert said[0][0] == "VD"                            # pinned voice, not the auto-assigned one
 
 
 def test_speak_crew_is_deterministic_per_name():

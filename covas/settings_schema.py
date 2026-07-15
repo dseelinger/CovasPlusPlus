@@ -237,12 +237,13 @@ SCHEMA: list[Setting] = [
             "Load personality.txt as the system prompt (Commander address + campaign context).",
             default=True, phrasings=("personality", "character"),
             example="turn personality off"),
-    # --- Crew (issue #69) --------------------------------------------------
+    # --- Crew (issues #69, #70) --------------------------------------------
     Setting("crew.enabled", ("crew", "enabled"), "bool",
             "Interactive crew", "Personality",
             "Let replies voice a NAMED crew member: the model may start a line with '[Name]' and "
             "that line is spoken in its own distinct, radio-filtered voice (the ship persona still "
-            "speaks every unprefixed line). Off by default.",
+            "speaks every unprefixed line). Define each character's personality and voice on the "
+            "Crew tab of the control panel. Off by default.",
             default=False, phrasings=("crew", "crew voices", "the crew"),
             example="turn crew on"),
 

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COVAS++ Crew</title>
+<!-- The crew editor (issue #70): define the ship's crew — name, personality, and voice per
+     character. Pure vanilla JS — no CDN — so the panel works fully offline. The whole roster is
+     saved at once (the cast is small); the save carries the content-hash base_version, and a 409
+     (a hand-edit / voice write landed) offers reload instead of clobbering, mirroring the memory
+     and checklist editors. Personas fold into the (static) system prompt; a chosen voice overrides
+     the deterministic auto-assignment, a blank one keeps it. -->
+<style>
+  :root{
+    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
+    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,#12181f,#0a0d12)}
+  header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
+  header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
+  header a.sub{color:var(--accent2);text-decoration:none}
+  .wrap{padding:16px;max-width:1000px}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:16px;margin-bottom:16px}
+  .card h2{margin:0 0 12px;font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  input,select,textarea{background:#0c1119;color:var(--text);border:1px solid var(--edge);
+      border-radius:6px;padding:8px 10px;font-family:inherit;font-size:13px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent2)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1 1 240px}
+  button{padding:9px 16px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+      border-radius:6px;font-family:inherit;font-size:13px;letter-spacing:1px;cursor:pointer}
+  button:hover{background:#162836}
+  button.primary{background:var(--accent);color:#0a0d12;border-color:var(--accent);font-weight:bold}
+  button.primary:hover{filter:brightness(1.1)}
+  button.danger{color:#ff9d9d}
+  button.small{padding:5px 10px;font-size:12px}
+  .msg{color:#39d353;font-size:12px}
+  .msg.err{color:#ff9d9d}
+  .hint{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.6}
+  .count{color:var(--muted);font-size:12px;margin-left:auto}
+  .banner{display:none;margin:0 0 16px;padding:12px 16px;border:1px solid #7a5a2a;border-radius:6px;
+      background:#2a2114;color:#ffce7a;font-size:13px;line-height:1.6}
+  .banner.show{display:block}
+  .banner a{color:var(--accent);text-decoration:none}
+  ul#list{list-style:none;margin:0;padding:0}
+  li.crew{border:1px solid var(--edge);border-radius:6px;padding:12px;margin-bottom:10px;background:#0e141d}
+  li.crew .nameRow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  li.crew .cName{flex:1 1 200px;font-weight:bold}
+  li.crew .cVoice{flex:1 1 220px}
+  li.crew textarea.cPersona{width:100%;min-height:52px;resize:vertical;line-height:1.5}
+  .empty{color:var(--muted);font-size:13px;padding:8px 0}
+  .conflict{display:none;margin-top:12px;padding:12px;border:1px solid #7a5a2a;border-radius:6px;
+      background:#2a2114;color:#ffce7a;font-size:13px;line-height:1.6}
+  .conflict.show{display:block}
+  .conflict button{margin-right:8px;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>COVAS++</h1>
+  <span class="sub">CREW</span>
+  <a href="/" class="sub">← control panel</a>
+  <a href="/settings" class="sub">⚙ settings</a>
+  <a href="/checklist" class="sub">☑ checklist</a>
+  <a href="/memory" class="sub">🧠 memory</a>
+  <span class="sub" id="fileName" style="margin-left:auto"></span>
+</header>
+
+<div class="wrap">
+  <div class="banner" id="offBanner">
+    Interactive crew is currently <b>off</b>. Your roster is saved, but crew members won't speak
+    until you enable it on the <a href="/settings">settings</a> page (or say "turn crew on").
+  </div>
+
+  <div class="card">
+    <h2>Crew roster</h2>
+    <div class="hint">
+      Each character has a <b>name</b> (how the companion refers to them and their line prefix),
+      an optional <b>personality</b> woven into the system prompt, and a <b>voice</b>. Leave the
+      voice on <i>Auto</i> to let COVAS++ pick a stable one deterministically, or pin a specific
+      cast voice.
+    </div>
+    <ul id="list" style="margin-top:12px"></ul>
+    <div class="empty" id="empty" style="display:none">No crew yet. Add a character to begin.</div>
+    <div class="row" style="margin-top:12px">
+      <button id="addRow">+ ADD CHARACTER</button>
+      <button class="primary" id="save">SAVE ROSTER</button>
+      <button id="reload">RELOAD FROM DISK</button>
+      <span class="count" id="count"></span>
+    </div>
+    <span class="msg" id="msg"></span>
+    <div class="conflict" id="conflict">
+      ⚠ The crew file changed on disk since you loaded it.<br>
+      <button id="reloadTheirs" class="small">RELOAD (discard my pending edits)</button>
+      <button id="overwrite" class="small danger">SAVE ANYWAY (overwrite)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let VERSION = null;   // content-hash of the roster file as we last loaded/saved it
+let VOICES = [];      // [{ref,label}] voice options for the per-character dropdown
+
+function flash(text, isErr){
+  const el = $("msg");
+  el.textContent = text; el.classList.toggle("err", !!isErr);
+  clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = ""; }, 3000);
+}
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function voiceOptions(sel){
+  // "Auto" (value "") plus every available cast voice; keep an unknown saved ref selectable.
+  let opts = `<option value="">Auto (deterministic)</option>`;
+  let known = false;
+  for (const v of VOICES){
+    const on = v.ref === sel ? " selected" : "";
+    if (v.ref === sel) known = true;
+    opts += `<option value="${esc(v.ref)}"${on}>${esc(v.label)}</option>`;
+  }
+  if (sel && !known) opts += `<option value="${esc(sel)}" selected>${esc(sel)} (saved)</option>`;
+  return opts;
+}
+
+function addRow(member){
+  const m = member || {name:"", persona:"", voice_ref:""};
+  const li = document.createElement("li");
+  li.className = "crew";
+  li.innerHTML = `
+    <div class="nameRow">
+      <input class="cName" placeholder="Name — e.g. Nyx" value="${esc(m.name)}">
+      <select class="cVoice">${voiceOptions(m.voice_ref || "")}</select>
+      <button class="small danger del">DELETE</button>
+    </div>
+    <textarea class="cPersona" placeholder="Personality (optional) — e.g. Sharp-eyed sensor officer, terse and dry.">${esc(m.persona)}</textarea>`;
+  li.querySelector(".del").onclick = () => { li.remove(); refreshCount(); };
+  $("list").appendChild(li);
+  $("empty").style.display = "none";
+  refreshCount();
+}
+
+function collect(){
+  // Gather the on-screen rows into a members list; drop nameless rows (nothing to voice).
+  return [...$("list").querySelectorAll("li.crew")].map(li => ({
+    name: li.querySelector(".cName").value.trim(),
+    persona: li.querySelector(".cPersona").value.trim(),
+    voice_ref: li.querySelector(".cVoice").value,
+  })).filter(m => m.name);
+}
+
+function refreshCount(){
+  const n = $("list").querySelectorAll("li.crew").length;
+  $("count").textContent = n ? n + " character(s)" : "";
+  $("empty").style.display = n ? "none" : "block";
+}
+
+function apply(data){          // fold a server snapshot into the UI
+  VERSION = data.version;
+  VOICES = data.voices || [];
+  $("fileName").textContent = data.name || "";
+  $("offBanner").classList.toggle("show", data.enabled === false);
+  $("conflict").classList.remove("show");
+  $("list").innerHTML = "";
+  for (const m of (data.members || [])) addRow(m);
+  refreshCount();
+}
+
+async function load(){
+  const r = await fetch("/api/crew");
+  const data = await r.json();
+  if (!r.ok) { flash(data.error || "load failed", true); return; }
+  apply(data);
+}
+
+async function save(force){
+  const r = await fetch("/api/crew", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ members: collect(), base_version: VERSION, force: !!force }),
+  });
+  const data = await r.json();
+  if (r.status === 409) {          // file changed underneath us
+    $("conflict").classList.add("show");
+    $("conflict")._theirs = data;
+    flash("Crew file changed on disk — reload or overwrite.", true);
+    return;
+  }
+  if (!r.ok) { flash(data.error || "save failed", true); return; }
+  apply(data);
+  flash("Saved.");
+}
+
+$("addRow").onclick = () => addRow();
+$("save").onclick = () => save(false);
+$("reload").onclick = async () => { await load(); flash("Reloaded."); };
+$("reloadTheirs").onclick = () => {
+  const theirs = $("conflict")._theirs;
+  if (theirs) apply(theirs);
+  flash("Loaded the on-disk version.");
+};
+$("overwrite").onclick = () => save(true);
+
+load();
+</script>
+</body>
+</html>

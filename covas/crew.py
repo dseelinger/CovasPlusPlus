@@ -26,11 +26,24 @@ Enablement is `[crew].enabled` (DEFAULT OFF). When ON, a STATIC instruction (see
 `system_instruction`) is folded into the cached system prefix telling the model it MAY use the
 `[Name]` prefix; when OFF, replies are spoken exactly as before (any stray `[...]` is just read
 as text — the parser is never even invoked).
+
+CREW EDITOR (issue #70) — the roster grows up from "a hint list of names" to a first-class,
+Commander-editable CAST: each character is a `CrewMember(name, persona, voice_ref)`. The `persona`
+folds into the SAME static crew instruction (so a character has consistent, self-authored
+personality) and `voice_ref` gives an EXPLICIT voice assignment that overrides the deterministic
+auto-assign from #69 (blank `voice_ref` = keep the auto voice). The roster persists to a small JSON
+file (`[crew].file`, git-ignored — persona text is personal) editable in the control panel; when
+the file is absent we fall back to the legacy `[crew].roster` (names, or inline member tables) so
+existing configs keep working unchanged. All of this stays STATIC for a given saved roster, so the
+personas ride the prompt cache and only rewrite it the once, when the Commander saves an edit.
 """
 from __future__ import annotations
 
+import json
 import re
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Optional
 
 # A LINE prefix like "[Nyx] ...". The name is 1..40 chars with no newline or ']' inside; a single
@@ -39,8 +52,11 @@ from typing import Callable, Optional
 _PREFIX = re.compile(r"^\[([^\]\r\n]{1,40})\]\s?(.*)$")
 
 # Longest crew name we honor when weaving the roster into the system instruction (defensive — a
-# config typo shouldn't dump a wall of text into the cached prefix).
+# config typo shouldn't dump a wall of text into the cached prefix). Also caps the editable roster.
 _MAX_ROSTER = 12
+# A persona line is trimmed to this in the (cached) system prefix so one runaway paragraph can't
+# blow up the prompt — the Commander gets consistent flavor, not an essay billed every session.
+_MAX_PERSONA = 400
 
 
 @dataclass(frozen=True)
@@ -122,40 +138,152 @@ def speak_segments(
             persona_speak(seg.text)  # fail soft: crew voice unavailable -> persona voice
 
 
+@dataclass(frozen=True)
+class CrewMember:
+    """One editable crew character (issue #70). `name` is the identity key — case-sensitive, used
+    verbatim both for the `[Name]` prefix the model writes and for the deterministic voice fallback,
+    so it must match the spelling the model uses. `persona` is optional free-form flavor folded into
+    the static crew instruction; `voice_ref` is an optional EXPLICIT voice id (an ElevenLabs
+    voice_id or a Piper .onnx path) that overrides the auto-assigned voice — blank = auto-assign."""
+
+    name: str
+    persona: str = ""
+    voice_ref: str = ""
+
+    def to_dict(self) -> dict:
+        return {"name": self.name, "persona": self.persona, "voice_ref": self.voice_ref}
+
+    @classmethod
+    def from_obj(cls, obj: object) -> Optional["CrewMember"]:
+        """Coerce one roster entry into a member, fail-soft. Accepts a bare string (a name, for the
+        legacy `[crew].roster = ["Nyx", ...]` form) or a table `{name, persona, voice_ref}`. Returns
+        None for anything with no usable name so a typo can't inject a nameless voice."""
+        if isinstance(obj, str):
+            name, persona, voice_ref = obj, "", ""
+        elif isinstance(obj, dict):
+            name = str(obj.get("name", "")).strip()
+            persona = str(obj.get("persona", "") or "").strip()
+            voice_ref = str(obj.get("voice_ref", "") or "").strip()
+        else:
+            return None
+        name = str(name).strip()
+        if not name:
+            return None
+        return cls(name=name, persona=persona[:_MAX_PERSONA], voice_ref=voice_ref)
+
+
 def is_enabled(cfg: dict) -> bool:
     """Whether crew voicing is on. DEFAULT OFF (opt-in, like the other atmosphere features)."""
     return bool((cfg.get("crew", {}) or {}).get("enabled", False))
 
 
-def roster(cfg: dict) -> list[str]:
-    """The optional configured crew roster (`[crew].roster`) — a hint list of names. A free-form
-    name the model invents still gets a deterministic voice, so this is purely advisory."""
-    names = (cfg.get("crew", {}) or {}).get("roster", []) or []
-    out: list[str] = []
-    for n in names:
-        s = str(n).strip()
-        if s and s not in out:
-            out.append(s)
+def roster_file(cfg: dict) -> Optional[Path]:
+    """Absolute path to the JSON crew-roster file (`[crew].file`), already resolved under the
+    writable data dir by config._resolve_paths, or None when unconfigured. The editor and the
+    voice/prompt paths all read/write THIS one file so a saved edit applies everywhere live."""
+    raw = str((cfg.get("crew", {}) or {}).get("file", "") or "").strip()
+    return Path(raw) if raw else None
+
+
+def _dedupe(members: list[CrewMember]) -> list[CrewMember]:
+    """First-wins de-dupe by (case-sensitive) name, capped at `_MAX_ROSTER` — a stable, bounded
+    roster so the cached instruction can't balloon from a copy-paste."""
+    out: list[CrewMember] = []
+    seen: set[str] = set()
+    for m in members:
+        if m.name not in seen:
+            seen.add(m.name)
+            out.append(m)
     return out[:_MAX_ROSTER]
+
+
+def load_members(cfg: dict) -> list[CrewMember]:
+    """The current crew CAST, fail-soft. Prefers the JSON roster file (`[crew].file`); when it's
+    absent or unreadable, falls back to the legacy in-config `[crew].roster` (names or member
+    tables) so existing setups keep working. Order is preserved (file order, then de-duped) so the
+    derived system instruction is byte-stable for a given saved roster — the prompt-cache guarantee.
+
+    A corrupt file degrades to the config fallback rather than crashing the reply loop (fail soft),
+    exactly like the rest of the voice path."""
+    path = roster_file(cfg)
+    if path is not None and path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8") or "[]")
+        except (OSError, json.JSONDecodeError, ValueError) as e:
+            _warn(f"could not read crew roster {path} ({e}); using config fallback")
+        else:
+            if isinstance(data, list):
+                members = [m for m in (CrewMember.from_obj(o) for o in data) if m is not None]
+                return _dedupe(members)
+            _warn(f"crew roster {path} is not a JSON list; using config fallback")
+    raw = (cfg.get("crew", {}) or {}).get("roster", []) or []
+    members = [m for m in (CrewMember.from_obj(o) for o in raw) if m is not None]
+    return _dedupe(members)
+
+
+def save_members(path: Path | str, members: list[CrewMember]) -> None:
+    """Persist the whole roster to the JSON file atomically (temp-then-replace, so a crash
+    mid-write can't corrupt the existing roster), fail-soft on I/O error — mirrors MemoryStore."""
+    p = Path(path)
+    clean = _dedupe([m for m in members if m.name.strip()])
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        body = json.dumps([m.to_dict() for m in clean], ensure_ascii=False, indent=2)
+        tmp = p.with_suffix(p.suffix + ".tmp")
+        tmp.write_text(body + "\n", encoding="utf-8")
+        tmp.replace(p)  # atomic on the same filesystem
+    except OSError as e:
+        _warn(f"could not save crew roster {p} ({e})")
+
+
+def roster(cfg: dict) -> list[str]:
+    """The crew names (from the roster file or the legacy config list) — a HINT the model reaches
+    for. A free-form name the model invents still gets a voice, so this is purely advisory."""
+    return [m.name for m in load_members(cfg)]
+
+
+def voice_ref_for(cfg: dict, name: str) -> str:
+    """The EXPLICIT voice_ref configured for crew member `name`, or '' when the member is unknown or
+    left on auto-assign. Case-sensitive to match the `[Name]` identity key. Used by the audio layer
+    to override the deterministic auto voice (issue #70) while falling back to it when blank."""
+    key = str(name or "").strip()
+    for m in load_members(cfg):
+        if m.name == key:
+            return m.voice_ref
+    return ""
 
 
 def system_instruction(cfg: dict) -> Optional[str]:
     """The STATIC crew instruction folded into the cached system prefix when crew is enabled, else
-    None. It's a constant for a given config (the only variable is the roster, itself static), so
-    it never busts the prompt cache turn-to-turn — the cache only rewrites the once when the
-    setting or roster changes. Returns None when crew is off (nothing added, prefix unchanged)."""
+    None. It's a constant for a given saved roster (the only variable), so it never busts the prompt
+    cache turn-to-turn — the cache only rewrites the once when the setting or roster changes.
+    Returns None when crew is off (nothing added, prefix unchanged).
+
+    Each member's `persona` (issue #70) is woven in as a short "Name — persona." clause so the model
+    voices a consistent character; members without a persona just contribute their name to the
+    roster hint. Voice assignment (`voice_ref`) is a synthesis-side concern and deliberately NOT put
+    in the prompt (the model needn't know which voice a name maps to)."""
     if not is_enabled(cfg):
         return None
-    names = roster(cfg)
+    members = load_members(cfg)
+    names = [m.name for m in members]
     crew_line = (
         f" Your crew: {', '.join(names)}." if names else
         " You may use any short crew name that fits the moment."
     )
+    personas = [f"{m.name} — {m.persona}" for m in members if m.persona]
+    persona_line = (" In character: " + " ".join(
+        p if p.endswith(".") else p + "." for p in personas)) if personas else ""
     return (
         "CREW VOICING: You may voice a named crew member by starting a line with their name in "
         "square brackets, e.g. `[Nyx] Picking up a contact off the port bow.` Each such line is "
-        "spoken aloud in that character's OWN distinct voice." + crew_line + " Lines with NO "
-        "bracket prefix are spoken by you, the ship's companion — that stays the default. Use "
-        "crew sparingly and only when it adds something; put the bracket at the very start of the "
-        "line, and keep each character's spoken text on its own line."
+        "spoken aloud in that character's OWN distinct voice." + crew_line + persona_line +
+        " Lines with NO bracket prefix are spoken by you, the ship's companion — that stays the "
+        "default. Use crew sparingly and only when it adds something; put the bracket at the very "
+        "start of the line, and keep each character's spoken text on its own line."
     )
+
+
+def _warn(msg: str) -> None:
+    """Fail-soft diagnostic to stderr (matches app.py / MemoryStore) — never an exception upward."""
+    print(f"!! [crew] {msg}", file=sys.stderr, flush=True)

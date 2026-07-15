@@ -438,8 +438,16 @@ file    = "personality.txt"
 enabled = false
 # Optional roster — a HINT list of crew names woven into the (static) system instruction so the
 # model reaches for consistent characters. Free-form: a name the model invents still gets a stable
-# voice via the cast. Leave empty to let the model pick names that fit the moment.
+# voice via the cast. Leave empty to let the model pick names that fit the moment. This is the
+# LEGACY inline form; the CREW EDITOR (issue #70, below) supersedes it with per-character personas
+# + explicit voices, and is used whenever the roster file exists.
 roster = []
+# CREW EDITOR roster file (issue #70). A small JSON list of {name, persona, voice_ref} the control
+# panel's Crew tab edits — personas fold into the (static) system instruction so each character has
+# consistent personality, and a non-blank voice_ref pins that character to a specific cast voice
+# (blank = the deterministic auto-assignment). Git-ignored (persona text is personal). When this
+# file is absent, the legacy `roster` list above is used instead, so existing setups are unchanged.
+file = "crew.json"
 
 
 [elevenlabs]

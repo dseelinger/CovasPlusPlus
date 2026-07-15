@@ -64,6 +64,7 @@ def test_all_path_fields_resolved():
         "cartesia": {"api_key_file": "CartesiaAPIKey.txt"},
         "cg": {"api_key_file": "InaraAPIKey.txt"},
         "checklist": {"file": "ultimate_checklist.md"},
+        "crew": {"file": "crew.json"},
         "memory": {"dir": "memory"},
         "logging": {"dir": "logs"},
         "piper": {"model": "voices/en.onnx"},

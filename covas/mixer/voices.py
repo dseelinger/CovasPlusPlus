@@ -84,6 +84,20 @@ class VoiceCast:
                 candidates = gendered
         return candidates[_stable_hash(str(identity or "")) % len(candidates)]
 
+    def for_crew(self, identity: str, voice_ref: str = "") -> Voice:
+        """Resolve a named crew member's voice (issue #70). An EXPLICIT `voice_ref` wins: if it
+        matches a pool voice we reuse that entry (keeping its provider + gender), otherwise we route
+        the raw ref through this cast's provider — either way the Commander's assignment overrides
+        the deterministic pick. A BLANK `voice_ref` falls back to `assign(identity)` (the #69
+        auto-assign: same name -> same pool voice, an empty pool -> the persona voice)."""
+        ref = str(voice_ref or "").strip()
+        if not ref:
+            return self.assign(identity)
+        for v in self._pool:
+            if v.ref == ref:
+                return v
+        return Voice(self._cast_provider, ref)
+
     def for_record(self, record) -> Voice:  # noqa: ANN001 — a VoiceableComms
         """The voice for a gated comms record: player DMs get the fixed player voice; NPC and
         ambiguous lines are assigned by the SENDER identity, narrowed by the C4 logical voice."""
