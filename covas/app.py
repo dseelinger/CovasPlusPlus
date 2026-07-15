@@ -1623,7 +1623,10 @@ class App:
             text = self.stt.transcribe(audio)
             if cancel.is_set():
                 return
-            if not text:
+            if not text.strip():
+                # Empty OR whitespace-only transcription (silence, or a barge-in that caught
+                # near-silence). Drop it — sending an empty/whitespace user turn 400s the API
+                # ("messages … must have non-empty content") and poisons later turns.
                 self.cues.play("failed")
                 self.set_state("Idle", "(no speech detected)")
                 return
@@ -1912,7 +1915,10 @@ class App:
             text = self.stt.transcribe(audio)
             if cancel.is_set():
                 return
-            if not text:
+            if not text.strip():
+                # Empty OR whitespace-only transcription (silence, or a barge-in that caught
+                # near-silence). Drop it — sending an empty/whitespace user turn 400s the API
+                # ("messages … must have non-empty content") and poisons later turns.
                 self.cues.play("failed")
                 self.set_state("Idle", "(no speech detected)")
                 return
@@ -2007,12 +2013,22 @@ class App:
                     self.bus.publish({"type": "memory_recall", "matched": True,
                                       "injected": bool(mblock), "reason": mref.reason})
 
-            self.history.append({"role": "user", "content": user_text})
-            self._trim_history()
-            # For this call only, swap the last user turn for its context-augmented form.
-            messages = self.history
-            if llm_text != user_text:
-                messages = self.history[:-1] + [{"role": "user", "content": llm_text}]
+            if not user_text.strip():
+                # The utterance stripped down to nothing to answer — e.g. a bare tier-control
+                # phrase ("use opus", "think hard"): the router already applied the tier, and
+                # sending an empty user turn 400s the API ("messages must have non-empty
+                # content"). Acknowledge and return without touching history.
+                self.cues.play("failed")
+                self.set_state("Idle", "(nothing to answer)")
+                return
+            # Build THIS call's messages WITHOUT mutating stored history. A cancelled, errored,
+            # or empty-reply turn must leave NO trace: an orphaned user turn (appended before the
+            # call with no assistant reply) poisons the next call — the model answers the stale
+            # question and the API 400s on the malformed history. So we commit the user+assistant
+            # PAIR together only after a successful reply (below). The per-turn message carries the
+            # context-augmented `llm_text`; what we PERSIST is the clean `user_text`, so telemetry/
+            # recall never linger across turns.
+            messages = self.history + [{"role": "user", "content": llm_text}]
 
             self.set_state("Thinking")
 
@@ -2068,9 +2084,14 @@ class App:
             if not reply.strip():
                 self.cues.play("failed")
                 self.set_state("Idle", "(empty reply)")
-                return
+                return                      # history untouched — no orphaned user turn
 
+            # Success: commit the user+assistant pair atomically. Persist the CLEAN user_text
+            # (not the augmented llm_text) so per-turn context never lingers; trim AFTER so the
+            # stored history stays bounded.
+            self.history.append({"role": "user", "content": user_text})
             self.history.append({"role": "assistant", "content": reply})
+            self._trim_history()
             self._log("COVAS", reply)
 
             if cancel.is_set():

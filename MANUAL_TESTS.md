@@ -820,7 +820,7 @@ Notes:
 Notes:
 
 ## 17. Robustness & quit  🔊 HW 📋 FILE
-- [ ] Ask for something with odd symbols/emoji (*"Draw me an ASCII arrow and explain it."*) → speaks/streams without the console crashing.
+- [ ] Ask for a reply that MUST contain odd Unicode (*"Say these words back to me — café, naïve, jalapeño — then tell me what the → (rightwards arrow) and — (em dash) symbols are called."*) → COVAS streams/speaks the accented words + symbol names without the console crashing on the non-cp1252 glyphs. (Avoid ASCII-ART requests — the audio persona declines those.)
 - [ ] 📋 After a session, open the newest **`logs\session_*.log`** → prompts + replies with timestamps, plus router/usage lines.
 - [ ] A provider hiccup (briefly kill network) degrades gracefully — the loop survives and returns to IDLE; a dead TTS falls back to text.
 - [ ] **Ctrl+Alt+Q** (or closing the console window) shuts it down cleanly.
