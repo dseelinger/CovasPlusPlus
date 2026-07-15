@@ -251,7 +251,7 @@ See [Keybind automation](automation/keybinds.md). **Off by default** — it send
 | `keybinds.binding_preference` | `"primary"` | Which `.binds` slot to read the key from: `primary` or `secondary` |
 | `keybinds.confirm_window` | `60` | Seconds an armed action stays confirmable |
 | `keybinds.binds_file` | *(blank)* | Override the auto-detected bindings file |
-| `keybinds.allowlist` | `["landing_gear"]` | The only macros the companion may run |
+| `keybinds.allowlist` | `["landing_gear"]` | The only macros the companion may run. Opt in more by name — Tier-1 ship-systems (#31): `cargo_scoop`, `night_vision`, `ship_lights`, `hud_mode`, `pips_engines`, `pips_weapons`, `pips_systems`, `pips_balance` |
 
 ## Auto-honk (`[honk]`)
 

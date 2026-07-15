@@ -222,6 +222,16 @@ Notes:
 
 Notes:
 
+### 6.1.1 Tier-1 ship-systems toggles (#31 — opt-in via allowlist)
+> Benign, repeatable **main-ship** toggles that **fire immediately** (no arm/confirm). Off until you add each macro NAME to `[keybinds].allowlist`; bind the matching control to a **key** in ED. Do these **parked/docked**. Names: `cargo_scoop`, `night_vision`, `ship_lights`, `hud_mode`, `pips_engines`, `pips_weapons`, `pips_systems`, `pips_balance`.
+- [ ] **Opt-in fires immediately:** add `cargo_scoop` to the allowlist, then *"toggle my cargo scoop"* → the scoop deploys/retracts **right away** (no "armed, confirm separately" step). Startup log lists `cargo_scoop -> <Key>`.
+- [ ] **Not allowlisted → refused:** with `ship_lights` **not** in the allowlist, *"turn on my ship lights"* → won't do it (off-allowlist), nothing presses.
+- [ ] **Pips:** allowlist `pips_engines`, say *"pips to engines"* three times → three pips move into ENG. Then allowlist + say *"balance the pips"* (`pips_balance`) → distribution resets to 2/2/2.
+- [ ] **HUD mode:** allowlist `hud_mode`, *"switch HUD to analysis mode"* → the HUD flips combat↔analysis.
+- [ ] **Combat guard still applies:** with a benign toggle allowlisted, get **interdicted / into danger** and ask for it → **refuses** (benign toggles aren't exempt from the combat guard).
+- [ ] **Mode gating:** **disembark** (on foot) and ask for cargo scoop → **refuses** ("only works in your ship") and isn't offered. Back in the ship it fires.
+- [ ] **Unbound control:** if the matching ED control is on a HOTAS/mouse only (no keyboard bind), asking for it → "bind it to a key" message; nothing fires.
+
 ### 6.2 Auto-honk (N5 + K2 — `[honk].enabled = true`, **on by default**)
 > Fires the Discovery Scanner shortly after you jump into a **new** system — no button press, and **no fire-group setup**. Bind the Discovery Scanner's fire to a **key** in ED (a HOTAS/mouse-only bind can't be pressed; a keyboard secondary, even with a modifier, is fine). At launch the log reports "Auto-honk ON …" or a "bind it in-game" warning.
 - [ ] **Happy path:** with the **Discovery Scanner** in your current fire group, **jump** to a new system → after a short probe it **holds** the fire button ~`hold_seconds` (default 5) and honks; the system map populates. Log: `honked — current fire group`.
