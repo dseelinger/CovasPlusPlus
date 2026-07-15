@@ -12,13 +12,15 @@ import threading
 
 import pytest
 
+from covas import firstrun
 from covas.providers import gemini_llm as gem
 
 
 # ---- helpers ---------------------------------------------------------------
 def _llm(monkeypatch=None, *, key="test-key", web_search=False, **cfg):
+    # Keys are file-only (DPAPI) now — patch the firstrun resolver instead of exporting an env var.
     if monkeypatch is not None and key is not None:
-        monkeypatch.setenv("GEMINI_API_KEY", key)
+        monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: key)
     return gem.GeminiLLM({
         "gemini": {"model": "gemini-2.5-flash", **cfg},
         "web_search": {"enabled": web_search},
@@ -183,7 +185,7 @@ def test_cancel_stops_streaming(monkeypatch):
         yield _text("second")
 
     monkeypatch.setattr(gem, "_stream_generate", fake_stream)
-    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: "k")
     out = list(gem.GeminiLLM({"gemini": {}, "web_search": {"enabled": False},
                               "personality": {"enabled": False}}).stream_reply(
         [{"role": "user", "content": "hi"}], cancel, lambda *a: None))
@@ -191,19 +193,11 @@ def test_cancel_stops_streaming(monkeypatch):
 
 
 def test_no_key_raises(monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: None)
     with pytest.raises(RuntimeError):
         list(gem.GeminiLLM({"gemini": {}, "web_search": {"enabled": False},
                             "personality": {"enabled": False}}).stream_reply(
             [{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
-
-
-def test_google_api_key_env_fallback(monkeypatch):
-    from covas.firstrun import gemini_key
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    monkeypatch.setenv("GOOGLE_API_KEY", "goog")
-    assert gemini_key({"gemini": {}}) == "goog"
 
 
 # ---- request shaping + SSE parsing -----------------------------------------

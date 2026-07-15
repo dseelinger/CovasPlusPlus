@@ -135,8 +135,9 @@ Notes:
 
 ### 4.1 OpenAI-compatible LLM provider (issue #12)  🔊 HW 🌍 NET 📋 FILE
 > One provider covers **OpenAI, Groq, DeepSeek, OpenRouter** — only `[openai].base_url` + model ids
-> differ. A *cloud* LLM, so it's fine in-game and the router tiers it via `[openai.tiers]`. Needs
-> `OPENAI_API_KEY` (env var or `OpenAIAPIKey.txt`). Restart after switching `[llm].provider`.
+> differ. A *cloud* LLM, so it's fine in-game and the router tiers it via `[openai.tiers]`. Needs a
+> key in `OpenAIAPIKey.txt` (DPAPI-encrypted; add it in Settings — env vars are no longer read, #22).
+> Restart after switching `[llm].provider`.
 - [ ] **Conversation:** set `[llm].provider = "openai"` (default `base_url`/`model` = OpenAI
   `gpt-4o-mini`), restart, speak a turn → COVAS answers via OpenAI; the `[router]` line shows the
   OpenAI model (e.g. `[cheap] gpt-4o-mini`) and `[usage]` shows token counts (+ a cost if priced).
@@ -155,9 +156,10 @@ Notes:
 
 ### 4.2 Gemini LLM provider (issue #13)  🔊 HW 🌍 NET 📋 FILE
 > Google Gemini on the **native** API — tool calling + Google-Search **grounding** + a cheap Flash
-> default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash/Pro). Needs `GEMINI_API_KEY` (or
-> `GOOGLE_API_KEY`, or `GeminiAPIKey.txt`). Restart after switching `[llm].provider`.
-- [ ] **Conversation:** set `[llm].provider = "gemini"`, export `GEMINI_API_KEY`, restart, speak a turn
+> default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash/Pro). Needs a key in
+> `GeminiAPIKey.txt` (DPAPI-encrypted; add it in Settings — env vars are no longer read, #22).
+> Restart after switching `[llm].provider`.
+- [ ] **Conversation:** set `[llm].provider = "gemini"`, add your Gemini key in Settings, restart, speak a turn
   → COVAS answers via Gemini; `[router]` line shows the Gemini model (e.g. `[cheap] gemini-2.5-flash`)
   and `[usage]` shows token counts.
 - [ ] **Tool calling works:** *"What's my next objective?"* / *"Mark fuel scooping complete."* → the
@@ -641,6 +643,28 @@ Notes:
 ### 19.7 Uninstall  📦 🖥️
 - [ ] Uninstall from **Apps & features** (or the Start-menu uninstaller) → the app and shortcuts are removed; the install tree under `%LOCALAPPDATA%\Programs\COVAS++` is gone.
 - [ ] Note whether your `%APPDATA%\COVAS++` user data is retained (a reinstall should find your settings again).
+
+Notes:
+
+### 19.8 API keys encrypted at rest — Windows DPAPI (issue #22)  📋 FILE 🖥️
+> Keys are stored ENCRYPTED with Windows DPAPI (CurrentUser scope): each `*APIKey.txt` holds a
+> `DPAPI:<base64>` blob, never plaintext. Environment-variable key reads were REMOVED. A source run
+> works for all of this (open the key files under `%APPDATA%\COVAS++`, or the dev data dir).
+- [ ] 📋 **Encrypted on disk:** after entering keys (wizard or Settings), open `AnthropicAPIKey.txt`
+  (and any other `*APIKey.txt`) → the content begins with **`DPAPI:`** and your raw key is **not**
+  visible anywhere in the file.
+- [ ] 📋 **Transparent migration:** drop a **plaintext** key into a fresh `AnthropicAPIKey.txt` (just
+  the raw `sk-ant-…`, no `DPAPI:`), launch → the app works normally, and re-opening the file shows it
+  has been **rewritten to `DPAPI:<blob>`** (migrated on first read). Your key still works.
+- [ ] **Env var is ignored:** set `ANTHROPIC_API_KEY` in your environment but **remove** the key file
+  → launch a source run → the app is **unconfigured** and the **setup wizard shows** (the env var is
+  NOT used). Add the key via the wizard/Settings to proceed.
+- [ ] **Wrong-machine blob = clear re-enter, not a crash:** copy a `DPAPI:` key file from another PC
+  (or hand-edit the base64 to corrupt it) → launch → the app treats it as **no key** and logs a clear
+  *"re-enter the key on this machine"* message (console/stderr); it does **not** crash. Re-enter the
+  key and it works.
+- [ ] 🔊 **check_setup:** `check_setup.bat` reports the **Anthropic key file** present (no
+  `ANTHROPIC_API_KEY` env line anymore) and the Anthropic API call succeeds using the file key.
 
 Notes:
 

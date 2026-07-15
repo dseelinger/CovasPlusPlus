@@ -13,15 +13,17 @@ import threading
 import pytest
 
 from covas.providers import cartesia_tts as cart
+from covas import firstrun
 from covas import settings_schema as ss
 
 
 # ---- test doubles ----------------------------------------------------------
 def _cartesia(monkeypatch=None, *, key="test-key", **cfg):
-    """Build a CartesiaTTS with a voice id; when a key is given, export CARTESIA_API_KEY so `_key()`
-    resolves without a real service. Extra kwargs land in the [cartesia] config table."""
+    """Build a CartesiaTTS with a voice id; when a key is given, patch the firstrun resolver so
+    `_key()` resolves without a real service (keys are file-only/DPAPI now, not env vars). Extra
+    kwargs land in the [cartesia] config table."""
     if monkeypatch is not None and key is not None:
-        monkeypatch.setenv("CARTESIA_API_KEY", key)
+        monkeypatch.setattr(firstrun, "cartesia_key", lambda cfg: key)
     return cart.CartesiaTTS({"cartesia": {"voice": "vid-123", **cfg}})
 
 
@@ -112,7 +114,6 @@ def test_synth_pcm_no_audio_raises(monkeypatch):
 
 
 def test_synth_pcm_no_key_raises(monkeypatch):
-    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     with pytest.raises(RuntimeError):
         _cartesia(monkeypatch, key=None).synth_pcm("hi")
 
@@ -122,7 +123,7 @@ def test_speak_streams_whole_samples_to_mixer(monkeypatch):
     # Odd-length chunks must be reassembled into whole 16-bit samples across the stream.
     monkeypatch.setattr(cart, "_iter_pcm_chunks", _chunks(b"\x01\x02\x03", b"\x04"))
     sink = _FakeSink()
-    monkeypatch.setenv("CARTESIA_API_KEY", "k")
+    monkeypatch.setattr(firstrun, "cartesia_key", lambda cfg: "k")
     cart.CartesiaTTS({"cartesia": {"voice": "v"}}, mixer=_FakeMixer(sink)).speak("hi", threading.Event())
     assert bytes(sink.fed) == b"\x01\x02\x03\x04" and sink.finished and not sink.cancelled
 
@@ -132,7 +133,7 @@ def test_speak_cancel_aborts_mixer(monkeypatch):
     sink = _FakeSink()
     cancel = threading.Event()
     cancel.set()
-    monkeypatch.setenv("CARTESIA_API_KEY", "k")
+    monkeypatch.setattr(firstrun, "cartesia_key", lambda cfg: "k")
     cart.CartesiaTTS({"cartesia": {"voice": "v"}}, mixer=_FakeMixer(sink)).speak("hi", cancel)
     assert sink.cancelled and not sink.finished
 
@@ -150,14 +151,12 @@ def test_speak_empty_text_noop(monkeypatch):
 
 
 def test_speak_no_key_raises(monkeypatch):
-    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     with pytest.raises(RuntimeError):
         _cartesia(monkeypatch, key=None).speak("hi", threading.Event())
 
 
 # ---- voice catalog ---------------------------------------------------------
 def test_list_voices_fails_soft_to_empty(monkeypatch):
-    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
     assert _cartesia(monkeypatch, key=None).list_voices() == []
 
 

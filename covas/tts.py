@@ -1,14 +1,16 @@
 """ElevenLabs streaming TTS -> low-latency PCM playback (instantly cancellable)."""
 from __future__ import annotations
 import threading
-from pathlib import Path
 
 import requests
 import sounddevice as sd
 
 
 def _api_key(cfg: dict) -> str:
-    return Path(cfg["elevenlabs"]["api_key_file"]).read_text(encoding="utf-8").strip()
+    """The ElevenLabs key, via firstrun so it's DPAPI-aware (decrypts / migrates plaintext) rather
+    than reading the file raw. Returns "" when unconfigured — the request then fails soft."""
+    from .firstrun import elevenlabs_key
+    return elevenlabs_key(cfg) or ""
 
 
 # ElevenLabs voice `speed` accepts 0.7–1.2; we expose only the faster half (a slower COVAS

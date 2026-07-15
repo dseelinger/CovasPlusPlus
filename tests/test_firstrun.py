@@ -6,9 +6,31 @@ mic enumeration, and ElevenLabs fetch are on-hardware and not exercised here.
 """
 from __future__ import annotations
 
+import base64
+
 import pytest
 
-from covas import firstrun
+from covas import dpapi, firstrun
+
+
+@pytest.fixture(autouse=True)
+def fake_dpapi(monkeypatch):
+    """Reversible, in-process stand-in for Windows DPAPI so firstrun's encrypt/decrypt/migrate path
+    runs hermetically on ANY OS (real crypt32 is Windows-only). `protect` base64s the key behind the
+    sentinel; `unprotect` reverses it and raises on anything that isn't valid base64 — mimicking a
+    blob copied from another machine that won't decrypt here."""
+    def protect(s: str) -> str:
+        return "DPAPI:" + base64.b64encode(s.encode("utf-8")).decode("ascii")
+
+    def unprotect(v: str) -> str:
+        payload = v[len("DPAPI:"):]
+        try:
+            return base64.b64decode(payload.encode("ascii"), validate=True).decode("utf-8")
+        except Exception as e:  # noqa: BLE001
+            raise OSError("cannot decrypt on this machine") from e
+
+    monkeypatch.setattr(dpapi, "protect", protect)
+    monkeypatch.setattr(dpapi, "unprotect", unprotect)
 
 
 def _cfg(tmp_path, *, anth_file="anth.txt", el_file="el.txt", model="small.en",
@@ -24,15 +46,13 @@ def _cfg(tmp_path, *, anth_file="anth.txt", el_file="el.txt", model="small.en",
 
 # ---- key presence + round-trip ------------------------------------------------------
 
-def test_keys_absent_by_default(tmp_path, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_keys_absent_by_default(tmp_path):
     cfg = _cfg(tmp_path)
     assert firstrun.anthropic_key_available(cfg) is False
     assert firstrun.elevenlabs_key_available(cfg) is False
 
 
-def test_save_and_read_keys_round_trip(tmp_path, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_save_and_read_keys_round_trip(tmp_path):
     cfg = _cfg(tmp_path)
     firstrun.save_anthropic_key(cfg, "  sk-ant-123  ")   # trimmed on write
     firstrun.save_elevenlabs_key(cfg, "el-key-9")
@@ -42,19 +62,45 @@ def test_save_and_read_keys_round_trip(tmp_path, monkeypatch):
     assert firstrun.elevenlabs_key_available(cfg) is True
 
 
-def test_empty_key_file_is_not_available(tmp_path, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_saved_key_file_is_encrypted_on_disk(tmp_path):
+    """The wizard's save writes ciphertext (DPAPI: sentinel), never the raw key."""
+    cfg = _cfg(tmp_path)
+    firstrun.save_anthropic_key(cfg, "sk-ant-secret")
+    raw = (tmp_path / "anth.txt").read_text(encoding="utf-8")
+    assert raw.startswith("DPAPI:")
+    assert "sk-ant-secret" not in raw
+
+
+def test_empty_key_file_is_not_available(tmp_path):
     cfg = _cfg(tmp_path)
     firstrun.save_anthropic_key(cfg, "   ")              # whitespace only
+    assert (tmp_path / "anth.txt").read_text(encoding="utf-8") == ""   # empty, not "DPAPI:"
     assert firstrun.anthropic_key(cfg) is None
     assert firstrun.anthropic_key_available(cfg) is False
 
 
-def test_env_var_wins_over_missing_file(tmp_path, monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "env-key")
-    cfg = _cfg(tmp_path)                                  # no file written
-    assert firstrun.anthropic_key(cfg) == "env-key"
-    assert firstrun.anthropic_key_available(cfg) is True
+def test_legacy_plaintext_key_is_read_then_migrated(tmp_path):
+    """A hand-dropped/legacy PLAINTEXT key reads back verbatim AND is re-encrypted in place, so the
+    next read is DPAPI-protected — without ever failing the first read."""
+    cfg = _cfg(tmp_path)
+    key_file = tmp_path / "anth.txt"
+    key_file.write_text("sk-ant-plaintext", encoding="utf-8")   # legacy, no sentinel
+    assert firstrun.anthropic_key(cfg) == "sk-ant-plaintext"    # transparent read
+    migrated = key_file.read_text(encoding="utf-8")
+    assert migrated.startswith("DPAPI:") and "sk-ant-plaintext" not in migrated  # rewritten
+    assert firstrun.anthropic_key(cfg) == "sk-ant-plaintext"    # still reads correctly after
+
+
+def test_undecryptable_blob_reads_as_no_key(tmp_path, capsys):
+    """A DPAPI blob that won't decrypt here (copied %APPDATA%) is treated as "no key" with a clear
+    message, not a crash — and the file is left untouched (not clobbered)."""
+    cfg = _cfg(tmp_path)
+    key_file = tmp_path / "anth.txt"
+    key_file.write_text("DPAPI:@@@not-valid-base64@@@", encoding="utf-8")
+    assert firstrun.anthropic_key(cfg) is None
+    assert firstrun.anthropic_key_available(cfg) is False
+    assert "re-enter" in capsys.readouterr().err.lower()
+    assert key_file.read_text(encoding="utf-8") == "DPAPI:@@@not-valid-base64@@@"  # not clobbered
 
 
 # ---- STT availability (monkeypatched cache lookup) ----------------------------------
@@ -104,7 +150,6 @@ def test_stt_download_root_source_vs_frozen(tmp_path, monkeypatch):
     (False, False, False),
 ])
 def test_is_configured_needs_key_and_stt(tmp_path, monkeypatch, has_key, has_stt, expected):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     cfg = _cfg(tmp_path)
     if has_key:
         firstrun.save_anthropic_key(cfg, "k")
@@ -113,7 +158,6 @@ def test_is_configured_needs_key_and_stt(tmp_path, monkeypatch, has_key, has_stt
 
 
 def test_configured_status_shape(tmp_path, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     cfg = _cfg(tmp_path)
     firstrun.save_anthropic_key(cfg, "k")
     firstrun.save_elevenlabs_key(cfg, "e")

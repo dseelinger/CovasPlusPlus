@@ -2,8 +2,8 @@
 
 A **cheap cloud voice** for the persona or as a supplemental cast voice, over the OpenAI
 `audio/speech` API. `base_url` is configurable, so any OpenAI-compatible endpoint (OpenAI itself,
-a proxy, a local server) works with the same implementation — one key can be shared with a future
-OpenAI LLM provider via the `OPENAI_API_KEY` env var.
+a proxy, a local server) works with the same implementation — one key file (`[openai_tts]` /
+`[openai].api_key_file`, DPAPI-encrypted) is shared with the OpenAI LLM provider.
 
 Uses REST via `requests` (already a dep — no OpenAI SDK). We request `response_format = "pcm"`, which
 OpenAI returns as raw 24 kHz 16-bit mono little-endian PCM — exactly the shape the audio/cancel path
@@ -51,13 +51,13 @@ class OpenAITTS:
         self._out_device = cfg.get("audio", {}).get("tts_output_device") or None
 
     def _key(self) -> str:
-        """Resolve the OpenAI key (env `OPENAI_API_KEY` first, else the key file). Raises a clear
-        error if unconfigured — callers fail soft (persona -> text, cast -> silence)."""
+        """Resolve the OpenAI key from its (DPAPI-encrypted) key file. Raises a clear error if
+        unconfigured — callers fail soft (persona -> text, cast -> silence)."""
         from ..firstrun import openai_key
         key = openai_key(self._cfg)
         if not key:
             raise RuntimeError(
-                "OpenAI TTS selected but no key found (set OPENAI_API_KEY or [openai_tts].api_key_file)."
+                "OpenAI TTS selected but no key found (add it in Settings, or to [openai_tts].api_key_file)."
             )
         return key
 

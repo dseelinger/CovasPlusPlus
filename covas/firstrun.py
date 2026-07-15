@@ -7,10 +7,16 @@ returns False, and skips straight to the control panel once satisfied. Everythin
 wizard writes lands under `data_dir()` — keys in their key files, choices in overrides.json,
 STT weights in the models cache — so a packaged build never writes into its read-only tree.
 
+Keys are stored ENCRYPTED at rest with Windows DPAPI (covas/dpapi.py, issue #22): the key file
+holds ``DPAPI:<base64(blob)>`` instead of plaintext. Reads are DPAPI-aware and transparently
+MIGRATE any legacy plaintext key (or a manually-dropped ``*.txt``) to encrypted on first read; a
+blob that won't decrypt on this machine (e.g. a copied ``%APPDATA%``) is treated as "no key" with
+a clear re-enter message, never a crash. Environment-variable key reads were removed here (they
+were a plaintext bypass and masked fresh-install testing) — keys are FILE-only now.
+
 Split of concerns:
   * Keys — Anthropic (LLM, REQUIRED) and ElevenLabs (TTS, OPTIONAL: no key ⇒ text-only, the
-    existing fail-soft path). Anthropic's key also honours the ANTHROPIC_API_KEY env var so a
-    source-run dev with it exported is "configured" with no file and no wizard.
+    existing fail-soft path).
   * STT — faster-whisper weights, download-on-first-run. Availability is a cache lookup; the
     wizard's model step downloads `small.en` (the locked shipped default) into data_dir/models
     when frozen, or the default HF cache in a source run (dev cache untouched).
@@ -23,10 +29,12 @@ offline; the actual download / device enumeration / network fetch are on-hardwar
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from huggingface_hub import try_to_load_from_cache
 
+from . import dpapi
 from .config import _frozen, data_dir, deep_merge, load_overrides, save_overrides
 
 # The shipped STT default (INSTALLER_DESIGN "Resolved"): English-only `small.en` — smaller and
@@ -63,27 +71,59 @@ def _key_path(cfg: dict, section: str) -> Path | None:
 
 
 def _read_key(path: Path | None) -> str | None:
-    if path and path.exists():
+    """Read a key file, DPAPI-aware. An encrypted ``DPAPI:`` blob is decrypted; a blob that won't
+    decrypt on THIS machine/account returns None with a clear re-enter message (not a crash). Any
+    non-sentinel content is a legacy PLAINTEXT key — returned as-is and transparently re-encrypted
+    in place (best-effort: a failed migration never fails the read)."""
+    if not (path and path.exists()):
+        return None
+    try:
+        content = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not content:
+        return None
+    if dpapi.is_encrypted(content):
         try:
-            return path.read_text(encoding="utf-8").strip() or None
-        except OSError:
+            return dpapi.unprotect(content) or None
+        except Exception:  # noqa: BLE001 — wrong machine/account or tampering => no usable key
+            print(
+                f"Could not decrypt the key in {path.name} on this machine — it was encrypted for "
+                "a different Windows account or PC. Re-enter the key here to use it.",
+                file=sys.stderr, flush=True)
             return None
-    return None
+    # Legacy plaintext (or a hand-dropped *.txt): migrate to encrypted, best-effort.
+    _migrate_plaintext_key(path, content)
+    return content or None
+
+
+def _migrate_plaintext_key(path: Path, key: str) -> None:
+    """Re-encrypt a legacy plaintext key file in place. Best-effort — swallow any failure (a
+    non-Windows/CI run, or a write error) so it never breaks the read that triggered it."""
+    try:
+        _write_key(path, key)
+    except Exception:  # noqa: BLE001 — migration is opportunistic; the plaintext read still stands
+        pass
 
 
 def _write_key(path: Path | None, key: str) -> None:
+    """Write a key ENCRYPTED (``DPAPI:<blob>``). Empty/whitespace keys are written as-is (an empty
+    file reads back as "no key") without encrypting nothing."""
     if path is None:
         raise ValueError("no api_key_file configured for this provider")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text((key or "").strip(), encoding="utf-8")
+    key = (key or "").strip()
+    path.write_text(dpapi.protect(key) if key else "", encoding="utf-8")
 
+
+# Env-var key reads were removed (issue #22): they were a plaintext bypass and masked
+# fresh-install testing. Every key is now FILE-only (DPAPI-encrypted at rest). Note the Anthropic
+# SDK still falls back to its own ANTHROPIC_API_KEY env var internally — but that's neutralized in
+# practice because `is_configured` gates the whole app on a FILE key (anthropic_key_available), so
+# an env var with no key file leaves the app unconfigured and the wizard runs.
 
 def anthropic_key(cfg: dict) -> str | None:
-    """The Anthropic key, env var first (a source-run dev's exported ANTHROPIC_API_KEY wins,
-    so they never see the wizard), else the key file under data_dir."""
-    env = os.environ.get("ANTHROPIC_API_KEY")
-    if env and env.strip():
-        return env.strip()
+    """The Anthropic key from its DPAPI-encrypted key file under data_dir (file-only, no env var)."""
     return _read_key(_key_path(cfg, "anthropic"))
 
 
@@ -92,41 +132,24 @@ def elevenlabs_key(cfg: dict) -> str | None:
 
 
 def azure_key(cfg: dict) -> str | None:
-    """The Azure Speech key, env var first (an exported AZURE_SPEECH_KEY wins for a source-run
-    dev), else the key file under data_dir."""
-    env = os.environ.get("AZURE_SPEECH_KEY")
-    if env and env.strip():
-        return env.strip()
+    """The Azure Speech key from its DPAPI-encrypted key file under data_dir (file-only)."""
     return _read_key(_key_path(cfg, "azure"))
 
 
 def openai_key(cfg: dict) -> str | None:
-    """The OpenAI key, shared between the OpenAI LLM (#12) and TTS (#16) providers. Env var first
-    (an exported OPENAI_API_KEY wins — the natural way to share ONE key), else the key file: the
+    """The OpenAI key, shared between the OpenAI LLM (#12) and TTS (#16) providers. Read from the
     LLM's `[openai].api_key_file`, falling back to `[openai_tts].api_key_file` (both default to the
-    same OpenAIAPIKey.txt, so one file serves both)."""
-    env = os.environ.get("OPENAI_API_KEY")
-    if env and env.strip():
-        return env.strip()
+    same OpenAIAPIKey.txt, so one file serves both). File-only, DPAPI-encrypted."""
     return _read_key(_key_path(cfg, "openai")) or _read_key(_key_path(cfg, "openai_tts"))
 
 
 def gemini_key(cfg: dict) -> str | None:
-    """The Gemini key, env var first (GEMINI_API_KEY, then the more general GOOGLE_API_KEY that a
-    Google-Cloud dev may already have exported), else the key file under data_dir."""
-    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
-        env = os.environ.get(name)
-        if env and env.strip():
-            return env.strip()
+    """The Gemini key from its DPAPI-encrypted key file under data_dir (file-only)."""
     return _read_key(_key_path(cfg, "gemini"))
 
 
 def cartesia_key(cfg: dict) -> str | None:
-    """The Cartesia key, env var first (an exported CARTESIA_API_KEY wins for a source-run dev),
-    else the key file under data_dir."""
-    env = os.environ.get("CARTESIA_API_KEY")
-    if env and env.strip():
-        return env.strip()
+    """The Cartesia key from its DPAPI-encrypted key file under data_dir (file-only)."""
     return _read_key(_key_path(cfg, "cartesia"))
 
 

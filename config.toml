@@ -196,9 +196,10 @@ download_root = ""
 
 
 [anthropic]
-# API key file (relative paths resolve under the writable data dir). The ANTHROPIC_API_KEY
-# environment variable takes precedence when set — a source-run dev with it exported never
-# needs this file. The first-run wizard writes the key here on a fresh (packaged) install.
+# API key file (relative paths resolve under the writable data dir). The first-run wizard writes
+# the key here, ENCRYPTED at rest with Windows DPAPI (the file holds "DPAPI:<blob>", not plaintext;
+# a legacy plaintext key is migrated to encrypted on first read). Environment variables are NOT
+# read for keys (removed in #22) — this file is the only source. Never commit it.
 api_key_file = "AnthropicAPIKey.txt"
 # Model shown/selected at runtime. Default + the two alternates you asked for.
 # Cost-tuned default: Sonnet-5 balances quality vs. price for a voice companion.
@@ -650,8 +651,8 @@ provider = "anthropic"
 # only `base_url` + the model ids differ. Select it with [llm].provider = "openai". Tool calling
 # (the checklist voice commands) works; there is no web-search tool on this path (Anthropic-only).
 #
-# The key comes from the OPENAI_API_KEY environment variable (takes precedence, and is SHARED with
-# the OpenAI TTS provider) or this git-ignored file (copy OpenAIAPIKey.txt.example). NEVER commit it.
+# The key comes from this git-ignored file (copy OpenAIAPIKey.txt.example), DPAPI-encrypted at rest
+# and SHARED with the OpenAI TTS provider. Env vars are NOT read for keys (#22). NEVER commit it.
 #   OpenAI:     base_url = "https://api.openai.com/v1"          (default)
 #   Groq:       base_url = "https://api.groq.com/openai/v1"     model = "llama-3.3-70b-versatile"
 #   DeepSeek:   base_url = "https://api.deepseek.com/v1"        model = "deepseek-chat"
@@ -673,8 +674,8 @@ premium  = "gpt-4o"
 # Google-Search GROUNDING that parallels web search (gated by [web_search].enabled). Select it with
 # [llm].provider = "gemini". A cheap/fast Flash default tier makes it a strong low-cost option.
 #
-# The key comes from the GEMINI_API_KEY environment variable (or GOOGLE_API_KEY), else this
-# git-ignored file (copy GeminiAPIKey.txt.example). Get a free key at https://aistudio.google.com.
+# The key comes from this git-ignored file (copy GeminiAPIKey.txt.example), DPAPI-encrypted at rest.
+# Env vars are NOT read for keys (#22). Get a free key at https://aistudio.google.com.
 # NEVER commit the key. `base_url` rarely changes.
 base_url     = "https://generativelanguage.googleapis.com/v1beta"
 api_key_file = "GeminiAPIKey.txt"
@@ -730,8 +731,8 @@ voice = "en-US-AriaNeural"
 # give the cast big voice variety. Select it with [tts].provider = "azure" (persona) or
 # [audio.voices].cast_provider = "azure" / a per-role override (cast).
 #
-# Needs a Speech resource key + its region. The key comes from the AZURE_SPEECH_KEY environment
-# variable (takes precedence) or this git-ignored file (copy AzureSpeechKey.txt.example). NEVER
+# Needs a Speech resource key + its region. The key comes from this git-ignored file (copy
+# AzureSpeechKey.txt.example), DPAPI-encrypted at rest; env vars are NOT read for keys (#22). NEVER
 # commit the key. `region` MUST match your Speech resource's region (e.g. eastus, westus2, uksouth).
 api_key_file = "AzureSpeechKey.txt"
 region       = "eastus"
@@ -748,9 +749,9 @@ style = ""
 # = "openai" / a per-role override. `base_url` is configurable, so any OpenAI-compatible endpoint
 # (OpenAI, a proxy, a local server) works with the same code.
 #
-# The key comes from the OPENAI_API_KEY environment variable (takes precedence — and is the natural
-# way to SHARE one key with a future OpenAI LLM provider) or this git-ignored file (copy
-# OpenAIAPIKey.txt.example). NEVER commit the key.
+# The key comes from this git-ignored file (copy OpenAIAPIKey.txt.example), DPAPI-encrypted at rest
+# and SHARED with the OpenAI LLM provider (same default file). Env vars are NOT read for keys (#22).
+# NEVER commit the key.
 base_url     = "https://api.openai.com/v1"
 api_key_file = "OpenAIAPIKey.txt"
 # TTS model + voice. gpt-4o-mini-tts is the current cheap model; "tts-1" is the classic alternative.
@@ -768,8 +769,8 @@ instructions = ""
 # the live reply, not background chatter). Streams so the first audio starts fast.
 # (Deepgram Aura is the documented alternative; Sonic was picked to start.)
 #
-# The key comes from the CARTESIA_API_KEY environment variable (takes precedence) or this git-ignored
-# file (copy CartesiaAPIKey.txt.example). NEVER commit the key.
+# The key comes from this git-ignored file (copy CartesiaAPIKey.txt.example), DPAPI-encrypted at
+# rest; env vars are NOT read for keys (#22). NEVER commit the key.
 api_key_file = "CartesiaAPIKey.txt"
 # Sonic model + a Cartesia VOICE ID (required — get one from the Cartesia voice library / API; the
 # voice list is at https://play.cartesia.ai or GET https://api.cartesia.ai/voices).

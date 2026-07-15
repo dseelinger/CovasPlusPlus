@@ -12,16 +12,18 @@ import threading
 
 import pytest
 
+from covas import firstrun
 from covas.mixer import CastSynth, Voice
 from covas.providers import openai_tts as oai
 
 
 # ---- test doubles ----------------------------------------------------------
 def _openai(monkeypatch=None, *, key="test-key", **cfg):
-    """Build an OpenAITTS with defaults; when a key is given, export OPENAI_API_KEY so `_key()`
-    resolves without a real service. Extra kwargs land in the [openai_tts] config table."""
+    """Build an OpenAITTS with defaults; when a key is given, patch the firstrun resolver so `_key()`
+    resolves without a real service (keys are file-only/DPAPI now, not env vars). Extra kwargs land
+    in the [openai_tts] config table."""
     if monkeypatch is not None and key is not None:
-        monkeypatch.setenv("OPENAI_API_KEY", key)
+        monkeypatch.setattr(firstrun, "openai_key", lambda cfg: key)
     return oai.OpenAITTS({"openai_tts": {**cfg}})
 
 
@@ -98,7 +100,6 @@ def test_synth_pcm_empty_text_is_silent(monkeypatch):
 
 
 def test_synth_pcm_no_key_raises(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(RuntimeError):
         _openai(monkeypatch, key=None).synth_pcm("hi")
 
@@ -133,7 +134,6 @@ def test_speak_empty_text_noop(monkeypatch):
 
 
 def test_speak_no_key_raises(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(RuntimeError):
         _openai(monkeypatch, key=None).speak("hi", threading.Event())
 
@@ -141,7 +141,7 @@ def test_speak_no_key_raises(monkeypatch):
 def test_play_via_mixer_feeds_and_finishes(monkeypatch):
     monkeypatch.setattr(oai, "_collect_pcm", lambda key, base, body, cancel: (b"\x00\x01" * 500, False))
     sink = _FakeSink()
-    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    monkeypatch.setattr(firstrun, "openai_key", lambda cfg: "k")
     e = oai.OpenAITTS({"openai_tts": {}}, mixer=_FakeMixer(sink))
     e.speak("hi", threading.Event())
     assert sink.fed and sink.finished and not sink.cancelled
@@ -152,7 +152,7 @@ def test_play_via_mixer_cancel_aborts(monkeypatch):
     sink = _FakeSink()
     cancel = threading.Event()
     cancel.set()
-    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    monkeypatch.setattr(firstrun, "openai_key", lambda cfg: "k")
     oai.OpenAITTS({"openai_tts": {}}, mixer=_FakeMixer(sink)).speak("hi", cancel)
     assert sink.cancelled and not sink.finished
 
@@ -177,7 +177,6 @@ def test_openai_is_cast_eligible_via_registry(monkeypatch):
 
 
 def test_openai_cast_voice_fails_soft_to_silence(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     e = _openai(monkeypatch, key=None)
     cs = CastSynth(el_synth=None, piper_loader=None)
     cs.registry.register("openai", lambda text, ref: e.synth_pcm(text, ref or None))

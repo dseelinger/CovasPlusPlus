@@ -373,7 +373,7 @@ SCHEMA: list[Setting] = [
     Setting("openai.base_url", ("openai", "base_url"), "string",
             "OpenAI LLM base URL", "Providers",
             "OpenAI-compatible chat/completions endpoint when LLM provider = openai. Default is "
-            "OpenAI; point it at Groq/DeepSeek/OpenRouter. Key from OPENAI_API_KEY or the key file.",
+            "OpenAI; point it at Groq/DeepSeek/OpenRouter. Key comes from the key file.",
             default="https://api.openai.com/v1", phrasings=("openai llm base url",)),
     Setting("openai.model", ("openai", "model"), "string",
             "OpenAI LLM model", "Providers",
@@ -401,7 +401,7 @@ SCHEMA: list[Setting] = [
     Setting("azure.region", ("azure", "region"), "string",
             "Azure region", "Providers",
             "Azure Speech resource region when TTS provider = azure, e.g. eastus, westus2, uksouth. "
-            "Must match your resource. Key comes from AZURE_SPEECH_KEY or [azure].api_key_file.",
+            "Must match your resource. Key comes from [azure].api_key_file.",
             default="eastus", phrasings=("azure region", "azure speech region")),
     Setting("azure.voice", ("azure", "voice"), "string",
             "Azure voice", "Providers",
@@ -416,7 +416,7 @@ SCHEMA: list[Setting] = [
     Setting("openai_tts.base_url", ("openai_tts", "base_url"), "string",
             "OpenAI TTS base URL", "Providers",
             "OpenAI-compatible audio/speech endpoint when TTS provider = openai. Default is OpenAI; "
-            "point it at any compatible endpoint. Key comes from OPENAI_API_KEY or the key file.",
+            "point it at any compatible endpoint. Key comes from the key file.",
             default="https://api.openai.com/v1", phrasings=("openai base url", "openai tts url")),
     Setting("openai_tts.model", ("openai_tts", "model"), "string",
             "OpenAI TTS model", "Providers",
@@ -435,7 +435,7 @@ SCHEMA: list[Setting] = [
     Setting("cartesia.model", ("cartesia", "model"), "string",
             "Cartesia model", "Providers",
             "Cartesia Sonic model when TTS provider = cartesia (a low-latency premium PERSONA "
-            "voice), e.g. sonic-2. Key comes from CARTESIA_API_KEY or the key file.",
+            "voice), e.g. sonic-2. Key comes from the key file.",
             default="sonic-2", phrasings=("cartesia model", "sonic model")),
     Setting("cartesia.voice", ("cartesia", "voice"), "string",
             "Cartesia voice id", "Providers",
