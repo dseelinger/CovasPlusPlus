@@ -198,8 +198,37 @@ discipline:
   shared event pump is started only when the HUD is actually enabled (a disabled HUD adds no
   thread; existing "no ambient feature → no pump" behaviour is preserved).
 - **Off by default, fail-soft.** `[hud].enabled = false`; a missing toolkit/display, or any Tk
-  error, degrades to "no overlay" and logs — it never crosses into the voice loop. **The VR
-  sub-issue (#48) is still open** and reuses the same `HudModel`.
+  error, degrades to "no overlay" and logs — it never crosses into the voice loop.
+
+**Shipped — the VR overlay (issue #48).** The in-headset surface is now built as
+`covas/capabilities/vr_hud.py`, following the spike verbatim (SteamVR `IVROverlay` via the
+`openvr` binding, `setOverlayRaw` from a raw RGBA buffer). It is the **second sink** the "one
+renderer, two sinks" design called for — it **reuses the same `HudModel`/`HudSnapshot`**; only
+the rendering surface differs:
+
+- **`render_snapshot_rgba` — the pure rasterizer (unit-tested, no runtime).** It paints a
+  `HudSnapshot` onto an HxWx4 uint8 **RGBA** buffer with a **built-in 5x7 bitmap font — zero new
+  runtime dependency** (only numpy, already required); text folds to ASCII/caps so arbitrary
+  game text degrades gracefully. Same four rows as the 2D panel, from the same snapshot.
+- **`VrPlacement` / `resolve_transform` — pure placement math.** A placement mode
+  (`world` cockpit-fixed / `head` view-locked) + a physical width become an OpenVR 3x4
+  transform; the mode picks the binding (`setOverlayTransformAbsolute` vs
+  `…TrackedDeviceRelative`). Clamped and unit-tested — a bad setting can't place it unusably.
+- **`VrHudView` / `make_vr_view` — the guarded sink.** `openvr` is imported **lazily** and
+  SteamVR is `init`'d as `VRApplication_Overlay` only when the VR HUD is enabled; **any**
+  import/init/runtime failure returns `None` (so `make_vr_view` yields "no VR surface"),
+  mirroring how `make_view` returns `None` with no tkinter/display. All OpenVR calls live on one
+  daemon thread; the outside world flips thread-safe `show`/`hide`/`close` flags, and the RGBA
+  buffer re-uploads only when the snapshot changes (no always-on cost).
+- **One capability, two independent surfaces.** `HudCapability` gained a VR sink alongside the
+  2D view; `App._reconcile_hud()` reconciles both against `[hud].enabled` / `[hud].vr_enabled`,
+  each fail-soft and independent (a headless desktop doesn't stop the VR overlay, and no VR
+  runtime doesn't stop the 2D window). The event pump starts when **either** is enabled.
+- **`openvr` is an OPTIONAL dependency.** It stays commented in `requirements.txt` (`pip install
+  openvr` to opt in); the app and the **default test suite run without it installed** — the
+  rasterizer and placement are covered with numpy-only fakes, `openvr` is never imported in CI.
+  `covas.spec` collects it (bundling `openvr_api.dll`) **only when present**, so a freeze without
+  it still succeeds. Off by default (`[hud].vr_enabled = false`).
 
 ---
 

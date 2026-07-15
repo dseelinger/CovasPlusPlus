@@ -51,6 +51,18 @@ for _pkg in ("ctranslate2", "sounddevice", "soundfile", "faster_whisper", "onnxr
 # them even though nothing imports them at module top level.
 hiddenimports += ["onnxruntime", "faster_whisper.vad"]
 
+# openvr (the VR HUD's SteamVR overlay, issue #48) is an OPTIONAL dependency — it may not be
+# installed in a given build env. Collect it (bundling openvr_api.dll) ONLY when present, so a
+# build without it still succeeds; a build with it ships the VR overlay. The runtime import is
+# lazy + fail-soft, so the frozen app runs either way.
+try:
+    _d, _b, _h = collect_all("openvr")
+    datas += _d
+    binaries += _b
+    hiddenimports += _h
+except Exception:
+    pass  # openvr not installed in this build env — VR HUD unavailable in the freeze
+
 # Shipped, read-only assets resolved via app_dir() at runtime (the writable copies are seeded into
 # data_dir on first run): the default config.toml and the personality presets.
 datas += [

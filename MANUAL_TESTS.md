@@ -28,6 +28,7 @@ your own dropped into `<data dir>/sounds/<type>/` — see §2):
 **Legend for what each section needs:**
 - 🎮 **ED** — Elite Dangerous must be running (reads live journal/Status.json).
 - 🔊 **HW** — needs real hardware: microphone, speakers/headset. (Nearly every voice step is HW.)
+- 🥽 **VR** — needs a VR headset + SteamVR (and the optional `openvr` package) for the in-headset overlay.
 - ⌨️ **INJECT** — sends real keypresses into ED (keybind automation / auto-honk).
 - 📋 **FILE** — verify by opening a file on disk.
 - 🌐 **PANEL** — verify in the web control panel.
@@ -59,6 +60,7 @@ the next restart** (only Whisper reloads live). Confirm each before running its 
 - [ ] `[proactive].enabled = true` — proactive callouts. (§5.2)
 - [ ] `[route].enabled = true` — Route callouts while flying a plotted route. (§5.3)
 - [ ] `[hud].enabled = true` — Companion HUD overlay (**off** by default; applies **live**, no restart). (§5a)
+- [ ] `[hud].vr_enabled = true` — in-headset VR HUD overlay (**off** by default; needs SteamVR + `pip install openvr`). (§5b)
 - [ ] `[keybinds].enabled = true` — Landing-gear automation. Keep `require_confirmation`/`combat_guard = true`. (§6.1)
 - [ ] `[reflex].enabled = true` — Tier-2 combat reflex (fire chaff). **Off** by default, allowlist ships empty — set `[reflex].allowlist = ["chaff"]` to opt in. Keep `combat_guard = true`. (§6.3)
 - [ ] `[honk].enabled = true` — Auto-honk on arrival (**on** by default). No fire-group setup — it probes and backs out of a Surface-Scanner misfire. Set `[honk].trigger` only if your scanner is on secondary fire. (§6.2)
@@ -264,6 +266,19 @@ Notes:
 - [ ] **Callout row:** trigger a proactive or route callout (§5.2/§5.3) → the last-callout row shows that line.
 - [ ] **Click-through (Windows):** move the mouse over the panel and click → the click lands on the window/game **behind** it (the HUD is non-interactive).
 - [ ] **Fail-soft:** it never blocks startup or the voice loop; with `[hud].enabled = false` no window appears and nothing is logged as an error.
+
+## 5b. VR HUD overlay (issue #48 — `[hud].vr_enabled`)  🥽 VR 🎮 ED
+> The **same** four-row HUD as §5a rendered as a true in-headset **SteamVR overlay** (reuses the identical data adapter — only the rendering surface differs). **Off by default** and **independent** of the 2D HUD. Cannot be exercised offline/headless — needs a VR headset, SteamVR, and the optional dep. **Setup:** `pip install openvr` into the app's environment, start **SteamVR**, and run **Elite Dangerous in VR through SteamVR** (native SteamVR headset, or Quest via Link/Air Link/Virtual Desktop in SteamVR mode).
+- [ ] **No-dep fail-soft (do this first, no headset needed):** with `openvr` **not** installed, set `[hud].vr_enabled = true` → the app starts normally, the VR overlay simply doesn't appear, and the log notes `openvr unavailable` (a `hud` info line) — no crash, no error, and the 2D HUD (if on) still works.
+- [ ] **No-SteamVR fail-soft:** with `openvr` installed but **SteamVR not running**, enable the VR HUD → it logs `SteamVR not available` and continues; nothing appears; the voice loop is unaffected.
+- [ ] **Toggle on — Settings page:** with SteamVR + ED-in-VR running, flip **VR HUD overlay** on the [Settings page](docs/using/hud.md) → the panel appears **floating in the headset** at a readable size, showing the state/checklist/route/callout rows.
+- [ ] **Toggle on — voice:** say *"turn the VR HUD on"* → the overlay appears; *"turn the VR HUD off"* → it disappears. Live, no restart.
+- [ ] **Live content:** confirm the in-headset rows track the same live data as §5a — hold PTT and watch the **state** row (Listening→Thinking→Speaking→Idle); with a checklist loaded the **step** row shows the next item; plot a route and the **route** row shows jumps-remaining (+ scoopable); a proactive/route callout fills the **callout** row.
+- [ ] **Placement — world vs head:** with `[hud].vr_placement = "world"` the panel stays **cockpit-fixed** as you turn your head; switch to `"head"` (re-enable to recreate the overlay) and it **follows your view**.
+- [ ] **Size:** adjust `[hud].vr_width_m` (e.g. `0.4` vs `0.8`) → the panel's physical width changes accordingly; pick a comfortable, legible size.
+- [ ] **Both surfaces at once:** enable **both** `[hud].enabled` and `[hud].vr_enabled` → the desktop window and the headset overlay show simultaneously and independently.
+- [ ] **Quest boundary (if applicable):** confirm the overlay shows on **Quest via SteamVR** (Link/Air Link/Virtual Desktop-SteamVR), and does **not** on the **native Oculus runtime / OpenComposite** (expected — use OpenKneeboard/OVR Toolkit to capture the 2D window there).
+
 ### 5.4 Blueprint / material sourcing (#66)  🎮 ED
 > Requires `[elite].enabled = true`. The material inventory comes from the journal `Materials`
 > event, written when you load into the game — so launch ED (any ship) before testing.

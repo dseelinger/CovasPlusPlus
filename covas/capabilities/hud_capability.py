@@ -407,18 +407,27 @@ def make_view(snapshot_provider: Callable[[], HudSnapshot],
 
 
 class HudCapability:
-    """Wires the model + view to the app: always registered, drives the overlay off the bus.
+    """Wires the model + view(s) to the app: always registered, drives the overlay off the bus.
 
-    It advertises no LLM tools (the HUD is a non-interactive view; its toggle is the ordinary
-    `[hud].enabled` setting, reached from the Settings page or by voice through the settings
-    capability). It only reacts to bus events — feeding the model and, on a `settings` change,
-    reconciling the window's visibility against the live `enabled` flag.
+    It advertises no LLM tools (the HUD is a non-interactive view; its toggles are the ordinary
+    `[hud].enabled` / `[hud].vr_enabled` settings, reached from the Settings page or by voice
+    through the settings capability). It only reacts to bus events — feeding the model and, on a
+    `settings` change, reconciling each surface's visibility against its live `enabled` flag.
+
+    ONE model, up to TWO sinks (issue #48): the 2D tkinter window and the SteamVR overlay are
+    both VIEWS over the same `HudModel` snapshot — only the rendering surface differs. Each is
+    created lazily on first enable, guarded so a missing toolkit/display or a missing VR runtime
+    just means "that surface is off", never a crash.
 
     Injected seams keep it headless-testable:
       * `is_enabled() -> bool` — read `[hud].enabled` live (app: reads `cfg`; tests: a flag).
-      * `view_factory(provider) -> HudView | None` — build the window (app: `make_view`; tests:
-        a fake, or one that returns None to simulate a headless box). Called lazily on first
+      * `view_factory(provider) -> HudView | None` — build the 2D window (app: `make_view`;
+        tests: a fake, or one returning None to simulate a headless box). Called lazily on first
         enable, so a disabled HUD never touches tkinter.
+      * `vr_is_enabled() -> bool` — read `[hud].vr_enabled` live (default: always off).
+      * `vr_view_factory(provider) -> VrHudView | None` — build the SteamVR overlay (app:
+        `make_vr_view` with the configured placement; tests: a fake / None). Called lazily on
+        first enable, so a disabled VR HUD never imports `openvr` or touches a runtime.
     """
 
     def __init__(
@@ -427,14 +436,20 @@ class HudCapability:
         *,
         is_enabled: Callable[[], bool],
         view_factory: Callable[[Callable[[], HudSnapshot]], Optional["HudView"]] = make_view,
+        vr_is_enabled: Optional[Callable[[], bool]] = None,
+        vr_view_factory: Optional[Callable[[Callable[[], HudSnapshot]], Optional[object]]] = None,
         log: Optional[Callable[[str], None]] = None,
     ) -> None:
         self.model = model
         self._is_enabled = is_enabled
         self._view_factory = view_factory
+        self._vr_is_enabled = vr_is_enabled or (lambda: False)
+        self._vr_view_factory = vr_view_factory
         self._log = log
         self._view: Optional[HudView] = None
         self._view_tried = False  # don't re-attempt a failed/headless window every settings change
+        self._vr_view: Optional[object] = None
+        self._vr_view_tried = False
         self._reconcile()          # show at startup if already enabled
 
     # -- capability interface ----------------------------------------------------------
@@ -446,11 +461,13 @@ class HudCapability:
             category="the HUD",
             group="settings",
             one_liner=("I can show a small always-on-top overlay with my current state, your "
-                       "active checklist step, and your route progress. Off by default."),
+                       "active checklist step, and your route progress — on your desktop or, in "
+                       "VR, floating in the cockpit. Off by default."),
             example="turn the HUD on",
             help_when_active=("Say 'turn the HUD on' or 'off' — it's a glanceable panel showing "
                               "whether I'm listening or speaking, your current checklist item, "
-                              "and jumps remaining on your route."),
+                              "and jumps remaining on your route. In VR, turn the VR HUD on for "
+                              "the same panel as a SteamVR overlay in the headset."),
         )
 
     def on_event(self, event: dict) -> None:
@@ -472,41 +489,58 @@ class HudCapability:
         self._reconcile()
 
     def shutdown(self) -> None:
-        """Tear the overlay down on app exit (idempotent)."""
-        if self._view is not None:
-            try:
-                self._view.close()
-            except Exception:  # noqa: BLE001
-                pass
-            self._view = None
+        """Tear both overlays down on app exit (idempotent)."""
+        for attr in ("_view", "_vr_view"):
+            view = getattr(self, attr)
+            if view is not None:
+                try:
+                    view.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                setattr(self, attr, None)
 
     # -- visibility reconciliation -----------------------------------------------------
     def _reconcile(self) -> None:
-        """Match the window to `[hud].enabled`: create+show it when on, hide it when off. The
-        window is created lazily on first enable and reused thereafter (a toggle just
-        hides/shows), so tkinter is only touched once the Commander opts in."""
+        """Match each surface to its live enable flag. Independent and fail-soft — the 2D
+        window and the VR overlay are reconciled separately, so one being unavailable (no
+        display, or no VR runtime) never affects the other."""
+        self._reconcile_surface(
+            "_view", "_view_tried", self._is_enabled, self._view_factory,
+            label="HUD", unavailable="no 2D overlay is available (no display / toolkit)")
+        if self._vr_view_factory is not None:
+            self._reconcile_surface(
+                "_vr_view", "_vr_view_tried", self._vr_is_enabled, self._vr_view_factory,
+                label="VR HUD", unavailable="no VR runtime is available (openvr / SteamVR absent)")
+
+    def _reconcile_surface(self, view_attr: str, tried_attr: str,
+                           is_enabled: Callable[[], bool], factory, *,
+                           label: str, unavailable: str) -> None:
+        """Match one surface's view to its enable flag: create+show when on, hide when off. The
+        view is created lazily on first enable and reused thereafter (a toggle just hides/shows),
+        so the underlying toolkit/runtime is only touched once the Commander opts in."""
         try:
-            want = bool(self._is_enabled())
+            want = bool(is_enabled())
         except Exception:  # noqa: BLE001 — a config read glitch => treat as off
             want = False
+        view = getattr(self, view_attr)
         if want:
-            if self._view is None and not self._view_tried:
-                self._view_tried = True
+            if view is None and not getattr(self, tried_attr):
+                setattr(self, tried_attr, True)
                 try:
-                    self._view = self._view_factory(self.model.snapshot)
-                except Exception as e:  # noqa: BLE001 — window build failure => no overlay
-                    self._logline(f"HUD unavailable: {e}")
-                    self._view = None
-                if self._view is None:
-                    self._logline("HUD enabled but no 2D overlay is available "
-                                  "(no display / toolkit); continuing without it.")
-            if self._view is not None:
-                self._view.show()
-                self._logline("HUD shown.")
+                    view = factory(self.model.snapshot)
+                except Exception as e:  # noqa: BLE001 — build failure => that surface stays off
+                    self._logline(f"{label} unavailable: {e}")
+                    view = None
+                setattr(self, view_attr, view)
+                if view is None:
+                    self._logline(f"{label} enabled but {unavailable}; continuing without it.")
+            if view is not None:
+                view.show()
+                self._logline(f"{label} shown.")
         else:
-            if self._view is not None:
-                self._view.hide()
-                self._logline("HUD hidden.")
+            if view is not None:
+                view.hide()
+                self._logline(f"{label} hidden.")
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:
