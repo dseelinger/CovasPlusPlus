@@ -9,8 +9,9 @@ import json
 from pathlib import Path
 
 from covas.ed import EDContext, StatusWatcher
-from covas.ed.status import (FLAGS, apply_status, decode_flags, describe_transition,
-                            flag_transitions, status_path)
+from covas.ed.modes import MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV
+from covas.ed.status import (FLAGS, FLAGS2, apply_status, decode_flags, describe_transition,
+                            flag_transitions, game_mode_from_flags, status_path)
 from covas.events import EventBus
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ed"
@@ -141,6 +142,56 @@ def test_apply_status_gui_focus_absent_leaves_default():
     apply_status(ctx, {"Flags": 0})              # combat HUD, no GuiFocus key
     snap = ctx.snapshot()
     assert snap["analysis_mode"] is False and snap["gui_focus"] is None
+
+
+# --- game mode (#29) -------------------------------------------------------
+
+def test_flags_include_mode_bits():
+    """The three ship-mode bits are at their spec positions; on-foot lives in Flags2 bit 0."""
+    assert FLAGS["InMainShip"] == 1 << 24
+    assert FLAGS["InFighter"] == 1 << 25
+    assert FLAGS["InSRV"] == 1 << 26
+    assert FLAGS2["OnFoot"] == 1 << 0
+
+
+def test_game_mode_from_ship_flags():
+    assert game_mode_from_flags(_flags("InMainShip"), None) == MODE_MAINSHIP
+    assert game_mode_from_flags(_flags("InFighter"), None) == MODE_FIGHTER
+    assert game_mode_from_flags(_flags("InSRV"), None) == MODE_SRV
+
+
+def test_game_mode_on_foot_from_flags2():
+    # On foot: no ship bit in Flags, OnFoot set in Flags2.
+    assert game_mode_from_flags(0, FLAGS2["OnFoot"]) == MODE_ON_FOOT
+    # A ship bit outranks a stray Flags2 (shouldn't co-occur, but ship-first is the safe rule).
+    assert game_mode_from_flags(_flags("InMainShip"), FLAGS2["OnFoot"]) == MODE_MAINSHIP
+
+
+def test_game_mode_unknown_when_nothing_pins_it():
+    # Menu / loading: no ship bits and no OnFoot -> unknown (None), and both fields absent too.
+    assert game_mode_from_flags(0, 0) is None
+    assert game_mode_from_flags(None, None) is None
+
+
+def test_apply_status_folds_game_mode():
+    ctx = EDContext()
+    patch = apply_status(ctx, {"Flags": _flags("InMainShip")})
+    assert patch["game_mode"] == MODE_MAINSHIP
+    assert ctx.snapshot()["game_mode"] == MODE_MAINSHIP
+    # On foot via Flags2, ship bits clear.
+    patch = apply_status(ctx, {"Flags": 0, "Flags2": FLAGS2["OnFoot"]})
+    assert patch["game_mode"] == MODE_ON_FOOT
+    assert ctx.snapshot()["game_mode"] == MODE_ON_FOOT
+
+
+def test_apply_status_clears_game_mode_to_none_in_menu():
+    # Flags present but no mode bits (main menu) clears a previously-known mode rather than
+    # leaving it stale.
+    ctx = EDContext()
+    apply_status(ctx, {"Flags": _flags("InSRV")})
+    assert ctx.snapshot()["game_mode"] == MODE_SRV
+    apply_status(ctx, {"Flags": 0})
+    assert ctx.snapshot()["game_mode"] is None
 
 
 # --- StatusWatcher read/publish cycle (synchronous, offline) ---------------

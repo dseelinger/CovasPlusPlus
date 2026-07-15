@@ -72,6 +72,48 @@ def test_parse_malformed_xml_is_empty_not_crash():
     assert parse_binds("not xml at all") == {}
 
 
+# --- binding preference (#29) ----------------------------------------------
+
+# An action with a KEYBOARD key on BOTH slots — the only case where the preference changes
+# which key is chosen (the shipped fixture never doubles up keyboard binds).
+_BOTH_KB = ("<Root><ToggleButtonUpInput>"
+            '<Primary Device="Keyboard" Key="Key_P" />'
+            '<Secondary Device="Keyboard" Key="Key_S" />'
+            "</ToggleButtonUpInput></Root>")
+
+
+def test_prefer_primary_is_the_default():
+    b = parse_binds(_BOTH_KB)["ToggleButtonUpInput"]
+    assert b.key == "Key_P" and b.source == "Primary"
+
+
+def test_prefer_secondary_picks_secondary_keyboard():
+    b = parse_binds(_BOTH_KB, prefer="secondary")["ToggleButtonUpInput"]
+    assert b.key == "Key_S" and b.source == "Secondary"
+
+
+def test_prefer_secondary_falls_back_to_primary_when_secondary_absent():
+    # LandingGearToggle has a keyboard key only on Primary — secondary-preference still finds it.
+    b = parse_binds(SAMPLE, prefer="secondary")["LandingGearToggle"]
+    assert b.key == "Key_L" and b.source == "Primary"
+
+
+def test_prefer_primary_falls_back_to_secondary_when_primary_is_joystick():
+    # ToggleCargoScoop's Primary is a joystick; primary-preference falls back to the Secondary key.
+    b = parse_binds(SAMPLE, prefer="primary")["ToggleCargoScoop"]
+    assert b.key == "Key_Home" and b.source == "Secondary"
+
+
+def test_binding_preference_from_cfg():
+    from covas.keybinds.binds import binding_preference
+    assert binding_preference(None) == "primary"
+    assert binding_preference({}) == "primary"
+    assert binding_preference({"keybinds": {"binding_preference": "secondary"}}) == "secondary"
+    assert binding_preference({"keybinds": {"binding_preference": "SECONDARY"}}) == "secondary"
+    # Unrecognized values fall back to the safe default.
+    assert binding_preference({"keybinds": {"binding_preference": "nonsense"}}) == "primary"
+
+
 # --- active_preset + resolve_binds_file ------------------------------------
 
 def test_active_preset_reads_first_nonempty_line():

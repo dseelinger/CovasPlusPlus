@@ -39,6 +39,11 @@ _LG = {"LandingGearToggle": KeyBinding(action="LandingGearToggle", key="Key_L")}
 _SAFE = {"in_danger": False, "being_interdicted": False}
 
 
+def _safe(mode: str | None = None) -> dict:
+    """A safe (no combat) status snapshot, optionally carrying a game_mode for mode-gating."""
+    return {"in_danger": False, "being_interdicted": False, "game_mode": mode}
+
+
 def _cap(*, binds=None, cfg=None, status=_SAFE, clock=None):
     ex = _FakeExecutor()
     clk = clock or _Clock()
@@ -198,6 +203,89 @@ def test_abort_clears_pending_and_releases_keys():
     # after abort, a confirm finds nothing pending
     cap.new_turn()
     assert "nothing to confirm" in cap.run_tool("confirm_keybind", {}).lower()
+
+
+# --- mode gating (#29) -----------------------------------------------------
+
+def test_mode_gate_advertises_action_in_matching_mode():
+    cap, _, _ = _cap(status=_safe("mainship"))
+    names = {t["name"] for t in cap.tools()}
+    assert "toggle_landing_gear" in names
+
+
+def test_mode_gate_hides_action_out_of_mode():
+    # landing_gear is a mainship action; on foot it must not be advertised.
+    cap, _, _ = _cap(status=_safe("on_foot"))
+    names = {t["name"] for t in cap.tools()}
+    assert "toggle_landing_gear" not in names
+    # confirm/abort are always available.
+    assert {"confirm_keybind", "abort_keybinds"} <= names
+
+
+def test_mode_unknown_advertises_all():
+    # No game_mode in the snapshot (ED telemetry can't pin a mode) -> fall back to advertising.
+    cap, _, _ = _cap(status=_safe(None))
+    assert "toggle_landing_gear" in {t["name"] for t in cap.tools()}
+
+
+def test_arm_refused_out_of_mode():
+    cap, ex, _ = _cap(status=_safe("on_foot"))
+    msg = cap.run_tool("toggle_landing_gear", {})
+    assert ex.pressed == []
+    assert "on foot" in msg.lower()
+
+
+def test_arm_allowed_in_mode():
+    cap, ex, _ = _cap(status=_safe("mainship"))
+    msg = cap.run_tool("toggle_landing_gear", {})
+    assert ex.pressed == []                  # armed, not fired (confirmation required)
+    assert "confirm" in msg.lower()
+
+
+def test_mode_guard_rechecked_at_confirm():
+    status = _safe("mainship")
+    cap, ex, _ = _cap(status=status)
+    cap.new_turn()
+    cap.run_tool("toggle_landing_gear", {})  # armed in the ship
+    status["game_mode"] = "on_foot"          # Commander disembarks before confirming
+    cap.new_turn()
+    msg = cap.run_tool("confirm_keybind", {})
+    assert ex.pressed == []
+    assert "on foot" in msg.lower()
+
+
+def test_mode_guard_can_be_disabled():
+    cfg = KeybindConfig(enabled=True, mode_guard=False, require_confirmation=False)
+    cap, ex, _ = _cap(cfg=cfg, status=_safe("on_foot"))
+    # With mode-gating off, the out-of-mode action is advertised and fires.
+    assert "toggle_landing_gear" in {t["name"] for t in cap.tools()}
+    cap.run_tool("toggle_landing_gear", {})
+    assert ex.pressed == ["Key_L"]
+
+
+# --- per-action confirmation policy (#29) ----------------------------------
+
+def test_macro_confirm_required_false_fires_immediately():
+    # A benign macro (confirm_required=False) fires on arm even with global confirmation ON.
+    macros = {"benign": Macro(name="benign", tool="do_benign", action="LandingGearToggle",
+                              arm_phrase="do the benign thing", done_phrase="Done",
+                              confirm_required=False)}
+    ex = _FakeExecutor()
+    cap = KeybindCapability(
+        binds=_LG, executor=ex,
+        config=KeybindConfig(enabled=True, require_confirmation=True, combat_guard=False,
+                             mode_guard=False, allowlist=("benign",)),
+        macros=macros, status_snapshot=None)
+    msg = cap.run_tool("do_benign", {})
+    assert ex.pressed == ["Key_L"]           # fired immediately, no confirmation step
+    assert "Key_L" in msg
+
+
+def test_macro_confirm_required_true_still_arms():
+    # A consequential macro (default confirm_required=True) still arms-and-confirms.
+    cap, ex, _ = _cap(status=_safe("mainship"))
+    cap.run_tool("toggle_landing_gear", {})
+    assert ex.pressed == []
 
 
 # --- hold macro ------------------------------------------------------------

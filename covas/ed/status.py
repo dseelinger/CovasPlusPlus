@@ -16,6 +16,7 @@ from typing import Callable
 
 from ..events import EventBus
 from .context import EDContext
+from .modes import MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV
 
 STATUS_FILE = "Status.json"
 
@@ -58,6 +59,33 @@ FLAGS: dict[str, int] = {
     "FsdJump": 1 << 30,
     "SrvHighBeam": 1 << 31,
 }
+
+# ED's Status.json *second* Flags field (Odyssey only; absent in Horizons). We use just the
+# OnFoot bit: it's how on-foot is detected positively, since the main Flags InMainShip/
+# InFighter/InSRV bits are ALL clear on foot (as they also are on the menu/loading screens).
+# Kept as a table for the same off-by-one safety as FLAGS.
+FLAGS2: dict[str, int] = {
+    "OnFoot": 1 << 0,
+}
+
+
+def game_mode_from_flags(flags: int | None, flags2: int | None) -> str | None:
+    """Derive the Commander's current mode from the two Status.json bitfields (#29).
+
+    Ship modes come from `Flags` (InMainShip/InFighter/InSRV, bits 24-26); on-foot is a
+    *separate* field, `Flags2` bit 0 (Odyssey), so it's detected positively rather than
+    inferred from "no ship bits" — which is also true on the menu/loading screens. Returns
+    None (unknown) when neither field pins a mode, so mode-gating can fall back safely."""
+    if isinstance(flags, int):
+        if flags & FLAGS["InMainShip"]:
+            return MODE_MAINSHIP
+        if flags & FLAGS["InFighter"]:
+            return MODE_FIGHTER
+        if flags & FLAGS["InSRV"]:
+            return MODE_SRV
+    if isinstance(flags2, int) and (flags2 & FLAGS2["OnFoot"]):
+        return MODE_ON_FOOT
+    return None
 
 # Flags whose flip is worth announcing, mapped to (name-when-set, name-when-cleared).
 # Everything else is decoded into context but not published as its own event.
@@ -139,6 +167,16 @@ def apply_status(ctx: EDContext, status: dict) -> dict:
         patch["being_interdicted"] = d["BeingInterdicted"]
         patch["low_fuel"] = d["LowFuel"]
         patch["analysis_mode"] = d["HudAnalysisMode"]
+
+    # Game mode (#29): mainship/fighter/srv from Flags, on-foot from Flags2. Mode-gated
+    # keybind advertisement reads this so on-foot actions aren't offered while flying (and
+    # vice-versa). Set whenever either field is present so it clears to None (unknown) in the
+    # menu rather than sticking at a stale mode.
+    flags2 = status.get("Flags2")
+    if isinstance(flags, int) or isinstance(flags2, int):
+        patch["game_mode"] = game_mode_from_flags(
+            flags if isinstance(flags, int) else None,
+            flags2 if isinstance(flags2, int) else None)
 
     fuel = status.get("Fuel")
     if isinstance(fuel, dict) and isinstance(fuel.get("FuelMain"), (int, float)):

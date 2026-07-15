@@ -26,36 +26,27 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
+from ..ed.modes import MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV
+from ..keybinds import actions as _actions  # noqa: F401 — import populates the macro registry
 from ..keybinds.binds import KeyBinding
 from ..keybinds.executor import ExecutorError
+from ..keybinds.registry import Macro, registered_macros
 from .base import HelpMeta
 
 # ---- macros -------------------------------------------------------------------------------
 
+# `Macro` and the action definitions now live in the keybinds registry (issue #29): action
+# batches register themselves from `keybinds/actions/*.py`, so adding actions is a new module,
+# not an edit here. DEFAULT_MACROS is the aggregated registry, snapshotted at import (after
+# `keybinds.actions` has registered every shipped macro).
+DEFAULT_MACROS: dict[str, Macro] = registered_macros()
 
-@dataclass(frozen=True)
-class Macro:
-    """A named, deterministic ship action the LLM may select. `action` is the ED binding
-    token the executor presses; `kind` is press (a tap) or hold (press for `hold_seconds`)."""
-    name: str            # allowlist key + identity (e.g. "landing_gear")
-    tool: str            # the tool name advertised to the LLM (e.g. "toggle_landing_gear")
-    action: str          # ED action token in the .binds file (e.g. "LandingGearToggle")
-    arm_phrase: str      # what we're about to do, for the confirmation prompt
-    done_phrase: str     # spoken result once executed
-    kind: str = "press"  # "press" | "hold"
-    hold_seconds: float = 0.0
-
-
-# The prototype exposes exactly ONE macro. Generalizing = adding entries here (each still
-# gated by the allowlist), not touching the executor or the loop.
-DEFAULT_MACROS: dict[str, Macro] = {
-    "landing_gear": Macro(
-        name="landing_gear",
-        tool="toggle_landing_gear",
-        action="LandingGearToggle",
-        arm_phrase="toggle the landing gear (deploy if up, retract if down)",
-        done_phrase="Landing gear toggled",
-    ),
+# Human-readable label per game mode, for mode-gating refusal messages.
+_MODE_LABEL: dict[str, str] = {
+    MODE_MAINSHIP: "in your ship",
+    MODE_FIGHTER: "in a fighter",
+    MODE_SRV: "in the SRV",
+    MODE_ON_FOOT: "on foot",
 }
 
 
@@ -69,6 +60,7 @@ class KeybindConfig:
     enabled: bool = False
     require_confirmation: bool = True
     combat_guard: bool = True
+    mode_guard: bool = True                  # gate actions to the current game mode (#29)
     confirm_window: float = 60.0            # seconds an armed action stays confirmable
     allowlist: tuple[str, ...] = ("landing_gear",)
 
@@ -85,6 +77,7 @@ class KeybindConfig:
             enabled=bool(k.get("enabled", False)),
             require_confirmation=bool(k.get("require_confirmation", True)),
             combat_guard=bool(k.get("combat_guard", True)),
+            mode_guard=bool(k.get("mode_guard", True)),
             confirm_window=float(k.get("confirm_window", d.confirm_window)),
             allowlist=allow,
         )
@@ -192,9 +185,12 @@ class KeybindCapability:
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:
-        """Arm tools for allowlisted+known macros, plus confirm + abort. A macro not in the
-        allowlist is never advertised (enforced again at run time)."""
-        out = [_arm_tool(m) for m in self._allowed_macros()]
+        """Arm tools for allowlisted+known macros valid in the CURRENT game mode, plus confirm
+        + abort. Allowlist and mode are both enforced again at run time. When the mode is
+        unknown (no ED telemetry), we can't gate, so all allowlisted macros are advertised —
+        no worse than before mode-gating, since the combat guard already refuses at run time
+        when telemetry is unavailable."""
+        out = [_arm_tool(m) for m in self._advertised_macros()]
         out.append(_CONFIRM_TOOL)
         out.append(_ABORT_TOOL)
         return out
@@ -244,8 +240,14 @@ class KeybindCapability:
             self._logline(f"{macro.name} blocked by guard: {guard}")
             return guard
 
-        if not self._cfg.require_confirmation:
-            # Confirmation disabled by config — still gated by allowlist + combat guard above.
+        mguard = self._mode_guard(macro)
+        if mguard is not None:
+            self._logline(f"{macro.name} blocked by mode guard: {mguard}")
+            return mguard
+
+        if not (self._cfg.require_confirmation and macro.confirm_required):
+            # Confirmation not required (globally off, or this macro is benign/read-only) —
+            # still gated by allowlist + combat + mode guards above.
             return self._execute(macro, binding)
 
         with self._lock:
@@ -272,11 +274,16 @@ class KeybindCapability:
         if macro is None:
             return "The armed action is no longer available."
 
-        # Re-check the combat guard at execution time: danger may have started since arming.
+        # Re-check the guards at execution time: danger may have started, or the Commander may
+        # have changed mode (e.g. disembarked), since arming.
         guard = self._guard()
         if guard is not None:
             self._logline(f"{macro.name} blocked at confirm: {guard}")
             return guard
+        mguard = self._mode_guard(macro)
+        if mguard is not None:
+            self._logline(f"{macro.name} blocked at confirm by mode guard: {mguard}")
+            return mguard
         binding = self._binds.get(macro.action)
         if binding is None or not binding.usable:
             return (binding.unusable_reason if binding is not None
@@ -321,8 +328,40 @@ class KeybindCapability:
         return None if state == SAFE else _GUARD_MESSAGES[state]
 
     def _allowed_macros(self) -> list[Macro]:
-        """Macros that are both allowlisted and known — the only ones ever advertised/run."""
+        """Macros that are both allowlisted and known — the run-time lookup set (mode-
+        independent, so startup readiness reporting lists every wired macro)."""
         return [self._macros[n] for n in self._cfg.allowlist if n in self._macros]
+
+    def _advertised_macros(self) -> list[Macro]:
+        """The allowlisted macros valid in the CURRENT game mode — what gets advertised to the
+        model. When mode-gating is off, or the mode is unknown (no telemetry), or a macro is
+        mode-agnostic (empty `modes`), it isn't filtered out here."""
+        if not self._cfg.mode_guard:
+            return self._allowed_macros()
+        mode = self._current_mode()
+        if mode is None:
+            return self._allowed_macros()
+        return [m for m in self._allowed_macros() if not m.modes or mode in m.modes]
+
+    def _current_mode(self) -> str | None:
+        """The Commander's current game mode from the ED status snapshot, or None (unknown)
+        when ED monitoring is off or the mode can't be determined."""
+        snap = self._status() if self._status is not None else None
+        return snap.get("game_mode") if isinstance(snap, dict) else None
+
+    def _mode_guard(self, macro: Macro) -> str | None:
+        """Returns a refusal message when `macro` isn't valid in the current mode, else None.
+        Skipped when mode-gating is off, the macro is mode-agnostic, or the mode is unknown
+        (can't prove a mismatch — the combat guard already covers the no-telemetry case)."""
+        if not self._cfg.mode_guard or not macro.modes:
+            return None
+        mode = self._current_mode()
+        if mode is None or mode in macro.modes:
+            return None
+        where = _MODE_LABEL.get(mode, "in your current mode")
+        allowed = ", ".join(_MODE_LABEL.get(m, m) for m in sorted(macro.modes))
+        return (f"Can't {macro.arm_phrase} while you're {where} — that action only works "
+                f"{allowed}.")
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:
