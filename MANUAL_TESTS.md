@@ -64,6 +64,7 @@ the next restart** (only Whisper reloads live). Confirm each before running its 
 - [ ] `[keybinds].enabled = true` — Landing-gear automation. Keep `require_confirmation`/`combat_guard = true`. (§6.1)
 - [ ] `[reflex].enabled = true` — Tier-2 combat reflex (fire chaff). **Off** by default, allowlist ships empty — set `[reflex].allowlist = ["chaff"]` to opt in. Keep `combat_guard = true`. (§6.3)
 - [ ] `[honk].enabled = true` — Auto-honk on arrival (**on** by default). No fire-group setup — it probes and backs out of a Surface-Scanner misfire. Set `[honk].trigger` only if your scanner is on secondary fire. (§6.2)
+- [ ] `[comms_send].enabled = true` — send in-game chat by voice (**off** by default). Bind **Quick Comms Panel** to a key; outward-facing, so it always reads back and sends only on a separate confirm. (§6.4)
 - [ ] `[nav].enabled = true` — outfitting "find the closest module". (§7)
 - [ ] `[star_systems].enabled = true` / `[search].enabled = true` — voice search categories. (§8)
 - [ ] `[cg].enabled` is implicit (`[cg].source`); add an **Inara API key** on the Settings API keys card to also see CGs you haven't visited. (§10)
@@ -310,8 +311,8 @@ Notes:
 
 Notes:
 
-## 6. Ship controls — keybinds & auto-honk  🎮 ED ⌨️ INJECT 🔊 HW
-> Both send **real keypresses** into ED and need `[elite].enabled = true` (combat guard). Do these **parked/docked and safe**.
+## 6. Ship controls — keybinds, auto-honk & comms  🎮 ED ⌨️ INJECT 🔊 HW
+> These send **real keypresses** into ED. Keybinds/auto-honk need `[elite].enabled = true` (combat guard) — do them **parked/docked and safe**. Comms send (§6.4) needs no ED monitoring but is **outward-facing**, so test it in a quiet/solo instance.
 
 ### 6.1 Toggle landing gear (`[keybinds].enabled = true`)
 > The **Toggle Landing Gear** control must be bound to a key in ED. Only `landing_gear` is allowlisted.
@@ -426,6 +427,22 @@ Notes:
 - [ ] **Disabled by default:** clear `[reflex].ptt` (blank) → no second hook; only the main PTT works.
 
 Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_DETECT_WINDOW`, the Exit-Mode bind):
+
+### 6.4 Send in-game messages by voice (#49 — `[comms_send].enabled = true`)  ⌨️ INJECT
+> **Outward-facing — other Commanders SEE the message.** COVAS composes ED chat from what you say, **reads it back**, and sends only on a **separate** confirm. Set `[comms_send].enabled = true` and bind **Quick Comms Panel** to a **key** in ED (a HOTAS/mouse-only bind can't be pressed). No ED monitoring needed — the read-back is the safety, not a combat guard. Do your first tests **in a quiet/solo instance** so a slip doesn't spam a populated one. Per-channel switching is optional: leave `channel_*` blank to send on your currently-selected channel, or set the ED tokens if you've bound channel-switch keys.
+- [ ] **Startup readiness:** launch reports `Comms: open box QuickCommsPanel -> <key>` (or `Comms UNUSABLE (bind QuickCommsPanel …)`), and a `Comms send ON (read-back-before-send confirmation required).` line.
+- [ ] **Compose reads back, does NOT send:** *"Tell local o7."* → COVAS says it's *ready to send to local/system chat: "o7"* and asks you to confirm. **Nothing is typed into ED yet.**
+- [ ] **Send on a separate turn:** then say *"Send it"* (or "confirm") → the comms box opens, **"o7"** is pasted, and the message sends on your current/local channel. Log: `sent comms to local: 'o7'`.
+- [ ] **No same-turn send:** confirm in the SAME breath as composing → refused ("that isn't a separate confirmation…"); nothing sends. (The model can't compose-and-send in one turn.)
+- [ ] **Cancel:** compose a message, then *"cancel"* → *"Discarded that message"*; a later "confirm" finds nothing armed.
+- [ ] **Reword:** compose, then compose a DIFFERENT message before confirming → only the **latest** is sent.
+- [ ] **Longer message + channel:** *"Message my wing: forming up at the nav beacon."* → reads it back as wing chat; confirm → it sends. (If you set `channel_wing`, verify it switches to the wing tab first.)
+- [ ] **Multi-line / dictation artefacts:** a message that transcribes with a line break sends as a **single line** (no early send).
+- [ ] **Unbound open key:** with **Quick Comms Panel** NOT bound to a key, ask to send → spoken *"bind QuickCommsPanel to a key…"*; nothing sends.
+- [ ] **Configured-but-unbound channel key:** set `channel_wing` to a token you haven't bound → asking to message the wing is refused with a *"bind it in-game"* message; nothing sends.
+- [ ] **Expiry:** compose, wait past `confirm_window` (default 60 s), say "confirm" → *"that message expired for safety"*; nothing sends.
+- [ ] **Hard abort:** say *"abort"* → releases any held key (shared executor with keybinds/honk).
+- [ ] **Disabled:** set `[comms_send].enabled = false` → no send/confirm/cancel tools offered; asking to message someone does nothing.
 
 ## 7. Outfitting search — find the closest module  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
 > `[nav].enabled = true`. `require_confirmation` ships **off**, so it searches as soon as the module is fully resolved.

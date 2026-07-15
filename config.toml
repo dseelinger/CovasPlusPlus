@@ -747,6 +747,41 @@ allowlist = []
 ptt = ""
 
 
+[comms_send]
+# Send in-game COMMS TEXT by voice (issue #49) — compose an Elite Dangerous chat message from
+# what you say and send it to local/system, your wing, your squadron, or as a direct message,
+# without opening the comms panel and typing. The model composes the words ("tell local o7",
+# "message my wing: forming up at the nav beacon") and picks the channel; COVAS opens the chat
+# box, PASTES the text via the clipboard (more reliable than per-character typing), and sends.
+#
+# OUTWARD-FACING — other Commanders SEE the message — so it's behind a MANDATORY read-back gate:
+# COVAS reads the composed message back and sends ONLY after you confirm on a SEPARATE spoken
+# command ("confirm" / "send it"). There is NO way to disable that gate; an un-confirmed send is
+# never performed. This also guards against a garbled transcription reaching strangers.
+#
+# DEFAULT OFF — opt in deliberately. Shares the keybind scancode executor (one hard "abort"
+# releases any key it pressed). No ED monitoring required — the read-back is the safety, not a
+# combat guard.
+enabled = false
+# Seconds a composed message stays confirmable before it expires for safety.
+confirm_window = 60
+# ED action token that OPENS the chat text box (drops the cursor into chat). QuickCommsPanel is
+# the usual one; bind it to a KEY in Elite Dangerous (Controls) — a HOTAS-only bind can't be
+# pressed. An unbound one degrades to a spoken "bind it in-game" message.
+open_bind = "QuickCommsPanel"
+# Pause (seconds) after focusing the box / selecting a channel / pasting, so the chat field
+# keeps up before the next keystroke.
+settle_seconds = 0.15
+# Per-channel ED action tokens that SELECT each channel before sending. Elite has no universal
+# per-channel send key, so these are yours to set (bind them in-game if you use them). Leave a
+# channel BLANK to send on your currently-selected comms channel (fine for the common local-chat
+# case). A configured-but-unbound key fails soft with a "bind it in-game" message.
+channel_local = ""
+channel_wing = ""
+channel_squadron = ""
+channel_direct = ""
+
+
 [honk]
 # Auto-honk (N5) — fire the Discovery Scanner shortly after arriving in a NEW system, so you scan
 # the system without lifting a finger. The model isn't involved — arrival triggers a deterministic

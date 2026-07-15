@@ -302,6 +302,19 @@ separate, *combat-permissive* policy (the inverse of `[keybinds]`): it fires def
 | `reflex.allowlist` | `[]` | Reflex names allowed to fire (separate from `keybinds.allowlist`). Add `"chaff"` to opt in |
 | `reflex.ptt` | `""` | Second push-to-talk for the **instant fast path** — a snap *"chaff!"* on this key fires locally with **no LLM round-trip** (same guard/abort). Bind a **different** key than `keys.push_to_talk`; **blank** disables it. A non-combat phrase on it falls through to a normal turn |
 
+## Send in-game messages (`[comms_send]`)
+
+See [Send in-game messages](automation/comms.md). **Off by default** — it types chat other
+Commanders see, behind a mandatory read-back-before-send confirmation.
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `comms_send.enabled` | `false` | Master switch |
+| `comms_send.open_bind` | `"QuickCommsPanel"` | ED action token that opens the chat text box (bind it to a key) |
+| `comms_send.confirm_window` | `60` | Seconds a composed message stays confirmable |
+| `comms_send.settle_seconds` | `0.15` | Pause after focus/channel/paste so the field keeps up |
+| `comms_send.channel_local` / `_wing` / `_squadron` / `_direct` | *(blank)* | Per-channel select binds; blank = send on your currently-selected channel |
+
 ## Auto-honk (`[honk]`)
 
 See [Auto-honk](automation/auto-honk.md). **Off by default** — it presses a fire button.

@@ -208,6 +208,11 @@ class App:
         # of the Tier-1 combat guard. Opt-in ([reflex].enabled, off by default); shares the
         # keybind executor + binds so the one hard abort releases every held key.
         self.reflex = None
+        # Send in-game comms text by voice (issue #49): compose a message, read it back, and
+        # send on confirm (local/wing/squadron/direct). Outward-facing (other Commanders see
+        # it), so it's behind a MANDATORY read-back-before-send gate — no un-confirmed sends.
+        # Opt-in ([comms_send].enabled, off by default); shares the keybind executor + binds.
+        self.comms = None
         # Shared scancode executor + parsed .binds, built once and reused by keybinds and
         # auto-honk so a hard abort releases keys held by either (and the .binds file is parsed
         # a single time). Lazily populated by the helpers below.
@@ -253,6 +258,8 @@ class App:
             self._start_honk()
         if self.cfg.get("reflex", {}).get("enabled"):
             self._start_reflex()
+        if self.cfg.get("comms_send", {}).get("enabled"):
+            self._start_comms()
         if self.cfg.get("nav", {}).get("enabled"):
             self._start_nav()
             self._start_ship_nav()
@@ -973,6 +980,50 @@ class App:
             self.reflex = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Tier-2 reflexes failed to start: {e}"})
+
+    # ---- Send in-game comms (issue #49) -----------------------------------
+    def _start_comms(self) -> None:
+        """Build the comms-send capability: reuse the shared ED binds + scancode executor, wire
+        the clipboard-paste text injector, and register it behind the read-back-before-send gate.
+        Fail soft — a missing bindings file or a non-Windows host (no executor) just leaves comms
+        off; it must never block startup. No combat/ED-monitoring dependency: the safety here is
+        the mandatory read-back confirmation, not a game-state guard."""
+        try:
+            from .capabilities.comms_capability import CommsSendCapability, CommsSendConfig
+            from .nav import clipboard
+
+            ccfg = CommsSendConfig.from_cfg(self.cfg)
+            binds = self._ed_binds()
+            executor = self._key_executor()   # raises ExecutorError off-Windows -> caught below
+            self.comms = CommsSendCapability(
+                binds=binds, executor=executor, config=ccfg,
+                copy=clipboard.copy,
+                log=lambda msg: self._log("comms", msg))
+            self.registry.register(self.comms)
+
+            # Report readiness so the manual test knows what's wired: the open-comms bind and
+            # each configured channel-select bind.
+            ob = binds.get(ccfg.open_bind)
+            if ob is not None and ob.usable:
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"Comms: open box {ccfg.open_bind} -> {ob.key}"})
+            else:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    f"Comms UNUSABLE (bind {ccfg.open_bind} to a key to open the chat box)."})
+            for ch, token in ccfg.channel_binds.items():
+                if not token:
+                    continue
+                b = binds.get(token)
+                detail = (f"{ch} -> {b.key}" if b is not None and b.usable
+                          else f"{ch} UNUSABLE (no keyboard bind for {token})")
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"Comms channel: {detail}"})
+            self.bus.publish({"type": "log", "who": "system", "text":
+                "Comms send ON (read-back-before-send confirmation required)."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.comms = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Comms send failed to start: {e}"})
 
     # ---- Auto-honk (N5) ---------------------------------------------------
     def _start_honk(self) -> None:
@@ -1780,12 +1831,15 @@ class App:
             print(f"\nCommander: {text}")
             self._log("Commander", text)
 
-            # New Commander utterance -> advance the keybind confirmation gate, so an armed
-            # ship action can only be confirmed on a genuinely separate command (the model
-            # can't arm-and-confirm within one turn). DESIGN §6 safety layer. The find-closest
-            # capability uses the same gate when [nav].require_confirmation is on.
+            # New Commander utterance -> advance the confirmation gates, so an armed ship action
+            # or a composed comms message can only be confirmed on a genuinely separate command
+            # (the model can't arm-and-confirm within one turn). DESIGN §6 safety layer. Comms
+            # (#49) uses this as its read-back-before-send gate; the find-closest capability uses
+            # the same gate when [nav].require_confirmation is on.
             if self.keybinds is not None:
                 self.keybinds.new_turn()
+            if self.comms is not None:
+                self.comms.new_turn()
             if self.nav is not None:
                 self.nav.new_turn()
 

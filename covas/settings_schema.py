@@ -410,6 +410,23 @@ SCHEMA: list[Setting] = [
             default="", phrasings=("reflex key", "reflex push to talk", "combat reflex key"),
             example="set the reflex key to right bracket"),
 
+    # --- Send in-game comms (issue #49) -----------------------------------
+    Setting("comms_send.enabled", ("comms_send", "enabled"), "bool",
+            "Send in-game messages", "Comms",
+            "Compose + send Elite Dangerous chat (local/wing/squadron/direct) by voice. "
+            "Always reads the message back and sends only on a separate confirm.",
+            default=False, phrasings=("send messages", "in-game messages", "voice comms"),
+            example="turn on sending in-game messages"),
+    Setting("comms_send.confirm_window", ("comms_send", "confirm_window"), "int",
+            "Confirm window", "Comms",
+            "Seconds a composed message stays confirmable before it expires.",
+            default=60, min=5, max=300, unit="s",
+            phrasings=("comms confirm window",)),
+    Setting("comms_send.open_bind", ("comms_send", "open_bind"), "string",
+            "Open-comms bind", "Comms",
+            "ED action token that opens the chat text box (bind it to a KEY in-game).",
+            default="QuickCommsPanel", phrasings=("comms open bind",)),
+
     # --- Navigation & search ----------------------------------------------
     Setting("nav.enabled", ("nav", "enabled"), "bool",
             "Find closest module", "Navigation & search",
