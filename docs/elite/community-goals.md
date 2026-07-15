@@ -30,20 +30,21 @@ if the CG is in your current system, it says so and skips the clipboard copy.
 - **With a key** → the complete active list, so CGs you haven't been to still surface (which is the
   whole point of adding the feed).
 
-To add one: create a free generic API key at **inara.cz → Settings → 3rd party APIs**, and set
-`[cg].inara_api_key` (in `config.toml` or the git-ignored `overrides.json`). It's read-only public
-CG data and low-risk, but since this is a public project, don't commit the key. Changing it takes
-effect on restart.
+To add one: create a free generic API key at **inara.cz → Settings → 3rd party APIs**, then paste it
+into the **API keys** card on the control panel's Settings page. It's stored the same way as every
+other key — encrypted at rest with Windows DPAPI in `InaraAPIKey.txt` (git-ignored), never in plain
+text. Changing it takes effect on restart.
 
-!!! note "The Inara key isn't on the Settings page"
-    Because it's a credential, the Inara API key is a restart-level setting edited in the config
-    file, not exposed as a field in the web Settings page.
+!!! note "Upgrading from an older version"
+    If you previously set `[cg].inara_api_key` in `config.toml` or `overrides.json`, COVAS++ moves it
+    into the encrypted `InaraAPIKey.txt` automatically on the next run and blanks the old plaintext
+    value — no action needed.
 
 ## Settings
 
 | Setting | What it does |
 |---------|--------------|
 | `cg.source` | `inara` (external feed) or `none` (journal-only) |
-| `cg.inara_api_key` | Your free Inara key; blank = journal-only |
+| Inara API key | Entered on the Settings **API keys** card; stored encrypted, blank = journal-only |
 
 See the [Configuration reference](../configuration.md#community-goals-cg).

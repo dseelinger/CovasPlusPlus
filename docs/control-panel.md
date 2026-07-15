@@ -46,6 +46,21 @@ inline help:
 Everything here is the **same schema** the [voice settings](using/settings.md) use, so the two never
 disagree.
 
+### API keys
+
+At the top of the Settings page is a hand-built **API keys** card — one write-only field per
+provider (Anthropic, ElevenLabs, OpenAI, Gemini, Azure, Cartesia, and Inara). It's how you set or
+**rotate** any key without hunting for files or re-running setup:
+
+- **Write-only & masked** — each field is a password box. Keys are **never shown back**; every row
+  just carries a **set / not-set** badge, so a stored key can't leak through the page.
+- **Encrypted at rest** — a saved key is written to that provider's key file **encrypted with
+  Windows DPAPI** (never plaintext, and never into `overrides.json`).
+- **Set, rotate, or clear** — paste a key and **Save** (or **Rotate** if one's already set); **Clear**
+  removes it. A blank box is ignored, so you can't accidentally wipe a stored key.
+- **Takes effect on restart** — providers read their key at launch, so a new or rotated key applies
+  the next time you start COVAS++.
+
 ## Personality tab
 
 Manage your [personas and campaign](using/personas-voice.md):

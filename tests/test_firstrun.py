@@ -91,6 +91,37 @@ def test_legacy_plaintext_key_is_read_then_migrated(tmp_path):
     assert firstrun.anthropic_key(cfg) == "sk-ant-plaintext"    # still reads correctly after
 
 
+def test_inara_key_reads_encrypted_file(tmp_path):
+    """`inara_key` reads the DPAPI-encrypted `[cg].api_key_file` — the same file-only path as every
+    other provider key (issue #24)."""
+    cfg = {"cg": {"source": "inara", "api_key_file": str(tmp_path / "InaraAPIKey.txt")}}
+    assert firstrun.inara_key(cfg) is None                       # nothing stored yet
+    firstrun.save_inara_key(cfg, "  inara-abc  ")                # trimmed on write
+    stored = (tmp_path / "InaraAPIKey.txt").read_text(encoding="utf-8")
+    assert stored.startswith("DPAPI:") and "inara-abc" not in stored   # encrypted at rest
+    assert firstrun.inara_key(cfg) == "inara-abc"
+
+
+def test_inara_key_migrates_and_blanks_legacy_inline(tmp_path, monkeypatch, capsys):
+    """A legacy inline `[cg].inara_api_key` is migrated on first read: encrypted into InaraAPIKey.txt,
+    then blanked in overrides.json AND the live cfg so it's never read as plaintext again."""
+    key_file = tmp_path / "InaraAPIKey.txt"
+    cfg = {"cg": {"source": "inara", "api_key_file": str(key_file),
+                  "inara_api_key": "legacy-inline-key"}}
+    saved: dict = {}
+    monkeypatch.setattr(firstrun, "load_overrides",
+                        lambda: {"cg": {"inara_api_key": "legacy-inline-key"}})
+    monkeypatch.setattr(firstrun, "save_overrides", lambda o: saved.update(o))
+
+    assert firstrun.inara_key(cfg) == "legacy-inline-key"        # migration returns the key
+    assert key_file.read_text(encoding="utf-8").startswith("DPAPI:")   # now encrypted on disk
+    assert saved["cg"]["inara_api_key"] == ""                    # blanked in overrides.json
+    assert cfg["cg"]["inara_api_key"] == ""                      # and in the live cfg
+    assert "migrated" in capsys.readouterr().err.lower()
+    # Second read comes straight from the encrypted file — no inline value left to re-migrate.
+    assert firstrun.inara_key(cfg) == "legacy-inline-key"
+
+
 def test_undecryptable_blob_reads_as_no_key(tmp_path, capsys):
     """A DPAPI blob that won't decrypt here (copied %APPDATA%) is treated as "no key" with a clear
     message, not a crash — and the file is left untouched (not clobbered)."""

@@ -36,6 +36,12 @@ than silently picking something:
 And if you name something that isn't a setting at all (*"set the warp factor to 9"*), it routes to
 [help](help.md) instead of inventing a setting.
 
+!!! note "API keys aren't voice settings"
+    Provider API keys (Anthropic, ElevenLabs, OpenAI, Gemini, Azure, Cartesia, Inara) are **not**
+    changed by voice and don't live in `overrides.json`. Set or rotate them on the write-only,
+    masked **API keys** card at the top of the [Settings page](../control-panel.md#api-keys), where
+    they're stored encrypted (Windows DPAPI). A key change takes effect on restart.
+
 ## What applies immediately vs. on restart
 
 - **Live** — a handful of settings take effect right away (the Whisper speech model reloads live,

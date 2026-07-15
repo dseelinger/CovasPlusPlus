@@ -609,9 +609,11 @@ search_size = 50
 # EDSM has no public community-goals API (verified at build time — every endpoint 404s), so the
 # supported feed is Inara's getCommunityGoalsRecent, which needs a free generic Inara API key
 # (inara.cz -> Settings -> 3rd party APIs -> generate an app key). Without a key it stays
-# journal-only. Changing the key takes effect on restart. The key can also live in
-# overrides.json (git-ignored); it's low-risk (read-only public CG data) but don't commit it.
+# journal-only. Enter or rotate the key on the Settings page; it takes effect on restart.
 source = "inara"       # "inara" (external feed) or "none" (journal-only)
+api_key_file = "InaraAPIKey.txt"   # DPAPI-encrypted at rest under your data dir (git-ignored)
+# DEPRECATED, kept only for one-time migration: a plaintext key left here (or in overrides.json)
+# is moved into the encrypted InaraAPIKey.txt on first run and this value is blanked. Don't commit it.
 inara_api_key = ""     # blank = journal-only
 
 

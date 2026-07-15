@@ -11,6 +11,7 @@ AzureSpeechKey.txt
 OpenAIAPIKey.txt
 CartesiaAPIKey.txt
 GeminiAPIKey.txt
+InaraAPIKey.txt
 *.key
 .env
 .env.*

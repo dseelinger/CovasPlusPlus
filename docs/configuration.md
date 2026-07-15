@@ -267,7 +267,8 @@ See [Community goals](elite/community-goals.md).
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `cg.source` | `inara` | `inara` (external feed) or `none` (journal-only) |
-| `cg.inara_api_key` | *(blank)* | Free Inara key to also see CGs you haven't visited (not on the Settings page — it's a credential) |
+| `cg.api_key_file` | `InaraAPIKey.txt` | Where the free Inara key is read from — DPAPI-encrypted at rest, git-ignored; enter it on the Settings **API keys** card |
+| `cg.inara_api_key` | *(blank)* | **Deprecated** — a legacy inline key here is migrated into the encrypted `InaraAPIKey.txt` on first run, then blanked |
 
 ## Ambient audio (`[audio]`, `[music]`)
 

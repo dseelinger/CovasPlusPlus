@@ -87,6 +87,7 @@ _DATA_PATH_FIELDS = (
     ("openai", "api_key_file"),
     ("gemini", "api_key_file"),
     ("cartesia", "api_key_file"),
+    ("cg", "api_key_file"),
     ("checklist", "file"),
     ("logging", "dir"),
     ("piper", "model"),
