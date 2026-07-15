@@ -14,9 +14,9 @@ import pytest
 
 from covas.search import NavError
 from covas.search.routes import (RESULTS_URL, RoutePlotter, RouteWaypoint, build_galaxy_request,
-                                 build_riches_request, build_trade_request, parse_galaxy_route,
-                                 parse_riches_route, parse_trade_route, stale_age_caveat,
-                                 submit_and_poll)
+                                 build_riches_request, build_trade_request, hop_age_days,
+                                 parse_galaxy_route, parse_riches_route, parse_trade_route,
+                                 stale_age_caveat, submit_and_poll)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -130,12 +130,28 @@ def test_parse_galaxy_route_empty_or_bad():
 def test_build_trade_request():
     q = build_trade_request(from_system="Sol", from_station="Galileo", capital=100_000_000,
                             max_cargo=720, jump_range=30, max_hops=4, max_arrival_distance=5000,
-                            requires_large_pad=True, max_price_age_days=2)
+                            requires_large_pad=True, allow_planetary=True, max_price_age_days=2)
     assert q["system"] == "Sol" and q["station"] == "Galileo"
     assert q["starting_capital"] == 100_000_000 and q["max_cargo"] == 720
     assert q["max_hop_distance"] == 30.0 and q["max_hops"] == 4
     assert q["max_system_distance"] == 5000 and q["requires_large_pad"] is True
+    assert q["allow_planetary"] is True
     assert q["max_price_age"] == 2 * 86400 and q["unique"] is True
+
+
+def test_build_trade_request_defaults_and_omits_optionals():
+    q = build_trade_request(from_system="Sol", from_station="Galileo", capital=1, max_cargo=1,
+                            jump_range=20)
+    assert q["requires_large_pad"] is False and q["allow_planetary"] is False
+    assert q["unique"] is True                             # avoid-loops on by default
+    assert "max_system_distance" not in q                  # no arrival cap unless asked
+    assert "max_price_age" not in q                        # no freshness cap unless asked
+
+
+def test_build_trade_request_avoid_loops_off_maps_to_unique_false():
+    q = build_trade_request(from_system="Sol", from_station="Galileo", capital=1, max_cargo=1,
+                            jump_range=20, unique=False)
+    assert q["unique"] is False
 
 
 def test_parse_trade_route_from_fixture():
@@ -224,6 +240,19 @@ def test_stale_age_caveat_flags_old_prices():
 
 def test_stale_age_caveat_none_without_timestamps():
     assert stale_age_caveat([_hop(None)]) is None
+
+
+def test_stale_age_caveat_fresh_when_youngest_within_window():
+    # A mix of one fresh + one old leg: the summary caveat stays quiet (per-leg tags cover it).
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+    hops = [_hop("2026-07-15 06:00:00+00"), _hop("2026-07-01 12:00:00+00")]  # 0.25d + 14d
+    assert stale_age_caveat(hops, now=now) is None
+
+
+def test_hop_age_days_reads_price_timestamp():
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+    assert hop_age_days(_hop("2026-07-10 12:00:00+00"), now=now) == pytest.approx(5.0, abs=0.01)
+    assert hop_age_days(_hop(None)) is None
 
 
 # --- plot handoff ----------------------------------------------------------

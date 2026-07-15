@@ -175,16 +175,22 @@ class TradeHop:
 
 def build_trade_request(*, from_system: str, from_station: str, capital: int, max_cargo: int,
                         jump_range: float, max_hops: int = 4, max_arrival_distance: int | None = None,
-                        requires_large_pad: bool = False, max_price_age_days: int | None = None,
-                        unique: bool = True) -> dict:
+                        requires_large_pad: bool = False, allow_planetary: bool = False,
+                        max_price_age_days: int | None = None, unique: bool = True) -> dict:
     """Query params for the trade planner (`POST /api/trade/route`).
 
     LIVE-VERIFY: these param NAMES are built to the observed trade form (Source Station, Starting
     Capital, Maximum Hop Distance, Maximum Cargo Capacity, Maximum Hops, Maximum Distance To
-    Arrival, Maximum Market Age, Requires Large Pad) + Spansh's route convention. Kept in this one
-    function so a name correction after on-hardware validation is a single edit. Freshness rides as
-    `max_price_age` — UNIT is a live-verify guess (seconds here); the client-side backstop
-    (`annotate_trade_freshness`) is authoritative regardless."""
+    Arrival, Maximum Market Age, Requires Large Pad, Include Planetary, Unique) + Spansh's route
+    convention. Kept in this one function so a name correction after on-hardware validation is a
+    single edit.
+
+    Exposed knobs mirror the useful trade-form fields: `jump_range` (max hop distance, ly),
+    `max_hops`, `max_arrival_distance` (supercruise distance star→station, ls), `requires_large_pad`,
+    `allow_planetary` (include planetary ports), `unique` (avoid revisiting a station — the
+    avoid-loops toggle), and `max_price_age_days` (freshness). Freshness rides as `max_price_age` —
+    UNIT is a live-verify guess (seconds here); the client-side backstop (`stale_age_caveat`) is
+    authoritative regardless."""
     params: dict = {
         "system": str(from_system),
         "station": str(from_station),
@@ -193,6 +199,7 @@ def build_trade_request(*, from_system: str, from_station: str, capital: int, ma
         "max_hop_distance": float(jump_range),
         "max_hops": int(max_hops),
         "requires_large_pad": bool(requires_large_pad),
+        "allow_planetary": bool(allow_planetary),
         "unique": bool(unique),
     }
     if max_arrival_distance is not None:
@@ -351,13 +358,21 @@ def parse_riches_route(result: object) -> list[RichesSystem]:
 
 # ---- freshness discipline (reuses the search layer's age helper) ---------------------------
 
+def hop_age_days(hop: TradeHop, *, now: datetime | None = None) -> float | None:
+    """Age of one hop's SOURCE price in days (None when the hop carries no timestamp). Lets a
+    readout flag the specific stale legs, not just the route as a whole. Reuses the unit-tested
+    `spansh.data_age_days` parser on the hop's `price_updated`."""
+    return data_age_days({"t": hop.price_updated}, "t", now=now)
+
+
 def stale_age_caveat(hops: list[TradeHop], *, max_age_days: int = TRADE_PRICE_MAX_AGE_DAYS,
                      now: datetime | None = None) -> str | None:
-    """A spoken age caveat when the FRESHEST hop price is older than the window, else None. This is
-    the 'answer stale, with a caveat' fallback — market data is volatile, so an old price is worth
-    flagging rather than dropping. Reuses `spansh.data_age_days` (its parser is unit-tested)."""
-    ages = [a for h in hops
-            if (a := data_age_days({"t": h.price_updated}, "t", now=now)) is not None]
+    """A spoken age caveat when even the FRESHEST hop price is older than the window, else None —
+    i.e. the WHOLE loop rests on stale data. This is the 'answer stale, with a caveat' fallback:
+    volatile market data worth flagging rather than dropping. (Partial staleness — a mix of fresh
+    and stale legs — is surfaced per-leg by the readout via `hop_age_days`, so the summary caveat
+    stays reserved for a wholesale-old loop.) Reuses `hop_age_days` (its parser is unit-tested)."""
+    ages = [a for h in hops if (a := hop_age_days(h, now=now)) is not None]
     if not ages:
         return None
     youngest = min(ages)

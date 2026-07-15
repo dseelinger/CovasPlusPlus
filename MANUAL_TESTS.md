@@ -332,14 +332,15 @@ Notes:
 
 Notes:
 
-## 8a. Trade-route planner (#41)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
-> `[route_plan].enabled = true` + `[elite].enabled = true`. Plans a Spansh **trade loop** from the station you're docked at and copies the next stop to the clipboard for the galaxy map. **This is the on-hardware validation of the #41 route foundation — including the LIVE-VERIFY of the Spansh trade API request/result shape.**
-- [ ] **Plan from docked (happy path):** dock at a busy station, then *"Plan me a trade route from here — 720 tons of cargo, 30 light-year jump range, 100 million to spend."* → speaks a real hop (**buy X, sell at station Y in system Z, ~N credits/ton**) and says the next stop was copied.
-- [ ] **⚠️ LIVE-VERIFY the trade shape:** confirm the spoken commodity / destination / profit are **real and correct** (cross-check on [spansh.co.uk/trade](https://spansh.co.uk/trade)). If any field is blank/wrong, the Spansh trade request/result field names have drifted — fix `build_trade_request` / `parse_trade_route` in `covas/search/routes.py` (they're isolated for exactly this).
-- [ ] **Plot handoff:** after a plan, **paste** (Ctrl-V) into the galaxy-map search box → it's the **next destination system**; it sets course. (In-game auto course-set is the later keybind action #32.)
+## 8a. Trade-route planner (#44)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
+> `[route_plan].enabled = true` + `[elite].enabled = true`. Plans a Spansh **trade loop** from the station you're docked at, reads the **whole multi-hop loop** + round-trip total, and copies the next stop to the clipboard for the galaxy map. **The ⚠️ LIVE-VERIFY of the Spansh trade API request/result shape still applies — this is its on-hardware validation.**
+- [ ] **Plan from docked (multi-hop, happy path):** dock at a busy station, then *"Plan me a trade route from here — 720 tons of cargo, 30 light-year jump range, 100 million to spend."* → speaks **every hop in the loop** (**buy X at A, sell at station Y in system Z, ~N credits/ton; then buy…**) and a **round-trip total**, then says the next stop was copied.
+- [ ] **⚠️ LIVE-VERIFY the trade shape:** confirm the spoken commodities / destinations / profits are **real and correct** (cross-check on [spansh.co.uk/trade](https://spansh.co.uk/trade)). If any field is blank/wrong, the Spansh trade request/result field names have drifted — fix `build_trade_request` / `parse_trade_route` in `covas/search/routes.py` (they're isolated for exactly this). Also sanity-check the **round-trip total** roughly equals the sum of the per-hop profits.
+- [ ] **Per-run options:** try *"…large pad only, up to 5 hops, nothing more than 2000 light-seconds out, and include planetary ports"* → the returned route respects the limits (large-pad stations, ≤5 hops, close-in stations, surface markets allowed). Cross-check the same filters on spansh.co.uk/trade. ⚠️ These map to LIVE-VERIFY param names (`requires_large_pad`, `max_hops`, `max_system_distance`, `allow_planetary`) in `build_trade_request` — if a filter is ignored, that's where to correct it.
+- [ ] **Plot handoff:** after a plan, **paste** (Ctrl-V) into the galaxy-map search box → it's the **first destination system**; it sets course. (In-game auto course-set is the later keybind action #32.)
 - [ ] **Asks for missing numbers:** *"Plan a trade route."* with nothing else → it asks for your cargo capacity, jump range, and budget rather than guessing.
 - [ ] **Not docked:** while in space, ask for a trade route → it asks you to dock or name a start station (doesn't invent one).
-- [ ] **Freshness caveat:** if the best route uses old prices, the reply includes a spoken **"these prices are about N days old"** caveat (hard to force on demand — note if you see it).
+- [ ] **Freshness — per hop & whole loop:** if any leg's price is old, that hop is read with an inline **"(price ~N days old)"** tag; if the *whole* loop is stale, the reply also adds a spoken **"the freshest prices on this route are about N days old"** caveat (hard to force on demand — note if you see either). Try *"…only prices from the last day"* to tighten the window and make it easier to trigger.
 - [ ] **Fail-soft:** with the internet briefly off, ask for a route → a spoken "couldn't reach the trade planner" note, and the voice loop keeps working (no crash).
 
 Notes:

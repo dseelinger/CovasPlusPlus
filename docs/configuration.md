@@ -293,10 +293,13 @@ See [Trade-route planner](search/trade-routes.md). **Off by default.**
 |---------|---------|--------------|
 | `route_plan.enabled` | `false` | Master switch — voice-plan a Spansh trade loop from where you're docked |
 | `route_plan.default_max_hops` | `4` | Hops in the loop when you don't say |
-| `route_plan.max_price_age_days` | `2` | Prices older than this get a spoken "may have moved" caveat |
+| `route_plan.max_price_age_days` | `2` | Prices older than this get a spoken "may have moved" caveat (per-hop and, when the whole loop is stale, a summary) |
 
-Needs [`[elite].enabled`](elite/monitoring.md) for the live docked-station start. The next stop is
-copied to your clipboard for the galaxy map (in-game course-set arrives with the keybind actions).
+It reads the **whole loop** (each hop plus the round-trip total). Per-run refinements — max hops,
+large-pad-only, arrival distance, include-planetary, avoid-loops, tighter price age — are **spoken
+tool args**, not settings; just mention them. Needs [`[elite].enabled`](elite/monitoring.md) for the
+live docked-station start. The next stop is copied to your clipboard for the galaxy map (in-game
+course-set arrives with the keybind actions).
 
 ## Neutron / long-range route planner (`[neutron_plan]`)
 
