@@ -10,8 +10,9 @@ from pathlib import Path
 
 from covas.ed import EDContext, StatusWatcher
 from covas.ed.modes import MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV
-from covas.ed.status import (FLAGS, FLAGS2, apply_status, decode_flags, describe_transition,
-                            flag_transitions, game_mode_from_flags, status_path)
+from covas.ed.status import (FLAGS, FLAGS2, HEALTH_LOW, OXYGEN_LOW, apply_status, decode_flags,
+                            describe_transition, flag_transitions, game_mode_from_flags,
+                            low_vital_transitions, status_path)
 from covas.events import EventBus
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ed"
@@ -192,6 +193,76 @@ def test_apply_status_clears_game_mode_to_none_in_menu():
     assert ctx.snapshot()["game_mode"] == MODE_SRV
     apply_status(ctx, {"Flags": 0})
     assert ctx.snapshot()["game_mode"] is None
+
+
+# --- on-foot vitals (#54) --------------------------------------------------
+
+def test_apply_status_folds_on_foot_vitals():
+    ctx = EDContext()
+    patch = apply_status(ctx, {"Flags": FLAGS["Landed"], "Flags2": FLAGS2["OnFoot"],
+                               "Oxygen": 0.85, "Health": 1.0, "Temperature": 293.0,
+                               "Gravity": 0.17})
+    assert patch["oxygen"] == 0.85 and patch["health"] == 1.0
+    assert patch["temperature"] == 293.0 and patch["gravity"] == 0.17
+    s = ctx.snapshot()
+    assert s["oxygen"] == 0.85 and s["gravity"] == 0.17
+
+
+def test_on_foot_vitals_clear_when_back_in_ship():
+    # Vitals present on foot, then a ship snapshot (no Oxygen/Health keys) clears them to None
+    # so a stale reading can't linger once re-boarded.
+    ctx = EDContext()
+    apply_status(ctx, {"Flags": FLAGS["Landed"], "Flags2": FLAGS2["OnFoot"],
+                       "Oxygen": 0.5, "Health": 0.9})
+    apply_status(ctx, {"Flags": _flags("InMainShip")})   # back in the ship
+    s = ctx.snapshot()
+    assert s["oxygen"] is None and s["health"] is None
+
+
+def test_apply_status_ignores_vitals_without_flags():
+    # A partial write with no Flags must NOT wipe good vital state.
+    ctx = EDContext()
+    ctx.update(oxygen=0.5, health=0.5)
+    apply_status(ctx, {"event": "Status"})               # no Flags
+    s = ctx.snapshot()
+    assert s["oxygen"] == 0.5 and s["health"] == 0.5
+
+
+def test_low_vital_transitions_downward_crossing_only():
+    # Fires only on a real crossing from at/above the threshold to below it.
+    assert low_vital_transitions({"oxygen": 0.5}, {"oxygen": 0.2}) == ["OxygenLow"]
+    # Already low -> already low = no re-alert.
+    assert low_vital_transitions({"oxygen": 0.1}, {"oxygen": 0.05}) == []
+    # Unknown prior (just embarked) establishes a baseline silently.
+    assert low_vital_transitions({}, {"oxygen": 0.1}) == []
+    # Health crosses too; both can fire together.
+    got = set(low_vital_transitions({"oxygen": 0.5, "health": 0.5},
+                                    {"oxygen": 0.1, "health": 0.1}))
+    assert got == {"OxygenLow", "HealthLow"}
+
+
+def test_low_vital_thresholds_are_sane():
+    assert 0.0 < OXYGEN_LOW <= 0.5 and 0.0 < HEALTH_LOW <= 0.5
+
+
+def test_describe_transition_covers_on_foot_srv_alerts():
+    assert describe_transition("OxygenLow") == "Oxygen running low"
+    assert describe_transition("HealthLow") == "Health critical"
+    assert describe_transition("SrvHullLow") == "SRV hull getting low"
+
+
+def test_watcher_fires_oxygen_low_callout(tmp_path):
+    sp = status_path(tmp_path)
+    w, ctx, q = _watcher(tmp_path)
+    _write_status(sp, FLAGS["Landed"], Flags2=FLAGS2["OnFoot"], Oxygen=0.8,
+                  timestamp="2026-07-08T12:00:00Z")
+    w.poll_once()                            # baseline vitals, no alert
+    assert _events(q) == []
+    _write_status(sp, FLAGS["Landed"], Flags2=FLAGS2["OnFoot"], Oxygen=0.15,
+                  timestamp="2026-07-08T12:01:00Z")
+    w.poll_once()
+    assert {e["event"] for e in _events(q)} == {"OxygenLow"}
+    assert [e["desc"] for e in ctx.recent()] == ["Oxygen running low"]
 
 
 # --- StatusWatcher read/publish cycle (synchronous, offline) ---------------

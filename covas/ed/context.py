@@ -41,6 +41,16 @@ _FIELDS: tuple[str, ...] = (
     "fire_group",     # currently-selected fire group index (Status.json, 0-based) — auto-honk (N5)
     "analysis_mode",  # HudAnalysisMode flag — analysis (scanners) vs combat HUD; auto-honk (K2)
     "gui_focus",      # Status.json GuiFocus: 9=FSS, 10=SAA probe view — honk detect-recover (K2)
+    # On-foot / SRV situational awareness (#54). All None/unknown outside their mode; the
+    # Status watcher fills the on-foot vitals (present only in Odyssey Flags2 mode), the
+    # journal watcher fills srv_hull (LaunchSRV/DockSRV/HullDamage). They ride in _FIELDS so
+    # the read tools + mode-gated summary see them, but summary() only voices them in the
+    # matching game_mode so a ship flight isn't cluttered.
+    "oxygen",         # on-foot suit oxygen remaining, 0..1 (Status.json Oxygen; None in a ship)
+    "health",         # on-foot Commander health, 0..1 (Status.json Health; None in a ship)
+    "temperature",    # on-foot external suit temperature, Kelvin (Status.json Temperature)
+    "gravity",        # local surface gravity in g (Status.json Gravity; present on-foot/landed)
+    "srv_hull",       # SRV hull integrity, 0..1 (1.0 on LaunchSRV, HullDamage while driving; None off-SRV)
 )
 
 # The Commander's PERSONAL fleet carrier, tracked live from journal carrier events. Kept
@@ -85,6 +95,17 @@ class EDContext:
         self.fire_group: int | None = None
         self.analysis_mode: bool = False
         self.gui_focus: int | None = None
+        # On-foot / SRV state (#54; see _FIELDS).
+        self.oxygen: float | None = None
+        self.health: float | None = None
+        self.temperature: float | None = None
+        self.gravity: float | None = None
+        self.srv_hull: float | None = None
+        # Exobiology sampling progress (#54): the current `ScanOrganic` organism and how many of
+        # the three samples are logged. Kept OFF _FIELDS/summary (rare + structured, would bloat
+        # the cached line); read on demand by the on-foot/SRV read tools. Single-writer (the
+        # journal thread) so a plain dict under the shared lock is enough. None until first scan.
+        self._bio: dict | None = None
         # Fleet-carrier state (see _CARRIER_FIELDS).
         self.carrier_id: int | None = None
         self.carrier_name: str | None = None
@@ -229,6 +250,31 @@ class EDContext:
         with self._lock:
             return self._materials
 
+    # -- exobiology sampling (#54) -------------------------------------------------------
+    def set_bio_scan(self, genus: str | None, samples: int,
+                     required: int = 3, species: str | None = None) -> None:
+        """Record the current `ScanOrganic` progress: `samples` of `required` logged for the
+        named organism. `samples >= required` means the analysis is complete. Replaces any
+        prior organism wholesale (each scan carries the full state)."""
+        with self._lock:
+            self._bio = {
+                "genus": genus,
+                "species": species,
+                "samples": max(0, int(samples)),
+                "required": max(1, int(required)),
+            }
+
+    def clear_bio_scan(self) -> None:
+        """Forget the tracked organism (e.g. once the three samples are analysed)."""
+        with self._lock:
+            self._bio = None
+
+    def bio_scan(self) -> dict | None:
+        """A copy of the current exobiology-sampling state, or None when nothing is in
+        progress. Shape: {genus, species, samples, required}."""
+        with self._lock:
+            return dict(self._bio) if self._bio is not None else None
+
     def fuel_pct(self) -> float | None:
         with self._lock:
             return _fuel_pct(self.fuel_main, self.fuel_capacity)
@@ -318,6 +364,19 @@ class EDContext:
             flags.append("hardpoints deployed")
         if flags:
             parts.append(", ".join(flags))
+
+        # Mode-specific vitals (#54) — only voiced in the matching game_mode so a ship flight
+        # isn't cluttered with on-foot/SRV readings (they linger at their last value until the
+        # watchers clear them). On foot: oxygen + health; in the SRV: hull.
+        mode = s["game_mode"]
+        if mode == "on_foot":
+            if s["oxygen"] is not None:
+                parts.append(f"oxygen {s['oxygen'] * 100:.0f}%")
+            if s["health"] is not None:
+                parts.append(f"health {s['health'] * 100:.0f}%")
+        elif mode == "srv":
+            if s["srv_hull"] is not None:
+                parts.append(f"SRV hull {s['srv_hull'] * 100:.0f}%")
 
         if not parts:
             return None

@@ -179,6 +179,35 @@ def test_event_phrase_reuses_describers_and_humanizes():
     assert event_phrase({"event": "SomethingOdd"}) == "Something odd"
 
 
+def test_on_foot_srv_events_are_whitelisted_by_default():
+    """The #54 callouts ship on by default (still gated by the master switch + cooldowns)."""
+    for name in ("ScanOrganic", "OxygenLow", "HealthLow", "SrvHullLow"):
+        assert DEFAULT_EVENTS.get(name) is True
+
+
+def test_event_phrase_for_on_foot_srv_events():
+    # ScanOrganic -> journal describer (count from ScanType); the status/SRV alerts -> transition
+    # phrases; all readable spoken lines for the callout prompt.
+    assert event_phrase({"event": "ScanOrganic", "ScanType": "Sample",
+                         "Genus_Localised": "Bacterium"}) == \
+        "Sample 2 of 3 of Bacterium logged — one more to analyse"
+    assert event_phrase({"event": "OxygenLow"}) == "Oxygen running low"
+    assert event_phrase({"event": "SrvHullLow"}) == "SRV hull getting low"
+
+
+def test_on_foot_callout_respects_cooldown():
+    """A whitelisted #54 event fires once, then is blocked by the cooldown it armed — the
+    same discipline as every other callout (never bypasses the policy)."""
+    p = ProactivePolicy(ProactiveConfig.from_cfg({"proactive": {
+        "enabled": True, "cooldown": 100, "min_interval": 0,
+        "events": {"OxygenLow": True}}}))
+    assert p.should_speak("OxygenLow", now=1000.0)[0] is True
+    p.mark_fired("OxygenLow", now=1000.0)
+    ok, reason = p.should_speak("OxygenLow", now=1050.0)
+    assert ok is False and "cooldown" in reason
+    assert p.should_speak("OxygenLow", now=1101.0)[0] is True   # clears after the cooldown
+
+
 def test_build_prompt_contains_event_and_context():
     prompt = build_prompt({"event": "FSDJump", "StarSystem": "Sol"},
                           "the Commander is in Sol; fuel 40%.")

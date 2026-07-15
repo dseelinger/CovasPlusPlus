@@ -411,6 +411,7 @@ class App:
             from .ed import (EDContext, JournalWatcher, StatusWatcher,
                              resolve_journal_dir, status_path)
             from .capabilities.ed_context_capability import EDContextCapability
+            from .capabilities.on_foot_srv_capability import OnFootSrvCapability
             from .capabilities.engineers_capability import EngineersCapability
             from .capabilities.loadout_capability import LoadoutCapability
             from .capabilities.blueprint_capability import BlueprintCapability
@@ -421,6 +422,9 @@ class App:
             jdir = resolve_journal_dir(self.cfg)
             self.ed_ctx = EDContext(recent_maxlen=int(el.get("recent_events_kept", 25)))
             self.registry.register(EDContextCapability(self.ed_ctx))
+            # On-foot / SRV / exobiology read tools (#54): situational awareness in the modes
+            # ED context was silent in. Same live EDContext, mode-specific read answers.
+            self.registry.register(OnFootSrvCapability(self.ed_ctx))
             # Ship loadout & engineering (N9): reads the snapshot the journal watcher keeps
             # on EDContext. Registered with monitoring since that's its only data source.
             self.registry.register(LoadoutCapability(

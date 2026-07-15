@@ -595,6 +595,11 @@ MissionCompleted = true
 LowFuel          = true   # fuel dropped below 25%
 Overheating      = true   # ship over 100% heat
 Died             = true
+# On-foot / SRV awareness (#54) — callouts in the modes COVAS++ used to be silent in.
+ScanOrganic      = true   # exobiology sample logged ("one more to analyse")
+OxygenLow        = true   # on-foot suit oxygen dropped below 25%
+HealthLow        = true   # on-foot health critical
+SrvHullLow       = true   # SRV hull dropped below 30%
 
 
 [route]

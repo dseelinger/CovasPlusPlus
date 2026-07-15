@@ -103,13 +103,39 @@ TRANSITIONS: dict[str, tuple[str, str]] = {
 }
 
 
+# On-foot / SRV low-vital thresholds (#54). These aren't ED flags — Status.json reports the
+# raw fractions (Oxygen/Health, 0..1) and the journal reports SRV hull — so we derive the
+# "getting low" alert ourselves by watching for a downward crossing (see low_vital_transitions
+# / the journal's srv_hull_transitions). Tuned to give real warning, not nag.
+OXYGEN_LOW = 0.25          # on-foot suit oxygen fraction
+HEALTH_LOW = 0.25          # on-foot Commander health fraction
+
 # Transitions worth adding to the recent-events feed. Kept to alerts the *journal* doesn't
 # cleanly event (fuel/heat are status-flag derived); dock/gear/hardpoint transitions are
-# omitted here because the journal already narrates docks and gear/hardpoints are noisy.
+# omitted here because the journal already narrates docks and gear/hardpoints are noisy. The
+# on-foot/SRV entries (#54) also give event_phrase() a clean spoken form for those callouts.
 _LOGGED_TRANSITIONS: dict[str, str] = {
     "LowFuel": "Fuel dropped below 25%",
     "Overheating": "Ship overheating",
+    "OxygenLow": "Oxygen running low",
+    "HealthLow": "Health critical",
+    "SrvHullLow": "SRV hull getting low",
 }
+
+
+def low_vital_transitions(old: dict, new: dict) -> list[str]:
+    """Event names for on-foot vitals that just crossed BELOW their alert threshold, given the
+    previous and current {oxygen, health} readings. Fires only on a genuine downward crossing —
+    a prior reading at/above the threshold to one below it — so a steady-low value doesn't
+    re-alert every poll, and an unknown prior (first read after embarking) establishes a
+    baseline silently (mirrors flag_transitions' first-read rule)."""
+    out: list[str] = []
+    for key, event, thresh in (("oxygen", "OxygenLow", OXYGEN_LOW),
+                               ("health", "HealthLow", HEALTH_LOW)):
+        o, n = old.get(key), new.get(key)
+        if isinstance(n, (int, float)) and n < thresh and isinstance(o, (int, float)) and o >= thresh:
+            out.append(event)
+    return out
 
 
 def describe_transition(name: str) -> str | None:
@@ -178,6 +204,16 @@ def apply_status(ctx: EDContext, status: dict) -> dict:
             flags if isinstance(flags, int) else None,
             flags2 if isinstance(flags2, int) else None)
 
+    # Odyssey on-foot vitals (#54): Oxygen/Health/Temperature are present ONLY on foot, Gravity
+    # on foot or landed. Fold each when present and CLEAR it to None otherwise, so a value can't
+    # linger and mislead once the Commander re-boards a ship. Only do this on a real snapshot
+    # (Flags present) so a stray/partial write doesn't wipe good state. (SRV hull is journal-fed.)
+    if isinstance(flags, int):
+        for src, field in (("Oxygen", "oxygen"), ("Health", "health"),
+                           ("Temperature", "temperature"), ("Gravity", "gravity")):
+            val = status.get(src)
+            patch[field] = float(val) if isinstance(val, (int, float)) else None
+
     fuel = status.get("Fuel")
     if isinstance(fuel, dict) and isinstance(fuel.get("FuelMain"), (int, float)):
         patch["fuel_main"] = float(fuel["FuelMain"])
@@ -224,6 +260,9 @@ class StatusWatcher(threading.Thread):
         self._stop = threading.Event()
         self._last_flags: int | None = None
         self._last_text: str | None = None
+        # Previous on-foot vitals, for downward-crossing detection (#54). Seeded empty so the
+        # first reading only establishes a baseline (no alert on connect).
+        self._last_vitals: dict[str, float | None] = {}
 
     def stop(self) -> None:
         self._stop.set()
@@ -267,6 +306,19 @@ class StatusWatcher(threading.Thread):
                 if desc:
                     self.ctx.record(name, desc, ts)
             self._last_flags = flags
+
+            # On-foot vital alerts (#54): oxygen/health have no ED flag, so diff the raw
+            # readings for a downward crossing and publish OxygenLow/HealthLow like a
+            # transition. Compared against a snapshot (apply_status already folded them),
+            # so this reflects the value we actually stored.
+            snap = self.ctx.snapshot()
+            vitals = {"oxygen": snap["oxygen"], "health": snap["health"]}
+            for name in low_vital_transitions(self._last_vitals, vitals):
+                self.bus.publish({"type": "ed_event", "event": name, "flags": flags})
+                desc = describe_transition(name)
+                if desc:
+                    self.ctx.record(name, desc, ts)
+            self._last_vitals = vitals
 
     def run(self) -> None:
         while not self._stop.is_set():

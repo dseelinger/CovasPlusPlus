@@ -9,9 +9,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from covas.ed import EDContext, JournalWatcher
-from covas.ed.journal import (apply_journal_event, default_journal_dir,
+from covas.ed.journal import (apply_journal_event, apply_scan_organic, default_journal_dir,
                               describe_journal_event, parse_journal_line,
-                              resolve_journal_dir)
+                              resolve_journal_dir, srv_hull_transitions)
+from covas.ed.modes import MODE_MAINSHIP, MODE_SRV
 from covas.events import EventBus
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ed"
@@ -94,6 +95,87 @@ def test_fuel_scoop_updates_fuel():
 def test_unhandled_event_returns_empty_patch():
     ctx = EDContext()
     assert apply_journal_event(ctx, {"event": "ReceiveText", "Message": "hi"}) == {}
+
+
+# --- SRV hull + exobiology (#54) -------------------------------------------
+
+def test_launch_and_dock_srv_track_hull():
+    ctx = EDContext()
+    apply_journal_event(ctx, {"event": "LaunchSRV", "Loadout": "starter"})
+    assert ctx.snapshot()["srv_hull"] == 1.0          # fresh SRV at full hull
+    apply_journal_event(ctx, {"event": "DockSRV"})
+    assert ctx.snapshot()["srv_hull"] is None         # back in the ship, cleared
+
+
+def test_hull_damage_is_srv_only_in_srv_mode():
+    ctx = EDContext()
+    # In the SRV, HullDamage.Health is the SRV's hull.
+    ctx.update(game_mode=MODE_SRV)
+    patch = apply_journal_event(ctx, {"event": "HullDamage", "Health": 0.4})
+    assert patch["srv_hull"] == 0.4 and ctx.snapshot()["srv_hull"] == 0.4
+    # In the main ship, the same event must NOT be read as SRV hull.
+    ctx2 = EDContext()
+    ctx2.update(game_mode=MODE_MAINSHIP)
+    patch2 = apply_journal_event(ctx2, {"event": "HullDamage", "Health": 0.4})
+    assert "srv_hull" not in patch2 and ctx2.snapshot()["srv_hull"] is None
+
+
+def test_srv_hull_transitions_downward_crossing_only():
+    assert srv_hull_transitions(1.0, 0.2) == ["SrvHullLow"]
+    assert srv_hull_transitions(0.2, 0.1) == []        # already low, no re-alert
+    assert srv_hull_transitions(None, 0.1) == []       # unknown prior = silent baseline
+    assert srv_hull_transitions(0.5, None) == []       # cleared (DockSRV) = no alert
+
+
+def test_scan_organic_tracks_sample_count():
+    ctx = EDContext()
+    apply_scan_organic(ctx, {"event": "ScanOrganic", "ScanType": "Log",
+                             "Genus_Localised": "Bacterium"})
+    assert ctx.bio_scan() == {"genus": "Bacterium", "species": None,
+                              "samples": 1, "required": 3}
+    apply_scan_organic(ctx, {"event": "ScanOrganic", "ScanType": "Sample",
+                             "Genus_Localised": "Bacterium"})
+    assert ctx.bio_scan()["samples"] == 2
+    apply_scan_organic(ctx, {"event": "ScanOrganic", "ScanType": "Analyse",
+                             "Genus_Localised": "Bacterium"})
+    assert ctx.bio_scan()["samples"] == 3              # complete (samples == required)
+
+
+def test_scan_organic_ignores_unknown_scan_type():
+    ctx = EDContext()
+    apply_scan_organic(ctx, {"event": "ScanOrganic", "ScanType": "Nonsense"})
+    assert ctx.bio_scan() is None
+
+
+def test_describe_scan_organic_phrases():
+    assert describe_journal_event(
+        {"event": "ScanOrganic", "ScanType": "Sample", "Genus_Localised": "Bacterium"}
+    ) == "Sample 2 of 3 of Bacterium logged — one more to analyse"
+    assert describe_journal_event(
+        {"event": "ScanOrganic", "ScanType": "Analyse", "Genus_Localised": "Bacterium"}
+    ) == "Analysed Bacterium — exobiology sample complete"
+    # A ScanType we don't recognise isn't logged as a bare event.
+    assert describe_journal_event({"event": "ScanOrganic", "ScanType": "Nope"}) is None
+
+
+def test_describe_srv_events():
+    assert describe_journal_event({"event": "LaunchSRV"}) == "Deployed the SRV"
+    assert describe_journal_event({"event": "DockSRV"}) == "Docked the SRV"
+
+
+def test_watcher_publishes_srv_hull_low(tmp_path):
+    jf = tmp_path / "Journal.2026-07-08T120000.01.log"
+    jf.write_text("", encoding="utf-8")
+    w, ctx, q = _watcher(tmp_path)
+    w._open(jf, prime=True)
+    ctx.update(game_mode=MODE_SRV)
+    with open(jf, "a", encoding="utf-8") as f:
+        f.write('{"event":"LaunchSRV"}\n')                       # baseline hull 1.0
+        f.write('{"timestamp":"2026-07-08T12:05:00Z","event":"HullDamage","Health":0.2}\n')
+    w._drain()
+    events = [e["event"] for e in _drain_queue(q) if e.get("type") == "ed_event"]
+    assert "SrvHullLow" in events
+    assert "SRV hull getting low" in [e["desc"] for e in ctx.recent()]
 
 
 # --- describe_journal_event (recent-events feed) ---------------------------
