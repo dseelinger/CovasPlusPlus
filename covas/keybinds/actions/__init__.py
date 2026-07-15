@@ -6,6 +6,7 @@ is its own module, imported here for its registration side effect. A Phase-1 act
 """
 from __future__ import annotations
 
-from . import ship  # noqa: F401 — imported for the register() side effect
+from . import ship      # noqa: F401 — imported for the register() side effect
+from . import on_foot   # noqa: F401 — Odyssey on-foot batch (#34)
 
-__all__ = ["ship"]
+__all__ = ["ship", "on_foot"]
