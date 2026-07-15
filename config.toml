@@ -700,15 +700,17 @@ search_size = 50
 
 
 [route_plan]
-# Trade-route planner (#41) — the foundation proof for the Spansh ROUTE planners. Voice: "plan
-# me a trade route from here". Plans a Spansh trade loop starting from the station you're docked
-# at, speaks the best first hop (what to buy, where to sell, profit per ton), and hands the next
-# stop to the galaxy map — via the CLIPBOARD for now (paste it into the galaxy-map search); the
-# in-game "set course" keybind handoff arrives with the Tier-1 galaxy-map action (#32). Needs
-# [elite].enabled for the live docked-station start. DEFAULT OFF — opt in.
+# Trade-route planner (#44, on the #41 route foundation). Voice: "plan me a trade route from
+# here". Plans a Spansh trade loop starting from the station you're docked at, speaks the WHOLE
+# loop (each hop: what to buy where, where to sell, profit per ton) plus the round-trip total,
+# flags any leg resting on stale prices, and hands the next stop to the galaxy map — via the
+# CLIPBOARD for now (paste it into the galaxy-map search); the in-game "set course" keybind
+# handoff arrives with the Tier-1 galaxy-map action (#32). Needs [elite].enabled for the live
+# docked-station start. DEFAULT OFF — opt in.
 #
-# The richer planners (Road to Riches, the full trade planner, mining) build on the SAME route
-# client as separate features; this is the minimal proof.
+# Per-run refinements (max hops, large-pad, arrival distance, include-planetary, avoid-loops,
+# max price age) are spoken tool args, not config — just mention them ("...avoiding planetary
+# ports", "...large pad only"). The settings below are the defaults those args fall back to.
 enabled = false
 # Sent as the HTTP User-Agent — be a polite API citizen and identify the app.
 user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
@@ -716,6 +718,7 @@ user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
 default_max_hops = 4
 # Market-price freshness: hops whose source price is older than this (days) get a spoken "these
 # prices are ~N days old" caveat — volatile market data answered honestly, not silently stale.
+# A per-run "max_price_age_days" tool arg overrides this for one plan.
 max_price_age_days = 2
 
 

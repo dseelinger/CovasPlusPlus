@@ -15,6 +15,17 @@ _OK_RESULT = {"hops": [
      "commodity": "Palladium", "buy_price": 51000, "sell_price": 58200,
      "profit": 7200, "total_profit": 5184000, "updated_at": "2999-01-01 00:00:00+00"}]}
 
+# A two-hop loop (fresh far-future timestamps so the summary caveat stays quiet).
+_LOOP_RESULT = {"hops": [
+    {"source": {"system": "Shinrarta Dezhra", "station": "Jameson Memorial"},
+     "destination": {"system": "Sol", "station": "Galileo"},
+     "commodity": "Palladium", "buy_price": 51000, "sell_price": 58200,
+     "profit": 7200, "total_profit": 5184000, "updated_at": "2999-01-01 00:00:00+00"},
+    {"source": {"system": "Sol", "station": "Galileo"},
+     "destination": {"system": "Alioth", "station": "Golden Gate"},
+     "commodity": "Progenitor Cells", "buy_price": 6800, "sell_price": 9100,
+     "profit": 2300, "total_profit": 1656000, "updated_at": "2999-01-01 00:00:00+00"}]}
+
 
 class _FakeHttp:
     def __init__(self, *, post, gets=()):
@@ -96,3 +107,42 @@ def test_stale_prices_add_caveat():
     cap, _ = _cap(_FakeHttp(post=(200, {"result": stale})))
     msg = cap.run_tool("plan_trade_route", dict(_ARGS))
     assert "days old" in msg.lower()
+
+
+def test_multi_hop_reads_full_loop_and_round_trip_total():
+    http = _FakeHttp(post=(200, {"result": _LOOP_RESULT}))
+    cap, clip = _cap(http)
+    msg = cap.run_tool("plan_trade_route", dict(_ARGS))
+    assert "2 hops" in msg                                # loop length spoken
+    assert "Palladium" in msg and "Progenitor Cells" in msg   # BOTH legs, not just the top hop
+    assert "Then buy" in msg                              # sequenced readout
+    assert "6,840,000" in msg                             # round-trip total (5,184,000 + 1,656,000)
+    assert clip.copied == ["Sol"]                         # first destination handed to the map
+
+
+def test_request_carries_new_options():
+    http = _FakeHttp(post=(200, {"result": _OK_RESULT}))
+    cap, _ = _cap(http)
+    cap.run_tool("plan_trade_route", dict(_ARGS, max_arrival_distance=1500, allow_planetary=True,
+                                          avoid_loops=False, requires_large_pad=True, max_hops=6))
+    url = http.posts[0]
+    assert "max_system_distance=1500" in url and "allow_planetary=true" in url
+    assert "unique=false" in url                          # avoid_loops off -> unique false
+    assert "requires_large_pad=true" in url and "max_hops=6" in url
+
+
+def test_max_price_age_override_flows_to_request():
+    http = _FakeHttp(post=(200, {"result": _OK_RESULT}))
+    cap, _ = _cap(http)
+    cap.run_tool("plan_trade_route", dict(_ARGS, max_price_age_days=5))
+    assert f"max_price_age={5 * 86400}" in http.posts[0]  # days -> seconds (LIVE-VERIFY unit)
+
+
+def test_per_hop_stale_tag_without_wholesale_caveat():
+    # One stale leg + one fresh leg: the leg gets a per-hop age tag, the summary caveat stays quiet.
+    mixed = {"hops": [dict(_LOOP_RESULT["hops"][0], updated_at="2000-01-01 00:00:00+00"),
+                      _LOOP_RESULT["hops"][1]]}
+    cap, _ = _cap(_FakeHttp(post=(200, {"result": mixed})))
+    msg = cap.run_tool("plan_trade_route", dict(_ARGS))
+    assert "(price ~" in msg                              # per-leg staleness flagged
+    assert "heads up" not in msg.lower()                  # but not the wholesale-loop caveat

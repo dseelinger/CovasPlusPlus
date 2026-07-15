@@ -27,7 +27,7 @@ from typing import Callable
 from ..nav import copy as _default_copy
 from ..search import NavError, RequestsHttp
 from ..search.routes import (TRADE_ROUTE_URL, RoutePlotter, RouteWaypoint, build_trade_request,
-                             parse_trade_route, stale_age_caveat, submit_and_poll)
+                             hop_age_days, parse_trade_route, stale_age_caveat, submit_and_poll)
 from ..search.spansh import Http, _DEFAULT_UA
 from .base import HelpMeta, Slot
 
@@ -56,17 +56,21 @@ class RoutePlanConfig:
 
 
 _DESC = (
-    "Plan a profitable TRADE ROUTE (a buy/sell loop) for the Commander using Spansh, starting from "
-    "the station they're currently docked at, and hand the first destination to the galaxy map. "
-    "Use when they ask to plan trading, find a trade run, or 'where should I trade from here'.\n"
+    "Plan a profitable multi-hop TRADE ROUTE (a buy/sell loop) for the Commander using Spansh, "
+    "starting from the station they're currently docked at, and hand the first destination to the "
+    "galaxy map. Use when they ask to plan trading, find a trade run, or 'where should I trade from "
+    "here'.\n"
     "- Fill the numbers you know or can infer, and ASK for any you can't: `capital` (credits to "
-    "spend), `max_cargo` (cargo capacity in tons), `jump_range` (laden jump range in ly). "
-    "`max_hops` defaults sensibly; `requires_large_pad` if they fly a big ship.\n"
+    "spend), `max_cargo` (cargo capacity in tons), `jump_range` (laden jump range in ly).\n"
+    "- Optional refinements, only when the Commander mentions them: `max_hops` (loop length), "
+    "`requires_large_pad` (big ship), `max_arrival_distance` (avoid long supercruise to the station, "
+    "ls), `allow_planetary` (include planetary ports), `avoid_loops` (don't revisit a station), "
+    "`max_price_age_days` (only trust prices newer than this).\n"
     "- The start defaults to where they're docked. If they aren't docked, pass `from_system` + "
     "`from_station`, or ask where to start.\n"
-    "- Relay the top hop: what to buy, where to sell, and the profit per ton; if the tool adds a "
-    "freshness caveat, pass it along. Tell them the next stop was copied to their clipboard for the "
-    "galaxy map."
+    "- Relay the WHOLE loop the tool returns (each hop: what to buy where, where to sell, profit per "
+    "ton) and the round-trip total; if the tool adds a freshness caveat or flags a leg's price age, "
+    "pass it along. Tell them the next stop was copied to their clipboard for the galaxy map."
 )
 
 _SCHEMA_PROPS = {
@@ -77,6 +81,16 @@ _SCHEMA_PROPS = {
                  "description": "Maximum number of hops in the loop. Omit for the default."},
     "requires_large_pad": {"type": "boolean",
                            "description": "True if the ship needs a large landing pad."},
+    "max_arrival_distance": {"type": "integer",
+                             "description": "Max supercruise distance from the star to the station, "
+                                            "in light-seconds. Omit for no cap."},
+    "allow_planetary": {"type": "boolean",
+                        "description": "True to include planetary ports (surface markets)."},
+    "avoid_loops": {"type": "boolean",
+                    "description": "True (default) to never revisit the same station in the loop."},
+    "max_price_age_days": {"type": "integer",
+                           "description": "Only trust market prices newer than this many days. "
+                                          "Omit for the configured default."},
     "from_system": {"type": "string",
                     "description": "Start system. Omit to use the current (docked) system."},
     "from_station": {"type": "string",
@@ -117,9 +131,10 @@ class RoutePlanCapability:
         return HelpMeta(
             category="trade routes",
             group="navigation and search",
-            one_liner=("I plan a profitable trade loop from where you're docked — what to buy, "
-                       "where to sell, and the profit — and copy the next stop to your clipboard "
-                       "for the galaxy map."),
+            one_liner=("I plan a profitable multi-hop trade loop from where you're docked — every "
+                       "hop's buy, sell, and profit plus the round-trip total, with a heads-up when "
+                       "prices are stale — and copy the next stop to your clipboard for the galaxy "
+                       "map."),
             example="plan me a trade route from here",
             slots=(
                 Slot(param="max_cargo",
@@ -162,14 +177,19 @@ class RoutePlanCapability:
         if need:
             return f"To plan a trade route I need {need}. What should I use?"
 
+        age_window = int(inp.get("max_price_age_days") or self._cfg.max_price_age_days)
         try:
             params = build_trade_request(
                 from_system=system, from_station=station,
                 capital=int(inp["capital"]), max_cargo=int(inp["max_cargo"]),
                 jump_range=float(inp["jump_range"]),
                 max_hops=int(inp.get("max_hops") or self._cfg.default_max_hops),
+                max_arrival_distance=(int(inp["max_arrival_distance"])
+                                      if inp.get("max_arrival_distance") not in (None, "") else None),
                 requires_large_pad=bool(inp.get("requires_large_pad", False)),
-                max_price_age_days=self._cfg.max_price_age_days)
+                allow_planetary=bool(inp.get("allow_planetary", False)),
+                unique=bool(inp.get("avoid_loops", True)),
+                max_price_age_days=age_window)
             result = submit_and_poll(self._http, TRADE_ROUTE_URL, params,
                                      user_agent=self._cfg.user_agent, sleep=self._sleep,
                                      subject="the trade planner", lookup_name="trade route")
@@ -181,7 +201,7 @@ class RoutePlanCapability:
         if not hops:
             return ("Spansh didn't find a profitable route from there with those limits — try more "
                     "cargo, a bigger budget, or a longer jump range.")
-        return self._say_and_plot(hops, station)
+        return self._say_and_plot(hops, station, age_window)
 
     def _required_numbers(self, inp: dict) -> str | None:
         """Which of the three essential numbers are missing, as a spoken phrase (or None)."""
@@ -195,19 +215,34 @@ class RoutePlanCapability:
             return missing[0]
         return ", ".join(missing[:-1]) + f", and {missing[-1]}"
 
-    def _say_and_plot(self, hops, start_station: str) -> str:
-        top = hops[0]
-        line = (f"Best run from {start_station}: buy {top.commodity} and sell it at "
-                f"{top.destination_station} in {top.destination_system} for about "
-                f"{top.profit_per_unit:,} credits a ton.")
-        caveat = stale_age_caveat(hops, max_age_days=self._cfg.max_price_age_days)
+    def _say_and_plot(self, hops, start_station: str, age_window: int) -> str:
+        """Speak the WHOLE loop — every hop's buy/sell/profit plus the round-trip total — flag any
+        leg resting on old prices, then hand the first destination to the galaxy map."""
+        n = len(hops)
+        round_trip = sum(h.profit_total for h in hops)
+        legs = " ".join(self._leg_phrase(i, h, age_window) for i, h in enumerate(hops))
+        header = (f"Trade loop from {start_station}: {n} hop{'s' if n != 1 else ''}, "
+                  f"round-trip profit about {round_trip:,} credits.")
+        caveat = stale_age_caveat(hops, max_age_days=age_window)
+        # Plot the first destination — that's where the Commander flies to sell the first haul.
+        plot = self._plotter.plot_next([RouteWaypoint(hops[0].destination_system)])
+        self._logline(f"trade route: {n} hops, round-trip {round_trip:,}cr, "
+                      f"first -> {hops[0].destination_system}{' (stale)' if caveat else ''}")
+        parts = [header, legs]
         if caveat:
-            line += f" ({caveat})"
-        # Plot the first destination — that's where the Commander flies to sell.
-        plot = self._plotter.plot_next([RouteWaypoint(top.destination_system)])
-        self._logline(f"trade route: {len(hops)} hops, first -> {top.destination_system}"
-                      f"{' (stale)' if caveat else ''}")
-        return f"{line} {plot}"
+            parts.append(f"({caveat})")
+        parts.append(plot)
+        return " ".join(parts)
+
+    def _leg_phrase(self, i: int, hop, age_window: int) -> str:
+        """One spoken hop, with a per-leg age tag when THAT leg's source price is stale (per-hop
+        freshness — the summary caveat only covers a wholesale-old loop)."""
+        verb = "Then buy" if i > 0 else "Buy"
+        age = hop_age_days(hop)
+        tag = f" (price ~{age:.0f} days old)" if age is not None and age > age_window else ""
+        return (f"{verb} {hop.commodity} at {hop.source_station} and sell at "
+                f"{hop.destination_station} in {hop.destination_system} for about "
+                f"{hop.profit_per_unit:,} a ton{tag}.")
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:
