@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "keybind-landing-gear",
+      "title": "Landing-gear keybind: arm, separate-turn confirm, guards, abort",
+      "section": "6. Ship controls",
+      "tags": [
+        "GAME",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "`[elite].enabled` and `[keybinds].enabled = true`, `require_confirmation`/`combat_guard`/`mode_guard = true`. Toggle Landing Gear bound in ED (on the `binding_preference` slot, default Primary). Do this parked/docked and safe.",
+      "expected": "Toggling gear arms without firing, requires a confirm on a SEPARATE turn, refuses same-turn confirm, refuses in danger or with ED off, expires after the window, hard-aborts on \"belay that\", refuses any off-allowlist control, is mode-gated (refused/not offered on foot, re-checked at confirm), and presses the key from the configured binding slot.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Arm: \"COVAS, toggle my landing gear.\" → says armed-but-not-done and asks to confirm separately. Gear does NOT move yet."
+        },
+        {
+          "id": "s2",
+          "text": "Confirm on a SEPARATE turn: \"Confirm.\" (or \"do it\") → the gear toggles in-game."
+        },
+        {
+          "id": "s3",
+          "text": "Same-turn confirm refused: arm and, in the same utterance, say \"…and do it now\" → refuses to fire in the arming turn."
+        },
+        {
+          "id": "s4",
+          "text": "Combat guard: get interdicted / into danger, then ask to toggle → refuses. With `[elite]` OFF it also refuses."
+        },
+        {
+          "id": "s5",
+          "text": "Expiry: arm, wait past `confirm_window` (60 s), then \"confirm\" → says it expired; nothing fires."
+        },
+        {
+          "id": "s6",
+          "text": "Hard abort: arm, then \"Abort.\" / \"Belay that.\" → arm cleared, any held key released."
+        },
+        {
+          "id": "s7",
+          "text": "Off-allowlist refusal: ask for a different control (\"deploy hardpoints\") → won't do it."
+        },
+        {
+          "id": "s8",
+          "text": "Mode gate on foot (#29): disembark (on foot) and ask to toggle landing gear → refuses (\"only works in your ship\") and doesn't offer the action. Back in the ship, the same request arms normally."
+        },
+        {
+          "id": "s9",
+          "text": "Mode re-check at confirm (#29): in the ship, arm the toggle; before confirming, disembark; then \"confirm\" → refused (mode re-checked at confirm time), nothing fires."
+        },
+        {
+          "id": "s10",
+          "text": "Binding preference (#29): with the keyboard key on Primary (normal), startup log shows `landing_gear -> <Key>` and it presses that. Set `[keybinds].binding_preference = \"secondary\"` with the key on the Secondary slot → it uses that instead (falls back to the other slot if only one is bound)."
+        }
+      ]
+    },
+    {
+      "id": "keybind-ship-systems-toggles",
+      "title": "Tier-1 ship-systems toggles: fire-immediately, allowlist-gated, pips, combat guard, mode gate (issue #31)",
+      "section": "6.1.1 Ship-systems toggles",
+      "tags": [
+        "ED",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "`[keybinds].enabled` + `[elite].enabled` on. Benign main-ship toggles that fire immediately (no arm/confirm). Off until you add each macro NAME to `[keybinds].allowlist`; bind the matching control to a KEY in ED. Do these parked/docked. Names: cargo_scoop, night_vision, ship_lights, hud_mode, pips_engines/weapons/systems/balance.",
+      "expected": "An allowlisted toggle fires immediately (no confirm); a non-allowlisted one is refused; pips move per request and balance resets to 2/2/2; HUD mode flips combat<->analysis; the combat guard still refuses benign toggles in danger; on-foot is mode-gated; an unbound control asks you to bind a key.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Opt-in fires immediately: add `cargo_scoop` to the allowlist, then 'toggle my cargo scoop' -> the scoop deploys/retracts right away (no 'armed, confirm separately' step). Startup log lists `cargo_scoop -> <Key>`."
+        },
+        {
+          "id": "s2",
+          "text": "Not allowlisted -> refused: with `ship_lights` NOT in the allowlist, 'turn on my ship lights' -> won't do it (off-allowlist), nothing presses."
+        },
+        {
+          "id": "s3",
+          "text": "Pips: allowlist `pips_engines`, say 'pips to engines' three times -> three pips move into ENG. Then allowlist + say 'balance the pips' (`pips_balance`) -> distribution resets to 2/2/2."
+        },
+        {
+          "id": "s4",
+          "text": "HUD mode: allowlist `hud_mode`, 'switch HUD to analysis mode' -> the HUD flips combat<->analysis."
+        },
+        {
+          "id": "s5",
+          "text": "Combat guard still applies: with a benign toggle allowlisted, get interdicted / into danger and ask for it -> refuses (benign toggles aren't exempt)."
+        },
+        {
+          "id": "s6",
+          "text": "Mode gating: disembark (on foot) and ask for cargo scoop -> refuses ('only works in your ship') and isn't offered. Back in the ship it fires."
+        },
+        {
+          "id": "s7",
+          "text": "Unbound control: if the matching ED control is on a HOTAS/mouse only (no keyboard bind), asking for it -> 'bind it to a key' message; nothing fires."
+        }
+      ]
+    },
+    {
+      "id": "keybind-flight-nav-actions",
+      "title": "Tier-1 flight / nav actions: benign fire-now vs arm-and-confirm, targeting, combat + mode gates (issue #30)",
+      "section": "6.1a Flight / nav actions",
+      "tags": [
+        "ED",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "Off by default. For each action add its name to `[keybinds].allowlist` AND bind the matching control to a KEY in ED. `[keybinds].enabled` + `[elite].enabled` on. Do parked/docked first, then open space with a clear area. Combat guard + mode gate apply to every one.",
+      "expected": "Benign actions (throttle_*, target cycling, target_next_route_system) fire immediately; consequential ones (supercruise, frame_shift_drive, hyperspace, flight_assist) arm and require a separate confirm; combat/danger and ED-off refuse; a deployed fighter is mode-gated off the main-ship-only actions; an unbound token says to bind it; an off-allowlist action is refused.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Benign fires immediately: allowlist `throttle_zero`; 'COVAS, cut the throttle.' -> throttle drops to zero at once (no separate confirm), reply 'Throttle at zero'. Same for `throttle_50` / `throttle_100`."
+        },
+        {
+          "id": "s2",
+          "text": "Targeting (benign): allowlist `cycle_next_target` + `select_target_ahead`; 'target the ship ahead' then 'cycle to the next target' -> target reticle changes immediately each time."
+        },
+        {
+          "id": "s3",
+          "text": "Route target (benign): with a route plotted, allowlist `target_next_route_system`; 'target the next system in my route' -> the next route system is selected immediately."
+        },
+        {
+          "id": "s4",
+          "text": "Consequential arms-and-confirms: allowlist `supercruise`; 'engage supercruise' -> armed but not done; on a separate 'confirm' it fires. Same shape for `frame_shift_drive`, `hyperspace`, and `flight_assist`."
+        },
+        {
+          "id": "s5",
+          "text": "Combat guard: in danger/interdiction, any flight action refuses; with `[elite]` OFF it refuses too."
+        },
+        {
+          "id": "s6",
+          "text": "Mode gate - fighter: deploy a ship-launched fighter; `throttle_*` and target cycling are still offered, but `supercruise` / `hyperspace` / `frame_shift_drive` / `target_next_route_system` / `nav_lock` are NOT (main-ship only) and refuse if asked."
+        },
+        {
+          "id": "s7",
+          "text": "Unbound token: allowlist `nav_lock` but leave WingNavLock unbound in ED -> asking to toggle nav lock says to bind it in-game; nothing fires."
+        },
+        {
+          "id": "s8",
+          "text": "Off-allowlist still refused: an action you did NOT add (e.g. `hyperspace` when only `throttle_zero` is allowlisted) -> won't do it."
+        }
+      ]
+    },
+    {
+      "id": "keybind-onfoot-actions",
+      "title": "Odyssey on-foot actions: mode-gated to foot, benign fire-now, weapon select/holster, combat guard (issue #34)",
+      "section": "6.1b On-foot actions",
+      "tags": [
+        "ED",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "Disembark first (on foot in Odyssey). `[keybinds].enabled` on. Add the macros under test to `[keybinds].allowlist` (e.g. on_foot_flashlight, on_foot_night_vision). Bind the matching On Foot controls to keys in ED. These are benign - they fire immediately.",
+      "expected": "On-foot actions are offered only on foot (refused/hidden while flying) and fire immediately there; flashlight/night vision/weapon-select+holster/suit-tools/crouch/galaxy-map all work; it never FIRES a weapon; the combat guard still refuses benign on-foot actions in danger; off-allowlist is refused; a ship control (landing gear) is refused while on foot (gate proven both ways).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Mode gating - offered only on foot: in your ship, ask to 'toggle my flashlight' -> refused ('only works on foot'), and not offered. Disembark, ask again -> it fires immediately. This is the core check: on-foot actions are hidden while flying."
+        },
+        {
+          "id": "s2",
+          "text": "Flashlight / night vision: on foot, 'flashlight' and 'night vision' each toggle the suit light / night vision."
+        },
+        {
+          "id": "s3",
+          "text": "Weapon select + holster: on foot, 'draw your primary weapon' / 'secondary' / 'utility' selects that weapon; 'holster your weapon' puts it away. It never FIRES - only draws/holsters."
+        },
+        {
+          "id": "s4",
+          "text": "Suit tools: on foot, 'switch to your energy link' / 'profile analyser' / 'suit tool' selects that gadget."
+        },
+        {
+          "id": "s5",
+          "text": "Crouch / galaxy map: on foot, 'crouch' and 'open the galaxy map' work."
+        },
+        {
+          "id": "s6",
+          "text": "Combat guard on foot: get into danger on foot, ask to toggle flashlight -> refused (benign still guarded). With `[elite]` OFF it also refuses."
+        },
+        {
+          "id": "s7",
+          "text": "Off-allowlist refusal: ask for an on-foot macro you did NOT add to the allowlist -> won't do it."
+        },
+        {
+          "id": "s8",
+          "text": "Ship control hidden on foot (regression): while on foot, 'toggle landing gear' -> refused and not offered (proves the gate both ways)."
+        }
+      ]
+    },
+    {
+      "id": "keybind-srv-controls",
+      "title": "SRV / buggy controls: benign fire-now, recall arm-and-confirm, mode gate, combat guard (issue #35)",
+      "section": "6.1a SRV controls",
+      "tags": [
+        "ED",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "`[keybinds].enabled` on. Add the SRV macros you want to `[keybinds].allowlist` (drive_assist, srv_headlights, srv_night_vision, srv_cargo_scoop, srv_auto_brake, recall_ship). Bind the matching Buggy controls to keys in ED. Deploy the SRV first - these are offered ONLY while driving.",
+      "expected": "Benign SRV toggles fire immediately while driving; recall_ship arms and needs a separate confirm (same-turn refused); back in the ship/on foot the SRV actions are refused/not offered; disembarking the SRV after arming recall re-checks the mode at confirm and refuses; the combat guard and ED-off refuse; off-allowlist and weapons/turret are never offered; an unbound control asks to bind a key.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Benign toggle fires immediately (in SRV): while driving the SRV, 'COVAS, turn on the headlights.' -> headlights toggle right away (no confirm); same for 'toggle drive assist', 'night vision', 'cargo scoop', 'auto-brake'. Log shows e.g. `executed srv_headlights -> <Key>`."
+        },
+        {
+          "id": "s2",
+          "text": "Recall ship arms-and-confirms: in the SRV, 'recall my ship.' -> armed but not done; confirm on a separate turn ('confirm') -> the ship recall/dismiss fires. Same-turn confirm is refused."
+        },
+        {
+          "id": "s3",
+          "text": "Mode gating - not in the SRV: back in the main ship (or on foot), ask for any SRV control ('headlights', 'recall my ship') -> refused ('only works in the SRV') and not offered."
+        },
+        {
+          "id": "s4",
+          "text": "Mode gating - exit SRV after arming recall: in the SRV, arm `recall_ship`; before confirming, board your ship; then 'confirm' -> refused (mode re-checked at confirm), nothing fires."
+        },
+        {
+          "id": "s5",
+          "text": "Combat guard: in the SRV, get into danger, then ask for any SRV toggle -> refuses. With `[elite]` OFF it also refuses."
+        },
+        {
+          "id": "s6",
+          "text": "Off-allowlist refusal: ask for an SRV control you did NOT allowlist -> won't do it. Weapons/turret are never offered."
+        },
+        {
+          "id": "s7",
+          "text": "Unbound control: if a Buggy control (e.g. Night Vision) is HOTAS/mouse-only -> COVAS says to bind it to a key; nothing fires."
+        }
+      ]
+    },
+    {
+      "id": "keybind-ui-panels-maps-firegroups",
+      "title": "Tier-1 UI actions: panels / maps / fire groups fire immediately, allowlist + combat + mode gates (issue #32)",
+      "section": "6.1a UI panels / maps / fire groups",
+      "tags": [
+        "ED",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "Benign fire-immediately actions (no confirm). Opt in by NAME in `[keybinds].allowlist` (e.g. open_galaxy_map, cycle_fire_group_next, focus_left_panel). Each ED control must be bound to a key. `[keybinds].enabled` + `[elite].enabled` on. Do first tests parked and docked.",
+      "expected": "Allowlisted UI actions fire on the spoken command (no confirm) - galaxy/system map, HUD panels, fire-group cycling, UI back/focus, head-look; a non-allowlisted macro is refused; the combat guard refuses benign UI actions in danger; on-foot is mode-gated (fire-group cycling also works in a fighter); an unbound control reports 'bind it in-game'.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Fires immediately (no confirm): with `open_galaxy_map` allowlisted, 'open the galaxy map' -> the map opens on the spoken command. Say it again to close."
+        },
+        {
+          "id": "s2",
+          "text": "Panels: allowlist a panel (e.g. `focus_left_panel`) -> 'open the navigation panel' focuses the correct HUD panel. Spot-check `focus_right_panel`, `focus_comms_panel`, `focus_role_panel`, `quick_comms`, `open_system_map`."
+        },
+        {
+          "id": "s3",
+          "text": "Fire groups: with `cycle_fire_group_next` / `cycle_fire_group_previous` allowlisted, 'next fire group' / 'previous fire group' steps the active fire group (top-right HUD)."
+        },
+        {
+          "id": "s4",
+          "text": "UI / head-look: allowlist `ui_back`, `ui_focus`, `toggle_headlook` -> each presses the matching control."
+        },
+        {
+          "id": "s5",
+          "text": "Not allowlisted = refused: with a macro NOT in the allowlist, asking for it -> won't do it (even though the action exists)."
+        },
+        {
+          "id": "s6",
+          "text": "Combat guard still applies: while interdicted / in danger, ask to open the galaxy map -> refused (benign actions are still gated)."
+        },
+        {
+          "id": "s7",
+          "text": "Mode gating: on foot, ask to open the galaxy map / focus a panel -> refused ('only works in your ship'); fire-group cycling also works in a deployed fighter."
+        },
+        {
+          "id": "s8",
+          "text": "Unbound control: if the ED control is HOTAS/mouse-only (no keyboard bind), the action reports 'bind it in-game' and nothing fires. Startup log shows each allowlisted macro `-> <Key>`."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

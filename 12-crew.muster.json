@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "crew-interactive-conversation",
+      "title": "Interactive crew: in-character crew voice segment, deterministic voice, barge-in, off-by-default (issue #69)",
+      "section": "18.5b Interactive crew",
+      "tags": [
+        "HW"
+      ],
+      "requires": "`[crew].enabled = true` (Settings -> Interactive crew, or 'turn crew on'). Distinct crew voices need the bus mixer (`[audio].enabled = true`) + a cast pool (default random ElevenLabs works); with no pool crew lines fall back to the persona voice. Optionally `[crew].roster = [\"Nyx\", \"Vela\"]`.",
+      "expected": "A crew-invoking prompt yields a reply where the crew member's line is in a distinct radio-filtered voice while the rest stays the companion's own clean voice; the same crew name keeps the same voice and different names differ; barge-in stops a crew line promptly across the persona->crew boundary; with crew off, replies are a single voice with no attribution and literal [bracketed] text is just read.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Crew speaks in character: ask something that invites a crew voice ('have your sensor officer read off any contacts') -> the crew member's part is spoken in a distinct, radio-filtered voice, while the rest of the reply stays your companion's own clean voice. The persona is still the default speaker."
+        },
+        {
+          "id": "s2",
+          "text": "Deterministic voice: over several turns, the same crew name keeps the same voice, and different names sound different."
+        },
+        {
+          "id": "s3",
+          "text": "Barge-in mid-crew: while a crew line is speaking, tap cancel (`[`) -> it stops promptly and returns to Idle (barge-in works across the persona->crew segment boundary)."
+        },
+        {
+          "id": "s4",
+          "text": "Off by default: with `[crew].enabled = false`, replies are spoken exactly as before - a single voice, no attribution, and any literal [bracketed] text is just read as text."
+        }
+      ]
+    },
+    {
+      "id": "crew-editor-panel",
+      "title": "Crew editor tab: add character, persistence, persona in conversation, assigned voice wins, stale-write guard (issue #70)",
+      "section": "18.5c Crew editor",
+      "tags": [
+        "PANEL",
+        "HW",
+        "FILE"
+      ],
+      "requires": "Run `run_covas_ui.py` and open the panel; click the crew tab. Edits `crew.json` (`[crew].file`), git-ignored. Personas fold into the system prompt; a chosen voice overrides the auto-assignment.",
+      "expected": "Adding a character writes crew.json and it persists across sessions; with crew on, that character responds in the personality you wrote in their assigned voice; a pinned voice is used every time (Auto reverts to the deterministic pick); a stale-write guard offers reload/overwrite (no silent clobber); with crew disabled the tab shows a banner but the roster still saves/loads.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Add a character: click + ADD CHARACTER, enter a name (e.g. Nyx), a personality line, pick a Voice from the dropdown (or leave Auto), SAVE ROSTER -> a green Saved and a `crew.json` appears in the data dir with your entry."
+        },
+        {
+          "id": "s2",
+          "text": "Persists across sessions: restart the UI, reopen the Crew tab -> your roster is still there (loaded from `crew.json`)."
+        },
+        {
+          "id": "s3",
+          "text": "Persona shows up in conversation: with crew on, ask something that invites that character -> they respond in the personality you wrote, in their assigned voice."
+        },
+        {
+          "id": "s4",
+          "text": "Assigned voice wins: pin a character to a specific voice, save, then invoke them a few times -> they use THAT voice every time. Switch back to Auto and save -> they revert to the deterministic voice."
+        },
+        {
+          "id": "s5",
+          "text": "Stale-write guard: open the Crew tab, hand-edit `crew.json` in a text editor and save, then click SAVE ROSTER -> it warns the file changed and offers reload or overwrite (no silent clobber)."
+        },
+        {
+          "id": "s6",
+          "text": "Disabled banner: with `[crew].enabled = false`, the Crew tab shows a banner noting crew won't speak until enabled, but the roster still saves/loads."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

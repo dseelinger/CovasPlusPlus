@@ -1,0 +1,449 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "env-health",
+      "title": "Environment health check reports all-OK",
+      "section": "0. Prerequisites",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "Source checkout with `.venv` set up.",
+      "expected": "`check_setup.py` prints `[ OK ]` for every line and ends with \"All systems go.\"; the two secret files exist.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Run `.venv\\Scripts\\python.exe check_setup.py` (or `check_setup.bat`)."
+        },
+        {
+          "id": "s2",
+          "text": "Every line reads `[ OK ]`, ending in \"All systems go.\""
+        },
+        {
+          "id": "s3",
+          "text": "Confirm `personality.txt` (or `campaign.txt`) and `ElevenLabsAPIKey.txt` exist (both git-ignored)."
+        }
+      ]
+    },
+    {
+      "id": "launch-headless-and-panel",
+      "title": "Both entry points launch with the expected banner",
+      "section": "0. Prerequisites",
+      "tags": [
+        "HW",
+        "GUI"
+      ],
+      "requires": "Source checkout, keys present.",
+      "expected": "Headless prints the capability banner and no browser; the UI build prints the same banner AND opens the panel at IDLE. The PTT scan-code line and `QUIT: Ctrl+Alt+Q` are printed.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Run `run_covas.py` (headless) → banner shows model, voice, Whisper size, and capability on/off lines (Router, ED monitor, Proactive, Keybinds, Auto-honk, Find, Personality). No browser opens."
+        },
+        {
+          "id": "s2",
+          "text": "Run `run_covas_ui.py` → same banner PLUS the browser opens http://127.0.0.1:8765 and the status light reads IDLE."
+        },
+        {
+          "id": "s3",
+          "text": "The console prints the PTT scan-codes line and `QUIT: Ctrl+Alt+Q`."
+        }
+      ]
+    },
+    {
+      "id": "openai-compatible-llm-provider",
+      "title": "OpenAI-compatible LLM provider — OpenAI/Groq/DeepSeek/OpenRouter (issue #12)",
+      "section": "4. Cost router",
+      "tags": [
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "An OpenAI (or compatible) API key: export `OPENAI_API_KEY` (or paste into `OpenAIAPIKey.txt`); internet access. Set `[llm].provider = \"openai\"` and restart. For the alt-endpoint step, a Groq or OpenRouter key + `[openai].base_url`.",
+      "expected": "COVAS answers via the OpenAI-compatible endpoint; the router tiers it (OpenAI model ids in the `[router]` line); tool calling (checklist) works over delta-assembled tool_calls; switching base_url to Groq/OpenRouter still works; a missing key/bad base_url degrades the turn to text without crashing.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[llm].provider = \"openai\"` (default base_url/model = OpenAI gpt-4o-mini), export `OPENAI_API_KEY`, restart, speak a turn -> COVAS answers via OpenAI; `[router]` line shows the OpenAI model (e.g. `[cheap] gpt-4o-mini`) and `[usage]` shows token counts."
+        },
+        {
+          "id": "s2",
+          "text": "Tool calling: \"What's my next objective?\" / \"Mark fuel scooping complete.\" -> the checklist tool fires (log shows the tool call) and COVAS confirms."
+        },
+        {
+          "id": "s3",
+          "text": "Escalation: \"Think hard about ...\" -> router line shows `[standard]` with the `[openai.tiers].standard` model; a premium wake phrase -> `[premium]`."
+        },
+        {
+          "id": "s4",
+          "text": "Alt endpoint: point `[openai].base_url` at Groq (`https://api.groq.com/openai/v1`, model `llama-3.3-70b-versatile`) or OpenRouter with that service's key, restart -> conversation still works through the same provider."
+        },
+        {
+          "id": "s5",
+          "text": "Fail-soft: clear the key (or set a bad `base_url`) -> the turn degrades to text and the loop returns to IDLE; restore -> it works again. No crash."
+        }
+      ]
+    },
+    {
+      "id": "gemini-llm-provider",
+      "title": "Gemini LLM provider — native API, tool calling + Search grounding (issue #13)",
+      "section": "4. Cost router",
+      "tags": [
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "A Gemini API key (free from aistudio.google.com): export `GEMINI_API_KEY` (or `GOOGLE_API_KEY`, or paste into `GeminiAPIKey.txt`); internet access. Set `[llm].provider = \"gemini\"` and restart. For grounding, `[web_search].enabled = true`.",
+      "expected": "COVAS answers via Gemini; the router tiers it (Flash cheap / Pro depth in the `[router]` line); checklist tool calling works; with web search on, Google-Search grounding surfaces a Searching side-channel line; a missing key degrades the turn to text without crashing.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[llm].provider = \"gemini\"`, export `GEMINI_API_KEY`, restart, speak a turn -> COVAS answers via Gemini; `[router]` line shows the model (e.g. `[cheap] gemini-2.5-flash`) and `[usage]` shows token counts."
+        },
+        {
+          "id": "s2",
+          "text": "Tool calling: \"What's my next objective?\" / \"Mark fuel scooping complete.\" -> the checklist tool fires (log shows the tool call) and COVAS confirms."
+        },
+        {
+          "id": "s3",
+          "text": "Grounding: with `[web_search].enabled = true`, ask \"What's the latest on the Thargoid war?\" -> the log shows a `Searching...` side-channel line (grounding queries) and the answer reflects live info."
+        },
+        {
+          "id": "s4",
+          "text": "Escalation: \"Think hard about ...\" -> router line shows `[standard]` with the `[gemini.tiers].standard` (Pro) model."
+        },
+        {
+          "id": "s5",
+          "text": "Fail-soft: clear the key -> the turn degrades to text and the loop returns to IDLE; restore -> it works again. No crash."
+        }
+      ]
+    },
+    {
+      "id": "help-hierarchy",
+      "title": "Help is a hierarchy templated from the live capability registry",
+      "section": "11. Help & version",
+      "tags": [
+        "HW"
+      ],
+      "requires": "App running; the capabilities you want to spot-check are enabled (see §0.3 in MANUAL_TESTS.md).",
+      "expected": "\"What can you do?\" names CATEGORIES (not every capability); drilling into a category lists ≤3 capabilities with examples; drilling into a capability describes its refinements; every enabled capability is reachable; misspellings get a suggestion, never an invented correction; an unbuilt capability is declined without echoing it as real.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Overview names CATEGORIES: \"What can you do?\" → names the groups (navigation and search, your ship, your checklist, community goals, settings) and invites drilling in — does NOT read every capability."
+        },
+        {
+          "id": "s2",
+          "text": "Drill into a category: \"Tell me about navigation and search.\" → lists its capabilities (≤3, then \"there are others — ask about …\"), each with an example."
+        },
+        {
+          "id": "s3",
+          "text": "Drill into a capability: \"How do I find a module?\" → describes outfitting and its refinements (size, mount, pad)."
+        },
+        {
+          "id": "s4",
+          "text": "Coverage: spot-check one capability per group (e.g. \"tell me about your ship\", \"tell me about settings\", \"tell me about community goals\")."
+        },
+        {
+          "id": "s5",
+          "text": "Failure recovery: \"Find the closest power distributer.\" (misspelled) → \"did you mean Power Distributor?\" — never inventing a correction."
+        },
+        {
+          "id": "s6",
+          "text": "Unknown capability: \"Can you plot me a route?\" (not built) → says it can't and offers to list what it can, WITHOUT echoing the fake capability as real."
+        }
+      ]
+    },
+    {
+      "id": "version-by-voice",
+      "title": "\"What version are you?\" reports the running version",
+      "section": "11. Help & version",
+      "tags": [
+        "HW"
+      ],
+      "requires": "App running (native window, browser UI, or headless). Know the expected version from `covas/__version__.py` (currently 0.3.1).",
+      "expected": "COVAS speaks the running version, e.g. \"I'm running COVAS++ version 0.3.1.\", matching covas/__version__.py exactly.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold `[`, say \"What version are you?\", release."
+        },
+        {
+          "id": "s2",
+          "text": "The spoken reply names the version and it matches the string in `covas/__version__.py`."
+        },
+        {
+          "id": "s3",
+          "text": "Try a variant (\"which build is this?\") → still reports the same version."
+        }
+      ]
+    },
+    {
+      "id": "check-updates-by-voice-is-ui-only",
+      "title": "\"Check for updates\" by voice does NOT update — points to the panel",
+      "section": "11. Help & version",
+      "tags": [
+        "HW"
+      ],
+      "requires": "App running.",
+      "expected": "Asking to check for / install an update by VOICE does not trigger any download or relaunch; COVAS says updates are done from the control panel's update banner. (Updating stays a UI action — INSTALLER_DESIGN decision #5.)",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold `[`, say \"Check for updates.\", release."
+        },
+        {
+          "id": "s2",
+          "text": "COVAS does NOT download or relaunch anything; it points you at the control panel's update banner instead."
+        }
+      ]
+    },
+    {
+      "id": "voice-settable-settings",
+      "title": "Change settings by voice, validated against the schema (N2)",
+      "section": "12. Voice settings",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "App running; you can open `overrides.json` to verify writes.",
+      "expected": "Voice settings changes are validated against the same schema as the Settings page, write `overrides.json`, refuse invalid values while listing the valid options, route unknown settings to help, and can be read back.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set an enum: \"Set the Whisper model to small.\" → confirms; the change appears in `overrides.json`."
+        },
+        {
+          "id": "s2",
+          "text": "Set a bool: \"Turn personality off.\" → confirms; a follow-up no longer says \"Commander\". Turn it back on."
+        },
+        {
+          "id": "s3",
+          "text": "Natural value: \"Set thinking to high.\" / \"Set the voice speed to 1.1.\" → applied."
+        },
+        {
+          "id": "s4",
+          "text": "Invalid value refused with options: \"Set the Whisper model to gigantic.\" → refuses and lists the valid options."
+        },
+        {
+          "id": "s5",
+          "text": "Unknown setting → help: \"Set the warp factor to 9.\" → routes to help / says it isn't a setting."
+        },
+        {
+          "id": "s6",
+          "text": "Get a setting: \"What's my Whisper model set to?\" → reads the current value."
+        }
+      ]
+    },
+    {
+      "id": "panel-live-status-log",
+      "title": "Live status light and log track the session",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Panel open; talk to the app.",
+      "expected": "The status light tracks state as you talk and the log scrolls with prompts, replies, router/usage, and status/search lines, all timestamped.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "As you talk, the status light tracks the state machine."
+        },
+        {
+          "id": "s2",
+          "text": "The log scrolls with prompts, replies, router/usage, and status/search lines (timestamped)."
+        }
+      ]
+    },
+    {
+      "id": "panel-voice-list-filter",
+      "title": "ElevenLabs voice pickers type-to-filter on both main panel and Settings (issue #26)",
+      "section": "14. Web panel — voice list",
+      "tags": [
+        "PANEL",
+        "NET"
+      ],
+      "requires": "Panel + Settings open; an ElevenLabs key set so both voice dropdowns actually populate.",
+      "expected": "Typing 3+ chars in either voice filter narrows the dropdown by name/category substring (case-insensitive); 1-2 chars filter nothing; clearing restores the full list; the currently-selected voice stays visible even when it doesn't match.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Main panel: type 3+ characters in the filter box under `ElevenLabs voice` -> the dropdown narrows to voices whose name OR category contains the text (try a category word like `cloned` or `premium`)."
+        },
+        {
+          "id": "s2",
+          "text": "Typing 1-2 chars filters nothing; clearing the box restores the full list; the currently-selected voice stays visible even when it doesn't match."
+        },
+        {
+          "id": "s3",
+          "text": "Settings page: same behavior in the filter box next to the schema `@elevenlabs_voices` picker - 3+ chars filters by substring, <3 clears. Picking a filtered voice still saves normally."
+        }
+      ]
+    },
+    {
+      "id": "panel-settings-page",
+      "title": "Settings page: grouped controls, filter, save/reset, validation, live reload",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI",
+        "FILE"
+      ],
+      "requires": "Panel open at http://127.0.0.1:8765/settings.",
+      "expected": "The Settings page renders grouped sections with the right control per type + inline help, filters live, saves to `overrides.json` (config.toml pristine) with a per-setting RESET, rejects out-of-range values, and reloads Whisper live.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "The page renders grouped sections with the right control per type (toggles, dropdowns, number/sliders, text/path) and inline help."
+        },
+        {
+          "id": "s2",
+          "text": "Filter box: type in the search box → the list narrows to matching settings."
+        },
+        {
+          "id": "s3",
+          "text": "Change + save: change a value → the save bar appears with a count; SAVE CHANGES → written to `overrides.json` (config.toml stays pristine)."
+        },
+        {
+          "id": "s4",
+          "text": "Per-setting reset: a changed setting shows RESET → click → reverts to default and drops from `overrides.json`."
+        },
+        {
+          "id": "s5",
+          "text": "Validation: try an out-of-range number (voice speed 2.0) → rejected, not written."
+        },
+        {
+          "id": "s6",
+          "text": "Live where supported: change the Whisper model → the log notes the model reloaded (no restart)."
+        }
+      ]
+    },
+    {
+      "id": "panel-personality-tab",
+      "title": "Personality tab: persona picker, campaign preserved, save-as-custom, campaign editor (N7)",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Panel open; Personality tab.",
+      "expected": "Selecting a persona previews and changes the spoken voice/register; switching persona never wipes your Campaign facts; editing + SAVE AS CUSTOM adds a git-ignored custom persona; editing + SAVE CAMPAIGN updates the facts reflected in replies.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Persona picker: the tab lists personas; selecting one shows a preview. Pick a different persona → the next reply's voice/register changes."
+        },
+        {
+          "id": "s2",
+          "text": "Campaign preserved: switch persona and confirm your Campaign text (personal facts) is unchanged."
+        },
+        {
+          "id": "s3",
+          "text": "Save as custom: edit the persona box → SAVE AS CUSTOM → a new custom persona appears (written under `personalities/custom/`)."
+        },
+        {
+          "id": "s4",
+          "text": "Campaign editor: edit the Campaign box → SAVE CAMPAIGN → a subsequent reply reflects the updated facts."
+        }
+      ]
+    },
+    {
+      "id": "panel-voice-speed",
+      "title": "Voice speed slider affects speech and clamps at 1.2 (N7)",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Panel open.",
+      "expected": "Nudging the Voice speed slider (1.0–1.2×) makes the next reply faster; the value cannot exceed 1.2.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Nudge the Voice speed slider and ask something → the reply is spoken faster."
+        },
+        {
+          "id": "s2",
+          "text": "The value can't exceed 1.2 (clamped)."
+        }
+      ]
+    },
+    {
+      "id": "panel-log-filter",
+      "title": "Live-log Conversation/All toggle filters and persists (N7)",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI"
+      ],
+      "requires": "Panel open.",
+      "expected": "The Live Log's Conversation/All toggle shows only utterances+replies vs everything; Conversation hides status/thinking/usage lines and the choice persists across a reload.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Conversation (default) shows only your utterances and COVAS replies; All shows status/thinking/search/usage/system lines too."
+        },
+        {
+          "id": "s2",
+          "text": "Switch to Conversation → status/thinking/usage lines hide; the choice persists across a reload."
+        }
+      ]
+    },
+    {
+      "id": "panel-log-select-copy",
+      "title": "Live Log is selectable and copyable, filter-aware (issue #6)",
+      "section": "14. Web panel",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Panel open with an active session producing log lines (a few turns). Try it in BOTH the browser build (run_covas_ui.py) and the packaged native window.",
+      "expected": "Auto-scroll pauses while you scroll up or select text (selection isn't stolen by new lines) and resumes at the bottom; the Copy button copies the log as clean timestamped plain text respecting the Conversation/All filter; per-line hover copy works; selection + clipboard work in the native window too.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With lines still arriving, scroll up and drag-select an older line: the selection survives (the view does NOT jump to the bottom). Scroll back to the bottom -> auto-scroll resumes."
+        },
+        {
+          "id": "s2",
+          "text": "In Conversation mode, click Copy (log header) and paste: only timestamped Commander/COVAS lines, clean 'HH:MM:SS  who: text' (no HTML). Switch to All, Copy again: status/thinking/search/[router]/[usage]/system lines are included."
+        },
+        {
+          "id": "s3",
+          "text": "Hover a line -> a small ⎘ button appears; click it -> just that line is on the clipboard (shows ✓)."
+        },
+        {
+          "id": "s4",
+          "text": "Repeat s1–s3 in the PACKAGED native window (not just the browser): selection highlights and both copy paths work there too."
+        }
+      ]
+    },
+    {
+      "id": "settings-persistence",
+      "title": "Settings survive a quit and relaunch",
+      "section": "15. Settings persistence",
+      "tags": [
+        "GUI",
+        "FILE"
+      ],
+      "requires": "App running; panel or voice.",
+      "expected": "Non-default model/voice/thinking/personality values are written to `overrides.json` and are still in effect after Ctrl+Alt+Q and relaunch.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set model, voice, thinking depth, and personality to non-default values (panel or voice)."
+        },
+        {
+          "id": "s2",
+          "text": "Open `overrides.json` → your changes are there."
+        },
+        {
+          "id": "s3",
+          "text": "Quit (Ctrl+Alt+Q) and relaunch → the panel comes back with the same settings."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

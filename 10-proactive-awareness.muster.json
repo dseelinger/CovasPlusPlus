@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "proactive-callouts",
+      "title": "Proactive callouts fire on game events and mute by voice",
+      "section": "5. ED monitoring & callouts",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[elite].enabled` and `[proactive].enabled = true`; ED running.",
+      "expected": "Arrival/dock events produce a short in-character spoken callout with no PTT (only when idle, throttled); voice mute silences them and can be turned back on; a callout in progress is cancelable.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Arrival: FSD jump to a new system → within a few seconds COVAS speaks a short callout with NO PTT press (fires only when idle)."
+        },
+        {
+          "id": "s2",
+          "text": "Dock at a station → a `Docked` callout fires (at most one line amid a jump→supercruise→dock burst — min-interval throttle)."
+        },
+        {
+          "id": "s3",
+          "text": "Mute by voice: \"COVAS, stop the callouts.\" → confirms; trigger another event → no callout. Then \"COVAS, turn callouts back on.\" → next event announces again."
+        },
+        {
+          "id": "s4",
+          "text": "A callout in progress is cancelable: hold `[` mid-callout → it cuts off."
+        }
+      ]
+    },
+    {
+      "id": "on-foot-srv-awareness",
+      "title": "On-foot / SRV awareness & proactive callouts: read tools + threshold callouts (issue #54)",
+      "section": "5.2a On-foot / SRV awareness",
+      "tags": [
+        "ED",
+        "HW"
+      ],
+      "requires": "`[elite].enabled = true`; callout checks also need `[proactive].enabled = true`. Needs Odyssey (on-foot) and a ship with an SRV bay. Read-tool checks work without proactive.",
+      "expected": "On-foot/SRV read tools report oxygen/health/temp/gravity, SRV hull+cargo, and exobiology sample progress from live telemetry and clear when back in the ship; proactive callouts fire once (throttled, mutable) on a second bio sample, low oxygen, and low SRV hull.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "On foot: disembark, then 'how's my oxygen?' / 'am I okay out here?' -> reports oxygen / health / temperature / gravity from live telemetry."
+        },
+        {
+          "id": "s2",
+          "text": "SRV: deploy the SRV, then 'SRV status.' / 'how's the buggy?' -> reports SRV hull and cargo."
+        },
+        {
+          "id": "s3",
+          "text": "Exobiology: with the Genetic Sampler, log a sample, then 'how many samples do I need?' -> reports the genus and samples-so-far (e.g. '1 of 3 - 2 more needed'). After the third (Analyse) it reports complete."
+        },
+        {
+          "id": "s4",
+          "text": "Mode-appropriate: on-foot/SRV readings only make sense in their mode; back in the ship they clear (a stale oxygen reading shouldn't linger)."
+        },
+        {
+          "id": "s5",
+          "text": "Proactive - bio sample: log your SECOND sample of an organism -> a callout like 'sample two of three - one more to analyse.'"
+        },
+        {
+          "id": "s6",
+          "text": "Proactive - oxygen low: let on-foot oxygen fall below ~25% -> an 'oxygen's getting low' callout (once - cooldown-gated, no repeat while it stays low)."
+        },
+        {
+          "id": "s7",
+          "text": "Proactive - SRV hull low: take the SRV below ~30% hull -> a 'hull's getting low' callout."
+        },
+        {
+          "id": "s8",
+          "text": "Mute applies: with the proactive mute on ('stop the callouts'), none of the above speak."
+        }
+      ]
+    },
+    {
+      "id": "route-callouts",
+      "title": "Route callouts track a plotted galaxy-map route",
+      "section": "5. ED monitoring & callouts",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[elite].enabled` and `[route].enabled = true`; plot a multi-jump galaxy-map route (writes `NavRoute.json`).",
+      "expected": "While flying the route COVAS calls scoopable heads-ups, jumps-remaining every Nth jump, and an arrival line; replotting resets counts; the proactive mute also silences route callouts.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Scoopable heads-up: as you lock/enter the next jump, COVAS says whether the next star is scoopable."
+        },
+        {
+          "id": "s2",
+          "text": "Jumps remaining: every Nth jump (`[route].every_n`, default 5) it announces jumps remaining (singular \"1 jump remaining\" near the end)."
+        },
+        {
+          "id": "s3",
+          "text": "Arrival: on the final system it says \"Arrived at <system>. Route complete.\" and stops."
+        },
+        {
+          "id": "s4",
+          "text": "Replot mid-flight → callouts follow the new route (counts reset)."
+        },
+        {
+          "id": "s5",
+          "text": "With the proactive mute on (\"stop the callouts\"), route callouts are silent too."
+        }
+      ]
+    },
+    {
+      "id": "auto-honk",
+      "title": "Auto-honk on arrival: happy path, DSS-misfire recovery, re-arm, guards",
+      "section": "6. Ship controls",
+      "tags": [
+        "GAME",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "`[elite].enabled` and `[honk].enabled = true`; Discovery Scanner fire bound to a KEY in ED. Startup log says \"Auto-honk ON …\" or a bind warning. Do this safely.",
+      "expected": "On jumping to a NEW system it probes and honks with the Discovery Scanner; a Detailed-Surface-Scanner fire group is detected and backed out of (speaks + disarms); it re-arms by voice or by a manual discovery scan; combat/danger/normal-space/unbound cases skip safely; \"abort\" releases the held key; disabled = no honk.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Happy path: with the Discovery Scanner in your fire group, jump to a new system → after a short probe it holds the fire button ~`hold_seconds` (5) and honks; the system map populates. Log: `honked — current fire group`."
+        },
+        {
+          "id": "s2",
+          "text": "DSS misfire → recover: select a fire group holding the Detailed Surface Scanner, jump near a planet → it detects the Surface-Scanner view, presses Exit Mode, speaks a heads-up, and disarms (you are NOT stuck in the DSS). Log: `disarmed: a honk opened the Surface Scanner`."
+        },
+        {
+          "id": "s3",
+          "text": "Re-arm (voice): after a disarm, \"re-arm auto honk\" → confirms and honks next jump."
+        },
+        {
+          "id": "s4",
+          "text": "Re-arm (auto): after a disarm, do a manual honk yourself → the discovery-scan event re-arms it. Log: `re-armed`."
+        },
+        {
+          "id": "s5",
+          "text": "Weapons group harmless: select a weapons fire group, jump → no weapons fire, no scan, no crash."
+        },
+        {
+          "id": "s6",
+          "text": "Guards: jump in combat mode → skips (`in combat mode`); in danger/interdiction → `blocked`; in normal space → `not in supercruise`."
+        },
+        {
+          "id": "s7",
+          "text": "Unbound fire (HOTAS/mouse-only, no keyboard bind) → skips with a \"no keyboard binding\" note; nothing fires."
+        },
+        {
+          "id": "s8",
+          "text": "Hard abort: with `[keybinds]` on, jump and during the hold say \"abort\" → the held fire key releases immediately."
+        },
+        {
+          "id": "s9",
+          "text": "Disabled: set `[honk].enabled = false` → no honk on arrival."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

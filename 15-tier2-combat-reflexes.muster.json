@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "reflex-fire-chaff",
+      "title": "LIVE-COMBAT: Tier-2 reflex fire chaff - fires only in danger, refused when safe, allowlist, abort (issue #36)",
+      "section": "6.3 Combat reflex - chaff",
+      "tags": [
+        "ED",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "SAFETY-CRITICAL / LIVE-COMBAT. `[reflex].enabled = true`, `[reflex].allowlist = [\"chaff\"]`, keep `[reflex].combat_guard = true`, bind your chaff launcher to a KEY in ED. Requires `[elite].enabled`. Chaff is purely DEFENSIVE (never shoots anyone) - the 'fires' cases are safe, but test only against WEAK NPCs.",
+      "expected": "Startup reports the chaff bind + reflexes-ON line; saying 'chaff' while safe is refused (proving the guard without a fight); with ED off it's refused; under fire from a weak NPC it presses chaff once; without chaff allowlisted it's neither advertised nor run; 'abort' releases all held keys; Tier-1 landing gear still refuses in combat (independent policies); disabling removes the chaff tool.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Startup readiness: launch reports `Reflex: chaff -> <key>` (or `chaff UNUSABLE (no keyboard bind for FireChaffLauncher)`), and a `Tier-2 combat reflexes ON ...` line. (Add heat_sink to the allowlist to also see it and say 'heat sink!' under fire - same guard.)"
+        },
+        {
+          "id": "s2",
+          "text": "Refused when safe (fully combat-SAFE - do this parked/docked): say 'chaff' while NOT in danger -> COVAS refuses ('you're not in combat...') and nothing is pressed. This is the safe way to prove the guard without a fight."
+        },
+        {
+          "id": "s3",
+          "text": "Refused with monitoring off: set `[elite].enabled = false`, say 'chaff' -> refused ('can't confirm you're in danger...'); nothing fires."
+        },
+        {
+          "id": "s4",
+          "text": "Fires under fire (defensive - safe): let a weak NPC interdict you (or take fire from a low-threat hostile), say 'chaff' -> it presses your chaff key once, log `fired chaff -> <key>`, and chaff deploys."
+        },
+        {
+          "id": "s5",
+          "text": "Not offered unless allowlisted: remove chaff from `[reflex].allowlist` (leave enabled), ask for chaff -> it's neither advertised nor run."
+        },
+        {
+          "id": "s6",
+          "text": "Hard abort: say 'abort' -> releases every held key (shared with keybinds/honk). Log: `aborted - released all keys`."
+        },
+        {
+          "id": "s7",
+          "text": "Tier-1 unaffected: with reflexes on, confirm 6.1 landing gear still refuses in combat (the two policies are independent)."
+        },
+        {
+          "id": "s8",
+          "text": "Disabled: set `[reflex].enabled = false` -> no chaff tool offered; asking for chaff does nothing."
+        }
+      ]
+    },
+    {
+      "id": "reflex-fast-ptt-phrase-spotter",
+      "title": "LIVE-COMBAT: Tier-2 reflex fast path - second-PTT phrase-spotter, no LLM, same guard (issue #38)",
+      "section": "6.3.1 Reflex fast path",
+      "tags": [
+        "ED",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "SAFETY-CRITICAL / LIVE-COMBAT. `[reflex].enabled = true`, `[reflex].allowlist = [\"chaff\"]`, bind `[reflex].ptt` to a DIFFERENT key than `[keys].push_to_talk` (e.g. `]` or a spare HOTAS button via JoyToKey). Requires `[elite].enabled`. A local hotword path - matches a fixed vocabulary and fires without the LLM, through the SAME guard/allowlist/abort as 6.3. Test 'fires' cases against WEAK NPCs only.",
+      "expected": "Startup shows the reflex scancodes and a `(fast-PTT [<key>])` banner tag; under fire, tapping the reflex key + 'chaff!' deploys noticeably faster than the assistant path; when safe the same tap is refused (faster, not looser); synonyms map to chaff; 'abort' snap-releases held keys; a non-combat phrase falls through to a normal turn; the main PTT is untouched; clearing the reflex ptt disables the second hook.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Startup readiness: launch reports the reflex scancodes on the `(PTT scan codes ... reflex ...)` line, and the banner's Reflexes line shows `(fast-PTT [<key>])`."
+        },
+        {
+          "id": "s2",
+          "text": "Instant fire under fire (defensive - safe): while a weak NPC is interdicting/shooting you, tap the reflex key and say 'chaff!' -> chaff deploys noticeably faster than the assistant path (no 'thinking'), log `phrase-spot fired chaff ...`."
+        },
+        {
+          "id": "s3",
+          "text": "Same guard when safe: parked/docked (not in danger), tap the reflex key and say 'chaff' -> refused ('you're not in combat...'), nothing pressed - the fast path is faster, not looser."
+        },
+        {
+          "id": "s4",
+          "text": "Synonyms: on the reflex key, 'flares' / 'break lock' also map to chaff (fire under fire to confirm; refused when safe)."
+        },
+        {
+          "id": "s5",
+          "text": "Snap abort: on the reflex key, say 'abort' (or 'stop'/'release') -> releases every held key immediately (shared abort). Log: `aborted - released all keys`."
+        },
+        {
+          "id": "s6",
+          "text": "Falls through to a normal turn: on the reflex key, say a non-combat request ('what's my fuel level?') -> it is NOT treated as a reflex; it runs as an ordinary conversation turn and COVAS answers."
+        },
+        {
+          "id": "s7",
+          "text": "Main PTT untouched: the normal `[keys].push_to_talk` key still opens a normal conversation turn exactly as before; the two keys don't interfere."
+        },
+        {
+          "id": "s8",
+          "text": "Disabled by default: clear `[reflex].ptt` (blank) -> no second hook; only the main PTT works."
+        }
+      ]
+    },
+    {
+      "id": "reflex-ambient-auto",
+      "title": "LIVE-COMBAT: Tier-2 ambient auto-reflexes - fire on status threshold, no voice, cooldown, guard (issue #37)",
+      "section": "6.3.2 Ambient auto-reflexes",
+      "tags": [
+        "ED",
+        "INJECT",
+        "HW"
+      ],
+      "requires": "SAFETY-CRITICAL / LIVE-COMBAT. These fire REAL keypresses with NO prompt - test the 'fires' cases against WEAK NPCs only. `[reflex].enabled = true` + `[reflex.auto].enabled = true`, then opt a reflex in: `[reflex.auto.heat_sink].enabled` and/or `[reflex.auto.chaff].enabled`. Keep `[reflex].combat_guard = true`. Bind DeployHeatSink and/or FireChaffLauncher to KEYS in ED. Requires `[elite].enabled`.",
+      "expected": "Startup shows `Reflexes : ON (auto ON)` and per-reflex bind lines; auto-chaff fires once under fire then holds for the cooldown; auto heat sink deploys on overheat in combat; the guard blocks a safe overheat (and combat_guard=false is the escape hatch); a disabled reflex stays quiet while the other still fires; 'abort' releases held keys; the master off stops all auto-fire (verbal 6.3 still works).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Startup readiness: launch reports `Reflexes : ON (auto ON)` and, per enabled reflex, `Auto-reflex: heat_sink -> <key>` / `chaff -> <key>` (or `... UNUSABLE (no keyboard bind for DeployHeatSink/FireChaffLauncher)`)."
+        },
+        {
+          "id": "s2",
+          "text": "Auto chaff under fire (defensive - safe): with auto-chaff on, let a weak NPC interdict you -> chaff fires automatically once shortly after the danger/interdiction begins. Log: `auto-chaff on EnteredDanger|Interdicted: Chaff away ...`."
+        },
+        {
+          "id": "s3",
+          "text": "Cooldown holds the repeat: stay in the fight past the danger onset -> it does NOT re-fire until the `[reflex.auto.chaff].cooldown` (default 8s) elapses. Log shows `chaff suppressed: chaff cooldown (8s)` for held attempts."
+        },
+        {
+          "id": "s4",
+          "text": "Auto heat sink on overheat (in combat): while in danger, push your ship over 100% heat -> a heat sink deploys automatically. Log: `auto-heat_sink on Overheating: Heat sink deployed ...`."
+        },
+        {
+          "id": "s5",
+          "text": "Guard blocks when safe: overheat while NOT in danger (flying too close to a star, parked) with `combat_guard = true` -> it refuses and nothing fires. Then set `[reflex].combat_guard = false`, repeat -> it DOES deploy on overheat regardless of danger (the escape hatch)."
+        },
+        {
+          "id": "s6",
+          "text": "Disabled reflex stays quiet: turn `[reflex.auto.chaff].enabled = false` (leave heat_sink on) -> interdiction fires NO chaff; overheat still deploys a heat sink."
+        },
+        {
+          "id": "s7",
+          "text": "Hard abort: say 'abort' mid-reaction -> releases every held key (shared with keybinds/honk/verbal reflexes)."
+        },
+        {
+          "id": "s8",
+          "text": "Master off: set `[reflex.auto].enabled = false` -> nothing auto-fires (verbal 6.3 still works if allowlisted)."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

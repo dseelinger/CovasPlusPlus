@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "continuous-listening",
+      "title": "Hands-free / continuous listening: live switch, VAD turn, noise rejection, PTT coexist (issue #63)",
+      "section": "3a. Hands-free / continuous listening",
+      "tags": [
+        "HW",
+        "HEADSET"
+      ],
+      "requires": "`[listen].mode = \"continuous\"` (off by default). Switch by voice ('switch to continuous listening'), on the Settings page (Activation mode), or in `config.toml`. Best with a HEADSET so COVAS doesn't hear itself. PTT must keep working throughout.",
+      "expected": "Switching to continuous is live (no restart); a hands-free utterance runs the full turn with a listen cue at speech onset; the capture closes only after trailing silence (a breath doesn't cut you off); a single cough/clack/'uh' doesn't start a turn; barge-in and PTT still work (PTT wins while held, no double-fire); sensitivity tuning settles noise; switching back stops the listener; a bad mic falls back to PTT without crashing.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Switch on live by voice: in PTT mode, hold `[` and say 'switch to continuous listening.' The log shows 'Hands-free continuous listening ON'; no restart needed."
+        },
+        {
+          "id": "s2",
+          "text": "Hands-free turn: hands off the keyboard, say 'COVAS, what time is it? Keep it short.' -> you hear the listen cue at speech onset, then the normal LISTENING -> TRANSCRIBING -> THINKING -> SPEAKING -> IDLE turn runs and the reply plays."
+        },
+        {
+          "id": "s3",
+          "text": "Trailing silence ends the turn: the capture closes only after you stop talking for a moment (not on a short mid-sentence pause) - a brief breath doesn't cut you off."
+        },
+        {
+          "id": "s4",
+          "text": "Noise rejection: a single cough / key clack / short 'uh' does NOT start a turn."
+        },
+        {
+          "id": "s5",
+          "text": "Barge-in preserved: while COVAS is speaking, start talking -> the speech cuts off and a fresh capture begins (same as a PTT barge-in)."
+        },
+        {
+          "id": "s6",
+          "text": "PTT still works in continuous mode: hold `[` and speak -> that PTT turn runs normally, and a simultaneous VAD capture does NOT double-fire (PTT wins while held)."
+        },
+        {
+          "id": "s7",
+          "text": "Sensitivity tuning: if background noise keeps opening captures, raise Voice-detect sensitivity (`listen.energy_threshold`) on the Settings page and confirm it settles down."
+        },
+        {
+          "id": "s8",
+          "text": "Switch back: say 'switch to push-to-talk' (or set mode to `ptt`) -> log shows 'Hands-free continuous listening OFF (push-to-talk)'; the mic listener stops and only PTT starts turns."
+        },
+        {
+          "id": "s9",
+          "text": "Fail-soft: with a bad/absent mic in continuous mode, startup logs a fall-back to PTT and the app still runs (it does not crash)."
+        }
+      ]
+    },
+    {
+      "id": "wake-word-gating",
+      "title": "Wake word - hands-free gating: set by voice, armed turn strips it, stray dropped, PTT bypass (issue #64)",
+      "section": "3b. Wake word",
+      "tags": [
+        "HW",
+        "HEADSET",
+        "PANEL"
+      ],
+      "requires": "`[listen].wake_word` (off/blank by default). Only affects CONTINUOUS mode; PTT is never gated. Set by voice ('set the wake word to COVAS'), on the Settings page (Wake word), or in `config.toml`. Turn on continuous mode first (section 3a).",
+      "expected": "A wake word set by voice shows in the log/Settings; an armed utterance runs and the printed transcript has the wake word stripped; an utterance without it is dropped ('wake word not heard', no turn/cost); the wake word alone returns to Idle with no LLM call; fuzzy tolerance still arms on a near-miss; PTT bypasses the gate; clearing it restores plain continuous mode.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set it by voice: in continuous mode, hold `[` and say 'set the wake word to COVAS.' The log/Settings show the wake word is now `COVAS`."
+        },
+        {
+          "id": "s2",
+          "text": "Armed turn: hands off the keyboard, say 'COVAS, what time is it? Keep it short.' -> the turn runs and the reply plays. The transcript printed as Commander: has the wake word STRIPPED (reads 'what time is it? ...', not 'COVAS, ...')."
+        },
+        {
+          "id": "s3",
+          "text": "Stray utterance dropped: with the wake word still set, say something WITHOUT it ('is dinner ready yet?') -> the log shows `[listen] wake word 'COVAS' not heard` and NO turn runs (no Thinking, no reply, no cost)."
+        },
+        {
+          "id": "s4",
+          "text": "Wake word only: say just 'COVAS.' on its own -> returns to Idle (nothing to answer), no LLM call."
+        },
+        {
+          "id": "s5",
+          "text": "Fuzzy tolerance: say the call sign slightly off ('Kovas, what's my fuel?') -> with `wake_word_fuzzy` on (default) it still arms and answers. (Set it off to require an exact match.)"
+        },
+        {
+          "id": "s6",
+          "text": "PTT bypasses the gate: with the wake word set, hold `[` and ask a question WITHOUT the wake word -> the PTT turn runs normally (a deliberate press is never gated)."
+        },
+        {
+          "id": "s7",
+          "text": "Clear it: 'clear the wake word' (blank) -> continuous mode again runs on any capture, exactly as section 3a."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

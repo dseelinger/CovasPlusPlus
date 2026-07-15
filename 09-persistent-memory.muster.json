@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "memory-store-foundation",
+      "title": "Transparent memory store: private file, keyword recall, fail-soft (#59)",
+      "section": "13a. Memory (foundation)",
+      "tags": [
+        "FILE"
+      ],
+      "requires": "This is the store/retrieval FOUNDATION (#59) — there is no voice surface yet (recall wiring is #61). Verify at the file + Python-shell level. Default `[memory]` config; embedding backend OFF.",
+      "expected": "The memory file lives under the writable data dir, is git-ignored (private, never leaves the machine), loads fail-soft skipping a corrupt line, and keyword/tag recall returns the most relevant facts offline with no new dependency.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hand-create the memory file (`memory.jsonl` under the `[memory].dir` data dir) with a few one-fact-per-line entries, e.g. `{\"text\":\"prefers the Krait Mk II for combat\",\"tags\":[\"ship\"]}`."
+        },
+        {
+          "id": "s2",
+          "text": "Confirm it's git-ignored: `git status` does NOT list the memory file (private data never committed)."
+        },
+        {
+          "id": "s3",
+          "text": "Fail-soft: add a deliberately broken line (e.g. `not json`) → loading skips just that line, keeps the good facts, and doesn't crash."
+        },
+        {
+          "id": "s4",
+          "text": "Keyword recall offline: in a Python shell, load the store and run a `Retriever(...).recall(\"which ship for combat\")` → the Krait fact ranks top; tag filter works; no network, no new dependency (embedding backend stays off)."
+        }
+      ]
+    },
+    {
+      "id": "memory-automatic-capture",
+      "title": "Persistent memory - automatic capture: journal milestones + piggybacked facts, dedup, cap (issue #60)",
+      "section": "13b. Memory (automatic capture)",
+      "tags": [
+        "ED",
+        "HW",
+        "FILE"
+      ],
+      "requires": "`[memory].enabled = true` (default) and, for milestones, `[elite].enabled = true`. Memory lives at `<data dir>/memory/memory.jsonl` (git-ignored).",
+      "expected": "Launch logs 'Persistent memory ON (capture + recall).'; a notable journal event writes a milestone line with NO model call; 'remember that...' adds a preference/note line in the SAME reply (one turn, not two); an exact repeat is deduped; a low cap drops oldest milestones first while explicit facts survive; a relaunch doesn't re-capture old milestones; the memory capability is listed in help.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "On launch the log shows `Persistent memory ON (capture + recall).`"
+        },
+        {
+          "id": "s2",
+          "text": "Journal milestone (deterministic, no cost): in-game, jump to an unexplored system and detailed-scan a first-discovery body, or fully map a body. A new line appears in `memory/memory.jsonl` (`First to discover ...` / `Fully mapped ...`, type `milestone`). No LLM/router/usage line accompanies it - capture is a local write."
+        },
+        {
+          "id": "s3",
+          "text": "Conversation fact (piggybacked, no extra call): say 'remember that I prefer the Krait Mk II'. COVAS acknowledges in-character in the SAME reply; a preference/note line is added. Confirm the router logged ONE turn, not two (no extra model call)."
+        },
+        {
+          "id": "s4",
+          "text": "Dedup: repeat the exact same 'remember that...' -> it is NOT added a second time (log: `Already knew that...`), and the file still has one copy."
+        },
+        {
+          "id": "s5",
+          "text": "Cap: set `[memory].cap` low (e.g. 3), add a couple of 'remember that...' facts, then generate several milestones. The file stays at the cap; the oldest milestones drop first while your explicitly-remembered facts survive."
+        },
+        {
+          "id": "s6",
+          "text": "Relaunch COVAS++ with the same journal present -> old milestones are NOT re-captured (capture only sees live events; startup priming doesn't republish)."
+        },
+        {
+          "id": "s7",
+          "text": "Ask 'what can you do' -> the memory capability is listed; drilling in mentions remembering facts and milestones."
+        }
+      ]
+    },
+    {
+      "id": "memory-recall-conversation",
+      "title": "Persistent memory - recall in conversation: auto-injection, silent no-match, wake word, cache-safe (issue #61)",
+      "section": "13c. Memory (recall)",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "`[memory].enabled = true` (default). Seed a fact first: say 'remember that my main ship is a Krait Mk II' (or hand-add a line to `memory/memory.jsonl`). Recall is keyword/tag, offline and free (no router/usage line for the recall block).",
+      "expected": "A past-referencing question is answered from the stored fact (a `memory-recall` log line shows the matched reason); a no-match says it isn't on file and injects nothing; an unrelated turn fires no recall; 'recall ...' forces a lookup with the word scrubbed; an explicit 'what do you know about...' may call the recall_memory tool; across recall turns the cached-prompt token count doesn't climb (the block rides the current user message only).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Automatic recall injection: ask 'do you remember my main ship?' -> COVAS answers from the stored fact ('a Krait Mk II'), not a guess. The log shows a `memory-recall` line with the matched reason."
+        },
+        {
+          "id": "s2",
+          "text": "No-match is silent: ask 'do you remember my favourite music?' (nothing stored) -> COVAS says it doesn't have that on file; the log's `memory-recall` note reads `(no matching memory)` and nothing is injected."
+        },
+        {
+          "id": "s3",
+          "text": "Plain turn untouched: ask an unrelated question ('tell me a joke') -> no `memory-recall` line, no memory block - recall only fires on past-referencing turns."
+        },
+        {
+          "id": "s4",
+          "text": "Wake-word override: say 'recall, what's my main ship' -> forces a lookup; the word 'recall' is scrubbed from what COVAS answers about (it doesn't echo it back)."
+        },
+        {
+          "id": "s5",
+          "text": "Explicit tool path: ask 'what do you know about my ship?' -> COVAS may call the `recall_memory` tool and reports the stored fact; a miss returns 'nothing on file'."
+        },
+        {
+          "id": "s6",
+          "text": "Cache-safe (no prefix growth): across several recall turns, replies stay quick and the cached-prompt token count doesn't climb turn-over-turn - the memory block rides the current user message only, never the cached system prompt."
+        }
+      ]
+    },
+    {
+      "id": "memory-browser-panel",
+      "title": "Memory browser tab: list, add, search, edit (lossless), delete, voice sync, stale-write guard (issue #62)",
+      "section": "14.7 Memory browser",
+      "tags": [
+        "PANEL",
+        "FILE"
+      ],
+      "requires": "Panel open at http://127.0.0.1:8765/memory. Reads/writes the SAME `memory/memory.jsonl` the voice loop uses. `[memory].enabled = true` (default). Pure vanilla JS - no CDN, works offline. Use THROWAWAY facts.",
+      "expected": "The memory tab lists every memory with type/tags/timestamp; ADD writes a new JSON line (heard live by voice); search filters live with an N/total count; EDIT round-trips losslessly (id + original when unchanged); DELETE removes just that line; a voice capture appears after RELOAD; a stale-write guard shows an amber warning and refuses to clobber, with a Live-Log note on a successful web write.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Tab + nav: the memory link exists on the control-panel, settings, and checklist headers; opening it lists EVERY memory with type, tags, and timestamp; the header shows the file name."
+        },
+        {
+          "id": "s2",
+          "text": "Add: type a fact (e.g. 'prefers metric units'), pick a type, add a tag -> ADD -> a new JSON line appears in `memory/memory.jsonl`; ask by voice 'do you remember what units I use?' -> COVAS answers from the new fact."
+        },
+        {
+          "id": "s3",
+          "text": "Search: type in the search box -> the list filters live by text, tag, or type; the count shows `N / total`; clearing restores all."
+        },
+        {
+          "id": "s4",
+          "text": "Edit: click EDIT, change text/type/tags -> SAVE -> the file line updates; the memory's `id` and original `when` are unchanged (round-trips losslessly), only the edited fields differ."
+        },
+        {
+          "id": "s5",
+          "text": "Delete: click DELETE on a throwaway memory, confirm -> that line is gone from the file; the rest survive."
+        },
+        {
+          "id": "s6",
+          "text": "Voice -> web: say 'remember that my callsign is Ghost', then click RELOAD FROM DISK (or refocus) -> the captured fact appears in the list."
+        },
+        {
+          "id": "s7",
+          "text": "Stale-write guard: load the tab, make a voice memory so the file changes, then ADD/EDIT/DELETE in the tab -> an amber warning appears and the write is refused; RELOAD pulls in the voice memory. The Live Log (All) shows 'Memory updated from the web browser' on a successful web write."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

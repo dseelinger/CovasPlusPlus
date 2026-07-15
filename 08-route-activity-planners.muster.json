@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "trade-route-planner",
+      "title": "Trade-route planner: full multi-hop loop, per-hop + loop freshness, options, plot handoff (issue #44)",
+      "section": "8a. Trade-route planner",
+      "tags": [
+        "ED",
+        "HW",
+        "CLIP",
+        "NET"
+      ],
+      "requires": "`[route_plan].enabled = true` + `[elite].enabled = true`. Dock at a busy station first (plans from where you're docked). LIVE-VERIFY the Spansh trade API request/result shape here - this is its on-hardware validation.",
+      "expected": "A trade plan reads EVERY hop of the loop (buy X at A, sell at Y in Z, ~N cr/ton) plus a round-trip total and copies the next stop; per-run options (large pad, max hops, max distance, planetary) are honored; paste yields the first destination; missing numbers and not-docked are asked about; stale legs get an inline '(price ~N days old)' tag and a whole-loop caveat; internet-off fails soft.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Plan from docked (multi-hop, happy path): docked at a busy station, 'Plan me a trade route from here - 720 tons of cargo, 30 light-year jump range, 100 million to spend.' -> speaks EVERY hop in the loop (buy X at A, sell at station Y in system Z, ~N credits/ton; then buy...) and a round-trip total, then says the next stop was copied."
+        },
+        {
+          "id": "s2",
+          "text": "LIVE-VERIFY the trade shape: confirm the spoken commodities / destinations / profits are real and correct (cross-check on spansh.co.uk/trade). If any field is blank/wrong, fix `build_trade_request` / `parse_trade_route` in `covas/search/routes.py`. Sanity-check the round-trip total roughly equals the sum of per-hop profits."
+        },
+        {
+          "id": "s3",
+          "text": "Per-run options: '...large pad only, up to 5 hops, nothing more than 2000 light-seconds out, and include planetary ports' -> the route respects the limits. Cross-check the same filters on spansh.co.uk/trade (these map to `requires_large_pad` / `max_hops` / `max_system_distance` / `allow_planetary`)."
+        },
+        {
+          "id": "s4",
+          "text": "Plot handoff: after a plan, paste (Ctrl-V) into the galaxy-map search box -> it's the first destination system; it sets course."
+        },
+        {
+          "id": "s5",
+          "text": "Asks for missing numbers: 'Plan a trade route.' with nothing else -> asks for cargo capacity, jump range, and budget rather than guessing."
+        },
+        {
+          "id": "s6",
+          "text": "Not docked: while in space, ask for a trade route -> asks you to dock or name a start station (doesn't invent one)."
+        },
+        {
+          "id": "s7",
+          "text": "Freshness - per hop & whole loop: an old leg is read with an inline '(price ~N days old)' tag; a stale loop adds a spoken 'the freshest prices on this route are about N days old' caveat. Try '...only prices from the last day' to make it easier to trigger."
+        },
+        {
+          "id": "s8",
+          "text": "Fail-soft: with the internet briefly off, ask for a route -> a spoken 'couldn't reach the trade planner' note, and the voice loop keeps working (no crash)."
+        }
+      ]
+    },
+    {
+      "id": "neutron-route-planner",
+      "title": "Neutron / long-range route planner: jump count, waypoints, first waypoint copy (issue #43)",
+      "section": "8b. Neutron route planner",
+      "tags": [
+        "ED",
+        "HW",
+        "CLIP",
+        "NET"
+      ],
+      "requires": "`[neutron_plan].enabled = true` + `[elite].enabled = true`. Plots a Spansh neutron-highway route to a distant system (start defaults to current system) and copies the first waypoint. Needs a real route.",
+      "expected": "A neutron plot speaks a total jump count, waypoint count, and the first waypoint system and copies it (jump count matches spansh.co.uk/plotter); missing destination/range are asked about; an explicit start is honored; an efficiency nudge changes the jump count; internet-off fails soft.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Plot to a distant system (happy path): 'Plot a neutron route to Colonia - my laden jump range is 55 light-years.' -> speaks a total jump count, the number of waypoints, and the first waypoint system, and says it was copied. Cross-check the jump count against spansh.co.uk/plotter with the same range/efficiency."
+        },
+        {
+          "id": "s2",
+          "text": "Plot handoff: paste (Ctrl-V) into the galaxy-map search box -> it's the first waypoint system; it sets course."
+        },
+        {
+          "id": "s3",
+          "text": "Asks for the destination: 'Plot a neutron route.' with no target -> asks where to, rather than guessing."
+        },
+        {
+          "id": "s4",
+          "text": "Asks for jump range: 'Plot a neutron route to Colonia.' with no range -> asks for your laden jump range rather than inventing one."
+        },
+        {
+          "id": "s5",
+          "text": "Explicit start: 'Plot a neutron route from Sol to Colonia, 55 light-year jump range.' -> uses Sol as the start even if you're elsewhere."
+        },
+        {
+          "id": "s6",
+          "text": "Efficiency nudge: ask for a more efficient (or more direct) route -> the jump count changes accordingly (higher efficiency = fewer jumps)."
+        },
+        {
+          "id": "s7",
+          "text": "Fail-soft: with the internet briefly off, ask for a route -> a spoken 'couldn't reach the neutron plotter' note, and the voice loop keeps working (no crash)."
+        }
+      ]
+    },
+    {
+      "id": "road-to-riches-planner",
+      "title": "Road-to-Riches planner: nearby high-value unscanned bodies, first-system copy (issue #42)",
+      "section": "8c. Road-to-Riches planner",
+      "tags": [
+        "ED",
+        "HW",
+        "CLIP",
+        "NET"
+      ],
+      "requires": "`[riches_plan].enabled = true` + `[elite].enabled = true`. Plans a Spansh Road to Riches from your current system and copies the first system. LIVE-VERIFY the Spansh Road-to-Riches request/result shape here.",
+      "expected": "A riches plan speaks a real first system (start at X, N bodies to scan worth ~V credits) and a rough total and copies the first system; missing jump range is asked about; an explicit start is honored; paste yields the first route system; internet-off fails soft.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Plan from current system (happy path): out in the black, 'Plan me a Road to Riches route - 40 light-year jump range.' -> speaks a real first system (start at system X, N bodies to scan worth ~V credits) and a rough total, and says the first system was copied."
+        },
+        {
+          "id": "s2",
+          "text": "LIVE-VERIFY the riches shape: confirm the spoken system name / body count / values are real and correct (cross-check on spansh.co.uk/riches with the same reference system + jump range). If blank/zeroed/wrong, fix `build_riches_request` / `parse_riches_route` in `covas/search/routes.py`."
+        },
+        {
+          "id": "s3",
+          "text": "Plot handoff: paste (Ctrl-V) into the galaxy-map search box -> it's the first route system; it sets course."
+        },
+        {
+          "id": "s4",
+          "text": "Asks for jump range: 'Plan a Road to Riches.' with no jump range -> asks for your laden jump range rather than guessing."
+        },
+        {
+          "id": "s5",
+          "text": "Explicit start: 'Plan a Road to Riches from Sol with a 30 light-year jump range.' -> uses Sol as the reference, not your current system."
+        },
+        {
+          "id": "s6",
+          "text": "Fail-soft: with the internet briefly off, ask for a route -> a spoken 'couldn't reach the Road-to-Riches planner' note, and the voice loop keeps working (no crash)."
+        }
+      ]
+    },
+    {
+      "id": "mining-helper",
+      "title": "Mining helper: nearest hotspot + fresh sell + checklist loop, aliases, refinements (issue #45)",
+      "section": "8d. Mining helper",
+      "tags": [
+        "ED",
+        "HW",
+        "CLIP",
+        "FILE",
+        "NET"
+      ],
+      "requires": "`[mining_helper].enabled = true` + `[elite].enabled = true`. Finds the nearest ring hotspot for a material, the best FRESH place to sell it, drops the loop onto your checklist, and copies the hotspot system. LIVE-VERIFY the Spansh hotspot + sell-price shapes here.",
+      "expected": "A mining plan speaks a real ring/system/hotspot-count + the best fresh sell (station/system/~cr per ton), adds a 3-step go-mine-sell loop to the checklist and copies the hotspot system; the sell quote skips stale fleet carriers or flags its age; material aliases (LTD, void opals) resolve; refinements (large pad, no checklist, hotspot-only) are honored; missing material is asked about; internet-off fails soft (a failed sell still leaves the hotspot + plot).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Plan a run (happy path): near inhabited space, 'Where's the nearest Painite hotspot?' -> speaks a real ring in a system, N ly away, with a hotspot / M overlapping hotspots, then the best sell (station, system, ~credits/ton), and says the loop was added to your checklist and the system copied."
+        },
+        {
+          "id": "s2",
+          "text": "LIVE-VERIFY the hotspot shape: confirm the spoken ring / system / hotspot count are real (cross-check on spansh.co.uk/bodies - Ring signals = Painite, reference = your system). If wrong, fix `build_hotspot_request` / `parse_hotspots` in `covas/search/mining.py`."
+        },
+        {
+          "id": "s3",
+          "text": "LIVE-VERIFY the sell shape + FRESHNESS: confirm the spoken station / price are real (spansh.co.uk/stations - Market = Painite, sort by sell price). Verify the quote is FRESH (not a years-old fleet carrier): the helper should skip carriers and give a recent price or add '...that's the freshest quote I found and it's about N days old.'"
+        },
+        {
+          "id": "s4",
+          "text": "Checklist loop: 'What's next on my checklist?' -> the three new steps are there in order (fly to the hotspot -> mine -> sell at the named station). Check one off and it advances normally."
+        },
+        {
+          "id": "s5",
+          "text": "Plot handoff: paste (Ctrl-V) into the galaxy-map search box -> it's the hotspot system; it sets course."
+        },
+        {
+          "id": "s6",
+          "text": "Material aliases: 'Find me an LTD hotspot' and '...void opals' -> resolves to Low Temperature Diamonds / Void Opal (correct hotspot + sell commodity), not a miss."
+        },
+        {
+          "id": "s7",
+          "text": "Refinements: '...large pad only to sell it' -> the sell station has a large pad; '...don't add it to my checklist' -> no new checklist lines; '...just the hotspot, don't plot it' -> nothing copied."
+        },
+        {
+          "id": "s8",
+          "text": "Asks for the material: 'Plan a mining run.' with nothing else -> asks what to mine rather than guessing."
+        },
+        {
+          "id": "s9",
+          "text": "Fail-soft: with the internet briefly off, ask for a hotspot -> a spoken 'couldn't reach' note, and the voice loop keeps working. A sell lookup that fails still leaves you the hotspot and the plot."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

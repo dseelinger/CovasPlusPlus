@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "ed-context-answers",
+      "title": "Context-aware answers come from live telemetry",
+      "section": "5. ED monitoring & callouts",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[elite].enabled = true`; ED running with live telemetry; fly around a bit.",
+      "expected": "Questions about location/fuel/dock/ship/recent activity are answered from the live journal + Status.json, not guessed; a \"context\" wake word forces a live status lookup and is scrubbed from the prompt.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "\"Where am I?\" → names your current system (from live telemetry)."
+        },
+        {
+          "id": "s2",
+          "text": "\"How's my fuel?\" → reports fuel level / status."
+        },
+        {
+          "id": "s3",
+          "text": "\"Am I docked?\" / \"What ship am I in?\" → answers from current status."
+        },
+        {
+          "id": "s4",
+          "text": "\"What did I just do?\" / \"Check my logs.\" → summarizes recent journal events."
+        },
+        {
+          "id": "s5",
+          "text": "Say a word containing \"context\" on an ambiguous question → forces a live status lookup (the wake word is scrubbed from what the model sees)."
+        }
+      ]
+    },
+    {
+      "id": "ship-loadout-engineering",
+      "title": "Loadout & engineering questions answer from the journal snapshot (N9)",
+      "section": "5. ED monitoring & callouts",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[elite].enabled = true`; ED running so the journal has a Loadout event (re-log or switch ships if needed).",
+      "expected": "COVAS answers about fitted modules and engineering strictly from the live loadout snapshot — it never invents a module, blueprint, or stat — and can OFFER (not auto-add) an upgrade to the checklist.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "\"What's on my FSD?\" / \"What engineering is on my frame shift drive?\" → reports the blueprint + grade + any experimental effect from your actual fit."
+        },
+        {
+          "id": "s2",
+          "text": "\"List my experimental effects.\" → names only effects genuinely fitted."
+        },
+        {
+          "id": "s3",
+          "text": "\"What should I upgrade next?\" → reasons over the real loadout and OFFERS to record a specific upgrade on the checklist (does NOT add it unasked)."
+        },
+        {
+          "id": "s4",
+          "text": "Ask about a module you do NOT have fitted → it says so rather than inventing stats."
+        }
+      ]
+    },
+    {
+      "id": "location-and-carriers",
+      "title": "Copy current system; fleet vs squadron carrier; already-there rule (N3)",
+      "section": "9. Location & carriers",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[elite].enabled = true`; ED running. The owned fleet carrier is tracked from the journal.",
+      "expected": "Copying the current system works; the fleet carrier's system is spoken + copied (or \"you own no carrier\"); the squadron carrier is explained as in-game-only (no lookup/copy); asking for the fleet carrier while in its system says you're already there and does NOT copy.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Copy current system: \"Copy my current system.\" → copies your current system (paste to confirm)."
+        },
+        {
+          "id": "s2",
+          "text": "Fleet carrier: \"Where's my fleet carrier?\" → speaks its current system and copies it. (No carrier → says so.)"
+        },
+        {
+          "id": "s3",
+          "text": "Squadron carrier: \"Where's my squadron carrier?\" → explains it's only available in-game on the Squadron menu's Carrier Management tab; does NOT look up or copy."
+        },
+        {
+          "id": "s4",
+          "text": "Already-there rule: ask for the fleet carrier while in the carrier's system → says you're already there and does NOT copy."
+        }
+      ]
+    },
+    {
+      "id": "carrier-context-voices",
+      "title": "Fleet-carrier context voices: captain / tower / chatter, identity-pinned (issue #19)",
+      "section": "9. Location & carriers",
+      "tags": [
+        "ED",
+        "HW"
+      ],
+      "requires": "`[audio].enabled = true` (restart to apply) + `[audio.carrier].enabled = true` (default). ED running; own a fleet carrier. Context is pinned to your carrier's CarrierID.",
+      "expected": "Aboard/near your OWN carrier you hear Captain / Tower Control / deck chatter on the radio-treated bus in distinct voices; tower is docked-only; away from the carrier there are no carrier voices; a squadron/other carrier never triggers them; a configured voice_ref/name is honored; voice controls mute/resume them without touching COVAS's replies.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Aboard your own carrier: dock at the carrier you OWN -> within a minute or two you hear the Captain, Tower Control, and/or deck chatter on the radio-treated comms bus, each in a different voice from COVAS and each other. Lines are spoken, never text."
+        },
+        {
+          "id": "s2",
+          "text": "In-system (not docked): be in the carrier's home system without docking -> the Captain greets you from across the system; Tower Control does NOT speak (docking control is docked-only)."
+        },
+        {
+          "id": "s3",
+          "text": "Away: somewhere that is NOT your carrier's system and not docked at it -> NO carrier voices at all."
+        },
+        {
+          "id": "s4",
+          "text": "Not a squadron carrier: dock at a squadron or someone else's carrier -> the carrier voices stay silent (identity mismatch), while normal station/NPC comms still work."
+        },
+        {
+          "id": "s5",
+          "text": "Configured voice + name: set `[audio.carrier.captain].voice_ref` and `name` (e.g. 'Reynolds'), restart -> the Captain uses THAT voice and the name is woven into the lines."
+        },
+        {
+          "id": "s6",
+          "text": "Voice control: 'mute the carrier' -> carrier voices stop; 'carrier voices on' -> resume. 'silence all the background audio' also mutes them. Your own replies are unaffected."
+        }
+      ]
+    },
+    {
+      "id": "community-goals",
+      "title": "Community Goals: list, system, standing, offline fallback (N6)",
+      "section": "10. Community goals",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET"
+      ],
+      "requires": "`[cg].source` set; ED running; visit a CG board in-game first so the journal has your standing. Optional `[cg].inara_api_key` to also surface unvisited CGs.",
+      "expected": "CG queries list active goals (flagging unvisited ones with an Inara key), resolve a CG's system by fuzzy title and copy it (unless it's your current system), report your standing or admit it doesn't have it, and degrade gracefully with no key / feed down.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "List: \"List the community goals.\" → active CGs (title + system + expiry); with an Inara key, unvisited ones are flagged."
+        },
+        {
+          "id": "s2",
+          "text": "CG system: \"What system is the <CG title> community goal in?\" → resolves by fuzzy title, speaks the system, and copies it — unless it's your current system (then says so, no copy)."
+        },
+        {
+          "id": "s3",
+          "text": "Standing: \"What's my standing in the <CG title> community goal?\" → \"Top 10 Commanders\" or \"top X%\". For a CG not in your journal it says it doesn't have your standing."
+        },
+        {
+          "id": "s4",
+          "text": "No key / feed down: with no Inara key it works journal-only and notes it can't see unvisited CGs right now (doesn't crash)."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

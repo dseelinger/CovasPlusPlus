@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "core-voice-loop",
+      "title": "Push-to-talk round trip: cues, state machine, spoken reply",
+      "section": "1. Core voice loop",
+      "tags": [
+        "HW",
+        "GUI"
+      ],
+      "requires": "App running with mic + speakers; panel open; personality ON.",
+      "expected": "A held-key utterance flows LISTENING→TRANSCRIBING→THINKING→SPEAKING→IDLE with the right cue at each stage and a spoken reply that addresses you as \"Commander\".",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold `[` → you hear a `listen` cue immediately (before speaking)."
+        },
+        {
+          "id": "s2",
+          "text": "While holding, say \"Hello COVAS, can you hear me? Keep it short.\" then release → you hear a `processing` cue."
+        },
+        {
+          "id": "s3",
+          "text": "Panel status + log move through LISTENING → TRANSCRIBING → THINKING → SPEAKING → IDLE."
+        },
+        {
+          "id": "s4",
+          "text": "Your words appear as `Commander: …` and the reply as `COVAS: …` (timestamped) in the log."
+        },
+        {
+          "id": "s5",
+          "text": "Just before speech you hear the `completed` cue, then the reply plays in the ElevenLabs voice and addresses you as \"Commander\"."
+        }
+      ]
+    },
+    {
+      "id": "cancel-barge-in",
+      "title": "Tap-to-cancel, barge-in, and panel CANCEL all interrupt",
+      "section": "3. Cancel & barge-in",
+      "tags": [
+        "HW",
+        "GUI"
+      ],
+      "requires": "App running with mic + speakers; panel open.",
+      "expected": "A brief tap of `[` (<400 ms) stops thinking/speaking instantly; holding `[` during a reply barges in with a fresh capture; the panel CANCEL button also stops a reply.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Ask a long question (\"Tell me the history of the Elite Dangerous galaxy in detail.\"). While it is thinking or speaking, tap `[` briefly → it stops instantly and returns to IDLE."
+        },
+        {
+          "id": "s2",
+          "text": "Confirm a normal hold still records fine (a hold is well over the 400 ms tap threshold)."
+        },
+        {
+          "id": "s3",
+          "text": "Barge-in: while a reply is being spoken, hold `[` again → speech cuts off and a fresh capture starts."
+        },
+        {
+          "id": "s4",
+          "text": "The panel's CANCEL / STOP button also stops an in-progress reply."
+        }
+      ]
+    },
+    {
+      "id": "cost-router-tiers",
+      "title": "Router picks the cheap tier by default and escalates on demand",
+      "section": "4. Cost router",
+      "tags": [
+        "HW",
+        "GUI"
+      ],
+      "requires": "`[router].enabled = true`; app running; panel open (read the `[router]` and `[usage]` log lines).",
+      "expected": "Each turn logs a `[router] [<tier>] <model> max_tokens=N — <reason>` line (the tier prefix is from issue #11) and a `[usage] … [<model>]` line; banter uses [cheap] Haiku, depth/\"think hard\" escalates to [standard] Sonnet, explicit \"use Opus\" uses [premium] Opus, and \"full breakdown\" raises max_tokens.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Banter cheap tier: \"Morning, COVAS — how's it going?\" → router line shows `[cheap] claude-haiku-4-5`; cost a fraction of a cent."
+        },
+        {
+          "id": "s2",
+          "text": "\"Think hard about the best way to break in a new ship.\" → `[standard] claude-sonnet-5`."
+        },
+        {
+          "id": "s3",
+          "text": "Depth phrase: \"Walk me through the pros and cons of a fuel scoop.\" → [standard] Sonnet."
+        },
+        {
+          "id": "s4",
+          "text": "Explicit premium: \"Use Opus for this — summarize the Thargoid war.\" → `[premium] claude-opus-4-8`."
+        },
+        {
+          "id": "s5",
+          "text": "\"Give me the full breakdown of the engineering process.\" → higher `max_tokens` (2048)."
+        },
+        {
+          "id": "s6",
+          "text": "(Optional) Set the router pin in Settings (`cheap`/`standard`/`premium`, or `haiku`/`sonnet`/`opus`) and confirm the router line's tier + model reflect it."
+        }
+      ]
+    },
+    {
+      "id": "web-search-automatic",
+      "title": "Automatic web search on current-info questions, capped and cancelable",
+      "section": "16. Web search",
+      "tags": [
+        "HW",
+        "GUI",
+        "NET"
+      ],
+      "requires": "`[web_search].enabled = true`; app running; panel open; internet.",
+      "expected": "A current-info question triggers a logged web search (with a processing beep), the answer reflects live info, mid-search tap-cancel stops it, and searches are capped at `max_uses` (3) per reply.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "\"What's the latest Elite Dangerous update right now?\" → log shows \"Searching the web for …\", status hits a searching state, you hear a processing beep."
+        },
+        {
+          "id": "s2",
+          "text": "The spoken answer reflects live/current info."
+        },
+        {
+          "id": "s3",
+          "text": "Cancel mid-search: start another current-info question, then tap `[` while searching → it stops."
+        },
+        {
+          "id": "s4",
+          "text": "Searches are capped at `[web_search].max_uses` (3) per reply."
+        }
+      ]
+    },
+    {
+      "id": "robustness-and-quit",
+      "title": "Odd input, session log, provider hiccup, clean quit",
+      "section": "17. Robustness & quit",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "App running.",
+      "expected": "Emoji/symbol input streams without crashing; the newest `logs\\session_*.log` holds timestamped prompts/replies + router/usage; a brief network kill degrades gracefully back to IDLE (dead TTS falls back to text); Ctrl+Alt+Q shuts down cleanly.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Ask for something with odd symbols/emoji (\"Draw me an ASCII arrow and explain it.\") → speaks/streams without the console crashing."
+        },
+        {
+          "id": "s2",
+          "text": "Open the newest `logs\\session_*.log` → prompts + replies with timestamps, plus router/usage lines."
+        },
+        {
+          "id": "s3",
+          "text": "A provider hiccup (briefly kill network) degrades gracefully — the loop survives and returns to IDLE; a dead TTS falls back to text."
+        },
+        {
+          "id": "s4",
+          "text": "Ctrl+Alt+Q (or closing the console window) shuts it down cleanly."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

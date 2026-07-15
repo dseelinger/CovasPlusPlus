@@ -1,0 +1,454 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "fresh-install-native-wizard",
+      "title": "Fresh install shows the first-run wizard IN THE NATIVE WINDOW",
+      "section": "19. Packaged build",
+      "tags": [
+        "GUI",
+        "NET",
+        "HW"
+      ],
+      "requires": "Empty user-data dir: delete %APPDATA%\\COVAS++ (back it up first if it has your keys). Launch the packaged app via dist\\COVAS++\\COVAS++.exe (or `python run_covas_app.py`).",
+      "expected": "The setup wizard renders inside the COVAS++ native PyWebView window. No browser (Edge/Chrome/etc.) opens at any point.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Confirm %APPDATA%\\COVAS++ is absent/empty, then launch COVAS++.exe (or run_covas_app.py)."
+        },
+        {
+          "id": "s2",
+          "text": "A native window titled COVAS++ appears showing the first-run setup page (API keys / speech model / mic)."
+        },
+        {
+          "id": "s3",
+          "text": "No browser tab or window opens — the wizard is ONLY in the native window."
+        }
+      ]
+    },
+    {
+      "id": "wizard-to-panel-handoff",
+      "title": "Finishing setup swaps the SAME window to the control panel (no browser)",
+      "section": "19. Packaged build",
+      "tags": [
+        "GUI",
+        "NET",
+        "HW"
+      ],
+      "requires": "Continue from fresh-install-native-wizard, in the native window on the wizard page.",
+      "expected": "After entering the Anthropic key (ElevenLabs optional), downloading the STT model, and picking a mic, clicking Launch turns the SAME native window into the control panel (status light IDLE), no browser. The finish message must say it's switching to the control panel and must NOT tell you to close the window/tab — closing the single native window would QUIT the app.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Enter your Anthropic API key (and optionally ElevenLabs) and save."
+        },
+        {
+          "id": "s2",
+          "text": "Trigger the speech-model download; wait for it to report ready."
+        },
+        {
+          "id": "s3",
+          "text": "Pick a microphone."
+        },
+        {
+          "id": "s4",
+          "text": "Click 'Launch COVAS++'. Read the finish message: it should say COVAS++ is starting / switching to the control panel — NOT 'you can close this tab'."
+        },
+        {
+          "id": "s5",
+          "text": "WITHOUT closing anything, the same window switches to the control panel (status light IDLE) within a few seconds. Do NOT close the window — that quits the app."
+        }
+      ]
+    },
+    {
+      "id": "already-configured-skips-wizard",
+      "title": "Relaunch on a configured install goes straight to the panel",
+      "section": "19. Packaged build",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Completed setup at least once (keys + STT model present in %APPDATA%\\COVAS++).",
+      "expected": "Launching COVAS++.exe (or run_covas_app.py) opens the native window directly on the control panel — no wizard, no browser.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Close COVAS++ if open, then relaunch it."
+        },
+        {
+          "id": "s2",
+          "text": "The native window opens directly on the control panel (IDLE); the wizard does not appear."
+        }
+      ]
+    },
+    {
+      "id": "bail-mid-wizard-quits-clean",
+      "title": "Closing the window during the wizard quits cleanly",
+      "section": "19. Packaged build",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "Fresh/empty user-data dir so the wizard shows. Launch via COVAS++.exe (or run_covas_app.py).",
+      "expected": "Closing the native window while still on the wizard exits the process fully — no orphaned COVAS++ process, and the port (127.0.0.1:8765) is free for an immediate relaunch.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With the wizard showing, close the native window (X) before finishing setup."
+        },
+        {
+          "id": "s2",
+          "text": "Confirm no COVAS++ process lingers (Task Manager) — the app quit."
+        },
+        {
+          "id": "s3",
+          "text": "Relaunch immediately; it starts again without a 'port in use'/'address already in use' error."
+        }
+      ]
+    },
+    {
+      "id": "native-quit-controls",
+      "title": "Ctrl+Alt+Q and window-close both quit the running app",
+      "section": "19. Packaged build",
+      "tags": [
+        "GUI",
+        "HW"
+      ],
+      "requires": "App running on the control panel (post-setup).",
+      "expected": "Pressing Ctrl+Alt+Q closes the window and exits the process; separately, closing the window with X also exits. No lingering process either way.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With the panel showing, press Ctrl+Alt+Q — the window closes and the process exits."
+        },
+        {
+          "id": "s2",
+          "text": "Relaunch, then close the window with the X button — the process also exits (no tray, no background loop)."
+        }
+      ]
+    },
+    {
+      "id": "browser-path-unchanged",
+      "title": "Source browser entry (run_covas_ui.py) still opens the wizard in the browser",
+      "section": "19. Packaged build",
+      "tags": [
+        "GUI",
+        "NET"
+      ],
+      "requires": "Empty user-data dir. Run the BROWSER entry from source: `python run_covas_ui.py`.",
+      "expected": "run_covas_ui.py is unchanged by I9: on a fresh install it serves the wizard and opens it in the DEFAULT BROWSER (not a native window), then the browser control panel once configured.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With an empty user-data dir, run `python run_covas_ui.py`."
+        },
+        {
+          "id": "s2",
+          "text": "The default browser opens http://127.0.0.1:8765 showing the setup wizard."
+        },
+        {
+          "id": "s3",
+          "text": "Finish setup; the browser continues to the control panel (IDLE)."
+        }
+      ]
+    },
+    {
+      "id": "frozen-selftest",
+      "title": "Frozen build passes the headless self-test",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG"
+      ],
+      "requires": "Rebuild the frozen app: `.\\build.ps1 -SelfTest`.",
+      "expected": "PyInstaller produces dist\\COVAS++\\COVAS++.exe and `COVAS++.exe --selftest` prints 'SELFTEST OK ...' and exits 0 (build.ps1 reports 'Self-test passed').",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Run `.\\build.ps1 -SelfTest` from the repo root."
+        },
+        {
+          "id": "s2",
+          "text": "Build completes and the frozen self-test passes (exit 0)."
+        }
+      ]
+    },
+    {
+      "id": "pkg-install-clean-vm",
+      "title": "Installer runs per-user with no admin and creates shortcuts",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "VM"
+      ],
+      "requires": "Clean Win11 VM snapshot; download `COVAS++ Setup.exe` from the Releases page.",
+      "expected": "SmartScreen \"unknown publisher\" → Run anyway installs per-user to `%LOCALAPPDATA%\\Programs\\COVAS++` with NO admin/UAC prompt, and creates a Start-menu entry + custom-icon desktop shortcut + a registered uninstaller.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Download `COVAS++ Setup.exe` → SmartScreen shows \"unknown publisher\" → More info → Run anyway installs (documented, expected)."
+        },
+        {
+          "id": "s2",
+          "text": "The installer runs per-user with NO admin/UAC prompt (installs to `%LOCALAPPDATA%\\Programs\\COVAS++`)."
+        },
+        {
+          "id": "s3",
+          "text": "It creates a Start-menu entry and a desktop icon (custom icon, not the generic exe icon), and registers an uninstaller."
+        }
+      ]
+    },
+    {
+      "id": "pkg-first-run-details",
+      "title": "First-run wizard: mic picker, STT download, no-EL text-only, default voice, data dirs",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "VM",
+        "HW",
+        "NET"
+      ],
+      "requires": "Clean VM with empty `%APPDATA%\\COVAS++`; internet; a mic.",
+      "expected": "The wizard lists mics, downloads `small.en` (~250 MB) once with a progress indicator, runs text-only when EL is skipped (spoken replies start once a key is added), defaults the voice to George, and writes user data to `%APPDATA%` + the model to `%LOCALAPPDATA%` with NOTHING written into the install tree.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Mic picker lists your input devices; pick one."
+        },
+        {
+          "id": "s2",
+          "text": "STT model downloads (`small.en`, ~250 MB) with a progress indicator (needs internet); fetched once."
+        },
+        {
+          "id": "s3",
+          "text": "No-ElevenLabs path: finish with no EL key → the app runs text-only and says so; add a key later in Settings → spoken replies start."
+        },
+        {
+          "id": "s4",
+          "text": "Default voice: with an EL key, the voice defaults to George (or the first valid voice if George isn't in your catalog)."
+        },
+        {
+          "id": "s5",
+          "text": "After the wizard, `%APPDATA%\\COVAS++` holds config/keys and the model is under `%LOCALAPPDATA%`; NOTHING was written into `%LOCALAPPDATA%\\Programs\\COVAS++`."
+        }
+      ]
+    },
+    {
+      "id": "pkg-native-window-ptt",
+      "title": "Packaged app launches from its icon and PTT works in the window",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "HW"
+      ],
+      "requires": "Installed packaged app (post-setup).",
+      "expected": "Launching from the desktop/Start-menu icon opens a native window (no browser/URL bar) on the panel, PTT works from the window with audio, and closing the window fully quits (no tray, no lingering process).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Launch from the desktop/Start-menu icon → a native window (no browser tab, no URL bar) rendering the panel."
+        },
+        {
+          "id": "s2",
+          "text": "PTT works from the window: hold `[`, speak, release → normal turn; audio plays."
+        },
+        {
+          "id": "s3",
+          "text": "Closing the window quits the app — no tray icon, no lingering `COVAS++`/python in Task Manager."
+        }
+      ]
+    },
+    {
+      "id": "pkg-ed-files-readable",
+      "title": "Installed (sandboxless) app reads ED journal + bindings",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "GAME"
+      ],
+      "requires": "Installed packaged app; ED running; `[keybinds]`/`[honk]` on.",
+      "expected": "The sandboxless install reads ED's journal (\"Where am I?\" names the current system) and finds/parses your `Custom.*.binds` (startup/log confirms, not a \"couldn't find binds\" warning).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With ED running: \"Where am I?\" → names your current system (journal readable from the installed app)."
+        },
+        {
+          "id": "s2",
+          "text": "With `[keybinds]`/`[honk]` on, the startup/log confirms your `Custom.*.binds` was found and parsed (not a \"couldn't find binds\" warning)."
+        }
+      ]
+    },
+    {
+      "id": "pkg-update-banner",
+      "title": "Update banner downloads the new installer and relaunches (Tier-2 updater)",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "VM",
+        "NET"
+      ],
+      "requires": "VM with an OLDER version installed; a NEWER GitHub Release published/pointed at.",
+      "expected": "An out-of-date install shows an \"Update available → vX.Y\" banner (current → no banner); clicking it downloads the installer, exits, and launches it; after install the version query reports the bumped version.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With a newer release available, an \"Update available → vX.Y\" banner appears on launch. (Already-current → no banner.)"
+        },
+        {
+          "id": "s2",
+          "text": "Click update → COVAS++ downloads the new installer, exits, and the installer launches (same SmartScreen step)."
+        },
+        {
+          "id": "s3",
+          "text": "After install, relaunch → \"What version are you?\" now reports the bumped version."
+        }
+      ]
+    },
+    {
+      "id": "pkg-settings-survive-update",
+      "title": "User settings survive an update (decision #6)",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "VM",
+        "FILE"
+      ],
+      "requires": "VM mid-update flow (§pkg-update-banner). Change some settings before updating.",
+      "expected": "After the update every changed setting is exactly as left (defaults are NOT re-applied), `overrides.json` is unchanged, and a newly-added setting appears at its default without resetting existing values.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Before updating: change the voice, mic, and a couple of settings; note them in `%APPDATA%\\COVAS++\\overrides.json`."
+        },
+        {
+          "id": "s2",
+          "text": "Run the update → after relaunch, every changed setting is exactly as you left it; `overrides.json` is unchanged."
+        },
+        {
+          "id": "s3",
+          "text": "A setting added by the new version appears at its default WITHOUT resetting your existing values."
+        }
+      ]
+    },
+    {
+      "id": "pkg-uninstall",
+      "title": "Uninstall removes the app and shortcuts; notes user-data retention",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "VM"
+      ],
+      "requires": "Installed packaged app on the VM.",
+      "expected": "Uninstalling from Apps & features removes the app + shortcuts and the install tree under `%LOCALAPPDATA%\\Programs\\COVAS++`; whether `%APPDATA%\\COVAS++` user data is retained is noted (a reinstall should find settings again).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Uninstall from Apps & features (or the Start-menu uninstaller) → the app and shortcuts are removed; the install tree under `%LOCALAPPDATA%\\Programs\\COVAS++` is gone."
+        },
+        {
+          "id": "s2",
+          "text": "Note whether your `%APPDATA%\\COVAS++` user data is retained (a reinstall should find your settings again)."
+        }
+      ]
+    },
+    {
+      "id": "pkg-provider-bundle-selftest",
+      "title": "Provider bundle & default-voice self-test: frozen selftest imports every provider + Edge plays (issue #20)",
+      "section": "19. Packaged build",
+      "tags": [
+        "PKG",
+        "HW",
+        "NET"
+      ],
+      "requires": "Build machine for the freeze/self-test; the packaged app for the play checks. Edge (edge-tts) is the DEFAULT TTS; providers import lazily from covas/providers/factory.py.",
+      "expected": "`build.ps1 -Installer -SelfTest` completes and the frozen `COVAS++.exe --selftest` prints `SELFTEST OK ...incl. ...edge_tts` and exits 0 (a missing bundle fails the build loudly); the default Edge voice actually PLAYS in the packaged app (audible, not text fallback, zero ElevenLabs usage); other cloud providers construct and speak in the frozen app without ImportError.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Frozen self-test (build machine): `.\\build.ps1 -Installer -SelfTest` -> the freeze completes and the frozen `COVAS++.exe --selftest` prints `SELFTEST OK ...incl. ...edge_tts` and exits 0. This proves edge_tts / aiohttp AND covas.providers.{edge_tts,azure_tts,openai_tts,cartesia_tts,piper_tts,elevenlabs_tts,openai_llm,gemini_llm,ollama_llm} are all bundled."
+        },
+        {
+          "id": "s2",
+          "text": "Size delta: note the onedir folder MB and Setup.exe MB the build prints; the aiohttp stack should add only a few MB (record it)."
+        },
+        {
+          "id": "s3",
+          "text": "Default Edge voice actually plays (not just imports): launch the packaged COVAS++.exe with the default `[tts].provider = \"edge\"`, speak a turn -> COVAS replies in the Edge neural voice (audible, not the text-only fallback), with zero ElevenLabs usage."
+        },
+        {
+          "id": "s4",
+          "text": "Other cloud providers construct in the frozen app: in turn, set `[tts].provider` to azure / openai / cartesia and `[llm].provider` to openai / gemini (each with a valid key), relaunch, speak a turn -> each constructs and speaks without an ImportError."
+        }
+      ]
+    },
+    {
+      "id": "pkg-dpapi-key-encryption",
+      "title": "API keys encrypted at rest (Windows DPAPI): DPAPI: blobs, migration, env ignored, wrong-machine re-enter (issue #22)",
+      "section": "19. Packaged build",
+      "tags": [
+        "FILE",
+        "HW"
+      ],
+      "requires": "Keys are stored ENCRYPTED with Windows DPAPI (CurrentUser): each `*APIKey.txt` holds a `DPAPI:<base64>` blob, never plaintext. Env-var key reads were REMOVED. A source run works for all of this (key files under `%APPDATA%\\COVAS++` or the dev data dir).",
+      "expected": "After entering keys the `*APIKey.txt` files begin with `DPAPI:` and never show the raw key; a plaintext key is transparently migrated to a DPAPI blob on first read; the env var is ignored (a source run with only the env var set shows the wizard); a wrong-machine/corrupt blob is treated as no-key with a clear re-enter message (no crash); check_setup reports the key file present; a plaintext Inara key is folded into `InaraAPIKey.txt` and blanked in overrides.json.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Encrypted on disk: after entering keys (wizard or Settings), open `AnthropicAPIKey.txt` (and any other `*APIKey.txt`) -> the content begins with `DPAPI:` and your raw key is not visible anywhere."
+        },
+        {
+          "id": "s2",
+          "text": "Transparent migration: drop a plaintext key into a fresh `AnthropicAPIKey.txt` (just the raw `sk-ant-...`, no `DPAPI:`), launch -> the app works and re-opening the file shows it rewritten to `DPAPI:<blob>` (migrated on first read). Your key still works."
+        },
+        {
+          "id": "s3",
+          "text": "Env var is ignored: set `ANTHROPIC_API_KEY` in your environment but remove the key file -> launch a source run -> the app is unconfigured and the setup wizard shows (the env var is NOT used). Add the key via the wizard/Settings to proceed."
+        },
+        {
+          "id": "s4",
+          "text": "Wrong-machine blob = clear re-enter, not a crash: copy a `DPAPI:` key file from another PC (or corrupt the base64) -> launch -> the app treats it as no key and logs a clear 're-enter the key on this machine' message; it does not crash. Re-enter the key and it works."
+        },
+        {
+          "id": "s5",
+          "text": "check_setup: `check_setup.bat` reports the Anthropic key file present (no `ANTHROPIC_API_KEY` env line) and the Anthropic API call succeeds using the file key."
+        },
+        {
+          "id": "s6",
+          "text": "Inara key folded in (issue #24): put a plaintext Inara key in `[cg].inara_api_key` (in overrides.json), launch -> community goals still authenticate, a new `InaraAPIKey.txt` appears holding a `DPAPI:` blob, and the inline `inara_api_key` in overrides.json is blanked. A fresh key on the Settings API keys card also works (on restart)."
+        }
+      ]
+    },
+    {
+      "id": "pkg-api-keys-card",
+      "title": "Masked API keys Settings card: set/rotate/clear any provider key, badges, never leaks (issue #23)",
+      "section": "19. Packaged build",
+      "tags": [
+        "PANEL",
+        "FILE"
+      ],
+      "requires": "The Settings page (`/settings`) has a write-only API keys card covering every provider (Anthropic, ElevenLabs, OpenAI, Gemini, Azure, Cartesia, Inara). Keys are never displayed - only a set/not-set badge - and are stored DPAPI-encrypted, never in overrides.json.",
+      "expected": "Badges show set/not-set per provider with no key value visible; setting/rotating a key flips the badge, clears the field, says 'takes effect on restart', and writes a `DPAPI:` blob to the provider's file; Clear empties the file and a blank Save is a no-op; reloading the page never exposes the key text in the field, page source, or network - only the boolean badge.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Badges reflect reality: open `/settings` -> the API keys card shows set for providers whose key file has a key, not set for the rest. No key value is visible anywhere."
+        },
+        {
+          "id": "s2",
+          "text": "Set / rotate: paste a key into a not-set provider -> Save -> the badge flips to set, the field clears, and the message says it takes effect on restart. The provider's `*APIKey.txt` now holds a `DPAPI:` blob (not your raw key). Rotate an already-set key the same way and the file's blob changes."
+        },
+        {
+          "id": "s3",
+          "text": "Clear: click Clear on a set provider -> badge flips to not set and the key file is emptied. A blank Save is a no-op (an existing key is NOT wiped)."
+        },
+        {
+          "id": "s4",
+          "text": "Never leaks: with a key set, reload `/settings` and check the field is still empty and the page source / network never contains the key text (only the boolean badge)."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}

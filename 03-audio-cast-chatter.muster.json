@@ -1,0 +1,513 @@
+{
+  "schemaVersion": 1,
+  "app": "COVAS++",
+  "tests": [
+    {
+      "id": "cues-shipped-defaults-play",
+      "title": "Shipped default cues play out of the box (no user cues)",
+      "section": "2. Sound cues",
+      "tags": [
+        "HW"
+      ],
+      "requires": "No user cue overrides present: `<data dir>\\sounds\\listen\\` etc. are empty or absent (source run: `.\\sounds\\`; packaged: `%APPDATA%\\COVAS++\\sounds\\`). App running with speakers/headset.",
+      "expected": "You hear the shipped ORIGINAL cues at each stage — a `listen` chirp on press, a `processing` tick while it works, a `completed` cue right before speech, and a `failure` cue on no-speech. None are silent.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hold `[` → you hear the `listen` cue immediately (before speaking)."
+        },
+        {
+          "id": "s2",
+          "text": "Say a short prompt and release → you hear the `processing` cue."
+        },
+        {
+          "id": "s3",
+          "text": "Just before the spoken answer you hear the `completed` cue."
+        },
+        {
+          "id": "s4",
+          "text": "Press and release WITHOUT speaking → you hear the `failure` cue; the log notes no speech detected."
+        }
+      ]
+    },
+    {
+      "id": "cues-open-folder-button",
+      "title": "'Open cues folder' opens the sounds dir with the per-type skeleton",
+      "section": "2. Sound cues",
+      "tags": [
+        "GUI",
+        "FILE"
+      ],
+      "requires": "Control panel open (native window or browser).",
+      "expected": "Clicking Open cues folder opens the OS file manager on `<data dir>\\sounds\\` containing `listen\\ processing\\ completed\\ failure\\ thinking\\` subfolders, each with a `README.txt`. The button shows 'opened'.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "In the first (config) card, click `OPEN CUES FOLDER`."
+        },
+        {
+          "id": "s2",
+          "text": "Explorer opens `<data dir>\\sounds\\` (source run: repo `.\\sounds\\`; packaged: `%APPDATA%\\COVAS++\\sounds\\`)."
+        },
+        {
+          "id": "s3",
+          "text": "It contains `listen`, `processing`, `completed`, `failure`, `thinking` folders, each with a README.txt explaining drop-in cues."
+        }
+      ]
+    },
+    {
+      "id": "cues-override-replaces-and-rotates",
+      "title": "User cues in a type folder replace the default and rotate randomly",
+      "section": "2. Sound cues",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "Access to `<data dir>\\sounds\\listen\\` (use Open cues folder). Have 2-3 distinct short `.wav` files to drop in.",
+      "expected": "With >=1 file in `sounds\\listen\\`, the press-to-talk cue plays YOUR files (the shipped default is no longer heard) and VARIES across presses (random rotation over any count).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Drop 2-3 distinct `.wav` files into `sounds\\listen\\`, then restart COVAS++."
+        },
+        {
+          "id": "s2",
+          "text": "Press to talk several times → the `listen` cue is now clearly YOUR audio, not the shipped chirp."
+        },
+        {
+          "id": "s3",
+          "text": "Across presses the cue VARIES (a random file each time)."
+        }
+      ]
+    },
+    {
+      "id": "cues-empty-folder-falls-back",
+      "title": "Emptying a type folder falls back to the shipped default",
+      "section": "2. Sound cues",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "Continue from cues-override-replaces-and-rotates (your files are in `sounds\\listen\\`).",
+      "expected": "Remove your files from `sounds\\listen\\` and restart → the press-to-talk cue is the SHIPPED default `listen` chirp again (fallback works).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Delete the files you added to `sounds\\listen\\` (leave the folder empty), then restart COVAS++."
+        },
+        {
+          "id": "s2",
+          "text": "Press to talk → you hear the shipped default `listen` cue, not your removed audio."
+        }
+      ]
+    },
+    {
+      "id": "cues-interdiction-sting-default",
+      "title": "Interdiction plays the shipped original sting when no user sting is set",
+      "section": "2. Sound cues",
+      "tags": [
+        "HW",
+        "GAME"
+      ],
+      "requires": "`[audio.interdiction].enabled` (and the audio layer) ON, with NO user interdiction sting configured or dropped in. Elite Dangerous running; trigger (or wait for) an Interdiction / UnderAttack event.",
+      "expected": "On an interdiction, the ALERT sting is the shipped ORIGINAL sting (audible), not silence — the bundled default fills in when the user supplies none.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With interdiction enabled and no custom sting, get interdicted (or pull a rebuy-safe NPC interdiction)."
+        },
+        {
+          "id": "s2",
+          "text": "You hear an alert sting at the start of the interdiction cue (followed by the threat line)."
+        }
+      ]
+    },
+    {
+      "id": "cues-thinking-bed",
+      "title": "Soft 'thinking' bed fills the wait and stops on every exit (issue #5)",
+      "section": "2. Sound cues",
+      "tags": [
+        "HW"
+      ],
+      "requires": "App running with mic + speakers. `[audio].thinking_bed = true` (default).",
+      "expected": "After the one-shot processing tick, a soft looping bed fills the transcribe/think/search wait and stops the instant the reply speaks, on tap-cancel, on barge-in, and on failure — never bleeding over the answer or doubling with the completed/failure cue. The toggle silences it (leaving just the tick), and a drop-in sounds/thinking/ file overrides the default.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Ask a slow question (e.g. 'Give me the full history of the Empire.'). After the processing tick you hear a soft, LOW, looping bed under the wait; it stops the instant COVAS starts speaking."
+        },
+        {
+          "id": "s2",
+          "text": "Repeat and tap `[` mid-think (cancel), and separately barge in by holding `[` while it works: the bed stops cleanly each time (no bleed over the next capture)."
+        },
+        {
+          "id": "s3",
+          "text": "Press+release without speaking (failure): the bed stops and you hear only the failure cue (no overlap)."
+        },
+        {
+          "id": "s4",
+          "text": "Say 'turn the thinking sound off' (or toggle Thinking sound on the Settings page) -> the next slow turn plays only the single processing tick. Turn it back on -> the bed returns."
+        },
+        {
+          "id": "s5",
+          "text": "Drop a loopable .wav into sounds/thinking/, restart -> your file loops during the wait; empty the folder -> the shipped default bed returns."
+        }
+      ]
+    },
+    {
+      "id": "audio-enable-master",
+      "title": "Audio layer master switch: COVAS bus unchanged, barge-in intact (C9)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "GUI"
+      ],
+      "requires": "Set `[audio].enabled = true` (master), enable the parts you want, `[elite].enabled` on. Restart after flipping the master switch.",
+      "expected": "With the audio layer ON, a normal spoken reply still sounds right through the mixer's clean COVAS bus and a tap-`[` barge-in still cuts speech instantly.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[audio].enabled = true` and enable the sub-parts (`[audio.cues]`, `[audio.comms]`, `[music]`, `[audio.interdiction]`); restart."
+        },
+        {
+          "id": "s2",
+          "text": "With the layer ON, a normal spoken reply still sounds right (no change in COVAS's character)."
+        },
+        {
+          "id": "s3",
+          "text": "A tap-`[` barge-in still cuts speech instantly."
+        }
+      ]
+    },
+    {
+      "id": "audio-bus-demos",
+      "title": "Bus mixer + comms radio treatment device demos (app not running)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "HW"
+      ],
+      "requires": "Source checkout; app NOT running; speakers.",
+      "expected": "The demo scripts play the expected clean-vs-radio and interdiction-layer tones.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "`.venv\\Scripts\\python.exe scripts\\demo_comms_bus.py` → a tone CLEAN (COVAS bus) then RADIO-FILTERED (Comms bus)."
+        },
+        {
+          "id": "s2",
+          "text": "`demo_comms_variants.py` → NPC riff / tampered→verbatim / player DM. `demo_interdiction.py` → the three interdiction layers."
+        }
+      ]
+    },
+    {
+      "id": "audio-comms-voices",
+      "title": "Comms voices in-game: NPC on radio bus, player DM verbatim, chatter gated (C4/C5)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[audio].enabled`, `[audio.comms].enabled`, `[elite].enabled` ON; ED in Open play.",
+      "expected": "NPC/station comms are read on the radio-treated bus, a direct player DM is read verbatim in the fixed male voice, Open-play local/wing chatter is NOT voiced (fail-closed), repeated station spam isn't re-read (dedup), and ED's own \"Entering channel\" jump chrome is NOT spoken.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Receive an NPC/station comms-panel line (e.g. request docking) → read on the radio-treated comms bus."
+        },
+        {
+          "id": "s2",
+          "text": "A direct player DM is read verbatim (fixed male voice)."
+        },
+        {
+          "id": "s3",
+          "text": "Open-play local/wing chatter is NOT voiced (the fail-closed gate)."
+        },
+        {
+          "id": "s4",
+          "text": "Repeated station spam isn't re-read every jump (template dedup)."
+        },
+        {
+          "id": "s5",
+          "text": "Jump-chrome dropped (#56): jump to a NEW system → the game's own \"Entering channel <system>.\" line is NOT spoken (on every jump, any population). Normal NPC/station comms and player DMs still voice."
+        }
+      ]
+    },
+    {
+      "id": "audio-chatter-sfx-interdiction",
+      "title": "Space chatter: populated-only, population-scaled frequency, random voices (C6/C8)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW"
+      ],
+      "requires": "`[audio.cues].enabled` and `[audio.interdiction].enabled` ON; ED running; an ElevenLabs key.",
+      "expected": "Chatter plays only in populated systems (silent in empty/unpopulated space), is more frequent in denser systems, and each line uses a different random voice; an interdiction plays the layered sting + threat line + pirate line.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "In a POPULATED system → occasional ambient chatter (rate-limited, never over-talking). Jump to an UNPOPULATED / deep-space system → chatter goes silent (populated-only)."
+        },
+        {
+          "id": "s2",
+          "text": "Compare a dense (billions) vs a sparse (thousands) populated system → chatter is noticeably more frequent in the dense one. Lowering `[audio.chatter].min_seconds` speeds it up. Each chatter line uses a different random voice."
+        },
+        {
+          "id": "s3",
+          "text": "Trigger an interdiction → the layered sting + threat line + pirate line."
+        }
+      ]
+    },
+    {
+      "id": "audio-voice-controls-live",
+      "title": "Voice audio controls and live Settings changes (C9)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "HW",
+        "GUI"
+      ],
+      "requires": "Audio layer ON; app running; panel open.",
+      "expected": "Voice commands mute/duck/stop each background layer without touching COVAS's own replies; changing a bus volume or toggling comms/chatter/music on the Settings page applies live (master + voice pickers persist on restart).",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "By voice: \"mute the chatter\", \"quiet the comms\", \"turn the music down/up\", \"stop the music\", \"silence all the background audio\", \"turn the ambient audio back on\" → each takes effect; your own replies are unaffected."
+        },
+        {
+          "id": "s2",
+          "text": "On Settings, change a bus volume or toggle comms/chatter/music → applies live (no restart). The master `audio.enabled` and comms voice pickers persist."
+        }
+      ]
+    },
+    {
+      "id": "audio-voice-cast",
+      "title": "Voice cast: random EL voices, sticky per system, players persist, Piper fallback (C10+)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "HW",
+        "GAME"
+      ],
+      "requires": "Defaults (`cast_provider = \"elevenlabs\"`, `random_el = true`, empty pool) with an ElevenLabs key. Audio layer ON.",
+      "expected": "Comms speakers get distinct random EL voices that stay stable within a system and re-cast on a jump; players keep a stable voice across the session (and across jumps); the cast is distinct from the COVAS persona; setting `cast_provider = \"piper\"` reverts to free local voices.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Receive comms from two different NPCs/stations → they sound different (random EL voices), and the SAME speaker sounds the same for as long as you're in that system. Cast voices are distinct from your COVAS persona voice."
+        },
+        {
+          "id": "s2",
+          "text": "Jump to a new system → that speaker (or a new one) is re-cast to a fresh random voice (comms voices reset on a jump)."
+        },
+        {
+          "id": "s3",
+          "text": "In a wing/multicrew/operation, each player keeps a stable, distinct voice — including across system jumps (last 25 players remembered)."
+        },
+        {
+          "id": "s4",
+          "text": "Set `[audio.voices].cast_provider = \"piper\"` with a few `[[audio.voices.pool]]` `.onnx` entries → the cast reverts to free local Piper voices; an ElevenLabs ™/famous voice is never selected."
+        }
+      ]
+    },
+    {
+      "id": "audio-voice-quality-perspective",
+      "title": "Context-aware voice quality: anti-repeat variety + companion-vs-cast perspective (issue #57)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "HW",
+        "ED"
+      ],
+      "requires": "`[audio.cues].enabled` ON with the random ElevenLabs cast; a busy populated system; a reasonably large ElevenLabs library.",
+      "expected": "Consecutive ambient/comms lines spread across many voices (no same-few-voices back-to-back); a companion 'our'-perspective musing is spoken in the companion's OWN clean voice (no radio treatment) while station/patrol/market ambient lines use a random radioed cast voice - perspective always matches the source.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Variety (anti-repeat): in a busy populated system, listen to a run of ambient chatter / NPC comms lines -> consecutive lines spread across many voices; you should NOT hear the same handful of voices repeat back-to-back."
+        },
+        {
+          "id": "s2",
+          "text": "Perspective: when the companion muses about the world (an 'our'-perspective line like 'nice to have some company out here') it's spoken in your companion's OWN voice, clean, with NO radio/static comms treatment."
+        },
+        {
+          "id": "s3",
+          "text": "By contrast, station traffic / patrol / market ambient lines come from a random radioed cast voice on the comms bus. Confirm the perspective always matches the source."
+        }
+      ]
+    },
+    {
+      "id": "audio-dropin-content",
+      "title": "Drop-in content skeleton + overrides + silent fallback (C11)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "HW",
+        "FILE"
+      ],
+      "requires": "Audio layer enabled; first run creates the skeleton. ED running for the in-game drops.",
+      "expected": "First run creates `audio/sfx/<cue>/`, `audio/music/<context>/`, `content/chatter/*.txt`, `content/interdiction_threat.txt` (each with a README) and logs a content-status line; dropped files play/override, deleting them falls back to the built-in pool, and a missing/empty folder is silently ignored.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "First run: the skeleton appears (`audio/sfx/<cue>/`, `audio/music/<context>/`, `content/chatter/*.txt`, `content/interdiction_threat.txt`), each with a README; the startup log shows a content-status line."
+        },
+        {
+          "id": "s2",
+          "text": "Drop a `.wav` into `audio/sfx/thargoid_voices/`, restart, jump to hyperspace → hear it on the ambient bus."
+        },
+        {
+          "id": "s3",
+          "text": "Add lines to `content/chatter/station_traffic.txt` (one per line, `#` = comment), restart, dock → hear your lines (override the built-in pool). Delete the file → falls back to the built-in pool. A missing/empty folder is silent (no error)."
+        }
+      ]
+    },
+    {
+      "id": "audio-cast-provider-registry",
+      "title": "Per-role cast providers via the TTS registry (issue #14)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "FILE"
+      ],
+      "requires": "Audio layer ON with the cast enabled; ED running. Edit `[audio.voices.providers]` in `config.toml`. Have Piper `.onnx` voices in `[audio.voices].pool` for the local-voice check.",
+      "expected": "Cast voices route through a provider registry so each role picks its provider. Default behaviour is unchanged; a `[audio.voices.providers]` override makes a role use a different provider (e.g. Piper chatter + ElevenLabs comms); COVAS's persona voice is unaffected; a role with no working backend falls silent, not crashing.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "With NO `[audio.voices.providers]` set, fly/dock in a populated system -> the cast sounds exactly as before (regression check); COVAS still uses your ElevenLabs persona voice."
+        },
+        {
+          "id": "s2",
+          "text": "Add `[audio.voices.providers]` with `chatter = \"piper\"` and `comms = \"elevenlabs\"` (plus Piper `.onnx` entries in `[audio.voices].pool`), restart -> ambient CHATTER is spoken by local Piper voices (no EL credits) while station/NPC COMMS stay on ElevenLabs."
+        },
+        {
+          "id": "s3",
+          "text": "Point a role at a provider with no working backend (e.g. `comms = \"piper\"` with an empty pool) -> those lines fall silent; the audio layer and your COVAS replies keep working (fail-soft)."
+        }
+      ]
+    },
+    {
+      "id": "edge-tts-free-provider",
+      "title": "Edge (edge-tts) free neural voices — persona + cast, fail-soft to Piper (issue #15)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "`edge-tts` installed (`pip install -r requirements.txt`); internet access. For the persona-fallback check, set `[piper].model` to a downloaded `.onnx`. Audio layer ON with the cast enabled for the cast check; ED running.",
+      "expected": "Edge speaks COVAS's persona voice for free (no ElevenLabs credits, no key) when `[tts].provider = \"edge\"`; Edge voices are cast-eligible for NPC/comms/chatter; when the endpoint is unavailable the persona voice falls back to Piper (or degrades to text if no Piper model) and cast Edge voices fall silent — the loop never crashes.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[tts].provider = \"edge\"` (optionally set `[edge].voice`, e.g. `en-US-GuyNeural`), restart, and speak a turn -> COVAS replies in the chosen Edge voice with no ElevenLabs usage."
+        },
+        {
+          "id": "s2",
+          "text": "Set `[audio.voices].cast_provider = \"edge\"` (or `[audio.voices.providers].chatter = \"edge\"`), restart, fly/dock in a populated system -> ambient chatter/comms speak in distinct free Edge voices."
+        },
+        {
+          "id": "s3",
+          "text": "With `[tts].provider = \"edge\"` and a valid `[piper].model` set, disconnect the network (or block the endpoint) and speak -> the persona voice falls back to local Piper; reconnect -> Edge resumes. With NO Piper model, a dead endpoint degrades to text and the loop returns to IDLE."
+        },
+        {
+          "id": "s4",
+          "text": "Browse the catalog: `.venv\\Scripts\\python.exe -m edge_tts --list-voices` lists hundreds of voices; a ShortName from it works as `[edge].voice` or a cast pool `ref`."
+        }
+      ]
+    },
+    {
+      "id": "azure-neural-tts-provider",
+      "title": "Azure Neural TTS — reliable free-tier sibling of Edge (issue #17)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "An Azure Speech resource: set `AZURE_SPEECH_KEY` (or paste the key into `AzureSpeechKey.txt`) and `[azure].region` to match it; internet access. Audio layer ON with the cast enabled for the cast check; ED running.",
+      "expected": "Azure speaks COVAS's persona voice (same voices as Edge) with a real API/SLA when `[tts].provider = \"azure\"`; an optional `[azure].style` changes delivery; Azure voices are cast-eligible; a wrong region or missing key degrades the persona to text and cast Azure voices to silence — the loop never crashes.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[tts].provider = \"azure\"` (and `[azure].voice`, e.g. `en-US-GuyNeural`), ensure the key + region are set, restart, and speak a turn -> COVAS replies in the chosen Azure voice."
+        },
+        {
+          "id": "s2",
+          "text": "Set `[azure].style = \"cheerful\"` on a style-capable voice, restart, speak -> the delivery changes; an unsupported style is ignored (still speaks)."
+        },
+        {
+          "id": "s3",
+          "text": "Set `[audio.voices].cast_provider = \"azure\"` (or `[audio.voices.providers].chatter = \"azure\"`), restart, fly/dock in a populated system -> ambient chatter/comms speak in distinct Azure voices."
+        },
+        {
+          "id": "s4",
+          "text": "Break it: set a WRONG `[azure].region` (or clear the key) and speak -> the reply degrades to text and the loop returns to IDLE (cast Azure voices fall silent); restore the correct key/region -> voices return. No crash either way."
+        }
+      ]
+    },
+    {
+      "id": "openai-compatible-tts-provider",
+      "title": "OpenAI-compatible TTS — cheap cloud voice (issue #16)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "An OpenAI (or compatible) API key: export `OPENAI_API_KEY` (or paste it into `OpenAIAPIKey.txt`); internet access. Audio layer ON with the cast enabled for the cast check; ED running.",
+      "expected": "OpenAI speaks COVAS's persona voice over the audio/speech API when `[tts].provider = \"openai\"`; the optional `instructions` steer is honored by newer models; OpenAI voices are cast-eligible; a missing key or bad base_url degrades the persona to text and cast OpenAI voices to silence — the loop never crashes.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[tts].provider = \"openai\"` (and `[openai_tts].voice`, e.g. `nova`), export `OPENAI_API_KEY`, restart, and speak a turn -> COVAS replies in the chosen OpenAI voice."
+        },
+        {
+          "id": "s2",
+          "text": "Set `[openai_tts].model = \"gpt-4o-mini-tts\"` with `[openai_tts].instructions = \"Calm, professional ship-computer tone\"`, restart, speak -> the delivery reflects the instruction; switching to `tts-1` still speaks (instruction ignored)."
+        },
+        {
+          "id": "s3",
+          "text": "Set `[audio.voices].cast_provider = \"openai\"` (or `[audio.voices.providers].chatter = \"openai\"`), restart, fly/dock in a populated system -> ambient chatter/comms speak in OpenAI voices (a small set, so speakers repeat sooner)."
+        },
+        {
+          "id": "s4",
+          "text": "Break it: clear `OPENAI_API_KEY` (or set a bad `[openai_tts].base_url`) and speak -> the reply degrades to text and the loop returns to IDLE (cast OpenAI voices fall silent); restore -> voices return. No crash either way."
+        }
+      ]
+    },
+    {
+      "id": "cartesia-low-latency-persona",
+      "title": "Cartesia (Sonic) low-latency persona voice (issue #18)",
+      "section": "18. Audio subsystem",
+      "tags": [
+        "GAME",
+        "HW",
+        "NET",
+        "FILE"
+      ],
+      "requires": "A Cartesia API key + a voice id: export `CARTESIA_API_KEY` (or paste it into `CartesiaAPIKey.txt`) and set `[cartesia].voice` to a voice id from play.cartesia.ai; internet access. ED running.",
+      "expected": "Cartesia speaks COVAS's PERSONA voice with low time-to-first-audio (streams) when `[tts].provider = \"cartesia\"`; barge-in stops it promptly; it is persona-only (no effect on the cast); a missing key/voice degrades the persona to text — the loop never crashes.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Set `[tts].provider = \"cartesia\"` with a valid `[cartesia].voice` id and `CARTESIA_API_KEY`, restart, speak a turn -> COVAS replies in the Cartesia voice and audio starts noticeably fast (low latency)."
+        },
+        {
+          "id": "s2",
+          "text": "While COVAS speaks a long Cartesia reply, tap push-to-talk -> speech stops promptly (streaming cancel) and the loop returns to LISTENING/IDLE."
+        },
+        {
+          "id": "s3",
+          "text": "Set `[audio.voices].cast_provider = \"cartesia\"` -> it has NO effect on the cast (Cartesia is persona-only, not a cast backend); the cast keeps its own provider; COVAS's own voice is unaffected."
+        },
+        {
+          "id": "s4",
+          "text": "Break it: clear `CARTESIA_API_KEY` (or blank `[cartesia].voice`) and speak -> the reply degrades to text and the loop returns to IDLE; restore -> the voice returns. No crash either way."
+        }
+      ]
+    }
+  ],
+  "runs": []
+}
