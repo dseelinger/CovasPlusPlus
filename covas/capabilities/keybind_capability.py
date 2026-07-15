@@ -31,6 +31,7 @@ from ..keybinds import actions as _actions  # noqa: F401 — import populates th
 from ..keybinds.binds import KeyBinding
 from ..keybinds.executor import ExecutorError
 from ..keybinds.registry import Macro, registered_macros
+from ..keybinds.sequence import run_sequence
 from .base import HelpMeta
 
 # ---- macros -------------------------------------------------------------------------------
@@ -170,6 +171,7 @@ class KeybindCapability:
         macros: dict[str, Macro] | None = None,
         status_snapshot: Callable[[], dict | None] | None = None,
         clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
         log: Callable[[str], None] | None = None,
     ) -> None:
         self._binds = binds or {}
@@ -178,10 +180,15 @@ class KeybindCapability:
         self._macros = macros or dict(DEFAULT_MACROS)
         self._status = status_snapshot
         self._clock = clock
+        self._sleep = sleep                    # injected so sequence waits are hermetic in tests
         self._log = log
         self._lock = threading.Lock()
         self._pending: dict | None = None     # {name, turn, at}
         self._turn = 0                         # Commander-utterance counter (confirm gate)
+        # Set by the hard abort to stop a running sequence between steps; cleared at the start of
+        # each sequence run. The executor's release_all() is the key-level guarantee; this is the
+        # loop-level one so an abort ends the sequence rather than firing its remaining steps.
+        self._abort_flag = threading.Event()
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:
@@ -201,8 +208,10 @@ class KeybindCapability:
             group="your ship",
             one_liner=("I can press the ship, SRV, and on-foot controls you've allowlisted — "
                        "landing gear, throttle, ship-systems toggles, panels, suit tools, buggy "
-                       "controls — always mode-aware and behind a combat safety check. Disruptive "
-                       "actions need a separate spoken confirmation; say 'abort' to cancel."),
+                       "controls — and run multi-step sequences (like a pad launch) that check "
+                       "your game status between steps instead of firing blind. Always mode-aware "
+                       "and behind a combat safety check; disruptive actions need a separate "
+                       "spoken confirmation, and 'abort' stops everything and releases held keys."),
             example="toggle my landing gear",
         )
 
@@ -229,13 +238,10 @@ class KeybindCapability:
 
     # -- arm / confirm / abort --------------------------------------------------------
     def _arm(self, macro: Macro) -> str:
-        binding = self._binds.get(macro.action)
-        if binding is None or not binding.usable:
-            reason = (binding.unusable_reason if binding is not None
-                      else f"'{macro.action}' isn't in your Elite Dangerous bindings — bind "
-                            f"it to a key in-game so I can press it.")
-            self._logline(f"{macro.name} unusable: {reason}")
-            return reason
+        problem = self._binding_problem(macro)
+        if problem is not None:
+            self._logline(f"{macro.name} unusable: {problem}")
+            return problem
 
         guard = self._guard()
         if guard is not None:
@@ -250,7 +256,7 @@ class KeybindCapability:
         if not (self._cfg.require_confirmation and macro.confirm_required):
             # Confirmation not required (globally off, or this macro is benign/read-only) —
             # still gated by allowlist + combat + mode guards above.
-            return self._execute(macro, binding)
+            return self._execute(macro)
 
         with self._lock:
             self._pending = {"name": macro.name, "turn": self._turn, "at": self._clock()}
@@ -286,15 +292,16 @@ class KeybindCapability:
         if mguard is not None:
             self._logline(f"{macro.name} blocked at confirm by mode guard: {mguard}")
             return mguard
-        binding = self._binds.get(macro.action)
-        if binding is None or not binding.usable:
-            return (binding.unusable_reason if binding is not None
-                    else f"'{macro.action}' is no longer bound to a key.")
-        return self._execute(macro, binding)
+        problem = self._binding_problem(macro)
+        if problem is not None:
+            return problem
+        return self._execute(macro)
 
     def _abort(self) -> str:
         with self._lock:
             self._pending = None
+        # Stop any in-flight sequence between steps (the runner polls this), then release keys.
+        self._abort_flag.set()
         try:
             release = getattr(self._executor, "release_all", None)
             if release is not None:
@@ -305,7 +312,13 @@ class KeybindCapability:
         return "Aborted — cleared any armed action and released all keys."
 
     # -- execution + guard ------------------------------------------------------------
-    def _execute(self, macro: Macro, binding: KeyBinding) -> str:
+    def _execute(self, macro: Macro) -> str:
+        """Run the macro — a status-checked SEQUENCE (issue #33) or a single press/hold. The
+        allowlist/combat/mode guards and (for consequential macros) confirmation have already
+        passed by the time we get here."""
+        if macro.steps:
+            return self._execute_sequence(macro)
+        binding = self._binds.get(macro.action)
         try:
             if macro.kind == "hold":
                 self._executor.hold(binding, macro.hold_seconds)
@@ -319,6 +332,52 @@ class KeybindCapability:
             return f"Ship-control injection failed: {e}"
         self._logline(f"executed {macro.name} -> {binding.key}")
         return f"{macro.done_phrase} (sent {binding.key})."
+
+    def _execute_sequence(self, macro: Macro) -> str:
+        """Run a sequenced macro through the deterministic runner, reading Status.json between
+        steps to gate/verify. The abort flag is cleared first so a prior abort can't kill this
+        run; the runner then polls it (and calls release_all on abort/failure)."""
+        self._abort_flag.clear()
+        outcome = run_sequence(
+            macro.steps,
+            executor=self._executor,
+            binds=self._binds,
+            status=self._status,
+            sleep=self._sleep,
+            clock=self._clock,
+            abort=self._abort_flag.is_set,
+        )
+        if outcome.status == "done":
+            self._logline(f"executed sequence {macro.name}")
+            return macro.done_phrase
+        if outcome.status == "aborted":
+            self._logline(f"sequence {macro.name} aborted mid-run")
+            return outcome.message
+        self._logline(f"sequence {macro.name} failed: {outcome.message}")
+        return f"Couldn't complete {macro.arm_phrase} — {outcome.message}"
+
+    def _binding_problem(self, macro: Macro) -> str | None:
+        """A Commander-facing reason the macro can't run because a key it needs isn't bound to a
+        keyboard key, or None when every key it needs is usable. For a sequence, checks every
+        press/hold/release step's token; for a single-key macro, checks `macro.action`."""
+        if macro.steps:
+            for step in macro.steps:
+                if not step.action:      # wait/status steps press nothing
+                    continue
+                b = self._binds.get(step.action)
+                if b is None:
+                    return (f"'{step.action}' isn't in your Elite Dangerous bindings — bind it "
+                            f"to a key in-game so I can run the {macro.name} sequence.")
+                if not b.usable:
+                    return b.unusable_reason or f"'{step.action}' has no keyboard binding."
+            return None
+        b = self._binds.get(macro.action)
+        if b is None:
+            return (f"'{macro.action}' isn't in your Elite Dangerous bindings — bind it to a key "
+                    f"in-game so I can press it.")
+        if not b.usable:
+            return b.unusable_reason
+        return None
 
     def _guard(self) -> str | None:
         """The combat/interdiction guard. Returns a refusal message when it's not safe to

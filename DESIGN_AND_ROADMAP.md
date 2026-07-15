@@ -570,6 +570,37 @@ system map (`GalaxyMapOpen` / `SystemMapOpen`, main-ship variants), cycle fire g
   destination into the map search, and selects it — closing the plot loop. That cross-cutting wire
   is intentionally NOT done here; only the building block is in place.
 
+### Implemented — Tier-1 macro framework: status-checked timed sequences (#33)
+Every batch above presses a **single** key. This adds the design's "macros over single keys":
+a macro can be a small **scripted sequence** that mixes presses/holds with waits and — the point
+— **Status.json checks between steps**, so it *verifies* game state instead of firing blind. It
+sits **on** the existing executor and safety layer; it does not rewrite either.
+
+- **Sequence model (`keybinds/sequence.py`).** A `Macro` is now EITHER a single key (`action` +
+  `kind`) OR a `steps` tuple of `Step`s (empty = single-key, so every prior batch is unchanged).
+  Six declarative step kinds cover the design's sketch: `press` / `hold(seconds)` / `release`
+  (the executor primitives), `wait(seconds)`, `require_status(key, expect)` (a **precondition** —
+  fail the sequence now if Status.json's flag isn't as expected) and `await_status(key, expect,
+  timeout)` (**block until** the flag flips, or fail on timeout). The LLM still only *selects* the
+  named macro — it never assembles the step list (the tool schema exposes the name, not the keys).
+- **Deterministic runner.** `run_sequence(...)` walks the steps on the injected executor, reading
+  an injected status snapshot between them. Every side effect is injected — executor, status
+  source, `sleep`, `clock`, and an `abort` predicate — so it's unit-tested with a recording fake
+  executor + fake status feed and **no real key presses or waiting** (the fake sleep advances the
+  fake clock, so awaits/timeouts are instant and deterministic). It **never raises**: a bad step
+  returns a `SequenceOutcome` the capability speaks.
+- **Safety inherited, not bypassed.** A sequence macro goes through the *same* gates as any macro
+  — allowlist, combat/interdiction guard, mode gate, and (for consequential ones) arm-and-confirm.
+  The **hard abort** now also sets a flag the runner polls **between steps and during waits**, so
+  "abort" stops a running sequence *and* `release_all()` lifts any key a mid-sequence `hold` left
+  down. On any failure the runner also calls `release_all()` — a failed step never strands a key.
+- **Worked macro (`keybinds/actions/macros.py`).** `launch` — the design's own launch example —
+  lifts off the pad and departs: `require_status(landing_gear=down)` → throttle 50% → **hold**
+  vertical thrust to clear the pad → boost → retract gear → **`await_status(landing_gear=up)`** to
+  confirm from Status.json that the gear actually retracted. It's `confirm_required=True` and, like
+  every batch macro, **NOT in the default allowlist** (`["landing_gear"]` unchanged) — opt-in by
+  name. This is the pattern future Tier-2 tasks (dock/undock flows, jump-and-continue) reuse.
+
 ### Implemented — auto-honk (`[honk]`, default off, N5)
 The second keybind-driven action, and the first PROACTIVE one — fire the Discovery Scanner
 ("honk") on arrival in a new system, no button press (`covas/capabilities/honk_capability.py`).

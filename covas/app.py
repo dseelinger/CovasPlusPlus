@@ -795,11 +795,18 @@ class App:
 
             # Report per-macro readiness so the manual test knows what's wired.
             for macro in self.keybinds._allowed_macros():
-                b = binds.get(macro.action)
-                if b is not None and b.usable:
-                    detail = f"{macro.name} -> {b.key}"
+                if macro.steps:
+                    # Sequence macro (#33): usable iff every key-pressing step is bound to a key.
+                    missing = [s.action for s in macro.steps if s.action
+                               and (binds.get(s.action) is None or not binds[s.action].usable)]
+                    detail = (f"{macro.name} (sequence) READY" if not missing
+                              else f"{macro.name} (sequence) UNUSABLE (bind: {', '.join(missing)})")
                 else:
-                    detail = f"{macro.name} UNUSABLE (no keyboard bind for {macro.action})"
+                    b = binds.get(macro.action)
+                    if b is not None and b.usable:
+                        detail = f"{macro.name} -> {b.key}"
+                    else:
+                        detail = f"{macro.name} UNUSABLE (no keyboard bind for {macro.action})"
                 self.bus.publish({"type": "log", "who": "system",
                                   "text": f"Keybind macro: {detail}"})
             guard = "on" if kcfg.combat_guard else "off"

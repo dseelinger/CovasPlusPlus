@@ -296,6 +296,18 @@ Notes:
 
 Notes:
 
+### 6.1c Status-checked timed sequence — `launch` (#33 — `[keybinds].enabled = true`, allowlist `launch`)
+> The first **multi-step** macro: a scripted sequence that mixes press/hold/wait with **Status.json checks between steps**. Add `launch` to `[keybinds].allowlist` (e.g. `["landing_gear", "launch"]`) and bind, to **keys** in ED, the controls it uses: *Flight Throttle* → Set Speed 50%, *Flight Rotation/Thrusters* → **Thrust Up** (`UpThrustButton`), *Flight Miscellaneous* → **Engine Boost** (`UseBoostJuice`), and *Landing Gear*. `[elite].enabled` on (combat guard + the status checks). **Do this docked at a station**, ready to undock — expect the ship to actually fly off the pad.
+- [ ] **Startup readiness:** launch reports `Keybind macro: launch (sequence) READY` (or `UNUSABLE (bind: <token>)` naming the control you still need to bind to a key).
+- [ ] **Arm-and-confirm:** *"COVAS, launch."* → says it's **armed but not done**; nothing moves. Same-turn confirm is refused (must be a separate command).
+- [ ] **Happy path:** press **undock** in the station menu (ED hovers you over the pad, gear down); then *"confirm"* → COVAS throttles up, **holds** thrust to rise off the pad, **boosts** clear, retracts the gear, and only reports success once Status.json shows the gear **up**. Log: `executed sequence launch`.
+- [ ] **Precondition refuses (gear up):** while flying with the **gear up** (not on a pad), arm+confirm `launch` → it **refuses** ("your landing gear isn't down…") and presses **nothing**.
+- [ ] **Verify step catches a miss:** if the gear never retracts (e.g. unbind Landing Gear from a key after arming) → after ~4 s it reports it **couldn't confirm the gear retracted** rather than claiming success.
+- [ ] **Hard abort mid-sequence:** during the confirmed run, say *"abort"* → the sequence **stops**, the held thrust key **releases immediately**, and remaining steps don't fire.
+- [ ] **Mode gating:** **on foot** or **in the SRV**, `launch` isn't offered and is refused ("only works in your ship").
+- [ ] **Combat guard:** in **danger/interdiction** (or with `[elite]` off) arming/confirming `launch` is **refused**.
+- [ ] **Off by default:** with the default allowlist (`landing_gear` only), *"launch"* is **not** offered and is refused — the sequence ships opt-in.
+
 ### 6.2 Auto-honk (N5 + K2 — `[honk].enabled = true`, **on by default**)
 > Fires the Discovery Scanner shortly after you jump into a **new** system — no button press, and **no fire-group setup**. Bind the Discovery Scanner's fire to a **key** in ED (a HOTAS/mouse-only bind can't be pressed; a keyboard secondary, even with a modifier, is fine). At launch the log reports "Auto-honk ON …" or a "bind it in-game" warning.
 - [ ] **Happy path:** with the **Discovery Scanner** in your current fire group, **jump** to a new system → after a short probe it **holds** the fire button ~`hold_seconds` (default 5) and honks; the system map populates. Log: `honked — current fire group`.
