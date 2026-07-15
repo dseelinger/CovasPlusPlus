@@ -1,0 +1,87 @@
+{
+  "results": [
+    {
+      "name": "Barnard's Star 5",
+      "system_name": "Barnard's Star",
+      "distance": 5.95466269510709,
+      "distance_to_arrival": 3272.446599,
+      "reserve_level": "Depleted",
+      "rings": [
+        {
+          "name": "Barnard's Star 5 A Ring",
+          "type": "Metal Rich",
+          "signals": [
+            {
+              "count": 2,
+              "name": "Painite"
+            },
+            {
+              "count": 1,
+              "name": "Platinum"
+            }
+          ],
+          "signals_updated_at": "2026-07-11 17:32:59+00"
+        },
+        {
+          "name": "Barnard's Star 5 B Ring",
+          "type": "Icy",
+          "signals": [
+            {
+              "count": 1,
+              "name": "Bromellite"
+            },
+            {
+              "count": 1,
+              "name": "Grandidierite"
+            },
+            {
+              "count": 1,
+              "name": "Low Temperature Diamonds"
+            },
+            {
+              "count": 1,
+              "name": "Tritium"
+            }
+          ],
+          "signals_updated_at": "2026-07-12 04:58:05+00"
+        }
+      ]
+    },
+    {
+      "name": "WISE 0855-0714 6",
+      "system_name": "WISE 0855-0714",
+      "distance": 7.17165372752338,
+      "distance_to_arrival": 916.881959,
+      "reserve_level": "Low",
+      "rings": [
+        {
+          "name": "WISE 0855-0714 6 A Ring",
+          "type": "Metal Rich",
+          "signals": [
+            {
+              "count": 5,
+              "name": "Monazite"
+            },
+            {
+              "count": 2,
+              "name": "Painite"
+            },
+            {
+              "count": 1,
+              "name": "Platinum"
+            },
+            {
+              "count": 1,
+              "name": "Rhodplumsite"
+            },
+            {
+              "count": 1,
+              "name": "Serendibite"
+            }
+          ],
+          "signals_updated_at": "2026-06-12 08:14:23+00"
+        }
+      ]
+    }
+  ]
+}

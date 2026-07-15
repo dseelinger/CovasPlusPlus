@@ -236,6 +236,8 @@ class App:
             self._start_neutron_plan()
         if self.cfg.get("riches_plan", {}).get("enabled"):
             self._start_riches_plan()
+        if self.cfg.get("mining_helper", {}).get("enabled"):
+            self._start_mining_helper()
         # C9: compose the audio layer once the mixer, providers, and ED context all exist.
         if self.mixer is not None:
             self._start_audio_layer()
@@ -1040,6 +1042,33 @@ class App:
             self.riches_plan = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Road-to-Riches planner failed to start: {e}"})
+
+    # ---- Mining helper (#45, on the Spansh search layer) ------------------
+    def _start_mining_helper(self) -> None:
+        """Build + register the mining helper (#45) — nearest ring hotspot for a material + the best
+        FRESHNESS-VERIFIED place to sell it + the mining loop dropped onto the checklist. Uses the
+        synchronous Spansh /search layer (not the async route client), shares the current-system
+        seam and the same checklist model the checklist capability serves, and hands the hotspot
+        system to the galaxy map via the clipboard until the #32 keybind course-set lands. Fail
+        soft — a startup problem just leaves it off."""
+        try:
+            from .search import RequestsHttp
+            from .capabilities.mining_helper_capability import (MiningHelperCapability,
+                                                                MiningHelperConfig)
+
+            mcfg = MiningHelperConfig.from_cfg(self.cfg)
+            self.mining_helper = MiningHelperCapability(
+                mcfg, http=RequestsHttp(),
+                get_current_system=self._current_system,
+                checklist=self.checklist,
+                log=lambda msg: self._log("mining", msg))
+            self.registry.register(self.mining_helper)
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": "Mining helper ON (hotspots + fresh sell price + checklist)."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.mining_helper = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Mining helper failed to start: {e}"})
 
     def _current_station(self) -> str | None:
         """The station the Commander is currently DOCKED at, from live ED context — or None when

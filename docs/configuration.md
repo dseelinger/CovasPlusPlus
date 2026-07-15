@@ -329,6 +329,19 @@ See [Road-to-Riches planner](search/road-to-riches.md). **Off by default.**
 Needs [`[elite].enabled`](elite/monitoring.md) for the live current-system start. The first system is
 copied to your clipboard for the galaxy map (in-game course-set arrives with the keybind actions).
 
+## Mining helper (`[mining_helper]`)
+
+See [Mining helper](search/mining.md). **Off by default.**
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `mining_helper.enabled` | `false` | Master switch — voice-find a ring hotspot + the best fresh place to sell |
+| `mining_helper.max_price_age_days` | `2` | A sell quote older than this gets a spoken "that price is ~N days old" caveat |
+| `mining_helper.add_to_checklist` | `true` | Drop the go-to-hotspot / mine / sell-here loop onto your checklist as trackable steps |
+
+Needs [`[elite].enabled`](elite/monitoring.md) for the live current-system start. The hotspot system is
+copied to your clipboard for the galaxy map (in-game course-set arrives with the keybind actions).
+
 ## Community goals (`[cg]`)
 
 See [Community goals](elite/community-goals.md).
