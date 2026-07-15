@@ -856,6 +856,25 @@ on in config (or the Settings page) before testing.
 - [ ] 🔊 **Off by default:** with `[crew].enabled = false`, replies are spoken **exactly as before**
   — a single voice, no attribution, and any literal `[bracketed]` text is just read as text.
 
+### 18.5c Crew editor (issue #70 — control-panel Crew tab)  🖥️
+> Run `run_covas_ui.py` and open the panel; click **🎙 crew**. This edits `crew.json` (`[crew].file`),
+> git-ignored. Personas fold into the system prompt; a chosen voice overrides the auto-assignment.
+- [ ] 🖥️ **Add a character:** click **+ ADD CHARACTER**, enter a name (e.g. *Nyx*), a personality
+  line, pick a **Voice** from the dropdown (or leave **Auto**), **SAVE ROSTER** → a green *Saved*
+  and a `crew.json` appears in the data dir with your entry.
+- [ ] 🖥️ **Persists across sessions:** restart the UI, reopen the Crew tab → your roster is still
+  there (loaded from `crew.json`).
+- [ ] 🔊 **Persona shows up in conversation:** with crew on, ask something that invites that
+  character → they respond **in the personality you wrote**, in their assigned voice.
+- [ ] 🔊 **Assigned voice wins:** pin a character to a **specific** voice, save, then invoke them a
+  few times → they use **that** voice every time (not the deterministic auto pick). Switch back to
+  **Auto** and save → they revert to the deterministic voice.
+- [ ] 🖥️ **Stale-write guard:** open the Crew tab, hand-edit `crew.json` in a text editor and save,
+  then click **SAVE ROSTER** in the tab → it warns the file changed and offers **reload** or
+  **overwrite** (no silent clobber).
+- [ ] 🖥️ **Disabled banner:** with `[crew].enabled = false`, the Crew tab shows a banner noting crew
+  won't speak until enabled, but the roster still saves/loads.
+
 ### 18.6 Drop-in content (C11)
 - [ ] On first run with the layer enabled, confirm the skeleton appears: **`audio/sfx/<cue>/`**,
   **`audio/music/<context>/`**, **`content/chatter/*.txt`**, **`content/interdiction_threat.txt`**,

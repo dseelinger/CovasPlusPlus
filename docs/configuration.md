@@ -138,8 +138,9 @@ See [Interactive crew](using/crew.md).
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `crew.enabled` | `false` | Let replies voice a named crew member via a `[Name]` line prefix, each in its own deterministic, radio-filtered cast voice (the persona still speaks every unprefixed line) |
-| `crew.roster` | `[]` | Optional hint list of crew names woven into the (static) system instruction; free-form names still get a stable voice |
+| `crew.enabled` | `false` | Let replies voice a named crew member via a `[Name]` line prefix, each in its own radio-filtered cast voice (the persona still speaks every unprefixed line) |
+| `crew.file` | `crew.json` | The editable crew roster — a git-ignored JSON list of `{name, persona, voice_ref}` the control-panel **Crew** tab manages. Personas fold into the (static) system prompt; a non-blank `voice_ref` pins that character to a specific cast voice, blank keeps the deterministic auto-assignment. When this file is absent, the legacy `crew.roster` list is used instead |
+| `crew.roster` | `[]` | Legacy inline hint list of crew names (superseded by `crew.file`); free-form names still get a stable voice |
 
 ## Text-to-speech (`[elevenlabs]`, `[tts]`, `[piper]`, `[edge]`, `[azure]`, `[openai_tts]`, `[cartesia]`)
 

@@ -21,12 +21,32 @@ Crew is **off by default**. Turn it on with:
 ```toml
 [crew]
 enabled = true
-# Optional hint list so the model reaches for consistent characters. Free-form names still work.
-roster = ["Nyx", "Vela"]
 ```
 
 When crew is **off**, replies are spoken exactly as before — nothing about the normal voice loop
 changes.
+
+## Defining your crew (the Crew tab)
+
+Open the control panel and click **🎙 crew**. Each character has three fields:
+
+- **Name** — how the companion refers to them, and the `[Name]` prefix it uses. Case-sensitive.
+- **Personality** *(optional)* — a short line of flavor ("Sharp-eyed sensor officer, terse and
+  dry") that folds into the system prompt so the character stays consistent turn to turn.
+- **Voice** — leave on **Auto** to let COVAS++ pick a stable voice deterministically, or pin a
+  specific voice from your [cast pool](../audio/ambient-audio.md).
+
+Add characters, edit them, delete them, then **SAVE ROSTER**. The roster is stored in a small,
+git-ignored `crew.json` file (`[crew].file`) that the voice loop and the system prompt read live —
+a saved edit applies to the very next reply. If someone hand-edits the file underneath you, the
+editor warns instead of clobbering it (the same stale-write guard as the checklist and memory
+editors).
+
+The personas fold into the **static** part of the prompt, so they ride the prompt cache and only
+rewrite it the once, when you save a change — they don't add per-turn cost.
+
+You can still use the legacy inline `[crew].roster = ["Nyx", "Vela"]` list in `config.toml`
+(names only). It's used only when no `crew.json` exists; the Crew tab supersedes it.
 
 ## How it works
 
@@ -47,20 +67,24 @@ COVAS++ splits that reply into ordered segments and speaks each in turn:
 - **`[Nyx]` / `[Vela]` lines** are spoken in each character's **own voice**, radio-filtered, from
   the shared [voice cast](../audio/ambient-audio.md).
 
-### Deterministic voices
+### Voices: auto or assigned
 
-Each crew name maps to a voice **deterministically**: the same name gets the **same** voice every
-time, and different names get **different** voices (drawn from your configured cast pool). You
-don't assign voices by hand — *"Nyx"* simply sounds like Nyx across the whole session, and across
-sessions. A free-form name the model invents on the spot still gets a stable voice the same way.
-If you haven't configured a cast pool, crew lines fall back to the persona voice.
+By default each crew name maps to a voice **deterministically**: the same name gets the **same**
+voice every time, and different names get **different** voices (drawn from your configured cast
+pool). *"Nyx"* simply sounds like Nyx across the whole session, and across sessions — including a
+free-form name the model invents on the spot.
 
-### The roster (optional)
+In the **Crew** tab you can also **assign** a specific voice to a character instead of leaving it
+on Auto. An assigned voice always wins over the automatic pick; leaving it on **Auto** keeps the
+deterministic behavior above. If you haven't configured a cast pool and a character is on Auto,
+that crew line falls back to the persona voice.
 
-`[crew].roster` is only a **hint** — a list of names woven into the instruction so the model
-tends to reuse the same characters instead of inventing new ones each turn. It never restricts the
-model: any name it uses is voiced. Leave it empty to let the companion pick names that fit the
-moment.
+### Personas keep characters consistent
+
+A character's **personality** line (from the Crew tab) is woven into the system prompt, so *"Nyx"*
+doesn't just *sound* the same each turn — she *acts* the same. The model reaches for the crew you've
+defined instead of inventing new names, and voices each in character. Leave the roster empty to let
+the companion pick names that fit the moment (each still gets a stable voice).
 
 ## Attribution
 

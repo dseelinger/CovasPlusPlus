@@ -2,7 +2,7 @@
 
 Launch with the UI build and COVAS++ opens a local dashboard in your browser at
 **[http://127.0.0.1:8765](http://127.0.0.1:8765)** — a status light, a live log, and full editors
-for settings, personality, your checklist, and your memory.
+for settings, personality, your checklist, your memory, and your crew.
 
 ```powershell
 .\run_covas_ui.bat
@@ -103,6 +103,21 @@ uses:
 - **Add** — record a fact by hand.
 - **Stale-write guard** — if the voice loop wrote to memory while you had the tab open, it warns you
   and offers a reload instead of clobbering — the same protection the checklist editor uses.
+
+Pure vanilla JS with **no CDN**, so this tab works fully offline.
+
+## Crew tab — `/crew`
+
+An editor for your [interactive crew](using/crew.md) — define the characters the companion can voice:
+
+- **Name** — the identity the companion refers to them by and prefixes their lines with.
+- **Personality** — an optional flavor line woven into the (static) system prompt so a character
+  stays consistent turn to turn.
+- **Voice** — pick a specific cast voice, or leave it on **Auto** for the deterministic assignment.
+- **Save / add / delete** — the whole roster is saved at once to a git-ignored `crew.json` the
+  voice and prompt paths read live.
+- **Stale-write guard** — if the roster file changed underneath you, it warns and offers reload or
+  overwrite instead of clobbering — the same protection the checklist and memory editors use.
 
 Pure vanilla JS with **no CDN**, so this tab works fully offline.
 

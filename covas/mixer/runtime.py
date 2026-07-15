@@ -271,9 +271,11 @@ class AudioLayer:
 
         This is the crew seam on the conversation path: the persona (ship COVAS++) keeps its own
         direct `tts.speak` path for unprefixed lines, while a `[Name]`-prefixed line comes here and
-        reuses the C10 cast exactly like comms/chatter — `VoiceCast.assign(name)` gives the same
-        voice for the same name every time (distinct names -> distinct voices; an empty pool
-        degrades to the persona voice), and `CastSynth` routes it to the right provider.
+        reuses the C10 cast exactly like comms/chatter. The voice is resolved via
+        `VoiceCast.for_crew(name, voice_ref)`: an EXPLICIT `[crew].file` voice_ref (issue #70)
+        overrides the deterministic pick, and a blank one falls back to `assign(name)` — same name
+        -> same voice, distinct names -> distinct voices, empty pool -> the persona voice. The
+        roster is read live from config so a control-panel edit applies to the very next crew line.
 
         Returns True when the line was voiced (or was empty — nothing to say); False only when
         nothing could be synthesized (dead provider), so the caller degrades THAT line to the
@@ -282,7 +284,8 @@ class AudioLayer:
         if not text:
             return True  # empty segment -> treat as handled, don't force a persona re-speak
         try:
-            voice = self._cast.assign(name)
+            from .. import crew as crew_mod  # local import: keep the mixer package cycle-free
+            voice = self._cast.for_crew(name, crew_mod.voice_ref_for(self.cfg, name))
             pcm, sr = self._cast.synth(voice, text)
         except Exception as e:  # noqa: BLE001 — a dead cast voice degrades to the persona voice
             self._log(f"crew synth failed ({name}): {e}")

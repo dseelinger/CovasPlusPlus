@@ -24,6 +24,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request
 from flask_sock import Sock
 
+from . import crew as crew_mod
 from . import elevenlabs as el
 from . import firstrun
 from . import personality as persona
@@ -508,6 +509,78 @@ def create_app(core) -> Flask:
         if len(kept) == len(records):
             return jsonify({"ok": False, "error": f"no memory with id {rec_id!r}"}), 404
         return _memory_saved(store, kept)
+
+    # ---- Crew editor (issue #70) -----------------------------------------------
+    # Define the crew CAST: name, personality, and (optional) explicit voice per character. It
+    # edits the SAME JSON roster file ([crew].file) the voice/prompt paths read live — personas
+    # fold into the static system instruction, a non-blank voice_ref overrides the deterministic
+    # auto-assign. A whole-roster save (the cast is small) guarded by the same content-hash
+    # stale-write token as the checklist/memory editors, so a hand-edit to the file isn't clobbered.
+    def _crew_path() -> Path | None:
+        return crew_mod.roster_file(core.cfg)
+
+    def _crew_voices() -> list[dict]:
+        """Voice options for the per-character dropdown — the configured cast POOL plus the persona
+        voice, each `{ref, label}`. A blank ref (offered as "Auto" in the UI) keeps the deterministic
+        assignment. Offline: reads [audio.voices] from config, never hits the network."""
+        try:
+            from .mixer.voices import build_cast
+            cast = build_cast(core.cfg)
+        except Exception:  # noqa: BLE001 — no resolvable cast -> only the Auto option in the UI
+            return []
+        persona = cast.persona()
+        out: list[dict] = []
+        seen: set[str] = set()
+        for v in [persona, *cast.pool]:
+            ref = str(v.ref or "").strip()
+            if not ref or ref in seen:
+                continue
+            seen.add(ref)
+            role = "persona" if ref == persona.ref else v.gender
+            out.append({"ref": ref, "label": f"{v.provider}:{ref} ({role})"})
+        return out
+
+    def _crew_snapshot() -> dict:
+        """The roster + voice options + version, re-read from the shared file so the content-hash
+        `version` and the returned members always describe the same on-disk state."""
+        path = _crew_path()
+        members = crew_mod.load_members(core.cfg)
+        return {"members": [m.to_dict() for m in members], "voices": _crew_voices(),
+                "enabled": crew_mod.is_enabled(core.cfg),
+                "version": _file_version(path) if path else "",
+                "name": path.name if path else ""}
+
+    @flask_app.route("/crew")
+    def crew_page():
+        return render_template("crew.html")
+
+    @flask_app.route("/api/crew")
+    def crew_state():
+        if _crew_path() is None:
+            return jsonify({"ok": False, "error": "no crew file configured"}), 400
+        return jsonify({"ok": True, **_crew_snapshot()})
+
+    @flask_app.route("/api/crew", methods=["POST"])
+    def crew_save():
+        """Save the whole roster back to [crew].file. Refuses (409) when the file changed since the
+        client loaded it (a hand-edit / voice write landed) unless `force` is set — the response
+        carries the current roster so the client can reload-vs-overwrite instead of clobbering."""
+        path = _crew_path()
+        if path is None:
+            return jsonify({"ok": False, "error": "no crew file configured"}), 400
+        b = request.get_json(force=True) or {}
+        current = _file_version(path)
+        if not b.get("force") and b.get("base_version") != current:
+            return jsonify({"ok": False, "error": "stale", **_crew_snapshot()}), 409
+        raw = b.get("members")
+        if not isinstance(raw, list):
+            return jsonify({"ok": False, "error": "members must be a list"}), 400
+        members = [m for m in (crew_mod.CrewMember.from_obj(o) for o in raw) if m is not None]
+        crew_mod.save_members(path, members)
+        core.bus.publish({"type": "log", "who": "system",
+                          "text": f"Crew roster updated from the web editor "
+                                  f"({len(members)} character(s))."})
+        return jsonify({"ok": True, **_crew_snapshot()})
 
     @flask_app.route("/api/cancel", methods=["POST"])
     def cancel():
