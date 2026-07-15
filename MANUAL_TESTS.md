@@ -66,6 +66,7 @@ the next restart** (only Whisper reloads live). Confirm each before running its 
 - [ ] `[reflex.auto].enabled = true` — Tier-2 **ambient** auto-reflexes (no voice). **Off** by default; needs `[reflex].enabled` too, plus a per-reflex enable (`[reflex.auto.heat_sink].enabled` / `[reflex.auto.chaff].enabled`). (§6.3.2)
 - [ ] `[honk].enabled = true` — Auto-honk on arrival (**on** by default). No fire-group setup — it probes and backs out of a Surface-Scanner misfire. Set `[honk].trigger` only if your scanner is on secondary fire. (§6.2)
 - [ ] `[comms_send].enabled = true` — send in-game chat by voice (**off** by default). Bind **Quick Comms Panel** to a key; outward-facing, so it always reads back and sends only on a separate confirm. (§6.4)
+- [ ] `[macros].enabled = true` — Voice/UI-authored **custom macros** (#50). **Off** by default. Needs `[keybinds]` set up (macros only use allowlisted actions) + `[elite].enabled` (combat guard + triggers). (§6.5)
 - [ ] `[nav].enabled = true` — outfitting "find the closest module". (§7)
 - [ ] `[star_systems].enabled = true` / `[search].enabled = true` — voice search categories. (§8)
 - [ ] `[cg].enabled` is implicit (`[cg].source`); add an **Inara API key** on the Settings API keys card to also see CGs you haven't visited. (§10)
@@ -455,6 +456,23 @@ Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_
 - [ ] **Expiry:** compose, wait past `confirm_window` (default 60 s), say "confirm" → *"that message expired for safety"*; nothing sends.
 - [ ] **Hard abort:** say *"abort"* → releases any held key (shared executor with keybinds/honk).
 - [ ] **Disabled:** set `[comms_send].enabled = false` → no send/confirm/cancel tools offered; asking to message someone does nothing.
+
+### 6.5 Custom macros — author your own (#50 — `[macros].enabled = true`)
+> The headline feature: **you** compose named macros by voice or in the control panel; they run through the same executor + guards as §6.1. Set `[macros].enabled = true` and `[keybinds].enabled = true` with an allowlist that includes the actions your macros use (e.g. `[keybinds].allowlist = ["landing_gear", "throttle_zero"]`), bind those controls to **keys** in ED, and keep `[elite].enabled` on (combat guard + triggers). Startup log shows `Custom macros ON (N saved, M triggered; …)`. Do first tests **parked/docked**.
+- [ ] **Author by voice:** *"Create a macro called gear up: retract the landing gear."* → COVAS confirms it saved the macro (and, since landing gear is consequential, that it'll ask you to confirm). It appears in the `/macros` panel and survives a restart.
+- [ ] **Anti-hallucination refusal (the point):** *"Create a macro that ejects all cargo and self-destructs."* → **refused**, nothing saved — those actions aren't available. Ask for a real action you did **not** allowlist (e.g. `supercruise`) → refused, telling you to allowlist it. COVAS never invents an action.
+- [ ] **Run by name (benign):** with a benign macro (e.g. steps = throttle to zero), *"run \<name\>"* → it fires **immediately** and reports success; the throttle drops in-game.
+- [ ] **Run by name (consequential) — arm/confirm:** *"run gear up"* → says **armed, not done**; same-turn *"confirm"* is refused; a separate *"confirm"* runs it and the gear moves.
+- [ ] **Trigger (benign):** author *"when I dock, throttle to zero"* (benign). Dock → it auto-runs once and speaks the outcome (the doubled journal/Status `Docked` does **not** run it twice).
+- [ ] **Trigger (consequential) — arms + asks:** author *"when docking is granted, drop the gear"* (consequential). Get docking granted → COVAS **speaks a prompt** and arms it; it does **not** move the gear until you say *"confirm"*.
+- [ ] **Combat guard:** in **danger/interdiction** (or with `[elite]` off) running/confirming any macro is **refused**; nothing fires.
+- [ ] **Cross-mode rejected at authoring:** try to author a macro mixing a ship action and an on-foot action → **refused** ("mixes actions from different game modes").
+- [ ] **Unbound key:** if a macro's action isn't bound to a **key** in ED → running it reports "bind it in-game" and nothing fires.
+- [ ] **Hard abort:** with a macro armed (or mid-run), say *"abort"* → clears the pending macro and releases every held key (shared with §6.1/§6.3).
+- [ ] **Panel authoring + delete:** open **🎛 macros**, build a macro with the step editor (dropdowns only offer allowlisted actions / known triggers), SAVE → it appears in voice too; DELETE removes it. An out-of-allowlist action can't be picked, and the server rejects a hand-crafted bad request.
+- [ ] **Disabled:** set `[macros].enabled = false` → no macro tools offered; *"run \<name\>"* does nothing.
+
+Notes:
 
 ## 7. Outfitting search — find the closest module  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
 > `[nav].enabled = true`. `require_confirmation` ships **off**, so it searches as soon as the module is fully resolved.

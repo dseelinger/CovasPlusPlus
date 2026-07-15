@@ -217,11 +217,19 @@ class App:
         # it), so it's behind a MANDATORY read-back-before-send gate — no un-confirmed sends.
         # Opt-in ([comms_send].enabled, off by default); shares the keybind executor + binds.
         self.comms = None
+        # Custom macros (issue #50) — the Commander AUTHORS named, triggerable macros by voice/UI,
+        # validated against the action/trigger registry (anti-hallucination), persisted, and run
+        # through the SAME executor + guard + hard abort as [keybinds]. Opt-in ([macros].enabled,
+        # off by default).
+        self.macros = None
         # Shared scancode executor + parsed .binds, built once and reused by keybinds and
         # auto-honk so a hard abort releases keys held by either (and the .binds file is parsed
         # a single time). Lazily populated by the helpers below.
         self._shared_executor = None
         self._binds_cache: dict | None = None
+        # Shared hard-abort flag so ONE "abort" stops a running sequence started by EITHER the
+        # keybind capability or a custom macro (they share the executor too). Created once here.
+        self._keybind_abort = threading.Event()
         # Find-closest-module: resolve a module by voice (offline taxonomy), confirm, then
         # find the nearest station selling it via Spansh + copy the system to the clipboard.
         # Opt-in ([nav].enabled, off by default).
@@ -264,6 +272,8 @@ class App:
             self._start_reflex()
         if self.cfg.get("comms_send", {}).get("enabled"):
             self._start_comms()
+        if self.cfg.get("macros", {}).get("enabled"):
+            self._start_macros()
         if self.cfg.get("nav", {}).get("enabled"):
             self._start_nav()
             self._start_ship_nav()
@@ -884,6 +894,7 @@ class App:
             self.keybinds = KeybindCapability(
                 binds=binds, executor=executor, config=kcfg,
                 status_snapshot=snapshot,
+                abort_event=self._keybind_abort,   # shared with custom macros (#50)
                 log=lambda msg: self._log("keybind", msg))
             self.registry.register(self.keybinds)
 
@@ -1072,6 +1083,53 @@ class App:
             self.comms = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Comms send failed to start: {e}"})
+
+    # ---- Custom macros (#50) ----------------------------------------------
+    def _start_macros(self) -> None:
+        """Build + register the custom-macro capability: the persisted spec store, the shared
+        binds/executor/abort, and the allowlist provider the compiler validates against. Fail
+        soft — a missing bindings file or non-Windows host just leaves authoring able to SAVE and
+        VALIDATE macros (offline), degrading only the actual key-press at run time to a spoken
+        'bind it in-game'. Ensures the event pump so triggered macros can auto-run. The combat
+        guard reads the live ED snapshot (needs [elite].enabled to positively confirm safety)."""
+        try:
+            from .capabilities.keybind_capability import KeybindConfig
+            from .capabilities.macro_capability import MacroCapability, MacroConfig
+            from .macros.store import store_from_config
+
+            mcfg = MacroConfig.from_cfg(self.cfg)
+            store = store_from_config(self.cfg)
+            binds = self._ed_binds()
+            executor = self._key_executor()   # raises ExecutorError off-Windows -> caught below
+            snapshot = ((lambda: self.ed_ctx.snapshot()) if self.ed_ctx is not None else None)
+            # Live allowlist: a custom macro may only use actions the Commander has opted into via
+            # [keybinds].allowlist, read fresh so a live settings change is honoured at run time.
+            allowlist = (lambda: frozenset(KeybindConfig.from_cfg(self.cfg).allowlist))
+            self.macros = MacroCapability(
+                store=store, config=mcfg, binds=binds, executor=executor,
+                allowlist=allowlist, status_snapshot=snapshot,
+                abort_event=self._keybind_abort,          # one hard abort covers keybinds + macros
+                speak=self._speak_proactive_line,         # triggered arm prompt / outcome
+                log=lambda msg: self._log("macro", msg))
+            self.registry.register(self.macros)
+            self._start_event_pump()                      # triggered macros need the bus pump
+
+            saved = store.all()
+            triggered = sum(1 for s in saved if s.trigger)
+            if self.ed_ctx is None:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    "Custom macros ON, but ED monitoring is OFF — the combat guard can't verify "
+                    "safety and triggers won't fire, so macros will be refused until "
+                    "[elite].enabled."})
+            else:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    f"Custom macros ON ({len(saved)} saved, {triggered} triggered; confirmation "
+                    f"{'on' if mcfg.require_confirmation else 'off'}, combat guard "
+                    f"{'on' if mcfg.combat_guard else 'off'})."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.macros = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Custom macros failed to start: {e}"})
 
     # ---- Auto-honk (N5) ---------------------------------------------------
     def _start_honk(self) -> None:
@@ -1888,6 +1946,8 @@ class App:
                 self.keybinds.new_turn()
             if self.comms is not None:
                 self.comms.new_turn()
+            if self.macros is not None:
+                self.macros.new_turn()
             if self.nav is not None:
                 self.nav.new_turn()
 

@@ -375,6 +375,32 @@ SCHEMA: list[Setting] = [
             default=60, min=5, max=300, unit="s",
             phrasings=("confirm window",)),
 
+    # --- Custom macros (#50) ----------------------------------------------
+    Setting("macros.enabled", ("macros", "enabled"), "bool",
+            "Custom macros", "Custom macros",
+            "Let the Commander author their OWN named, triggerable macros by voice/UI. A macro "
+            "may only use actions in the Keybinds allowlist, so it can't do anything you haven't "
+            "already enabled. Needs Keybinds + ED monitoring to run.",
+            default=False, phrasings=("custom macros", "macros", "macro authoring"),
+            example="turn custom macros on"),
+    Setting("macros.require_confirmation", ("macros", "require_confirmation"), "bool",
+            "Require confirmation", "Custom macros",
+            "A consequential macro needs a SEPARATE spoken confirm before it runs. Leave ON.",
+            default=True, phrasings=("macro confirmation",)),
+    Setting("macros.combat_guard", ("macros", "combat_guard"), "bool",
+            "Combat guard", "Custom macros",
+            "Refuse to run a macro during danger/interdiction (or unknown status). Leave ON.",
+            default=True, phrasings=("macro combat guard",)),
+    Setting("macros.mode_guard", ("macros", "mode_guard"), "bool",
+            "Mode guard", "Custom macros",
+            "Only run a macro whose actions are valid for your current game mode. Leave ON.",
+            default=True, phrasings=("macro mode guard",)),
+    Setting("macros.confirm_window", ("macros", "confirm_window"), "int",
+            "Confirm window", "Custom macros",
+            "Seconds an armed macro stays confirmable before it expires.",
+            default=60, min=5, max=300, unit="s",
+            phrasings=("macro confirm window",)),
+
     # --- Auto-honk ---------------------------------------------------------
     Setting("honk.enabled", ("honk", "enabled"), "bool",
             "Auto-honk", "Auto-honk",

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COVAS++ Macros</title>
+<!-- Custom-macro browser (issue #50): view / author / delete the Commander's own named macros.
+     Pure vanilla JS — no CDN — so it works fully offline. The create form's option lists come
+     from the server's closed vocabularies (allowlisted actions, known status keys/triggers), and
+     the server re-validates with the SAME compile_macro the voice path uses, so a web-authored
+     macro is anti-hallucination-checked identically: an out-of-allowlist action is a 400, not a
+     saved macro. Authoring here shares the same JSONL file the voice loop reads. -->
+<style>
+  :root{
+    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
+    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,#12181f,#0a0d12)}
+  header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
+  header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
+  header a.sub{color:var(--accent2);text-decoration:none}
+  .wrap{padding:16px;max-width:1000px}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:16px;margin-bottom:16px}
+  .card h2{margin:0 0 12px;font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  input,select{background:#0c1119;color:var(--text);border:1px solid var(--edge);
+      border-radius:6px;padding:8px 10px;font-family:inherit;font-size:13px}
+  input:focus,select:focus{outline:none;border-color:var(--accent2)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1 1 200px}
+  button{padding:9px 16px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+      border-radius:6px;font-family:inherit;font-size:13px;letter-spacing:1px;cursor:pointer}
+  button:hover{background:#162836}
+  button.primary{background:var(--accent);color:#0a0d12;border-color:var(--accent);font-weight:bold}
+  button.primary:hover{filter:brightness(1.1)}
+  button.danger{color:#ff9d9d}
+  button.small{padding:5px 10px;font-size:12px}
+  .msg{color:#39d353;font-size:12px}
+  .msg.err{color:#ff9d9d}
+  .hint{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.6}
+  .count{color:var(--muted);font-size:12px;margin-left:auto}
+  ul#list{list-style:none;margin:0;padding:0}
+  li.mac{border:1px solid var(--edge);border-radius:6px;padding:12px;margin-bottom:10px;background:#0e141d}
+  li.mac .name{font-size:15px;color:var(--accent);letter-spacing:1px}
+  li.mac .body{font-size:13px;line-height:1.5;margin-top:6px;color:var(--text);word-break:break-word}
+  li.mac .meta{color:var(--muted);font-size:11px;margin-top:6px;letter-spacing:.5px}
+  li.mac .trig{color:var(--accent2)}
+  li.mac .actions{margin-top:10px;display:flex;gap:8px}
+  .step{border:1px solid var(--edge);border-radius:6px;padding:8px;margin-bottom:8px;background:#0e141d}
+  .step .row{align-items:center}
+  .step .fld{display:none}
+  .empty{color:var(--muted);font-size:13px;padding:8px 0}
+  .steplbl{color:var(--muted);font-size:11px;min-width:52px}
+</style>
+</head>
+<body>
+<header>
+  <h1>COVAS++</h1>
+  <span class="sub">CUSTOM MACROS</span>
+  <a href="/" class="sub">← control panel</a>
+  <a href="/settings" class="sub">⚙ settings</a>
+  <a href="/checklist" class="sub">☑ checklist</a>
+  <a href="/memory" class="sub">🧠 memory</a>
+  <span class="sub" id="fileName" style="margin-left:auto"></span>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Author a macro</h2>
+    <div class="row">
+      <input class="grow" id="mName" placeholder="Macro name — e.g. Dock ASAP">
+      <select id="mTrigger" title="Auto-run trigger (optional)"></select>
+      <label class="steplbl" style="min-width:auto">
+        <input type="checkbox" id="mConfirm" checked style="vertical-align:middle"> confirm
+      </label>
+    </div>
+    <div id="steps" style="margin-top:12px"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="addStep" class="small">+ ADD STEP</button>
+      <button class="primary" id="save" style="margin-left:auto">SAVE MACRO</button>
+    </div>
+    <span class="msg" id="msg"></span>
+    <div class="hint">
+      A macro can only use actions in your <b>[keybinds].allowlist</b> — that's what keeps it
+      safe (it can't do anything you haven't already enabled). Add a trigger to auto-run it on a
+      game event, or leave it blank and say "run <i>name</i>". Consequential macros ask for a
+      spoken confirm first. You can also author entirely by voice: "create a macro called…".
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Saved macros</h2>
+    <div class="row">
+      <button id="reload">RELOAD FROM DISK</button>
+      <span class="count" id="count"></span>
+    </div>
+    <ul id="list" style="margin-top:12px"></ul>
+    <div class="empty" id="empty" style="display:none">No macros yet — author one above.</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let VOCAB = {actions:[], statuses:[], triggers:[]};
+let MACROS = [];
+
+function flash(text, isErr){
+  const el = $("msg");
+  el.textContent = text; el.classList.toggle("err", !!isErr);
+  clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = ""; }, 5000);
+}
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+// ---- step builder -------------------------------------------------------
+function opt(val, label){ return `<option value="${esc(val)}">${esc(label || val)}</option>`; }
+
+function addStep(){
+  const div = document.createElement("div");
+  div.className = "step";
+  const acts = VOCAB.actions.map(a => opt(a)).join("");
+  const stats = VOCAB.statuses.map(s => opt(s.key, s.key + " — " + s.label)).join("");
+  div.innerHTML = `
+    <div class="row">
+      <span class="steplbl">step</span>
+      <select class="sType">
+        ${opt("action","action")}${opt("wait","wait")}
+        ${opt("require_status","require status")}${opt("await_status","await status")}
+      </select>
+      <select class="sAction fld">${acts}</select>
+      <input class="sSeconds fld" type="number" step="0.1" min="0" placeholder="seconds" style="width:110px">
+      <select class="sStatus fld">${stats}</select>
+      <select class="sExpect fld">${opt("true","must be TRUE")}${opt("false","must be FALSE")}</select>
+      <button class="small danger delStep" style="margin-left:auto">✕</button>
+    </div>`;
+  const type = div.querySelector(".sType");
+  const refresh = () => {
+    const t = type.value;
+    div.querySelector(".sAction").style.display  = t === "action" ? "" : "none";
+    div.querySelector(".sSeconds").style.display = (t === "wait" || t === "await_status") ? "" : "none";
+    div.querySelector(".sStatus").style.display  = (t === "require_status" || t === "await_status") ? "" : "none";
+    div.querySelector(".sExpect").style.display  = (t === "require_status" || t === "await_status") ? "" : "none";
+  };
+  type.onchange = refresh; refresh();
+  div.querySelector(".delStep").onclick = () => div.remove();
+  $("steps").appendChild(div);
+}
+
+function collectSteps(){
+  const out = [];
+  for (const div of $("steps").querySelectorAll(".step")){
+    const t = div.querySelector(".sType").value;
+    if (t === "action") out.push({type:"action", action: div.querySelector(".sAction").value});
+    else if (t === "wait") out.push({type:"wait", seconds: parseFloat(div.querySelector(".sSeconds").value) || 0});
+    else out.push({type:t, status: div.querySelector(".sStatus").value,
+                   expect: div.querySelector(".sExpect").value === "true",
+                   seconds: parseFloat(div.querySelector(".sSeconds").value) || 0});
+  }
+  return out;
+}
+
+// ---- list ---------------------------------------------------------------
+function summarize(m){
+  return (m.steps || []).map(s => {
+    if (s.kind === "action") return s.action;
+    if (s.kind === "wait") return "wait " + (s.seconds || 0) + "s";
+    if (s.kind === "require_status") return "need " + s.status + "=" + s.expect;
+    if (s.kind === "await_status") return "await " + s.status + "=" + s.expect;
+    return s.kind;
+  }).join("  →  ");
+}
+function triggerWhen(id){
+  const t = (VOCAB.triggers || []).find(x => x.id === id);
+  return t ? t.when : id;
+}
+
+function render(){
+  $("count").textContent = MACROS.length + " on file";
+  $("empty").style.display = MACROS.length ? "none" : "block";
+  const list = $("list"); list.innerHTML = "";
+  for (const m of MACROS){
+    const li = document.createElement("li");
+    li.className = "mac";
+    const trig = m.trigger ? `<div class="meta trig">auto-runs when ${esc(triggerWhen(m.trigger))}</div>` : "";
+    li.innerHTML = `
+      <div class="name">${esc(m.name)}</div>
+      <div class="body">${esc(summarize(m))}</div>
+      ${trig}
+      <div class="meta">${m.confirm ? "needs spoken confirm" : "runs immediately"}</div>
+      <div class="actions"><button class="small danger del">DELETE</button></div>`;
+    li.querySelector(".del").onclick = () => del(m.name);
+    list.appendChild(li);
+  }
+}
+
+function applyVocab(){
+  const trig = $("mTrigger");
+  trig.innerHTML = opt("", "no trigger (run by name)")
+    + (VOCAB.triggers || []).map(t => opt(t.id, "when " + t.when)).join("");
+}
+
+async function load(){
+  const r = await fetch("/api/macros");
+  const data = await r.json();
+  if (!r.ok) { flash(data.error || "load failed", true); return; }
+  VOCAB = data.vocab || VOCAB; MACROS = data.macros || [];
+  $("fileName").textContent = data.name || "";
+  applyVocab(); render();
+}
+
+async function save(){
+  const name = $("mName").value.trim();
+  if (!name) { flash("Give the macro a name.", true); return; }
+  const steps = collectSteps();
+  if (!steps.length) { flash("Add at least one step.", true); return; }
+  const body = {name, steps, trigger: $("mTrigger").value, confirm: $("mConfirm").checked};
+  const r = await fetch("/api/macros/create", {
+    method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(body)});
+  const data = await r.json();
+  if (!r.ok) { flash(data.error || "save failed", true); return; }   // templated validator error
+  MACROS = data.macros || []; render();
+  $("mName").value = ""; $("steps").innerHTML = ""; addStep();
+  flash("Saved '" + name + "'.");
+}
+
+async function del(name){
+  if (!window.confirm("Delete macro '" + name + "'?")) return;
+  const r = await fetch("/api/macros/delete", {
+    method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({name})});
+  const data = await r.json();
+  if (!r.ok) { flash(data.error || "delete failed", true); return; }
+  MACROS = data.macros || []; render(); flash("Deleted '" + name + "'.");
+}
+
+$("addStep").onclick = addStep;
+$("save").onclick = save;
+$("reload").onclick = async () => { await load(); flash("Reloaded."); };
+
+load().then(() => addStep());
+</script>
+</body>
+</html>

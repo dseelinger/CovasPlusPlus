@@ -121,6 +121,21 @@ An editor for your [interactive crew](using/crew.md) — define the characters t
 
 Pure vanilla JS with **no CDN**, so this tab works fully offline.
 
+## Macros tab — `/macros`
+
+An editor for your [custom macros](automation/custom-macros.md) — the named, triggerable macros
+you author yourself. It reads and writes the **same `custom_macros.jsonl`** the voice loop uses:
+
+- **List** — every saved macro with its steps, trigger, and whether it needs a spoken confirm.
+- **Author** — name a macro, add ordered steps (an allowlisted **action**, a **wait**, a **require
+  status** check, or an **await status** wait), optionally pick a **trigger**, and save. The
+  dropdowns only offer real, allowlisted actions and known triggers/status flags.
+- **Delete** — remove a macro you no longer want.
+
+Saving here runs the **exact same validation** as voice authoring, so a web-created macro can't
+reference an action outside your allowlist or a trigger COVAS++ doesn't track. Pure vanilla JS with
+**no CDN** — works fully offline. Requires `[macros].enabled` to actually run the macros you build.
+
 ## What needs what
 
 The panel itself just needs the app running. Individual features it exposes (settings that toggle
