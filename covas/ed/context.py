@@ -101,6 +101,10 @@ class EDContext:
         # structured, read on demand by the StoredCapability's tools (issue #67).
         self._stored_ships = None
         self._stored_modules = None
+        # The Commander's engineer unlock progress (issue #65): {journal-name: EngineerStatus}
+        # from `EngineerProgress`. MERGED (not replaced): the startup summary lists everyone,
+        # later single-engineer updates patch one. Read on demand by the engineers capability.
+        self._engineer_progress: dict = {}
 
     def update(self, **changes) -> None:
         """Atomically set one or more fields. Unknown keys raise (fail loud) so a typo
@@ -190,6 +194,22 @@ class EDContext:
         seen yet. Immutable, so handing out the reference is thread-safe."""
         with self._lock:
             return self._stored_modules
+
+    # -- engineer progress (issue #65) ---------------------------------------------------
+    def update_engineer_progress(self, mapping: dict) -> None:
+        """Merge a {engineer-name: EngineerStatus} patch into the tracked progress. Merging
+        (not replacing) keeps a prior startup summary intact when a single-engineer update
+        arrives. A falsy/empty patch is a no-op."""
+        if not mapping:
+            return
+        with self._lock:
+            self._engineer_progress.update(mapping)
+
+    def engineer_progress(self) -> dict:
+        """A copy of the Commander's engineer progress map ({name: EngineerStatus}), taken
+        under lock. Empty until an `EngineerProgress` event has been seen."""
+        with self._lock:
+            return dict(self._engineer_progress)
 
     def fuel_pct(self) -> float | None:
         with self._lock:

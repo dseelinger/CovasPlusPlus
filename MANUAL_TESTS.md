@@ -406,6 +406,16 @@ Notes:
 - [ ] **Stored-modules rundown:** *"What modules do I have stored?"* → grouped here / elsewhere / in transit.
 - [ ] **Honest miss:** ask for a ship/module you have **not** stored → it says it doesn't see one and **lists what you actually have** (never invents a location).
 - [ ] **Not seen yet:** ask before docking at a shipyard/outfitting this session → it says to dock at one first (no crash).
+## 9a. Engineers finder (#65)  🎮 ED 🔊 HW 📋 clipboard
+> `[elite].enabled = true`. Unlock **status** is read live from the journal's `EngineerProgress`
+> event (written at login); locations/requirements come from a bundled offline table. Log into the
+> game at least once this session so progress has been read.
+- [ ] **Locate by name + plot:** *"Where is Felicity Farseer?"* → speaks her system (Deciat) and base, what she engineers, and copies **Deciat** to the clipboard to plot a route (paste to confirm).
+- [ ] **Journal-grounded status:** *"How do I unlock The Dweller?"* → your **actual** status (unlocked / invited / discovered / not started) from the journal, plus what's still needed. Compare against the in-game Engineers panel — it should match your real progress, not a generic answer.
+- [ ] **By module:** *"Which engineer upgrades my FSD?"* → lists the FSD engineers (Farseer, Palin, …), each tagged with whether **you've** unlocked them.
+- [ ] **Unlock rundown:** *"Which engineers have I unlocked?"* → a count plus what's unlocked, in-progress, and still locked — matching the in-game panel.
+- [ ] **Already-there rule:** ask *"where is …"* an engineer while you're **in that engineer's system** → it says you're already there and does **NOT** copy.
+- [ ] **No progress yet:** with the game not yet logged in this session, ask *"which engineers have I unlocked?"* → it says it hasn't read your progress yet rather than guessing.
 
 Notes:
 

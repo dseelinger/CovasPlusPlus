@@ -16,6 +16,7 @@ from typing import Callable
 
 from ..events import EventBus
 from .context import EDContext
+from .engineers import parse_engineer_progress
 from .loadout import parse_loadout
 from .stored import parse_stored_ships, parse_stored_modules
 
@@ -185,16 +186,19 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     patch = handler(event) if handler is not None else {}
     if patch:
         ctx.update(**patch)
-    # A few events carry far more than a "current context" patch — a full structured snapshot
-    # stored alongside for its capability's tools (each event is complete -> replace wholesale).
-    # These have NO context patch of their own (Loadout's ship/fuel aside), so they're handled
-    # here even when the event isn't in _HANDLERS.
+    # A few events carry structured state beyond the flat "current context" patch and have no
+    # _HANDLERS entry of their own — fold those in regardless of whether a field-patch was
+    # produced (each event is complete -> replace/merge wholesale).
     if name == "Loadout":                                   # per-module engineering (N9)
         ctx.set_loadout(parse_loadout(event))
     elif name == "StoredShips":                             # stored-ships inventory (#67)
         ctx.set_stored_ships(parse_stored_ships(event))
     elif name == "StoredModules":                           # stored-modules inventory (#67)
         ctx.set_stored_modules(parse_stored_modules(event))
+    # EngineerProgress grounds the engineers finder (#65): merge the {name: status} map so
+    # "what have I unlocked / what's left" is answered from the Commander's own journal.
+    elif name == "EngineerProgress":
+        ctx.update_engineer_progress(parse_engineer_progress(event))
     return patch
 
 

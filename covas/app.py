@@ -378,6 +378,7 @@ class App:
             from .ed import (EDContext, JournalWatcher, StatusWatcher,
                              resolve_journal_dir, status_path)
             from .capabilities.ed_context_capability import EDContextCapability
+            from .capabilities.engineers_capability import EngineersCapability
             from .capabilities.loadout_capability import LoadoutCapability
             from .capabilities.stored_capability import StoredCapability
             from .nav import copy as _nav_copy
@@ -400,6 +401,13 @@ class App:
                 get_current_system=self._current_system,
                 clipboard=_nav_copy,
                 log=lambda m: self._log("stored", m)))
+            # Engineers finder (#65): bundled reference table joined with live EngineerProgress
+            # for journal-grounded unlock status. Copies an engineer's system for plotting.
+            self.registry.register(EngineersCapability(
+                get_progress=self.ed_ctx.engineer_progress,
+                get_current_system=lambda: self.ed_ctx.snapshot().get("system"),
+                clipboard=_nav_copy,
+                log=lambda m: self._log("engineers", m)))
             self._start_carriers(jdir)
             self._start_cg(jdir)
 
