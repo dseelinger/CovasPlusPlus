@@ -719,6 +719,23 @@ default_max_hops = 4
 max_price_age_days = 2
 
 
+[neutron_plan]
+# Neutron / long-range GALAXY route planner (#43) — the neutron-highway workhorse on the same
+# #41 route foundation as the trade planner. Voice: "plot a neutron route to Colonia". Give a
+# destination system + your laden jump range (start defaults to your current system) and it plots
+# a long-range route via Spansh's neutron plotter, speaks the summary (total jumps, number of
+# waypoints, the first one), and hands the first waypoint to the galaxy map — via the CLIPBOARD
+# for now (paste it into the galaxy-map search); the in-game "set course" keybind handoff arrives
+# with the Tier-1 galaxy-map action (#32). Needs [elite].enabled for the current-system default
+# start. DEFAULT OFF — opt in.
+enabled = false
+# Sent as the HTTP User-Agent — be a polite API citizen and identify the app.
+user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
+# Default Spansh efficiency (1-100) when you don't specify: higher rides more neutron detours for
+# fewer total jumps; 60 is the site's sensible middle ground.
+default_efficiency = 60
+
+
 # Location & carrier voice commands (N3) — "copy my current system" and "where's my fleet
 # carrier" — need no configuration: the PERSONAL (owned) carrier is auto-tracked from the
 # journal (name, callsign, current system via CarrierStats / CarrierLocation), pinned to the
