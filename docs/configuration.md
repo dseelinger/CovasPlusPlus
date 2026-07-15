@@ -14,6 +14,14 @@ settings, with **relative paths** so your checkout stays portable. Anything you 
     Turning a whole feature on or off takes effect the next time you launch. A few settings (the
     Whisper model, bus volumes, some audio toggles) apply live.
 
+!!! note "Upgrades pick up new defaults automatically"
+    In a packaged install your editable `config.toml` lives in the writable data dir
+    (`%APPDATA%\COVAS++`), while the **shipped** `config.toml` ships inside the app. At load time the
+    shipped config is the **base**, then your data-dir `config.toml` and `overrides.json` layer on
+    top — so a config seeded by an older build automatically gains any new sections and defaults on
+    upgrade (your own edits still win). You never have to hand-merge or delete your config after an
+    update.
+
 This page groups the settings by their `config.toml` section. It's a reference — `config.toml`
 itself carries a comment on every line.
 

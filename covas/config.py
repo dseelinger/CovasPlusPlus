@@ -145,8 +145,24 @@ def _seed_config_if_missing() -> None:
 
 def load_config() -> dict:
     _seed_config_if_missing()
+    # Precedence (lowest to highest): SHIPPED config.toml < user data-dir config.toml < overrides.json.
+    # Loading the shipped config as the BASE is what fixes the upgrade bug: a data-dir config seeded
+    # by an older build (or in an old format) never gained sections/fields added since — e.g. a
+    # pre-#12 config has no [openai], so the API-keys card had no `api_key_file` to write and the key
+    # couldn't be set at all. With the shipped config underneath, new defaults always appear while the
+    # user's edits still win on top. Gated on app_dir() != data_dir() (a frozen/relocated run): in a
+    # source run they're the SAME file, so this is a no-op and dev/test behaviour is unchanged.
+    cfg: dict = {}
+    if app_dir() != data_dir():
+        bundled = app_dir() / "config.toml"
+        if bundled.exists() and bundled.resolve() != config_path().resolve():
+            try:
+                with open(bundled, "rb") as f:
+                    cfg = tomllib.load(f)
+            except (OSError, tomllib.TOMLDecodeError):
+                cfg = {}
     with open(config_path(), "rb") as f:
-        cfg = tomllib.load(f)
+        _deep_merge(cfg, tomllib.load(f))
     op = overrides_path()
     if op.exists():
         try:
