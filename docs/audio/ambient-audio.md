@@ -138,6 +138,6 @@ git-ignored — the assets are yours to supply.
 
 The audio layer lives under the `[audio]`, `[audio.buses.*]`, `[audio.comms]`, `[audio.voices]`,
 `[music]`, and related sections. The Settings page has an **"Ambient audio"** group for the common
-knobs — master and per-part enables, per-bus volumes, and the comms voice pickers — most of which
+knobs — master and per-part enables, per-bus volumes, and the voice-cast provider — most of which
 apply live. See the [Configuration reference](../configuration.md#ambient-audio-audio-music) for the
 full set.

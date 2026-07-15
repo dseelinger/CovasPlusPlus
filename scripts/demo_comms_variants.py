@@ -5,15 +5,23 @@ verbatim, and a player DM read verbatim.
     .venv\\Scripts\\python.exe scripts\\demo_comms_variants.py
 
 Uses the configured TTS provider + real audio device (ElevenLabs key or a Piper voice needed).
-No LLM cost: the "generator" here is a canned stub so the fallback is deterministic. Set voices
-in [audio.comms.voices] to hear male/female/default differ.
+No LLM cost: the "generator" here is a canned stub so the fallback is deterministic. The speaker
+voice is cast by identity through the C10 voice cast (a random-but-sticky pool voice), so a given
+NPC keeps its voice across lines; configure the pool in [audio.voices].
 """
 from __future__ import annotations
 
 import time
 
 from covas.config import load_config
-from covas.mixer import COMMS, BusMixer, CommsVoicer, comms_voice_id, evaluate, speak_on_bus
+from covas.mixer import (
+    COMMS,
+    BusMixer,
+    CommsVoicer,
+    build_cast,
+    evaluate,
+    pcm16_to_float,
+)
 from covas.providers.factory import make_tts
 
 
@@ -36,8 +44,13 @@ def main() -> None:
     mixer = BusMixer(cfg)
     mixer.start()
 
-    def play(text: str, record) -> bool:   # C10: play receives the whole record
-        speak_on_bus(mixer, tts, text, bus=COMMS, voice_id=comms_voice_id(cfg, record.voice))
+    # C10 voice cast: route each chosen Voice through the configured TTS provider. With no pool in
+    # [audio.voices] this degrades to the single provider/persona voice — same as the live app.
+    cast = build_cast(cfg, synth=lambda voice, text: tts.synth_pcm(text, voice.ref or None))
+
+    def play(text: str, record) -> bool:   # C10: play receives the whole record, casts by identity
+        pcm, sr = cast.synth(cast.for_record(record), text)
+        mixer.submit(COMMS, pcm16_to_float(pcm), sr)
         return True
 
     voicer = CommsVoicer(play, generate=lambda src, tier: _CANNED.get(src, src))

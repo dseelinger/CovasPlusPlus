@@ -82,17 +82,6 @@ noise_level           = 0.02     # static bed amplitude (0 = no hiss)
 compress_threshold_db = -12.0    # peaks above this level get pushed back down
 compress_ratio        = 4.0      # how hard (higher = more level-flattening)
 
-[audio.comms.voices]
-# ElevenLabs voice ids for voiced comms lines (C5), by the logical voice the C4 gate picks:
-#   male    — player DMs (fixed) and male-honorific NPCs
-#   female  — female-honorific NPCs
-#   default — everything else (the neutral NPC voice)
-# Blank falls back to `default`, then to the provider default. Set these to voices DISTINCT from
-# the COVAS voice so comms sound like someone else over the radio.
-male    = ""
-female  = ""
-default = ""
-
 [audio.voices]
 # Voice cast (C10). COVAS (you) always speak on ElevenLabs with the persona voice
 # ([elevenlabs].voice_id). The NPC/comms/chatter CAST is drawn from a pool of RANDOM voices, kept

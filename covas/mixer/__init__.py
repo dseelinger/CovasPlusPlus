@@ -82,7 +82,6 @@ from .variants import (
     VoicedComms,
     build_variant_prompt,
     clamp_tier,
-    comms_voice_id,
     make_variant_generator,
     validate_variant,
 )
@@ -136,7 +135,6 @@ __all__ = [
     "VoicedComms",
     "build_variant_prompt",
     "clamp_tier",
-    "comms_voice_id",
     "make_variant_generator",
     "validate_variant",
     "ChatterPlayer",
