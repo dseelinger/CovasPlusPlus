@@ -89,6 +89,7 @@ _DATA_PATH_FIELDS = (
     ("cartesia", "api_key_file"),
     ("cg", "api_key_file"),
     ("checklist", "file"),
+    ("memory", "dir"),
     ("logging", "dir"),
     ("piper", "model"),
     ("whisper", "download_root"),

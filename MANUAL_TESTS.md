@@ -350,6 +350,22 @@ Notes:
 
 Notes:
 
+## 13a. Persistent memory — store & recall (issue #59)  📋 FILE
+> **Foundation only** — no voice surface yet (voice recall lands in #61). This verifies the
+> transparent store on disk and fail-soft loading. Memory lives at `<data dir>/memory/memory.jsonl`
+> (`memory/memory.jsonl` in a source run; `%APPDATA%\COVAS++\memory\memory.jsonl` when installed).
+- [ ] 📋 Create `memory/memory.jsonl` and add a line by hand:
+      `{"text": "CMDR prefers metric units", "type": "preference", "tags": ["units"]}` → save.
+- [ ] 📋 Confirm the folder/file is **git-ignored** (`git status` does not list it) — memory stays private.
+- [ ] 📋 **Fail-soft:** append a deliberately broken line (e.g. `{ not json`) and a `# comment` line, save.
+      In a Python shell: `from covas.memory import MemoryStore; MemoryStore("memory/memory.jsonl").load()`
+      → returns only the **valid** fact(s); a `!! [memory] skipping corrupt line…` warning prints; no crash.
+- [ ] 📋 **Recall (offline, free):** `from covas.memory import MemoryStore, Retriever;`
+      `Retriever(MemoryStore("memory/memory.jsonl")).recall("what units do I use")` → returns the units fact.
+- [ ] Confirm `[memory.embedding].enabled` is **false** by default (no network on the recall path).
+
+Notes:
+
 ## 14. Web control panel  🌐 PANEL 🔊 HW 📋 FILE
 
 ### 14.1 Live status & log

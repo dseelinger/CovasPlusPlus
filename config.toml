@@ -423,6 +423,26 @@ output_format = "pcm_16000"
 file = "ultimate_checklist.md"
 
 
+[memory]
+# Persistent memory (issue #59). Small facts about you and your play — how you like to be
+# addressed, your main ship, standing preferences — that the companion can recall later.
+# TRANSPARENT by design: stored as a plain, human-readable JSON-lines file you can open,
+# read, edit, or prune in any text editor. It lives under your writable data dir and is
+# GIT-IGNORED (private) — never committed, unlike the opaque memory in other ED assistants.
+enabled = true
+# Directory (relative to your data dir) holding the memory file (memory.jsonl). Git-ignored.
+dir = "memory"
+
+[memory.embedding]
+# OPTIONAL semantic recall via text embeddings. DEFAULT OFF — and off is the whole point:
+# recall works out of the box with pure keyword/tag matching, which is offline, free, and
+# needs no extra dependency. Embeddings can recall by meaning (not just shared words) but
+# cost money and/or a heavy local model and phone home, so you opt in deliberately. No
+# backend ships yet; when enabled without a working provider, recall falls back to keyword.
+enabled  = false
+provider = ""   # name of an embedding backend (none available yet); blank = keyword only
+
+
 [elite]
 # Elite Dangerous game-state monitoring (DESIGN §5). When ON, two watcher threads tail
 # the Journal.*.log + Status.json that ED writes to disk and publish semantic events on

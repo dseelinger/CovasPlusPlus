@@ -187,6 +187,17 @@ Turn the whole bed off with `[audio].thinking_bed = false` (or the **Thinking so
 |---------|---------|--------------|
 | `checklist.file` | `ultimate_checklist.md` | Your checklist markdown file (git-ignored) |
 
+## Persistent memory (`[memory]`)
+
+Transparent, human-readable facts about you — see [Persistent memory](using/memory.md).
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `memory.enabled` | `true` | Master switch for loading/saving memory |
+| `memory.dir` | `memory` | Folder (under your data dir) holding `memory.jsonl` (git-ignored) |
+| `memory.embedding.enabled` | `false` | Opt in to semantic recall (costs money; off = free keyword recall) |
+| `memory.embedding.provider` | *(blank)* | Name of an embedding backend (none available yet) |
+
 ## Elite Dangerous (`[elite]`)
 
 Game-state monitoring — see [Game-state monitoring](elite/monitoring.md). **Enable this first**;
