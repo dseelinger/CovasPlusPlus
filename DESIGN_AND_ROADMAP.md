@@ -705,8 +705,9 @@ A PROTOTYPE proving the inverted policy end-to-end on the *same* scancode execut
 - Everything (binds, executor, status snapshot) is injected, so the guard's three cases
   (permitted-in-combat / always-refused / permitted-but-not-in-combat), the chaff dispatch, and
   the hard abort are all unit-tested offline with a recording fake executor + a fake Status feed.
-- **Next (separate issues, building ON this guard):** an auto-reflex framework that fires chaff
-  automatically on a Status danger transition (#37). It builds on the guard this issue lands.
+- **Built ON this guard (separate issues):** a local phrase-spotter + second-PTT fast path (#38,
+  below) and an automatic threshold layer (#37, below) — both fire the same reflexes through the
+  same guard/executor, adding only new *triggers*.
 
 ### Implemented — Tier-2 phrase-spotter + second-PTT reflex fast path (`covas/reflex_spotter.py`, #38)
 The reflex path in #36 dispatches through the LLM (`fire_chaff` is a tool). That's fine for a
@@ -737,6 +738,40 @@ must not queue behind the main conversation turn. #38 adds a **local fast path**
   no-false-fire, leftmost-wins, no-match→None, vocabulary integrity); `fire_reflex` reusing the
   allowlist+guard+abort; and the app path (a spotted keyword fires the reflex and never calls the
   LLM, a non-combat capture falls through to a normal turn, abort routes to release_all).
+
+### Implemented — Tier-2 ambient auto-reflex framework (`[reflex.auto]`, default off, #37)
+The AUTOMATIC (no-voice) trigger layer for the reflexes above — the only sub-100ms path, because a
+threshold crossing fires the reflex directly instead of waiting on an LLM round-trip *or* a key
+press. Like #38 it adds **nothing** to the safety model: it fires the SAME `REFLEX_ACTIONS` through
+the SAME `fire_reflex_action` helper (bind check → combat-permissive guard → executor), so an
+automatic reflex is exactly as safe as a spoken or hotword one. What's new is only the *trigger*.
+
+- **Same shape as auto-honk.** `AutoReflexCapability` (`covas/capabilities/auto_reflex_capability.py`)
+  is a self-contained capability with an `on_event` bus hook (no worker-loop edits — capabilities
+  over loop edits). On a waking `ed_event` it re-reads the live Status snapshot, checks each enabled
+  reflex's threshold, and — if met — fires through the shared guard/executor. `#36`'s
+  `ReflexCapability._fire` (which #38's `fire_reflex` also routes through) was refactored onto the
+  shared `fire_reflex_action` helper so all three reflex paths take one route.
+- **Two reflexes shipped, both default OFF.** `heat_sink` — deploy a heat sink on ED's `Overheating`
+  flag (>100% heat); the per-reflex `threshold` is the heat percent to react at (>100 disables it,
+  since ED never signals hotter). `chaff` — fire chaff on the `EnteredDanger` / `Interdicted` /
+  `UnderAttack` triggers, i.e. when a hostile has a lock. `heat_sink` is a threshold reflex, `chaff`
+  a pure boolean trigger. (`overheating` was added to the decoded `EDContext` snapshot for the
+  trigger; both reflexes were also wired into `REFLEX_ACTIONS`, so the verbal + hotword paths gained
+  heat sink too.)
+- **Cooldowns reuse the proactive governor's shape.** `AutoReflexPolicy` (mirroring `ProactivePolicy`)
+  enforces a per-reflex `cooldown` plus a global `min_interval`, on an injectable clock, so a
+  sustained overheat or a long fight can't machine-gun presses. A guard-refused attempt does **not**
+  arm the cooldown (a real danger re-trigger can still fire).
+- **Guard re-enforced at fire time.** Even a threshold that fired is refused if Status can't confirm
+  danger (SAFE/UNKNOWN), and the `ALWAYS_REFUSED` set is unreachable (only `COMBAT_PERMISSIVE` names
+  are wired). `[reflex].combat_guard` is shared — its escape-hatch `false` lets `heat_sink` fire on
+  overheat regardless of danger (e.g. fuel scooping), but never a dangerous action. The shared hard
+  abort (`release_all()`) still lifts any held key.
+- **No LLM tools** (the "no voice" requirement) — the layer is silent and ambient; the verbal
+  `ReflexCapability` still owns the spoken tools + help metadata. Everything (binds, executor, status
+  snapshot, clock) is injected, so the threshold/below-threshold/cooldown/guard-blocks/abort cases
+  are all unit-tested offline with a recording fake executor, a fake Status feed, and a fake clock.
 
 ### Implemented — send in-game comms text by voice (`[comms_send]`, default off, #49)
 The first Tier-1 action that needs **character input**, not a single scancode — compose ED chat

@@ -293,14 +293,22 @@ See [Keybind automation](automation/keybinds.md). **Off by default** — it send
 
 See [Combat reflexes](automation/reflexes.md). **Off by default**, allowlist ships **empty** — a
 separate, *combat-permissive* policy (the inverse of `[keybinds]`): it fires defensive reflexes
-(chaff today) only while you're in danger, and hard-refuses dangerous actions always.
+(chaff, heat sink) only while you're in danger, and hard-refuses dangerous actions always. Three
+paths: **spoken** / **hotword** (`[reflex]`) and **automatic** (`[reflex.auto]`).
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `reflex.enabled` | `false` | Master switch |
-| `reflex.combat_guard` | `true` | Permit reflexes only while in danger/interdiction; always refuse dangerous actions (leave on) |
-| `reflex.allowlist` | `[]` | Reflex names allowed to fire (separate from `keybinds.allowlist`). Add `"chaff"` to opt in |
+| `reflex.enabled` | `false` | Master switch for the spoken/hotword reflexes (and the whole Tier-2 subsystem) |
+| `reflex.combat_guard` | `true` | Permit reflexes only while in danger/interdiction; always refuse dangerous actions (leave on). Shared by every reflex path |
+| `reflex.allowlist` | `[]` | Reflex names allowed to fire (separate from `keybinds.allowlist`). Add `"chaff"` / `"heat_sink"` to opt in |
 | `reflex.ptt` | `""` | Second push-to-talk for the **instant fast path** — a snap *"chaff!"* on this key fires locally with **no LLM round-trip** (same guard/abort). Bind a **different** key than `keys.push_to_talk`; **blank** disables it. A non-combat phrase on it falls through to a normal turn |
+| `reflex.auto.enabled` | `false` | Master switch for the **automatic** (no-voice) reflexes |
+| `reflex.auto.min_interval` | `3.0` | Global governor — no two auto-reflexes fire within this many seconds |
+| `reflex.auto.heat_sink.enabled` | `false` | Auto-deploy a heat sink on overheat |
+| `reflex.auto.heat_sink.threshold` | `100.0` | Heat percent to react at (ED signals overheat at >100%; a value above 100 disables it) |
+| `reflex.auto.heat_sink.cooldown` | `10.0` | Minimum seconds between auto heat-sink deployments |
+| `reflex.auto.chaff.enabled` | `false` | Auto-fire chaff when targeted/interdicted |
+| `reflex.auto.chaff.cooldown` | `8.0` | Minimum seconds between auto chaff bursts |
 
 ## Send in-game messages (`[comms_send]`)
 

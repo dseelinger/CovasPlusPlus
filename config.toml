@@ -718,18 +718,22 @@ allowlist = ["landing_gear"]
 # app behaves exactly as if reflexes didn't exist. Requires [elite].enabled: the guard must read
 # ED Status to positively confirm you're in danger before firing (no telemetry -> refused).
 #
-# PROTOTYPE: exactly one reflex is wired end-to-end today — chaff (fire_chaff). Auto-firing
-# reflexes (#37) and a local phrase-spotter (#38) build ON this guard later.
+# Two reflexes are wired end-to-end today — chaff (fire_chaff) and heat sink (fire_heat_sink) — on
+# the VERBAL path here, the second-PTT phrase-spotter (#38), and the AUTOMATIC layer ([reflex.auto]
+# below). A local phrase-spotter (#38) and the auto layer (#37) build ON this same guard.
 enabled = false
 # Enforce the combat-permissive guard (leave ON). OFF is an escape hatch that lets a permitted
-# reflex fire regardless of Status — but the always-refused set stays refused even then.
+# reflex fire regardless of Status — but the always-refused set stays refused even then. Shared by
+# the verbal, phrase-spotter, and automatic reflex paths.
 combat_guard = true
-# Allowlist of reflex NAMES the companion may fire — the ONLY reflexes permitted, and entirely
-# SEPARATE from [keybinds].allowlist. Ships EMPTY (opt-in). Available reflexes:
-#   chaff        — fire the chaff launcher (FireChaffLauncher)   [wired end-to-end today]
-#   heat_sink, shields, boost                                    [policy-recognized; not yet wired]
+# Allowlist of reflex NAMES the companion may fire ON COMMAND — the ONLY reflexes the verbal/spotter
+# path permits, entirely SEPARATE from [keybinds].allowlist AND from the [reflex.auto] enables below.
+# Ships EMPTY (opt-in). Available reflexes:
+#   chaff        — fire the chaff launcher (FireChaffLauncher)   [wired end-to-end]
+#   heat_sink    — deploy a heat sink (DeployHeatSink)           [wired end-to-end]
+#   shields, boost                                               [policy-recognized; not yet wired]
 # The action must also be bound to a KEY in Elite Dangerous; an unbound one degrades to a spoken
-# "bind it in-game" message. Example: allowlist = ["chaff"]
+# "bind it in-game" message. Example: allowlist = ["chaff", "heat_sink"]
 allowlist = []
 # SECOND push-to-talk for the reflex FAST PATH (issue #38). Bind this to a DIFFERENT key/button
 # than [keys].push_to_talk. A capture on this key is transcribed locally and matched against a
@@ -740,11 +744,42 @@ allowlist = []
 # allowlisted+bound reflex to actually fire. `keyboard`-library key name, e.g. ptt = "]".
 # Fixed vocabulary (say any synonym on the reflex key):
 #   chaff     — "chaff", "flares", "decoy", "break lock"
-#   heat_sink — "heat", "heat sink", "dump heat"      [policy-recognized; wiring lands with #37+]
+#   heat_sink — "heat", "heat sink", "dump heat"      [wired end-to-end]
 #   shields   — "shields", "shield cell", "cell"      [policy-recognized]
 #   boost     — "boost", "punch it"                   [policy-recognized]
 #   abort     — "abort", "stop", "cancel", "release"  (shared hard abort — releases every held key)
 ptt = ""
+
+# --- Tier-2 AMBIENT auto-reflexes (#37) ---------------------------------------------------------
+# Fire the SAME reflexes AUTOMATICALLY off Elite Dangerous Status/journal thresholds — no voice,
+# no LLM round-trip, the only sub-100ms path. Each reflex takes the SAME combat-permissive guard
+# (above) and shared key executor as the verbal path, plus a cooldown so a sustained overheat or a
+# long fight can't machine-gun presses. Requires [elite].enabled (the trigger reads Status) AND
+# [reflex].enabled above — that master switch turns on the whole Tier-2 subsystem this nests under.
+[reflex.auto]
+# Master switch for the automatic layer. OFF by default; even ON, nothing fires until you enable a
+# reflex by name below (both levels default OFF — opt in deliberately).
+enabled = false
+# Global governor: no two auto-reflexes of ANY kind fire within this many seconds, so a burst of
+# overlapping transitions (enter danger -> interdicted -> overheat) yields at most one press.
+min_interval = 3.0
+
+# Auto-deploy a heat sink when the ship overheats. Trigger: ED's Overheating flag (set at > 100%
+# heat). `threshold` is the heat percent to react at — the default 100 fires on the overheat flag;
+# a value above 100 disables it by threshold (ED never reports hotter than the flag). Still gated
+# by the combat-permissive guard, so with the guard ON it fires only while ALSO in danger; set
+# [reflex].combat_guard = false if you want it to fire on overheat regardless (e.g. fuel scooping).
+[reflex.auto.heat_sink]
+enabled = false
+threshold = 100.0
+cooldown = 10.0
+
+# Auto-fire chaff when a hostile has a lock — on the danger/interdiction/under-attack triggers.
+# A pure boolean trigger (no numeric threshold): it fires whenever Status shows you're in danger
+# or being interdicted, which is exactly when the guard permits it.
+[reflex.auto.chaff]
+enabled = false
+cooldown = 8.0
 
 
 [comms_send]

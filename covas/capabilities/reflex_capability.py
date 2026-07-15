@@ -16,11 +16,12 @@ The two guards live side by side; neither weakens the other. The Tier-1 default 
 off by default and its allowlist ships empty, so a Commander must deliberately enable it and
 name each reflex.
 
-This is a PROTOTYPE: exactly one reflex — **fire chaff** — is proven end-to-end on the shared
-scancode executor, behind the new combat-permissive guard and the hard abort (`release_all()`).
-Dispatch here is the simplest possible path: a direct LLM tool (`fire_chaff`). The fast paths —
-an auto-reflex framework (#37) and a local phrase-spotter (#38) — are SEPARATE later issues that
-build ON this guard; they are intentionally NOT built here.
+Reflexes are proven end-to-end on the shared scancode executor, behind the combat-permissive guard
+and the hard abort (`release_all()`). Dispatch is a direct LLM tool per reflex (`fire_chaff`,
+`fire_heat_sink`) plus the local phrase-spotter's `fire_reflex(name)` fast path (#38). The AUTOMATIC
+(no-voice) threshold layer — an auto-reflex framework off Status/journal thresholds (#37) — lives in
+`auto_reflex_capability.py` and fires these SAME `REFLEX_ACTIONS` through the SAME
+`fire_reflex_action` helper below, so every reflex path shares one guard/executor/fail-soft route.
 
 Everything is injected (binds, executor, status snapshot) so the whole path is unit-testable
 offline with a recording fake executor and a fake Status feed — no real key presses, no real
@@ -66,15 +67,23 @@ COMBAT_PERMISSIVE = frozenset({"chaff", "heat_sink", "shields", "boost"})
 # combat must not become a backdoor to eject cargo / self-destruct / drop landing gear mid-fight.
 ALWAYS_REFUSED = frozenset({"eject_cargo", "self_destruct", "landing_gear"})
 
-# The reflexes actually wired to dispatch. The prototype validates exactly ONE end-to-end —
-# fire chaff — on the shared executor. The other COMBAT_PERMISSIVE members are recognized by the
-# guard (so the policy is real) but not yet dispatchable; #37/#38 and follow-up batches add them.
+# The reflexes actually wired to dispatch — the shared registry every reflex path fires: the LLM
+# tool + the local phrase-spotter (#38) here, and the AUTOMATIC threshold layer (auto_reflex_
+# capability, #37). Each name here is also a COMBAT_PERMISSIVE member, so the same guard governs it
+# however it's triggered. `shields` and `boost` remain policy-recognized but unwired (no validated
+# ED token yet).
 REFLEX_ACTIONS: dict[str, ReflexAction] = {
     "chaff": ReflexAction(
         name="chaff",
         tool="fire_chaff",
         action="FireChaffLauncher",      # ED .binds token for the chaff launcher
         done_phrase="Chaff away",
+    ),
+    "heat_sink": ReflexAction(
+        name="heat_sink",
+        tool="fire_heat_sink",
+        action="DeployHeatSink",         # ED .binds token for the heat-sink launcher
+        done_phrase="Heat sink deployed",
     ),
 }
 
@@ -155,6 +164,76 @@ class ReflexConfig:
         )
 
 
+# ---- shared fire path (used by every reflex path: LLM tool #36, spotter #38, auto #37) ----
+
+
+def reflex_binding_problem(reflex: ReflexAction, binds: dict[str, KeyBinding]) -> str | None:
+    """A Commander-facing reason a reflex can't run because its ED action isn't bound to a
+    keyboard key, or None when usable. Fail-soft: an unbound reflex degrades to a spoken
+    'bind it in-game' rather than a silent no-op. Pure — shared by every reflex path."""
+    b = binds.get(reflex.action)
+    if b is None:
+        return (f"'{reflex.action}' isn't in your Elite Dangerous bindings — bind your "
+                f"{reflex.name} control to a key in-game so I can fire it.")
+    if not b.usable:
+        return b.unusable_reason
+    return None
+
+
+def fire_reflex_action(
+    reflex: ReflexAction,
+    *,
+    binds: dict[str, KeyBinding],
+    executor: object,
+    snap: dict | None,
+    combat_guard: bool = True,
+    log: Optional[Callable[[str], None]] = None,
+) -> tuple[bool, str]:
+    """Fire a reflex end-to-end: bind check -> combat-permissive guard -> press/hold. Returns
+    `(fired, message)` — `fired` is True only when a key was actually sent.
+
+    This is the ONE safety path SHARED by every reflex trigger: the verbal LLM tool + the local
+    phrase-spotter (#38) via `ReflexCapability._fire`, and the automatic threshold layer (#37) via
+    `AutoReflexCapability`. So a reflex takes exactly the same guard/executor/fail-soft route no
+    matter how it was triggered. The combat-permissive guard (`combat_permissive_verdict`) is
+    re-enforced here at fire time — a threshold or keyword that decided to fire still can't fire
+    when Status shows SAFE/UNKNOWN, and the ALWAYS_REFUSED set is refused even with `combat_guard`
+    off (the escape hatch only relaxes the permitted set)."""
+    def _logline(msg: str) -> None:
+        if log is not None:
+            log(msg)
+
+    problem = reflex_binding_problem(reflex, binds)
+    if problem is not None:
+        _logline(f"{reflex.name} unusable: {problem}")
+        return False, problem
+
+    if combat_guard:
+        verdict = combat_permissive_verdict(reflex.name, snap)
+        if verdict is not None:
+            _logline(f"{reflex.name} blocked by combat-permissive guard: {verdict}")
+            return False, verdict
+    elif reflex.name in ALWAYS_REFUSED:
+        # Guard disabled is an escape hatch for the PERMITTED set only — the always-refused set
+        # is refused even with the guard off.
+        return False, combat_permissive_verdict(reflex.name, snap) or ""
+
+    binding = binds.get(reflex.action)
+    try:
+        if reflex.kind == "hold":
+            executor.hold(binding, reflex.hold_seconds)
+        else:
+            executor.press(binding)
+    except ExecutorError as e:
+        _logline(f"{reflex.name} injection failed: {e}")
+        return False, f"Couldn't send that key: {e}"
+    except Exception as e:  # noqa: BLE001 — never crash the loop on an injection fault
+        _logline(f"{reflex.name} injection error: {e}")
+        return False, f"Combat-reflex injection failed: {e}"
+    _logline(f"fired {reflex.name} -> {binding.key}")
+    return True, f"{reflex.done_phrase} (sent {binding.key})."
+
+
 # ---- tools --------------------------------------------------------------------------------
 
 _ABORT_TOOL = {
@@ -225,12 +304,13 @@ class ReflexCapability:
             category="combat reflexes",
             group="your ship",
             one_liner=("When you're under fire I can fire defensive reflexes on command — chaff "
-                       "today (heat sink, shield cell, and boost are on the way). Unlike the ship "
-                       "controls, which lock down in combat, these are the opposite: they only "
-                       "fire WHILE you're in danger or being interdicted, and dangerous actions "
-                       "stay off-limits. Bind a second push-to-talk ([reflex].ptt) and a snap "
-                       "'chaff!' on it fires locally in a heartbeat — no thinking, no delay. Say "
-                       "'abort' to release everything."),
+                       "and heat sink today (shield cell and boost are on the way). Unlike the "
+                       "ship controls, which lock down in combat, these are the opposite: they "
+                       "only fire WHILE you're in danger or being interdicted, and dangerous "
+                       "actions stay off-limits. Bind a second push-to-talk ([reflex].ptt) and a "
+                       "snap 'chaff!' on it fires locally in a heartbeat — no thinking, no delay. "
+                       "I can also fire them AUTOMATICALLY when you opt in — a heat sink when you "
+                       "overheat, chaff when you're targeted. Say 'abort' to release everything."),
             example="chaff!",
         )
 
@@ -270,38 +350,16 @@ class ReflexCapability:
 
     # -- fire / abort -----------------------------------------------------------------
     def _fire(self, reflex: ReflexAction) -> str:
-        """Fire a reflex end-to-end: bind check -> combat-permissive guard -> press. No arm and
-        no confirmation — a reflex is meant to be instant; the guard is the safety, not a prompt."""
-        problem = self._binding_problem(reflex)
-        if problem is not None:
-            self._logline(f"{reflex.name} unusable: {problem}")
-            return problem
-
+        """Fire a reflex through the SHARED safety path (`fire_reflex_action`): bind check ->
+        combat-permissive guard -> press. No arm and no confirmation — a reflex is meant to be
+        instant; the guard is the safety, not a prompt. The phrase-spotter fast path (#38) and the
+        automatic layer (#37) fire the same actions through the same helper, so every reflex path
+        behaves identically."""
         snap = self._status() if self._status is not None else None
-        if self._cfg.combat_guard:
-            verdict = combat_permissive_verdict(reflex.name, snap)
-            if verdict is not None:
-                self._logline(f"{reflex.name} blocked by combat-permissive guard: {verdict}")
-                return verdict
-        elif reflex.name in ALWAYS_REFUSED:
-            # Guard disabled is an escape hatch for the PERMITTED set only — the always-refused
-            # set is refused even with the guard off.
-            return combat_permissive_verdict(reflex.name, snap) or ""
-
-        binding = self._binds.get(reflex.action)
-        try:
-            if reflex.kind == "hold":
-                self._executor.hold(binding, reflex.hold_seconds)
-            else:
-                self._executor.press(binding)
-        except ExecutorError as e:
-            self._logline(f"{reflex.name} injection failed: {e}")
-            return f"Couldn't send that key: {e}"
-        except Exception as e:  # noqa: BLE001 — never crash the loop on an injection fault
-            self._logline(f"{reflex.name} injection error: {e}")
-            return f"Combat-reflex injection failed: {e}"
-        self._logline(f"fired {reflex.name} -> {binding.key}")
-        return f"{reflex.done_phrase} (sent {binding.key})."
+        _, msg = fire_reflex_action(
+            reflex, binds=self._binds, executor=self._executor, snap=snap,
+            combat_guard=self._cfg.combat_guard, log=self._log)
+        return msg
 
     def _abort(self) -> str:
         """Hard abort: release every held key on the shared executor. Never raises — an abort
@@ -323,15 +381,8 @@ class ReflexCapability:
 
     def _binding_problem(self, reflex: ReflexAction) -> str | None:
         """A Commander-facing reason the reflex can't run because its ED action isn't bound to a
-        keyboard key, or None when usable. Fail-soft: an unbound reflex degrades to a spoken
-        'bind it in-game' rather than a silent no-op."""
-        b = self._binds.get(reflex.action)
-        if b is None:
-            return (f"'{reflex.action}' isn't in your Elite Dangerous bindings — bind your "
-                    f"{reflex.name} control to a key in-game so I can fire it.")
-        if not b.usable:
-            return b.unusable_reason
-        return None
+        keyboard key, or None when usable. Thin wrapper over the shared `reflex_binding_problem`."""
+        return reflex_binding_problem(reflex, self._binds)
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:
@@ -343,4 +394,5 @@ class ReflexCapability:
 __all__ = [
     "ReflexAction", "ReflexCapability", "ReflexConfig", "combat_permissive_verdict",
     "COMBAT_PERMISSIVE", "ALWAYS_REFUSED", "REFLEX_ACTIONS", "SAFE",
+    "fire_reflex_action", "reflex_binding_problem",
 ]

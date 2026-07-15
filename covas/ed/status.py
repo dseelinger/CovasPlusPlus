@@ -191,6 +191,7 @@ def apply_status(ctx: EDContext, status: dict) -> dict:
         patch["hardpoints"] = d["HardpointsDeployed"]
         patch["in_danger"] = d["IsInDanger"]
         patch["being_interdicted"] = d["BeingInterdicted"]
+        patch["overheating"] = d["Overheating"]        # auto-reflex heat-sink trigger (#37)
         patch["low_fuel"] = d["LowFuel"]
         patch["analysis_mode"] = d["HudAnalysisMode"]
 

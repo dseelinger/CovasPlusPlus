@@ -33,6 +33,7 @@ _FIELDS: tuple[str, ...] = (
     "hardpoints",     # hardpoints deployed
     "in_danger",      # ED's IsInDanger flag (under fire / hostiles near) — combat guard
     "being_interdicted",  # ED's BeingInterdicted flag — combat guard (keybinds §6)
+    "overheating",    # ED's Overheating flag (> 100% heat) — auto-reflex heat-sink trigger (#37)
     "game_mode",      # mainship/fighter/srv/on_foot (Flags/Flags2) — mode-gated actions (#29)
     "low_fuel",       # ED's LowFuel flag (< 25%)
     "fuel_main",      # main tank fuel, tons
@@ -87,6 +88,7 @@ class EDContext:
         self.hardpoints: bool = False
         self.in_danger: bool = False
         self.being_interdicted: bool = False
+        self.overheating: bool = False
         self.game_mode: str | None = None
         self.low_fuel: bool = False
         self.fuel_main: float | None = None
