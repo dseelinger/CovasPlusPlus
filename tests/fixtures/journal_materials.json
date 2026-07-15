@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-07-15T09:30:00Z",
+  "event": "Materials",
+  "Raw": [
+    { "Name": "iron", "Count": 300 },
+    { "Name": "nickel", "Count": 250 },
+    { "Name": "arsenic", "Count": 12 },
+    { "Name": "phosphorus", "Count": 40 },
+    { "Name": "manganese", "Count": 8 },
+    { "Name": "cadmium", "Count": 5 }
+  ],
+  "Manufactured": [
+    { "Name": "chemicalprocessors", "Name_Localised": "Chemical Processors", "Count": 20 },
+    { "Name": "chemicaldistillery", "Name_Localised": "Chemical Distillery", "Count": 3 }
+  ],
+  "Encoded": [
+    { "Name": "disruptedwakeechoes", "Name_Localised": "Atypical Disrupted Wake Echoes", "Count": 30 },
+    { "Name": "wakesolutions", "Name_Localised": "Strange Wake Solutions", "Count": 10 },
+    { "Name": "hyperspacetrajectories", "Name_Localised": "Eccentric Hyperspace Trajectories", "Count": 4 }
+  ]
+}

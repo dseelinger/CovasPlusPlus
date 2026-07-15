@@ -18,6 +18,7 @@ from ..events import EventBus
 from .context import EDContext
 from .engineers import parse_engineer_progress
 from .loadout import parse_loadout
+from .materials import parse_materials
 from .stored import parse_stored_ships, parse_stored_modules
 
 # ED's journals live under the Windows user profile. Resolved at runtime (never a
@@ -182,6 +183,11 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     """Fold one parsed journal event into the rolling context. Returns the patch that was
     applied (empty when the event doesn't affect context) — handy for tests."""
     name = event.get("event", "")
+    # Material-inventory events (#66) don't touch "current context" _FIELDS, so they run
+    # independent of the handler table: the full `Materials` snapshot replaces the inventory;
+    # Collected/Discarded nudge counts between snapshots. Single-writer (this thread), so the
+    # read-modify-write on a delta is race-free.
+    apply_materials_event(ctx, event)
     handler = _HANDLERS.get(name)
     patch = handler(event) if handler is not None else {}
     if patch:
@@ -200,6 +206,29 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     elif name == "EngineerProgress":
         ctx.update_engineer_progress(parse_engineer_progress(event))
     return patch
+
+
+# The three material buckets each carry a Category on the incremental events.
+_MATERIAL_DELTAS = {"MaterialCollected": 1, "MaterialDiscarded": -1}
+
+
+def apply_materials_event(ctx: EDContext, event: dict) -> None:
+    """Fold a material-inventory event into `ctx`: a full `Materials` snapshot replaces the
+    inventory; `MaterialCollected` / `MaterialDiscarded` adjust one count. Anything else is a
+    no-op. Kept separate from the context _FIELDS patch — materials aren't 'current context'."""
+    name = event.get("event", "")
+    if name == "Materials":
+        ctx.set_materials(parse_materials(event))
+        return
+    sign = _MATERIAL_DELTAS.get(name)
+    if sign is None:
+        return
+    symbol = str(event.get("Name") or "").strip().lower()
+    count = event.get("Count")
+    snap = ctx.materials_snapshot()
+    if not symbol or not isinstance(count, (int, float)) or snap is None:
+        return  # no baseline inventory yet, or a malformed delta — wait for the next Materials
+    ctx.set_materials(snap.with_delta(symbol, sign * int(count)))
 
 
 # --- carrier event -> carrier state (N3) ----------------------------------------------

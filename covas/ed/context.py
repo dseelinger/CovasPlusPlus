@@ -105,6 +105,11 @@ class EDContext:
         # from `EngineerProgress`. MERGED (not replaced): the startup summary lists everyone,
         # later single-engineer updates patch one. Read on demand by the engineers capability.
         self._engineer_progress: dict = {}
+        # The Commander's engineering material inventory (a frozen ed/materials.MaterialsSnapshot),
+        # from the journal `Materials` event (nudged by Collected/Discarded deltas). Same rationale
+        # as loadout: big, structured, read on demand by the BlueprintCapability — never in the
+        # cached system prompt.
+        self._materials = None
 
     def update(self, **changes) -> None:
         """Atomically set one or more fields. Unknown keys raise (fail loud) so a typo
@@ -210,6 +215,19 @@ class EDContext:
         under lock. Empty until an `EngineerProgress` event has been seen."""
         with self._lock:
             return dict(self._engineer_progress)
+
+    # -- material inventory (#66) --------------------------------------------------------
+    def set_materials(self, snapshot) -> None:
+        """Replace the stored material inventory. `snapshot` is a frozen
+        `ed/materials.MaterialsSnapshot` (or None to clear)."""
+        with self._lock:
+            self._materials = snapshot
+
+    def materials_snapshot(self):
+        """The current `MaterialsSnapshot`, or None when no `Materials` event has been seen yet.
+        Immutable, so handing out the reference is thread-safe."""
+        with self._lock:
+            return self._materials
 
     def fuel_pct(self) -> float | None:
         with self._lock:
