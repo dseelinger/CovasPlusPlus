@@ -397,6 +397,19 @@ SCHEMA: list[Setting] = [
             "Refuse to honk during danger/interdiction (or unknown status). Leave ON.",
             default=True, phrasings=("honk combat guard",)),
 
+    # --- Combat reflexes (Tier-2) -----------------------------------------
+    # The second push-to-talk for the local phrase-spotter fast path (issue #38). A capture on
+    # this key is matched against a fixed combat vocabulary and fires the reflex WITHOUT the LLM.
+    # Blank = disabled (no second hook installed). Requires [reflex].enabled + an allowlisted
+    # reflex to actually fire; the combat-permissive guard + hard abort still apply (#36).
+    Setting("reflex.ptt", ("reflex", "ptt"), "string",
+            "Reflex fast-PTT key", "Combat reflexes",
+            "Second push-to-talk for the instant reflex fast path — a snap 'chaff!' on this key "
+            "fires locally with no LLM round-trip. Bind a DIFFERENT key than the talk key; blank "
+            "disables it. A non-combat phrase on it falls through to a normal turn.",
+            default="", phrasings=("reflex key", "reflex push to talk", "combat reflex key"),
+            example="set the reflex key to right bracket"),
+
     # --- Navigation & search ----------------------------------------------
     Setting("nav.enabled", ("nav", "enabled"), "bool",
             "Find closest module", "Navigation & search",

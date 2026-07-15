@@ -179,6 +179,50 @@ def test_unknown_tool_is_soft_error():
 
 
 # =========================================================================
+# fire_reflex — the phrase-spotter fast-path entry (issue #38)
+# =========================================================================
+# The local spotter dispatches BY NAME through fire_reflex, which must reuse the SAME allowlist +
+# combat-permissive guard + executor as the LLM tool path (no second guard).
+
+def test_fire_reflex_by_name_fires_in_combat():
+    cap, ex = _cap(status=_COMBAT)
+    msg = cap.fire_reflex("chaff")
+    assert ex.calls == [("press", "Key_H", 0.0)]       # same executor press as the tool path
+    assert "chaff away" in msg.lower()
+
+
+def test_fire_reflex_honours_the_combat_guard():
+    # Safe -> the same guard that blocks the tool path blocks the spotter path (no second guard).
+    cap, ex = _cap(status=_SAFE)
+    msg = cap.fire_reflex("chaff")
+    assert ex.calls == []
+    assert "not in combat" in msg.lower()
+
+
+def test_fire_reflex_honours_the_allowlist():
+    cap, ex = _cap(allowlist=(), status=_COMBAT)       # empty allowlist -> nothing fireable
+    msg = cap.fire_reflex("chaff")
+    assert ex.calls == []
+    assert "disallowed" in msg.lower() or "unknown" in msg.lower()
+
+
+def test_fire_reflex_abort_sentinel_hits_hard_abort():
+    # The spotter's ABORT sentinel routes to the SHARED release_all(), just like the abort tool.
+    cap, ex = _cap()
+    msg = cap.fire_reflex("abort")
+    assert ex.released_all == 1
+    assert "released" in msg.lower()
+
+
+def test_fire_reflex_unbound_key_fails_soft():
+    binds = {"FireChaffLauncher": KeyBinding(action="FireChaffLauncher", key=None)}
+    cap, ex = _cap(binds=binds, status=_COMBAT)
+    msg = cap.fire_reflex("chaff")
+    assert ex.calls == []
+    assert "bind" in msg.lower()
+
+
+# =========================================================================
 # Hard abort — release_all()
 # =========================================================================
 

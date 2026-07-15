@@ -706,9 +706,37 @@ A PROTOTYPE proving the inverted policy end-to-end on the *same* scancode execut
   (permitted-in-combat / always-refused / permitted-but-not-in-combat), the chaff dispatch, and
   the hard abort are all unit-tested offline with a recording fake executor + a fake Status feed.
 - **Next (separate issues, building ON this guard):** an auto-reflex framework that fires chaff
-  automatically on a Status danger transition (#37), and a local phrase-spotter for a
-  sub-second "chaff!" hotword that bypasses the LLM round-trip (#38). Neither is built here — this
-  issue only lands the guard + the one validated reflex they both stand on.
+  automatically on a Status danger transition (#37). It builds on the guard this issue lands.
+
+### Implemented — Tier-2 phrase-spotter + second-PTT reflex fast path (`covas/reflex_spotter.py`, #38)
+The reflex path in #36 dispatches through the LLM (`fire_chaff` is a tool). That's fine for a
+conversational "fire chaff", but a deliberate combat call wants latency ≈ STT time only, and it
+must not queue behind the main conversation turn. #38 adds a **local fast path** that keeps the
+#36 guard/executor unchanged:
+
+- **Pure `PhraseSpotter`** (`covas/reflex_spotter.py`) — a function of *(fixed vocabulary,
+  transcript)*, mirroring the pure-rules detectors (`wake.py`, `ed/detector.py`). It maps a small,
+  FIXED combat vocabulary spotted in the LOCAL Whisper transcript straight to a Tier-2 reflex
+  NAME: the `COMBAT_PERMISSIVE` set (`chaff`/`heat_sink`/`shields`/`boost`), each with spoken
+  synonyms and multi-word phrases ("break their lock", "heat sink"), plus an `ABORT` sentinel
+  ("abort"/"stop"/…). Matching is whole-word (so "chaff" fires but "chaffinch" can't) and
+  leftmost-wins; **no keyword → `None`**, so the caller falls through to a normal LLM turn. It
+  NEVER presses a key — it only returns a name.
+- **Dispatch reuses the ONE guard.** The spotter feeds `ReflexCapability.fire_reflex(name)`, a thin
+  by-name entry that routes through the *same* `_fire` path as the `fire_*` tool — same allowlist,
+  same `combat_permissive_verdict`, same shared executor, same hard abort (the `ABORT` sentinel
+  calls `release_all()`). There is deliberately **no second guard** and no LLM on this path.
+- **Second push-to-talk (`[reflex].ptt`, default unbound).** `app.py`'s key hook installs a
+  SECOND bind alongside `[keys].push_to_talk`; its scancodes are subtracted from the main PTT/cancel
+  codes so a mis-config can't double-dispatch. A capture on it runs `_process_reflex`: local
+  transcribe → `PhraseSpotter.match` → on a hit fire IMMEDIATELY via `fire_reflex` (no LLM, no
+  conversation-turn dispatch, spoken result is after-the-fact feedback); on a miss hand the SAME
+  capture to the usual `_dispatch_utterance`/`_process`. Default unbound = no second hook installs,
+  so the main PTT and the whole conversation path are untouched. Fail soft throughout.
+- Unit-tested offline: the spotter exhaustively (exact/synonym/multi-word match, whole-word
+  no-false-fire, leftmost-wins, no-match→None, vocabulary integrity); `fire_reflex` reusing the
+  allowlist+guard+abort; and the app path (a spotted keyword fires the reflex and never calls the
+  LLM, a non-combat capture falls through to a normal turn, abort routes to release_all).
 
 ---
 

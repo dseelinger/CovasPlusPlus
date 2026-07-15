@@ -228,7 +228,9 @@ class ReflexCapability:
                        "today (heat sink, shield cell, and boost are on the way). Unlike the ship "
                        "controls, which lock down in combat, these are the opposite: they only "
                        "fire WHILE you're in danger or being interdicted, and dangerous actions "
-                       "stay off-limits. Say 'abort' to release everything."),
+                       "stay off-limits. Bind a second push-to-talk ([reflex].ptt) and a snap "
+                       "'chaff!' on it fires locally in a heartbeat — no thinking, no delay. Say "
+                       "'abort' to release everything."),
             example="chaff!",
         )
 
@@ -242,6 +244,28 @@ class ReflexCapability:
             return f"Unknown or disallowed combat reflex: {name}"
         except Exception as e:  # noqa: BLE001 — the loop must survive any tool error
             self._logline(f"error in {name}: {e}")
+            return f"Combat-reflex error: {e}"
+
+    # -- phrase-spotter fast-path entry (issue #38) -----------------------------------
+    def fire_reflex(self, name: str) -> str:
+        """Fire an allowlisted reflex BY NAME — the local phrase-spotter's dispatch point (#38).
+
+        The Tier-2 fast path (a second PTT + a local keyword match) bypasses the LLM but MUST NOT
+        bypass the safety layer: this routes through the exact same allowlist check + combat-
+        permissive guard + shared executor as the LLM `fire_*` tool (`_fire`). There is deliberately
+        NO second guard here. The spotter's ABORT sentinel ("abort"/"stop"/…) maps to the shared
+        hard abort so a snap "abort!" releases every held key just as fast as a reflex fires. Fail
+        soft like `run_tool` — the voice loop must survive any error. Returns the Commander-facing
+        result/refusal string (spoken back as feedback; the keypress, if any, already went out)."""
+        try:
+            if name == "abort":
+                return self._abort()
+            for r in self._allowed_reflexes():
+                if r.name == name:
+                    return self._fire(r)
+            return f"Unknown or disallowed combat reflex: {name}"
+        except Exception as e:  # noqa: BLE001 — the reflex path must fail soft, like run_tool
+            self._logline(f"error firing reflex {name}: {e}")
             return f"Combat-reflex error: {e}"
 
     # -- fire / abort -----------------------------------------------------------------

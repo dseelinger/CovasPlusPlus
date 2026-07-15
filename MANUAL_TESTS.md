@@ -414,6 +414,17 @@ Notes:
 - [ ] **Tier-1 unaffected:** with reflexes on, confirm §6.1 landing gear still behaves exactly as before — it still **refuses in combat** (the two policies are independent).
 - [ ] **Disabled:** set `[reflex].enabled = false` → no chaff tool offered; asking for chaff does nothing.
 
+### 6.3.1 Tier-2 reflex FAST PATH — second push-to-talk phrase-spotter (#38 — `[reflex].ptt`)
+> A **local** hotword path for snap combat calls: a capture on the second PTT is matched against a fixed vocabulary and, on a hit, fires the reflex **without the LLM** (latency ≈ speech-to-text only), through the **same** guard/allowlist/abort as §6.3. Set `[reflex].enabled = true`, `[reflex].allowlist = ["chaff"]`, and bind `[reflex].ptt` to a **DIFFERENT** key than `[keys].push_to_talk` (e.g. `"]"` or a spare HOTAS button via JoyToKey). Requires `[elite].enabled`.
+- [ ] **Startup readiness:** launch reports the reflex scancodes on the `(PTT scan codes … reflex …)` line, and the banner's `Reflexes` line shows `(fast-PTT [<key>])`.
+- [ ] **Instant fire under fire (defensive — safe):** while a **weak NPC** is interdicting/shooting you, tap the **reflex** key and say *"chaff!"* → chaff deploys **noticeably faster than the assistant path** (no "thinking"), log `phrase-spot fired chaff …`. Because chaff is defensive this is safe mid-combat.
+- [ ] **Same guard when safe:** parked/docked (not in danger), tap the reflex key and say *"chaff"* → **refused** ("you're not in combat…"), nothing pressed — the fast path is faster, not looser.
+- [ ] **Synonyms:** on the reflex key, *"flares"* / *"break lock"* also map to chaff (fire under fire to confirm; refused when safe).
+- [ ] **Snap abort:** on the reflex key, say *"abort"* (or *"stop"*/*"release"*) → releases every held key immediately (shared abort). Log: `aborted — released all keys`.
+- [ ] **Falls through to a normal turn:** on the reflex key, say a **non-combat** request (*"what's my fuel level?"*) → it is **not** treated as a reflex; it runs as an ordinary conversation turn and COVAS answers.
+- [ ] **Main PTT untouched:** the normal `[keys].push_to_talk` key still opens a normal conversation turn exactly as before; the two keys don't interfere.
+- [ ] **Disabled by default:** clear `[reflex].ptt` (blank) → no second hook; only the main PTT works.
+
 Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_DETECT_WINDOW`, the Exit-Mode bind):
 
 ## 7. Outfitting search — find the closest module  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
