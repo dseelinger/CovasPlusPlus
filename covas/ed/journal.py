@@ -16,6 +16,7 @@ from typing import Callable
 
 from ..events import EventBus
 from .context import EDContext
+from .engineers import parse_engineer_progress
 from .loadout import parse_loadout
 
 # ED's journals live under the Windows user profile. Resolved at runtime (never a
@@ -179,16 +180,21 @@ _HANDLERS: dict[str, Callable[[dict], dict]] = {
 def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     """Fold one parsed journal event into the rolling context. Returns the patch that was
     applied (empty when the event doesn't affect context) — handy for tests."""
-    handler = _HANDLERS.get(event.get("event", ""))
-    if handler is None:
-        return {}
-    patch = handler(event)
+    name = event.get("event", "")
+    handler = _HANDLERS.get(name)
+    patch = handler(event) if handler is not None else {}
     if patch:
         ctx.update(**patch)
-    # Loadout carries far more than the context patch (per-module engineering, N9): store
-    # the full structured snapshot alongside — each event is complete, so replace wholesale.
-    if event.get("event") == "Loadout":
+    # Some events carry structured state beyond the flat context patch and have no _HANDLERS
+    # entry of their own — fold those in regardless of whether a field-patch was produced.
+    #
+    # Loadout: the full per-module engineering snapshot (N9), replaced wholesale each time.
+    if name == "Loadout":
         ctx.set_loadout(parse_loadout(event))
+    # EngineerProgress grounds the engineers finder (#65): merge the {name: status} map so
+    # "what have I unlocked / what's left" is answered from the Commander's own journal.
+    elif name == "EngineerProgress":
+        ctx.update_engineer_progress(parse_engineer_progress(event))
     return patch
 
 

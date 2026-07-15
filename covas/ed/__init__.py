@@ -14,6 +14,8 @@ later phase — nothing here initiates a reply.
 """
 from .context import EDContext
 from .detector import ContextDetector, ContextRef
+from .engineers import (ENGINEERS, Engineer, EngineerStatus, find_by_specialty,
+                        find_engineer, parse_engineer_progress, status_for)
 from .journal import (JournalWatcher, apply_carrier_event, apply_journal_event,
                       default_journal_dir, describe_journal_event, parse_journal_line,
                       resolve_journal_dir)
@@ -26,6 +28,13 @@ __all__ = [
     "ContextDetector",
     "ContextRef",
     "EDContext",
+    "ENGINEERS",
+    "Engineer",
+    "EngineerStatus",
+    "find_by_specialty",
+    "find_engineer",
+    "parse_engineer_progress",
+    "status_for",
     "JournalWatcher",
     "StatusWatcher",
     "apply_carrier_event",
