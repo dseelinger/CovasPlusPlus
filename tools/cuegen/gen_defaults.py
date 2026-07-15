@@ -171,9 +171,10 @@ _FAMILIES = {
 }
 
 # The soft bed sits WELL under the one-shot cues (peak 0.5) — a quieter target so it never
-# competes with COVAS or the chimes when it loops. Lowered from 0.22 to 0.14 (~4 dB quieter,
-# issue #9): at 0.22 the looping bed was still too present under a slow turn.
-_PEAKS = {"thinking": 0.14}   # peak ~ -17 dBFS
+# competes with COVAS or the chimes when it loops. Tuned by ear (issue #9): 0.22 -> 0.14 -> 0.08.
+# At 0.14 the looping bed was still more present than wanted; 0.08 (~-22 dBFS) fades into the
+# background under COVAS and the chimes while staying just audible.
+_PEAKS = {"thinking": 0.08}   # peak ~ -22 dBFS
 
 
 if __name__ == "__main__":

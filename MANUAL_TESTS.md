@@ -104,8 +104,8 @@ Notes:
       wait; it **stops the instant speech begins**. Confirm it also stops cleanly on **tap-cancel**,
       **barge-in**, and a **failure** (no double-up with the `completed`/`failure` cue).
 - [ ] **Thinking bed level (issue #9):** during that multi-second turn, confirm the bed now sits
-      **quieter** (~4 dB down from the old level) — it fades into the background under COVAS's voice
-      and the one-shot chimes without disappearing entirely.
+      **quietly in the background** (peak ~0.08 / ~-22 dBFS, tuned by ear) — it stays under COVAS's
+      voice and the one-shot chimes without disappearing entirely.
 - [ ] **Thinking bed toggle:** *"turn the thinking sound off"* (or the **Thinking sound** row on the
       Settings page) → the next slow turn plays only the single `processing` tick, no looping bed.
       Turn it back on and the bed returns.
