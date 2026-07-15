@@ -415,6 +415,21 @@ campaign_file = "campaign.txt"
 file    = "personality.txt"
 
 
+[crew]
+# INTERACTIVE CREW (issue #69). DEFAULT OFF. When ON, the LLM may voice a NAMED crew member in an
+# ordinary reply by starting a line with their name in square brackets — e.g. "[Nyx] Contact off
+# the port bow." — and that line is spoken in the character's OWN distinct, radio-filtered voice
+# (reusing the C10 voice cast). Lines with NO bracket prefix stay the ship persona (COVAS++), which
+# remains the DEFAULT speaker. Crew voices are DETERMINISTIC: the same name always maps to the same
+# pool voice, distinct names to distinct voices (an empty voice pool degrades to the persona voice).
+# When OFF, replies are spoken verbatim exactly as before (any stray "[...]" is just read as text).
+enabled = false
+# Optional roster — a HINT list of crew names woven into the (static) system instruction so the
+# model reaches for consistent characters. Free-form: a name the model invents still gets a stable
+# voice via the cast. Leave empty to let the model pick names that fit the moment.
+roster = []
+
+
 [elevenlabs]
 # API key file (git-ignored). The first-run wizard / Settings "API keys" card write the key here,
 # ENCRYPTED at rest with Windows DPAPI (the file holds "DPAPI:<blob>", not plaintext; a legacy
