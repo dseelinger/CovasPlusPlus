@@ -432,6 +432,17 @@ file = "ultimate_checklist.md"
 enabled = true
 # Directory (relative to your data dir) holding the memory file (memory.jsonl). Git-ignored.
 dir = "memory"
+# Automatic CAPTURE (issue #60). When enabled, COVAS++ populates memory WITHOUT being asked,
+# from two cheap, cost-free sources: curated journal MILESTONES (first discoveries, deaths,
+# rank-ups, big payouts, a new ship/carrier — deterministic, no LLM per event) and durable
+# conversation FACTS the companion notes when you state a standing preference or say "remember
+# that…" (piggybacked on the reply it's already writing — no extra model call). Every capture
+# is deduped against what's already stored; the embedding path stays OFF, so capture never
+# costs money or touches the network.
+# Upper bound on stored records so an always-on capture can't grow the file without limit. When
+# full, the oldest auto-captured journal milestones are pruned FIRST (they're reproducible from
+# the journal); facts you explicitly asked to remember are pruned only if they alone exceed it.
+cap = 500
 
 [memory.embedding]
 # OPTIONAL semantic recall via text embeddings. DEFAULT OFF — and off is the whole point:

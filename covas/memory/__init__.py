@@ -16,6 +16,7 @@ exposing a memory capability/tool to the LLM is a later issue (#61); nothing her
 """
 from __future__ import annotations
 
+from covas.memory.capture import MemoryCapture, describe_highlight
 from covas.memory.embedding import EmbeddingProvider, build_embedder, cosine
 from covas.memory.retrieval import Retriever, keyword_score
 from covas.memory.store import MemoryRecord, MemoryStore, store_from_config
@@ -26,6 +27,8 @@ __all__ = [
     "store_from_config",
     "Retriever",
     "keyword_score",
+    "MemoryCapture",
+    "describe_highlight",
     "EmbeddingProvider",
     "build_embedder",
     "cosine",

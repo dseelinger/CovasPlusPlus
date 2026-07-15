@@ -209,6 +209,10 @@ class App:
         # capability is ALWAYS registered so the toggle (Settings/voice) works live, but the
         # window is created only when enabled and only when a display is available.
         self.hud = None
+        # Persistent-memory CAPTURE (issue #60): a self-contained capability that captures
+        # curated journal milestones off the bus and exposes a 'remember that' store tool the
+        # LLM calls in-turn. Store-only — recall (#61) extends it. Opt-in ([memory].enabled).
+        self.memory = None
         self._proactive_lock = threading.Lock()
         self._pump: threading.Thread | None = None
         self._pump_q: queue.Queue | None = None
@@ -245,6 +249,8 @@ class App:
             self._start_riches_plan()
         if self.cfg.get("mining_helper", {}).get("enabled"):
             self._start_mining_helper()
+        if self.cfg.get("memory", {}).get("enabled"):
+            self._start_memory()
         # Companion HUD (issue #47) — always wired so a live toggle (Settings/voice) can bring
         # it up; the window itself stays off until [hud].enabled and a display are both present.
         self._start_hud()
@@ -772,6 +778,34 @@ class App:
             self.hud.reconcile()
         except Exception as e:  # noqa: BLE001 — a toggle glitch must not crash the loop
             self._log("hud", f"reconcile failed: {e}")
+
+    # ---- Persistent memory capture (issue #60) ----------------------------
+    def _start_memory(self) -> None:
+        """Wire persistent-memory CAPTURE: register a capability that (a) captures curated
+        journal milestones off the bus (deterministic describers — no LLM per event) and (b)
+        exposes a 'remember that' store tool the LLM calls in-turn (no extra model call). Both
+        paths dedup against the store and enforce a cap so the git-ignored memory file stays
+        bounded. Opt-in ([memory].enabled). Fail soft — any wiring problem just leaves capture
+        off; it must never block startup. Recall (#61) extends the capability later."""
+        try:
+            from .capabilities.memory_capability import MemoryCapability
+            from .memory import MemoryCapture, store_from_config
+
+            store = store_from_config(self.cfg)
+            cap = int(self.cfg.get("memory", {}).get("cap", 500))
+            capture = MemoryCapture(store, cap=cap, log=lambda m: self._log("memory", m))
+            self.memory = MemoryCapability(capture, log=lambda m: self._log("memory", m))
+            self.registry.register(self.memory)
+            # Journal-highlight capture rides the shared bus/event pump (live-only, so an
+            # existing journal isn't re-captured on every launch — the watcher primes context
+            # WITHOUT publishing). The 'remember that' tool works regardless of the pump.
+            self._start_event_pump()
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": "Persistent memory capture ON."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.memory = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Memory capture failed to start: {e}"})
 
     # ---- Keybind automation (DESIGN §6) -----------------------------------
     def _start_keybinds(self) -> None:

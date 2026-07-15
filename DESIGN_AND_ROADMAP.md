@@ -734,13 +734,13 @@ The provider seam *is* the dependency-injection boundary. Build real providers o
 
 ---
 
-## 10. Persistent memory (epic #58 — foundation #59)
+## 10. Persistent memory (epic #58 — foundation #59, capture #60)
 
 A companion that forgets your name between sessions doesn't feel like a companion. Persistent
 memory lets COVAS++ carry a handful of small facts about you — how you like to be addressed, your
-main ship, standing preferences — across restarts. Issue #59 is the **foundation**: the store and
-the recall API. Wiring recall into the live turn and giving the LLM a "remember this" tool is a
-later issue (#61); the foundation does **not** touch `app.py`.
+main ship, standing preferences — across restarts. Issue #59 is the **foundation** (store + recall
+API); issue #60 is **automatic capture** (populating the store without being asked); wiring
+*recall* into the live turn and a "what do you remember about…" tool is the remaining issue (#61).
 
 ### The store — transparent by design (`covas/memory/store.py`)
 Facts live in a plain **JSON Lines** file, `memory.jsonl`, under the user's writable data dir
@@ -772,6 +772,33 @@ foundation; enabling it without one falls back to keyword recall. A dead/failing
 also degrades to keyword rather than crashing recall. Dependencies are **injected** (the store takes
 a path; the retriever takes an optional embedder), so the default `pytest` run stays hermetic — tests
 point the store at a tmp file and pass a deterministic fake embedder to exercise the similarity path.
+
+### Automatic capture — journal milestones + conversation facts (#60, `memory/capture.py`)
+The store fills itself, from two **cost-free** sources, wired as a self-contained
+`MemoryCapability` (capabilities over loop edits — it subscribes to the bus, no worker-loop
+branch) gated on `[memory].enabled`:
+
+- **Journal milestones (deterministic).** A curated `describe_highlight` table turns a *small,
+  high-signal* set of journal events — first discovery / full mapping of a body, death, rank
+  promotion, buying a carrier or a new ship, and *notable* (≥ `NOTABLE_CREDITS`, 10 M) missions /
+  exploration payouts / voucher redemptions — into a durable one-line `milestone` memory. This
+  mirrors the recent-events feed's curated-describer style (§5) but writes a **permanent** fact
+  rather than a rolling line. **No LLM per event** — a table lookup. It rides the live bus via the
+  event pump (`replay=False`), so relaunching never re-captures an existing journal (the watcher
+  primes context *without* republishing).
+- **Conversation facts (piggybacked).** A `remember_this` tool lets the LLM store a standing
+  preference/instruction ("remember that…", "call me Commander") **during a turn it's already
+  producing** — the tool-use rides the existing reply, so there is **no extra model call** and no
+  extra cost. This one tool serves both the explicit "remember that X" command and the model
+  proactively noting a durable fact it just heard.
+
+Both paths **dedup** against `store.all()` before writing — a verbatim (normalized) match, or a
+`keyword_score` at/over `DEDUP_THRESHOLD` (0.9), is skipped, so a repeated milestone or a reworded-
+but-identical fact isn't stored twice (pure/offline — **no embedding**). A **cap** (`[memory].cap`,
+default 500) bounds the file: over cap, the oldest auto `milestone` records are evicted first
+(reproducible from the journal), and facts the Commander explicitly asked to keep are evicted only
+if they alone exceed the cap. Every capture method is fail-soft — a bad event or store error is
+logged, never raised, so capture can't take down the event pump or the voice loop.
 
 ### Cost & privacy stance — and how this beats the competitors
 Two deliberate defaults, both cost- and privacy-forward:

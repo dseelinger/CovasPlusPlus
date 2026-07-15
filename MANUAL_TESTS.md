@@ -541,6 +541,29 @@ Notes:
 
 Notes:
 
+## 13b. Persistent memory — automatic capture (issue #60)  🎮 ED 🔊 HW 📋 FILE
+> Memory now populates itself. Needs `[memory].enabled = true` (default) and, for milestones,
+> `[elite].enabled = true`. Memory lives at `<data dir>/memory/memory.jsonl` (git-ignored).
+- [ ] On launch the log shows `Persistent memory capture ON.`
+- [ ] 🎮 **Journal milestone (deterministic, no cost):** in-game, do something notable — jump to
+      an unexplored system and **detailed-scan a first-discovery body**, or fully map a body. A new
+      line appears in `memory/memory.jsonl` (`First to discover …` / `Fully mapped …`, `type:
+      "milestone"`). No LLM/router/usage line accompanies it — capture is a local write.
+- [ ] 🔊 **Conversation fact (piggybacked, no extra call):** say **"remember that I prefer the
+      Krait Mk II"**. COVAS acknowledges in-character in the SAME reply; a `preference`/`note` line
+      is added to the file. Confirm the router logged **one** turn, not two (no extra model call).
+- [ ] 📋 **Dedup:** repeat the exact same "remember that…" — it is **not** added a second time
+      (log: `Already knew that…`), and the file still has one copy.
+- [ ] 📋 **Cap:** set `[memory].cap` low (e.g. `3`), add a couple of `remember that…` facts, then
+      generate several milestones. The file stays at the cap; the oldest **milestones** drop first
+      while your explicitly-remembered facts survive.
+- [ ] 📋 Relaunch COVAS++ with the same journal present — old milestones are **not** re-captured
+      (capture only sees live events; startup priming doesn't republish).
+- [ ] Ask **"what can you do"** → the **memory** capability is listed; drilling in mentions
+      remembering facts and milestones.
+
+Notes:
+
 ## 14. Web control panel  🌐 PANEL 🔊 HW 📋 FILE
 
 ### 14.1 Live status & log
