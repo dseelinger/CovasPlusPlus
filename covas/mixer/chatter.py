@@ -24,8 +24,8 @@ import re
 import time
 from typing import Callable, Optional
 
-from .buses import COMMS
-from .cues import Cue
+from .buses import COMMS, COVAS
+from .cues import PERSONA, Cue
 from .eligibility import POPULATED
 
 _WORD = re.compile(r"[A-Za-z']+")
@@ -163,8 +163,11 @@ class ChatterPlayer:
 # ---- the shipped chatter categories ---------------------------------------------------------
 # POPULATED-ONLY: every chatter cue is eligible only in an inhabited system (Population > 0). The
 # ambient radio buzz is the sound of *other people* — station traffic, patrols, market talk — so
-# out in the empty black there is deliberately nothing to say. All ride the Comms bus
-# (radio-flavored), are throttled by their own cooldown plus the global C3 governor, and are then
+# out in the empty black there is deliberately nothing to say. The ambient lines ride the Comms bus
+# (radio-flavored) with a random cast voice; the `populated_musing` cue is different — it's the
+# COMPANION'S OWN observation ("nice to have some company out here"), an "our"-perspective line, so
+# it's tagged `voice_role=PERSONA` and the audio layer speaks it in COVAS's own voice on the clean
+# COVAS bus (issue #57). All are throttled by their own cooldown plus the global C3 governor, then
 # frequency-gated + population-scaled by `chatter_interval` (see ChatterPlayer.min_interval).
 def chatter_cues() -> list[Cue]:
     return [
@@ -194,7 +197,9 @@ def chatter_cues() -> list[Cue]:
             ),
         ),
         Cue(
-            "populated_musing", COMMS, {POPULATED}, cooldown_s=150.0,
+            # OUR-perspective: the companion musing to the Commander -> persona voice, clean bus.
+            "populated_musing", COVAS, {POPULATED}, cooldown_s=150.0,
+            voice_role=PERSONA,
             fact_bearing=False,   # pure atmosphere -> LLM permitted (validated), pool fallback
             phrasings=(
                 "Nice to have some company out here.",

@@ -12,13 +12,19 @@ user wants the ambient galaxy to feel *randomly cast yet consistent within a pla
     (default 25) so a wing or an operation keeps stable per-person voices without growing forever.
     Use `capacity=25`.
 
+ANTI-REPEAT VARIETY (issue #57): the ambient cast recurs often enough to sound like a shuffled
+soundboard. On top of the "prefer a voice not currently assigned" rule, an optional `anti_repeat`
+window remembers the last N voices this pool HANDED OUT and avoids re-picking them, so consecutive
+per-line chatter (and freshly-cast speakers) spread across the pool instead of clustering on a few
+voices. The window relaxes gracefully when the pool is too small to honor it, so it never deadlocks.
+
 Pure aside from an injected `rng` (a `random.Random`), so tests seed it for determinism. Empty pool
 degrades to the `fallback` voice (the persona) — i.e. today's single-voice behaviour — never raises.
 """
 from __future__ import annotations
 
 import random
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from typing import Optional
 
 from .voices import Voice
@@ -28,15 +34,20 @@ class StickyVoicePool:
     """Assigns pool voices to identities: random on first encounter, then stable.
 
     `capacity=None` keeps every identity until `clear()`; `capacity=N` keeps the last N (LRU),
-    evicting the least-recently-assigned so long-running sessions don't grow unbounded."""
+    evicting the least-recently-assigned so long-running sessions don't grow unbounded.
+    `anti_repeat=N` avoids re-handing-out any of the last N voices picked (0 = off, today's
+    behaviour), widening the EFFECTIVE variety of the ambient cast."""
 
     def __init__(self, pool, *, rng: Optional[random.Random] = None,
-                 capacity: Optional[int] = None, fallback: Optional[Voice] = None) -> None:
+                 capacity: Optional[int] = None, fallback: Optional[Voice] = None,
+                 anti_repeat: int = 0) -> None:
         self._pool: list[Voice] = list(pool or [])
         self._rng = rng or random.Random()
         self._capacity = capacity
         self._fallback = fallback
         self._assigned: "OrderedDict[str, Voice]" = OrderedDict()
+        # Rolling window of the most-recently-picked voices, avoided on the next pick for variety.
+        self._recent: "deque[Voice]" = deque(maxlen=max(0, int(anti_repeat)))
 
     @property
     def pool(self) -> list[Voice]:
@@ -51,14 +62,25 @@ class StickyVoicePool:
         return list(self._pool)
 
     def _pick(self, gender_hint: Optional[str]) -> Optional[Voice]:
-        """A random voice from the candidates, PREFERRING one not already handed out (so distinct
-        speakers sound distinct until the pool is exhausted). None when the pool is empty."""
+        """A random voice from the candidates, PREFERRING one that is neither currently assigned
+        (so distinct speakers sound distinct until the pool is exhausted) nor in the anti-repeat
+        window (so the ambient cast doesn't cluster on a few voices). Relaxes step by step when the
+        pool is too small to honor both constraints, so it never deadlocks. None on an empty pool.
+        Records the pick in the anti-repeat window."""
         candidates = self._candidates(gender_hint)
         if not candidates:
             return None
         in_use = set(self._assigned.values())
-        fresh = [v for v in candidates if v not in in_use]
-        return self._rng.choice(fresh if fresh else candidates)
+        recent = set(self._recent)
+        # Ideal: avoid both the in-use voices and the recently-handed-out ones; relax in order.
+        fresh = ([v for v in candidates if v not in in_use and v not in recent]
+                 or [v for v in candidates if v not in in_use]
+                 or [v for v in candidates if v not in recent]
+                 or candidates)
+        choice = self._rng.choice(fresh)
+        if self._recent.maxlen:
+            self._recent.append(choice)
+        return choice
 
     def random(self, gender_hint: Optional[str] = None) -> Voice:
         """A fresh RANDOM voice with no memory — for per-line chatter, where each line should sound

@@ -142,6 +142,46 @@ def test_chatter_uses_a_pool_voice_per_line():
     assert layer.tts.said[-1][1] in {"VA", "VB", "VC", "VD"}
 
 
+# ---- voice attribution: our-perspective vs ambient (issue #57) ------------------------------
+
+def _spy_buses(layer):
+    """Wrap the mixer's submit to record which bus each line lands on."""
+    buses: list[str] = []
+    orig = layer.mixer.submit
+
+    def submit(bus, *a, **k):
+        buses.append(bus)
+        return orig(bus, *a, **k)
+
+    layer.mixer.submit = submit  # type: ignore[method-assign]
+    return buses
+
+
+def test_our_event_cue_routes_to_persona_on_the_clean_covas_bus():
+    from covas.mixer.buses import COVAS
+    from covas.mixer.chatter import chatter_cues
+    layer, _ = _layer_pooled()
+    layer._population = 1e9                            # populated -> the frequency gate lets it play
+    buses = _spy_buses(layer)
+    musing = next(c for c in chatter_cues() if c.voice_role)   # the PERSONA (our-perspective) cue
+    assert layer._dispatch_play(musing) is True
+    # Spoken via the app's own TTS provider (voice_id None = the persona voice), NOT a cast pool id.
+    assert layer.tts.said[-1] == (musing.phrasings[0], None)
+    assert buses[-1] == COVAS                          # clean bus, never the radio-treated comms
+
+
+def test_ambient_cue_routes_to_a_radioed_cast_voice_on_comms():
+    from covas.mixer.buses import COMMS
+    from covas.mixer.chatter import chatter_cues
+    layer, _ = _layer_pooled()
+    layer._population = 1e9
+    buses = _spy_buses(layer)
+    ambient = next(c for c in chatter_cues() if not c.voice_role)  # station_traffic etc.
+    assert layer._dispatch_play(ambient) is True
+    assert layer.tts.said[-1][1] in {"VA", "VB", "VC", "VD"}   # a random cast voice, not the persona
+    assert buses[-1] == COMMS                                   # radio-treated comms bus
+
+
 def test_settings_rebuild_keeps_the_random_el_pool():
     # Regression: with no configured pool, the random default pool is seeded from the live EL list
     # fetched at startup. A later settings change rebuilds via apply_settings WITHOUT re-fetching;
