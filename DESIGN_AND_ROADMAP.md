@@ -429,6 +429,43 @@ proving toggle-landing-gear end-to-end before any generalization:
 
 Next actions stay gated behind a go/no-go after on-hardware validation of this one.
 
+### Implemented — generalized action model (Tier-1 foundation, #29)
+Before any *new* action batch lands, the prototype is generalized along four axes — all
+additive, all still behind the same safety layer — so growing the action set is new **modules**
+and **data**, not new branches in the capability or the loop:
+
+- **Game-mode signal on `EDContext`.** A `game_mode` field (`mainship` / `fighter` / `srv` /
+  `on_foot` / `None`) folded from Status.json by a pure `game_mode_from_flags(flags, flags2)`:
+  ship modes come from the `Flags` bits `InMainShip`/`InFighter`/`InSRV` (24–26); **on-foot is a
+  *separate* field**, `Flags2` bit 0 (Odyssey), so it's detected *positively* rather than
+  inferred from "no ship bits" — which is also true on the menu/loading screens. The mode clears
+  to `None` (unknown) in the menu rather than sticking stale. Canonical mode strings live in a
+  zero-dependency leaf `ed/modes.py` shared by the producer (status decode) and consumer
+  (keybinds), so neither imports the other.
+- **Mode-gated tool advertisement.** `KeybindCapability` advertises only actions valid for the
+  *current* mode (each `Macro` declares a `modes` set; empty = any mode), so the model isn't
+  offered on-foot actions while flying (mirrors COVAS:NEXT's mode filter). The gate is enforced
+  again at arm **and** re-checked at confirm (the Commander may disembark between the two). When
+  the mode is **unknown** (no ED telemetry) gating is skipped — no worse than before, since the
+  combat guard already refuses in that case. Toggle with `[keybinds].mode_guard`.
+- **Action registry (the Phase-1 lever).** `Macro` and the action definitions moved out of the
+  capability into `keybinds/registry.py` + `keybinds/actions/*.py`. Each batch registers its
+  macros from its own module (imported for the side effect); the capability reads the aggregated
+  registry. A future action batch (nav/combat/…) is a **new `actions/` module + one import
+  line**, not an edit to `KeybindCapability` — keeping the Phase-1 fan-out parallel.
+- **Per-action confirmation policy.** Each `Macro` carries `confirm_required` (default `True`).
+  Effective confirmation = `[keybinds].require_confirmation` **AND** the macro's policy, so a
+  consequential action arms-and-confirms while a benign/read-only one may fire immediately —
+  still behind the allowlist + combat + mode guards. This is the declarative scaffold every
+  future batch reuses instead of a global on/off.
+- **Binding-preference decision.** `binds.py` still **prefers Primary**, now configurable via
+  `[keybinds].binding_preference` (`primary`/`secondary`, either way falling back to the other
+  slot). Rationale: unlike COVAS:NEXT's "prefer Secondary" convention, in a normal ED setup the
+  **keyboard key lives on Primary** (ED seeds the keyboard/mouse preset there) and a
+  joystick/HOTAS custom bind goes on Secondary — so Primary is where the *pressable* key is.
+  The `secondary` option is the escape hatch for a Commander who deliberately parks COVAS's
+  keyboard binds on the Secondary slot.
+
 ### Implemented — auto-honk (`[honk]`, default off, N5)
 The second keybind-driven action, and the first PROACTIVE one — fire the Discovery Scanner
 ("honk") on arrival in a new system, no button press (`covas/capabilities/honk_capability.py`).

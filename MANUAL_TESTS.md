@@ -216,6 +216,9 @@ Notes:
 - [ ] **Expiry:** arm it, wait past `confirm_window` (60 s), then *"confirm"* → says it expired; nothing fires.
 - [ ] **Hard abort:** arm it, then *"Abort."* / *"Belay that."* → arm cleared, any held key released.
 - [ ] **Off-allowlist refusal:** ask for a different control (*"deploy hardpoints"*) → won't do it.
+- [ ] **Mode gating — on foot (#29):** **disembark** (on foot) and ask to toggle landing gear → it **refuses** with an "only works in your ship" style message, and doesn't offer the action. Back **in the ship**, the same request arms normally.
+- [ ] **Mode gating — disembark after arming (#29):** in the ship, **arm** the toggle; before confirming, **disembark**; then *"confirm"* → **refused** (mode re-checked at confirm), nothing fires.
+- [ ] **Binding preference (#29):** with a keyboard bind on **Primary** (the normal case), it presses it. If you set `[keybinds].binding_preference = "secondary"` and your keyboard key is on the Secondary slot, it uses that instead (falls back to the other slot if only one is bound). Startup log shows `landing_gear -> <Key>`.
 
 Notes:
 

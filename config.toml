@@ -554,6 +554,16 @@ require_confirmation = true
 # Refuse to touch controls when ED Status reports danger/interdiction (and when ED status is
 # unavailable — we won't act unless we can prove it's safe). Leave ON.
 combat_guard = true
+# Only offer/allow actions valid for the CURRENT game mode (mainship / fighter / SRV / on-foot,
+# read from ED Status). Stops on-foot actions being offered while flying, and vice-versa. When
+# the mode is unknown (ED monitoring off), gating is skipped and the combat guard still applies.
+# Leave ON.
+mode_guard = true
+# Which .binds slot to read the keyboard key from: "primary" or "secondary". Primary is right
+# for almost everyone — ED puts the KEY on Primary and a joystick/HOTAS on Secondary, so Primary
+# is where the pressable key is. Set "secondary" only if you deliberately put COVAS's keyboard
+# binds on the Secondary slot. Either way we fall back to the other slot.
+binding_preference = "primary"
 # Seconds an armed action stays confirmable before it expires for safety.
 confirm_window = 60
 # Allowlist of macro names the companion may run — the ONLY actions permitted, even if asked

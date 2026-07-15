@@ -192,14 +192,27 @@ def _keyboard_slot(slot: ET.Element | None) -> tuple[str, tuple[str, ...]] | Non
     return key, mods
 
 
-def parse_binds(xml_text: str) -> dict[str, KeyBinding]:
+# Binding-preference values for parse_binds/load_binds. "primary" (the default) is correct
+# for almost every Commander: ED seeds the keyboard/mouse preset with the KEY on the Primary
+# slot, and a joystick/HOTAS custom bind typically goes on Secondary — so preferring Primary
+# is where the pressable keyboard key actually lives (Secondary is often the unpressable
+# joystick). "secondary" is the escape hatch for a Commander who put their keyboard key on
+# Secondary (e.g. mirroring COVAS:NEXT's convention). Either way we FALL BACK to the other
+# slot, so a keyboard bind in either slot is still found.
+PREFER_PRIMARY = "primary"
+PREFER_SECONDARY = "secondary"
+
+
+def parse_binds(xml_text: str, *, prefer: str = PREFER_PRIMARY) -> dict[str, KeyBinding]:
     """Parse a `.binds` XML document into {action_name: KeyBinding}.
 
-    For each action element we prefer the Primary keyboard binding, falling back to
-    Secondary — so a Commander who put the joystick on Primary and a key on Secondary still
-    gets a usable keyboard binding. An action whose slots are all joystick/unbound yields a
-    KeyBinding with key=None (unusable). Non-action elements (root-level scalars ED writes,
-    like <KeyboardLayout>) that have no Primary/Secondary are skipped.
+    For each action element we take the keyboard binding from the PREFERRED slot, falling
+    back to the other — so a Commander who put the joystick on one slot and a key on the
+    other still gets a usable keyboard binding. `prefer` is "primary" (default) or
+    "secondary"; see PREFER_PRIMARY for why primary is the sensible default. An action whose
+    slots are all joystick/unbound yields a KeyBinding with key=None (unusable). Non-action
+    elements (root-level scalars ED writes, like <KeyboardLayout>) with no Primary/Secondary
+    are skipped.
 
     Tolerant of a malformed document: a parse error yields an empty mapping rather than
     raising, so a corrupt file degrades to 'no bindings' instead of crashing the loop."""
@@ -208,6 +221,7 @@ def parse_binds(xml_text: str) -> dict[str, KeyBinding]:
     except ET.ParseError:
         return {}
 
+    secondary_first = str(prefer).strip().lower() == PREFER_SECONDARY
     out: dict[str, KeyBinding] = {}
     for el in root:
         primary = el.find("Primary")
@@ -217,11 +231,15 @@ def parse_binds(xml_text: str) -> dict[str, KeyBinding]:
         if primary is None and secondary is None:
             continue
         action = el.tag
-        kb = _keyboard_slot(primary)
-        source = "Primary"
+        # Try the preferred slot first, then the other. Default order is Primary→Secondary.
+        first, first_src, second, second_src = (
+            (secondary, "Secondary", primary, "Primary") if secondary_first
+            else (primary, "Primary", secondary, "Secondary"))
+        kb = _keyboard_slot(first)
+        source = first_src
         if kb is None:
-            kb = _keyboard_slot(secondary)
-            source = "Secondary"
+            kb = _keyboard_slot(second)
+            source = second_src
         if kb is None:
             out[action] = KeyBinding(action=action)          # bound elsewhere / unbound
         else:
@@ -230,13 +248,21 @@ def parse_binds(xml_text: str) -> dict[str, KeyBinding]:
     return out
 
 
+def binding_preference(cfg: dict | None = None) -> str:
+    """The configured slot preference ("primary"/"secondary") from `[keybinds]`, defaulting
+    to primary. Anything unrecognized falls back to primary (the safe default)."""
+    pref = str((cfg or {}).get("keybinds", {}).get("binding_preference", "") or "").strip().lower()
+    return PREFER_SECONDARY if pref == PREFER_SECONDARY else PREFER_PRIMARY
+
+
 def load_binds(cfg: dict | None = None, *, dir_: Path | None = None) -> dict[str, KeyBinding]:
-    """Resolve the active bindings file and parse it. Raises `BindsError` if the file can't
-    be located; a file that exists but is unreadable/corrupt yields an empty mapping (the
-    capability then reports every action as unusable, fail-soft)."""
+    """Resolve the active bindings file and parse it, honoring `[keybinds].binding_preference`
+    (primary by default). Raises `BindsError` if the file can't be located; a file that exists
+    but is unreadable/corrupt yields an empty mapping (the capability then reports every action
+    as unusable, fail-soft)."""
     path = resolve_binds_file(cfg, dir_=dir_)
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError as e:
         raise BindsError(f"Couldn't read bindings file {path}: {e}") from e
-    return parse_binds(text)
+    return parse_binds(text, prefer=binding_preference(cfg))

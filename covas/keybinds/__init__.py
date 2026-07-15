@@ -15,13 +15,20 @@ covas/capabilities/keybind_capability.py — it advertises exactly ONE named mac
 LLM and runs deterministic keystrokes behind confirmation + allowlist + a combat guard.
 The model only ever *selects* a macro; it never synthesizes raw key sequences.
 """
-from .binds import (KeyBinding, BindsError, load_binds, parse_binds,
-                    resolve_binds_file)
+from .binds import (KeyBinding, BindsError, PREFER_PRIMARY, PREFER_SECONDARY,
+                    binding_preference, load_binds, parse_binds, resolve_binds_file)
+from .registry import Macro, register, registered_macros
 
 __all__ = [
     "KeyBinding",
     "BindsError",
+    "Macro",
+    "PREFER_PRIMARY",
+    "PREFER_SECONDARY",
+    "binding_preference",
     "load_binds",
     "parse_binds",
+    "register",
+    "registered_macros",
     "resolve_binds_file",
 ]

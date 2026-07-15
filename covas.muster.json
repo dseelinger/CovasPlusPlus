@@ -504,8 +504,8 @@
         "INJECT",
         "HW"
       ],
-      "requires": "`[elite].enabled` and `[keybinds].enabled = true`, `require_confirmation`/`combat_guard = true`. Toggle Landing Gear bound in ED. Do this parked/docked and safe.",
-      "expected": "Toggling gear arms without firing, requires a confirm on a SEPARATE turn, refuses same-turn confirm, refuses in danger or with ED off, expires after the window, hard-aborts on \"belay that\", and refuses any off-allowlist control.",
+      "requires": "`[elite].enabled` and `[keybinds].enabled = true`, `require_confirmation`/`combat_guard`/`mode_guard = true`. Toggle Landing Gear bound in ED (on the `binding_preference` slot, default Primary). Do this parked/docked and safe.",
+      "expected": "Toggling gear arms without firing, requires a confirm on a SEPARATE turn, refuses same-turn confirm, refuses in danger or with ED off, expires after the window, hard-aborts on \"belay that\", refuses any off-allowlist control, is mode-gated (refused/not offered on foot, re-checked at confirm), and presses the key from the configured binding slot.",
       "steps": [
         {
           "id": "s1",
@@ -534,6 +534,18 @@
         {
           "id": "s7",
           "text": "Off-allowlist refusal: ask for a different control (\"deploy hardpoints\") → won't do it."
+        },
+        {
+          "id": "s8",
+          "text": "Mode gate on foot (#29): disembark (on foot) and ask to toggle landing gear → refuses (\"only works in your ship\") and doesn't offer the action. Back in the ship, the same request arms normally."
+        },
+        {
+          "id": "s9",
+          "text": "Mode re-check at confirm (#29): in the ship, arm the toggle; before confirming, disembark; then \"confirm\" → refused (mode re-checked at confirm time), nothing fires."
+        },
+        {
+          "id": "s10",
+          "text": "Binding preference (#29): with the keyboard key on Primary (normal), startup log shows `landing_gear -> <Key>` and it presses that. Set `[keybinds].binding_preference = \"secondary\"` with the key on the Secondary slot → it uses that instead (falls back to the other slot if only one is bound)."
         }
       ]
     },
@@ -907,6 +919,34 @@
       ]
     },
     {
+      "id": "memory-store-foundation",
+      "title": "Transparent memory store: private file, keyword recall, fail-soft (#59)",
+      "section": "13a. Memory (foundation)",
+      "tags": [
+        "FILE"
+      ],
+      "requires": "This is the store/retrieval FOUNDATION (#59) — there is no voice surface yet (recall wiring is #61). Verify at the file + Python-shell level. Default `[memory]` config; embedding backend OFF.",
+      "expected": "The memory file lives under the writable data dir, is git-ignored (private, never leaves the machine), loads fail-soft skipping a corrupt line, and keyword/tag recall returns the most relevant facts offline with no new dependency.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Hand-create the memory file (`memory.jsonl` under the `[memory].dir` data dir) with a few one-fact-per-line entries, e.g. `{\"text\":\"prefers the Krait Mk II for combat\",\"tags\":[\"ship\"]}`."
+        },
+        {
+          "id": "s2",
+          "text": "Confirm it's git-ignored: `git status` does NOT list the memory file (private data never committed)."
+        },
+        {
+          "id": "s3",
+          "text": "Fail-soft: add a deliberately broken line (e.g. `not json`) → loading skips just that line, keeps the good facts, and doesn't crash."
+        },
+        {
+          "id": "s4",
+          "text": "Keyword recall offline: in a Python shell, load the store and run a `Retriever(...).recall(\"which ship for combat\")` → the Krait fact ranks top; tag filter works; no network, no new dependency (embedding backend stays off)."
+        }
+      ]
+    },
+    {
       "id": "panel-live-status-log",
       "title": "Live status light and log track the session",
       "section": "14. Web panel",
@@ -1240,7 +1280,7 @@
         "HW"
       ],
       "requires": "`[audio].enabled`, `[audio.comms].enabled`, `[elite].enabled` ON; ED in Open play.",
-      "expected": "NPC/station comms are read on the radio-treated bus, a direct player DM is read verbatim in the fixed male voice, Open-play local/wing chatter is NOT voiced (fail-closed), and repeated station spam isn't re-read (dedup).",
+      "expected": "NPC/station comms are read on the radio-treated bus, a direct player DM is read verbatim in the fixed male voice, Open-play local/wing chatter is NOT voiced (fail-closed), repeated station spam isn't re-read (dedup), and ED's own \"Entering channel\" jump chrome is NOT spoken.",
       "steps": [
         {
           "id": "s1",
@@ -1257,6 +1297,10 @@
         {
           "id": "s4",
           "text": "Repeated station spam isn't re-read every jump (template dedup)."
+        },
+        {
+          "id": "s5",
+          "text": "Jump-chrome dropped (#56): jump to a NEW system → the game's own \"Entering channel <system>.\" line is NOT spoken (on every jump, any population). Normal NPC/station comms and player DMs still voice."
         }
       ]
     },

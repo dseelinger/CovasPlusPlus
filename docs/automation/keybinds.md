@@ -24,6 +24,11 @@ Every safeguard is on by default:
 - **Combat / interdiction guard** — it refuses to touch controls while you're in danger or being
   interdicted. If it can't read your status at all, it refuses too (it won't act unless it can
   *prove* it's safe).
+- **Mode gating** — it only offers and runs actions that make sense for what you're *currently*
+  doing: mainship, fighter, SRV, or on foot. A ship control like landing gear isn't offered while
+  you're on foot, and it's re-checked at confirm time (so if you disembark after arming, it won't
+  fire). When game-state monitoring is off (COVAS can't tell your mode), gating is skipped and the
+  combat guard still applies.
 - **Confirmation expiry** — an armed action stops being confirmable after a timeout (60 s), so a
   stale "confirm" can't fire it later.
 - **Hard abort** — say **"abort"** (or "belay that") any time to cancel a pending action and
@@ -51,6 +56,11 @@ setups. It injects at scancode level, which is what Elite Dangerous actually lis
 **Toggle Landing Gear** control must be bound to a key in-game; if it's only on a joystick, COVAS++
 will say so and ask you to bind it to a key.
 
+By default COVAS reads the **Primary** binding — which is where the keyboard key normally lives (a
+joystick/HOTAS bind usually sits on Secondary). If you deliberately put COVAS's keyboard binds on the
+**Secondary** slot, set `[keybinds].binding_preference = "secondary"`. Either way it falls back to the
+other slot, so a keyboard bind on either one is found.
+
 ## Settings
 
 | Setting | What it does |
@@ -58,6 +68,8 @@ will say so and ask you to bind it to a key.
 | `keybinds.enabled` | Master switch (off by default) |
 | `keybinds.require_confirmation` | Require a separate spoken confirm before firing (leave on) |
 | `keybinds.combat_guard` | Refuse during danger/interdiction or unknown status (leave on) |
+| `keybinds.mode_guard` | Only offer/run actions valid for your current mode (ship/fighter/SRV/foot; leave on) |
+| `keybinds.binding_preference` | Which `.binds` slot to read the key from: `primary` (default) or `secondary` |
 | `keybinds.confirm_window` | Seconds an armed action stays confirmable |
 | `keybinds.binds_file` | Override the auto-detected bindings file (rarely needed) |
 
