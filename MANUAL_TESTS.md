@@ -771,6 +771,22 @@ on in config (or the Settings page) before testing.
   traffic / patrol / market** ambient lines come from a **random radioed cast voice** on the
   comms bus. Confirm the perspective always matches the source.
 
+### 18.5b Interactive crew (issue #69 — `[crew].enabled`)  🔊 HW
+> Turn on `[crew].enabled = true` (Settings → **Interactive crew**, or *"turn crew on"*). Distinct
+> crew voices need the bus mixer (`[audio].enabled = true`) + a cast pool (the default random
+> ElevenLabs pool works); with no pool, crew lines fall back to the persona voice. Optionally set
+> `[crew].roster = ["Nyx", "Vela"]` to steer the names.
+- [ ] 🔊 **Crew speaks in character:** ask something that invites a crew voice (e.g. *"have your
+  sensor officer read off any contacts"*) → the reply that comes from the crew member is spoken in a
+  **distinct, radio-filtered voice**, while the rest of the reply stays your **companion's own**
+  clean voice. The persona is still the default speaker.
+- [ ] 🔊 **Deterministic voice:** over several turns, the **same crew name** keeps the **same**
+  voice, and **different** names sound **different**.
+- [ ] 🔊 **Barge-in mid-crew:** while a crew line is speaking, tap cancel (`[`) → it stops promptly
+  and returns to Idle (barge-in works across the persona→crew segment boundary).
+- [ ] 🔊 **Off by default:** with `[crew].enabled = false`, replies are spoken **exactly as before**
+  — a single voice, no attribution, and any literal `[bracketed]` text is just read as text.
+
 ### 18.6 Drop-in content (C11)
 - [ ] On first run with the layer enabled, confirm the skeleton appears: **`audio/sfx/<cue>/`**,
   **`audio/music/<context>/`**, **`content/chatter/*.txt`**, **`content/interdiction_threat.txt`**,

@@ -128,6 +128,15 @@ See [Personas & voice](using/personas-voice.md).
 | `personality.custom_dir` | `personalities/custom` | Where your saved custom personas live (git-ignored) |
 | `personality.campaign_file` | `campaign.txt` | Your personal Commander facts (git-ignored) |
 
+## Interactive crew (`[crew]`)
+
+See [Interactive crew](using/crew.md).
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `crew.enabled` | `false` | Let replies voice a named crew member via a `[Name]` line prefix, each in its own deterministic, radio-filtered cast voice (the persona still speaks every unprefixed line) |
+| `crew.roster` | `[]` | Optional hint list of crew names woven into the (static) system instruction; free-form names still get a stable voice |
+
 ## Text-to-speech (`[elevenlabs]`, `[tts]`, `[piper]`, `[edge]`, `[azure]`, `[openai_tts]`, `[cartesia]`)
 
 | Setting | Default | What it does |

@@ -265,6 +265,44 @@ class AudioLayer:
             self._log(f"voice synth/play failed: {e}")
             return False
 
+    def speak_crew(self, name: str, text: str, cancel) -> bool:  # noqa: ANN001 — threading.Event
+        """Voice a NAMED CREW line (issue #69) in that character's DETERMINISTIC cast voice on the
+        radio-treated COMMS bus, BLOCKING until the line has played or `cancel` fires (barge-in).
+
+        This is the crew seam on the conversation path: the persona (ship COVAS++) keeps its own
+        direct `tts.speak` path for unprefixed lines, while a `[Name]`-prefixed line comes here and
+        reuses the C10 cast exactly like comms/chatter — `VoiceCast.assign(name)` gives the same
+        voice for the same name every time (distinct names -> distinct voices; an empty pool
+        degrades to the persona voice), and `CastSynth` routes it to the right provider.
+
+        Returns True when the line was voiced (or was empty — nothing to say); False only when
+        nothing could be synthesized (dead provider), so the caller degrades THAT line to the
+        persona voice. Fail soft — never raises into the reply loop."""
+        text = str(text or "").strip()
+        if not text:
+            return True  # empty segment -> treat as handled, don't force a persona re-speak
+        try:
+            voice = self._cast.assign(name)
+            pcm, sr = self._cast.synth(voice, text)
+        except Exception as e:  # noqa: BLE001 — a dead cast voice degrades to the persona voice
+            self._log(f"crew synth failed ({name}): {e}")
+            return False
+        if not pcm:
+            return False
+        try:
+            buf = self.mixer.submit(COMMS, pcm16_to_float(pcm), sr)
+        except Exception as e:  # noqa: BLE001 — a mixer glitch degrades to the persona voice
+            self._log(f"crew play failed ({name}): {e}")
+            return False
+        # The mixer plays buffer sources fire-and-forget, so block for the known duration to keep
+        # segments in order — but wake immediately on barge-in: a `cancel` set mid-line drops the
+        # rest of this crew line off the comms bus (mirrors the persona speak path's cancellation).
+        sr_out = float(getattr(self.mixer, "sample_rate", 0) or sr or 16000)
+        duration = (len(buf) / sr_out) if sr_out else 0.0
+        if duration > 0 and cancel.wait(duration):
+            self.mixer.clear_bus(COMMS)
+        return True
+
     def _chatter_interval(self) -> Optional[float]:
         """Current required seconds between chatter lines, scaled by the live system population
         (see chatter.chatter_interval). Read live so a Settings-page change applies immediately."""

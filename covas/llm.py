@@ -16,9 +16,21 @@ if TYPE_CHECKING:  # only for type hints — keep the offline stack importable w
 
 def build_system(cfg: dict) -> str | None:
     """The composed system prompt when personality is ON; else None (neutral). Composition
-    (Base + selected Persona + Campaign) lives in `personality.compose_system` (N7)."""
+    (Base + selected Persona + Campaign) lives in `personality.compose_system` (N7).
+
+    When CREW voicing is on ([crew].enabled, issue #69) a STATIC instruction is appended so the
+    model may voice named crew via a `[Name]` line prefix. It's a constant for a given config, so
+    it rides the cached prefix and never busts the prompt cache turn-to-turn (only the once when
+    the setting/roster changes). It applies even with personality OFF — otherwise there'd be no
+    system prompt to carry it — and stays static in either case."""
+    from .crew import system_instruction
     from .personality import compose_system
-    return compose_system(cfg)
+
+    system = compose_system(cfg)
+    crew = system_instruction(cfg)
+    if not crew:
+        return system
+    return f"{system}\n\n{crew}" if system else crew
 
 
 def _cache_control(cfg: dict) -> dict:

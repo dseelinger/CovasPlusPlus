@@ -28,6 +28,7 @@ from .providers.factory import make_llm, make_stt, make_tts
 from .router import Router
 from .ed import ContextDetector
 from .memory import MemoryDetector
+from . import crew as crew_mod
 
 # Claude replies can contain Unicode (arrows, em-dashes, emoji) the default Windows
 # console can't encode. Make console output lossy-safe so a stray glyph never crashes
@@ -1508,9 +1509,29 @@ class App:
         diagnosable, not a silent no-op (e.g. a 401 famous_voice_not_permitted). Callers keep
         their broad guards and still degrade to text/Idle. In text-only mode (no ElevenLabs key)
         there is no TTS to attempt — the reply is already shown as text — so skip quietly; that
-        loud path is for a CONFIGURED-but-broken TTS, not the intended keyless mode."""
+        loud path is for a CONFIGURED-but-broken TTS, not the intended keyless mode.
+
+        When CREW voicing is on ([crew].enabled, issue #69), the reply is first split into
+        `[Name]`-prefixed segments: persona lines keep the direct TTS path below, crew lines are
+        voiced in their own deterministic cast voice on the radio-treated comms bus. When it's off
+        (the default) the reply is spoken verbatim, exactly as before — the parser isn't invoked."""
         if self.text_only:
             return
+        if not crew_mod.is_enabled(self.cfg):
+            self._speak_persona(text, cancel)
+            return
+        segments = crew_mod.parse_segments(text, enabled=True)
+        crew_mod.speak_segments(
+            segments,
+            persona_speak=lambda t: self._speak_persona(t, cancel),
+            crew_speak=lambda name, t: self._speak_crew(name, t, cancel),
+            cancel=cancel,
+        )
+
+    def _speak_persona(self, text: str, cancel: threading.Event) -> None:
+        """Voice the ship persona (COVAS++) via the injected TTS provider — the direct path that
+        every reply used before crew. Raises on failure after logging LOUDLY so a dead TTS stays
+        diagnosable; callers keep their broad guards and degrade to text/Idle."""
         try:
             self.tts.speak(text, cancel)
         except Exception as e:  # noqa: BLE001 — re-raised after logging; callers fail soft
@@ -1518,6 +1539,19 @@ class App:
             self._log("system", msg)
             print(f"\n!! {msg}", file=sys.stderr, flush=True)
             raise
+
+    def _speak_crew(self, name: str, text: str, cancel: threading.Event) -> bool:
+        """Voice one crew line in its own DETERMINISTIC cast voice (issue #69), delegating to the
+        audio layer's cast seam. Returns True if voiced; False degrades that line to the persona
+        voice. Never raises — a crew voice failing must not break the reply (fail soft), unlike the
+        persona path whose failure is loud + diagnosable."""
+        if self.audio is None:
+            return False  # no bus mixer / cast available -> speak this line as the persona
+        try:
+            return self.audio.speak_crew(name, text, cancel)
+        except Exception as e:  # noqa: BLE001 — crew is best-effort; degrade to the persona voice
+            self._log("system", f"crew voice failed ({name}): {e}")
+            return False
 
     def _log_usage(self, u: dict) -> None:
         """Record a per-call token/cost usage event to the session log + EventBus."""
