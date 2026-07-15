@@ -234,15 +234,3 @@ class CommsVoicer:
         if started and self._log is not None:
             self._log(f"comms[{applied}/{record.voice}]: {text}")
         return VoicedComms(started, text, applied, record.voice, reason)
-
-
-def comms_voice_id(cfg: dict, logical: str) -> str | None:
-    """Map a logical comms voice (male/female/default from C4) to a configured ElevenLabs voice
-    id via [audio.comms.voices]. Falls back to the configured default, then None (provider
-    default). This is the C1 voice-selection bridge the app's play callback uses."""
-    voices = ((cfg.get("audio", {}) or {}).get("comms", {}) or {}).get("voices", {}) or {}
-    vid = str(voices.get(logical) or "").strip()
-    if vid:
-        return vid
-    dflt = str(voices.get("default") or "").strip()
-    return dflt or None

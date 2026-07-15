@@ -435,6 +435,9 @@ on in config (or the Settings page) before testing.
 - [ ] 🌐 On the **Settings → Ambient audio** page, change a bus **volume**, the **cast provider**,
   **random ElevenLabs voices**, or the **chatter min/max seconds** / **full-population** → applies
   live (no restart). The **master** `audio.enabled` persists.
+- [ ] 🌐 Confirm the old **Comms voice — male / female / default** dropdowns are **gone** from the
+  Ambient audio group (superseded by the random voice cast; issue #8) — no stale `audio.comms.voices`
+  keys are written to `overrides.json`.
 
 ### 18.5 Voice cast — random, persistent voices (C10+)
 - [ ] 🔊 With the defaults (`cast_provider = "elevenlabs"`, `random_el = true`, empty pool) and an

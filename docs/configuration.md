@@ -287,7 +287,6 @@ The optional [atmospheric audio layer](audio/ambient-audio.md). **All off by def
 | `audio.voices.cast_provider` | `elevenlabs` | Default TTS for the NPC/comms/chatter cast: `elevenlabs` (random voices, burns credits), `piper` (local, free), `edge` (free neural, no key/SLA), `azure` (official Azure Neural, free tier + SLA), or `openai` (cheap cloud) |
 | `audio.voices.providers.*` | *(unset)* | Per-role provider overrides (`comms`/`chatter`/`player`/`interdiction`); fall back to `cast_provider`. Persona uses `[tts].provider` |
 | `audio.voices.random_el` | `true` | With no pool set, cast from random ElevenLabs voices (minus the COVAS voice) |
-| `audio.comms.voices.{male,female,default}` | *(blank)* | Legacy per-logical-voice ElevenLabs pins (superseded by the random cast) |
 
 The comms radio treatment (band limits, static, compression), the SFX/music track lists, and the
 voice-cast pool live in the same sections — see the comments in `config.toml`.

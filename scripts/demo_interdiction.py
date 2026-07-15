@@ -20,7 +20,8 @@ from covas.mixer import (
     BusMixer,
     InterdictionCue,
     Layer,
-    comms_voice_id,
+    build_cast,
+    pcm16_to_float,
     speak_on_bus,
 )
 from covas.providers.factory import make_tts
@@ -32,6 +33,10 @@ def main() -> None:
     mixer = BusMixer(cfg)
     mixer.start()
 
+    # C10 voice cast: the pirate's comms line gets a cast pool voice (by the "pirate" identity),
+    # gender-narrowed by the layer's hint; COVAS's own threat line stays on the persona voice.
+    cast = build_cast(cfg, synth=lambda voice, text: tts.synth_pcm(text, voice.ref or None))
+
     def emit(layer: Layer) -> bool:
         print(f"  layer -> {layer.bus}: {layer.kind} {layer.payload!r}")
         if layer.kind == "sfx":
@@ -42,8 +47,12 @@ def main() -> None:
             data, sr = sf.read(str(path), dtype="float32", always_2d=False)
             mixer.submit(layer.bus, data, sr)
             return True
-        voice_id = comms_voice_id(cfg, layer.voice) if layer.bus == COMMS else None
-        speak_on_bus(mixer, tts, layer.payload, bus=layer.bus, voice_id=voice_id)
+        if layer.bus == COMMS:
+            hint = layer.voice if layer.voice in ("male", "female") else None
+            pcm, sr = cast.synth(cast.assign("pirate", gender_hint=hint), layer.payload)
+            mixer.submit(layer.bus, pcm16_to_float(pcm), sr)
+            return True
+        speak_on_bus(mixer, tts, layer.payload, bus=layer.bus)
         return True
 
     cue = InterdictionCue.from_cfg(cfg, emit)

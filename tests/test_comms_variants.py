@@ -7,7 +7,6 @@ from covas.mixer import (
     GovernorConfig,
     build_variant_prompt,
     clamp_tier,
-    comms_voice_id,
     evaluate,
     validate_variant,
 )
@@ -165,11 +164,34 @@ def test_build_variant_prompt_mentions_source_and_rules():
     assert "Docking granted." in p and "reworded line" in p
 
 
-def test_comms_voice_id_mapping_and_fallback():
-    cfg = {"audio": {"comms": {"voices": {"male": "VID_M", "default": "VID_D"}}}}
-    assert comms_voice_id(cfg, "male") == "VID_M"
-    assert comms_voice_id(cfg, "female") == "VID_D"     # unset -> default
-    assert comms_voice_id({}, "male") is None            # nothing configured -> provider default
+def test_play_gets_the_record_so_the_sticky_cast_assigns_by_identity():
+    # The live path (runtime._comms_play) casts a random-but-STICKY voice per NPC identity via a
+    # StickyVoicePool — replacing the old male/female/default config lookup. The voicer's contract
+    # that makes that possible: it hands the WHOLE record to `play`, so the callback can key the
+    # pool off the sender/channel identity. Prove that wiring end to end with a real pool.
+    import random
+
+    from covas.mixer import StickyVoicePool, Voice
+
+    pool = StickyVoicePool([Voice("elevenlabs", f"v{i}") for i in range(6)],
+                           rng=random.Random(1234))
+    seen: dict[str, str] = {}
+
+    def play(text, record):
+        identity = record.sender or record.channel or "npc"
+        seen[identity] = pool.assign(identity).ref
+        return True
+
+    voicer = CommsVoicer(play)   # no generator -> verbatim, so `play` runs
+    tower = evaluate(_rt("npc", from_localised="Tower Control"))
+    depot = evaluate(_rt("npc", from_localised="Depot Ops"))
+
+    voicer.voice(tower)
+    first = seen[tower.sender]
+    voicer.voice(depot)
+    voicer.voice(tower)                                  # same identity again
+    assert seen[tower.sender] == first                   # sticky: unchanged for the same speaker
+    assert seen[depot.sender] != first                   # a different speaker -> its own voice
 
 
 def test_make_variant_generator_with_fake_llm():
