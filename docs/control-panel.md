@@ -34,7 +34,9 @@ A schema-driven [settings page](using/settings.md) that renders every setting wi
 control for its type — toggles, dropdowns, number fields and sliders, text/path boxes — each with
 inline help:
 
-- **Filter box** — type to narrow the list to matching settings.
+- **Filter box** — type to narrow the list to matching settings. It matches a setting's section,
+  title, or description (case-insensitive substring) and hides sections with no matches. Filtering
+  kicks in at 3+ characters; shorter or empty shows everything.
 - **Change & save** — edit values, then **Save changes** writes them to `overrides.json`
   (`config.toml` stays pristine).
 - **Per-setting reset** — a changed setting shows a **Reset** button that reverts it to the default

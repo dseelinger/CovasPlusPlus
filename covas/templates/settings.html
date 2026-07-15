@@ -155,17 +155,18 @@ function render(){
     const card = document.createElement("section");
     card.className="card"; card.id=slug(g.name);
     card.innerHTML = '<h2>'+esc(g.name)+'</h2>';
-    for(const s of g.settings){ ORIG[s.key]=s.value; card.appendChild(row(s)); }
+    for(const s of g.settings){ ORIG[s.key]=s.value; card.appendChild(row(s, g.name)); }
     main.appendChild(card);
   }
   syncSaveBar();
 }
 
-function row(s){
+function row(s, group){
   const wrap = document.createElement("div");
   wrap.className = "setting" + (s.overridden ? " overridden":"");
   wrap.dataset.key = s.key;
-  wrap.dataset.search = (s.label+" "+s.help+" "+s.key).toLowerCase();
+  // Filter matches section, title, and description (issue #7) — case-insensitive substring.
+  wrap.dataset.search = ((group||"")+" "+s.label+" "+s.help).toLowerCase();
 
   const top = document.createElement("div"); top.className="top";
   const label = document.createElement("div"); label.className="label"; label.textContent=s.label;
@@ -301,7 +302,9 @@ function toast(msg, bad){
 }
 
 function filter(){
-  const q=$("search").value.trim().toLowerCase();
+  const raw=$("search").value.trim().toLowerCase();
+  // Only filter once the query is 3+ chars; shorter (or empty) shows everything (issue #7).
+  const q = raw.length>=3 ? raw : "";
   for(const el of document.querySelectorAll(".setting"))
     el.classList.toggle("hidden", q && !el.dataset.search.includes(q));
   for(const card of document.querySelectorAll(".card")){
