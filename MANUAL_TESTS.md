@@ -396,6 +396,19 @@ Notes:
 
 Notes:
 
+## 8e. Body finder (#68)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
+> `[bodies].enabled = true` + `[elite].enabled = true`. Nearest **single body** by type or biological signal over Spansh's `bodies/search`, nearest-first from your current system, copying the match's **system** to the clipboard. Stateless conversational slot-filling; misheard types/genera are validated against a bundled vocabulary and corrected. **This is the on-hardware validation of the LIVE-VERIFY Spansh bodies request/result shape.**
+- [ ] **Nearest body type (happy path):** *"Find the nearest Earth-like world."* → names a real body + its system + distance (and light-seconds from the star), and says the system was copied. Try *"the closest ammonia world"* / *"the nearest water world"*.
+- [ ] **⚠️ LIVE-VERIFY the bodies shape:** confirm the spoken **body / system / distance** are **real and correct** (cross-check on [spansh.co.uk/bodies](https://spansh.co.uk/bodies) with the same reference system + subtype). If the answer is blank/wrong or the filter is ignored (a mismatched subtype comes back), the Spansh bodies request/result field names have drifted — fix the `BODIES` spec / `parse_bodies` in `covas/search/categories.py` and the vocab in `covas/search/bodies.py`.
+- [ ] **Biological signal of type X:** *"Find the nearest body with Bacterium signals."* → nearest body listing a *Bacterium* species; it confirms the signal. Try a specific species (*"…with Bacterium Aurasus"*) and *"any biological signal"*.
+- [ ] **Landable + close-in:** *"The nearest landable body with Aleoida, close to the star."* → respects both (a landable body, low arrival distance). Cross-check on spansh.co.uk/bodies.
+- [ ] **Correction, not invention:** ask for a nonsense type/biology (*"the nearest chocolate planet"*, *"a body with space whales"*) → it offers the closest real value or asks again; it does **not** run a bogus search.
+- [ ] **Plot handoff:** after a match, **paste** (Ctrl-V) into the galaxy-map search box → it's the **body's system**; it sets course. (There's no per-body plot; you plot the system, then fly in.)
+- [ ] **Already-there rule:** if the nearest match is a body **in your current system**, it says you're already there and does **NOT** copy.
+- [ ] **Fail-soft:** with the internet briefly off, ask for a body → a spoken "couldn't reach the bodies database" note, and the voice loop keeps working (no crash).
+
+Notes:
+
 ## 9. Location & carriers (N3)  🎮 ED 🔊 HW 📋 clipboard
 > `[elite].enabled = true`. The owned fleet carrier is tracked from the journal (pinned to its `CarrierID`).
 - [ ] **Copy current system:** *"Copy my current system."* → copies your **current** system to the clipboard (paste to confirm).

@@ -43,18 +43,18 @@ class FakeHttp:
         return self._status, self._body
 
 
-# --- the six categories are all registered, with real endpoints ----------------------------
+# --- the seven categories are all registered, with real endpoints --------------------------
 
-def test_all_six_categories_present():
+def test_all_categories_present():
     assert set(CATEGORIES) == {"stations", "outfitting", "star_systems",
-                               "minor_factions", "signals", "misc"}
+                               "minor_factions", "signals", "misc", "bodies"}
 
 
 def test_each_category_targets_a_real_search_endpoint():
     for spec in CATEGORIES.values():
         assert spec.endpoint.startswith("https://spansh.co.uk/api/")
         assert spec.endpoint.endswith("/search")
-        assert spec.result_kind in ("station", "system")
+        assert spec.result_kind in ("station", "system", "body")
 
 
 # --- query building: valid params render into the Spansh filter shapes ---------------------
@@ -131,22 +131,24 @@ def test_validate_params_lists_accepted_on_failure():
     assert "bogus" in msg and "allegiance" in msg  # allegiance is accepted, shown in the list
 
 
-# --- outfitting is bespoke; bodies is an unimplemented seam --------------------------------
+# --- outfitting is bespoke; bodies is now an implemented category (#68) --------------------
 
 def test_outfitting_build_is_bespoke_and_refuses_generic_builder():
     with pytest.raises(NotImplementedError):
         build_filters(category("outfitting"), {"module": "Multi-Cannon"})
 
 
-def test_bodies_is_an_unimplemented_seam():
-    assert BODIES.implemented is False
-    with pytest.raises(NotImplementedError):
-        build_query(BODIES, {}, "Sol")
+def test_bodies_is_implemented_and_builds_through_the_generic_builder():
+    assert BODIES.implemented is True and BODIES.result_kind == "body"
+    q = build_query(category("bodies"),
+                    {"subtype": "Earth-like world", "is_landable": True}, "Sol")
+    assert q["filters"]["subtype"] == {"value": ["Earth-like world"]}
+    assert q["filters"]["is_landable"] == {"value": True}
+    assert q["reference_system"] == "Sol"
 
 
-def test_category_lookup_rejects_the_bodies_seam_and_unknowns():
-    with pytest.raises(KeyError):
-        category("bodies")
+def test_category_lookup_finds_bodies_and_rejects_unknowns():
+    assert category("bodies") is BODIES
     with pytest.raises(KeyError):
         category("teleportation")
 

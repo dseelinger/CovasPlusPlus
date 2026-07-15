@@ -699,6 +699,26 @@ user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
 search_size = 50
 
 
+[bodies]
+# Body / bio-geo signal finder (#68). Voice: "find the nearest Earth-like world", "the closest
+# body with Bacterium signals". Same stateless, LLM-native shape as [star_systems]/[search], but
+# over the Spansh bodies/search endpoint — a TARGETED single-body lookup (complements the Road-to-
+# Riches ROUTE planner in [riches_plan], which plans a whole scan run). Filter by:
+#   * body type      — Earth-like / ammonia / water world, high-metal-content, a gas-giant class…
+#   * biological signal — an exobiology genus (Bacterium, Stratum, Tussock…), a specific species
+#                      (Bacterium Aurasus), or "any biological" (via Spansh's landmark_subtype).
+#   * landable, and/or distance from the main star (light-seconds).
+# Nearest first from your current system; the match's SYSTEM is copied to the clipboard for the
+# galaxy map. Spoken values are validated against bundled canonical vocabularies (from the live
+# Spansh API) before any query, so a misheard type/biology is corrected, not silently widened.
+# Needs [elite].enabled for the live current-system. DEFAULT OFF — opt in.
+enabled = false
+# Sent as the HTTP User-Agent — be a polite API citizen and identify the app.
+user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
+# How many nearest matching bodies to fetch per search; the closest is the answer.
+search_size = 50
+
+
 [route_plan]
 # Trade-route planner (#44, on the #41 route foundation). Voice: "plan me a trade route from
 # here". Plans a Spansh trade loop starting from the station you're docked at, speaks the WHOLE

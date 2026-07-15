@@ -29,6 +29,7 @@ All searches share the same feel:
 | [Minor factions](minor-factions.md) | **system** where a faction is present or in control | *"find the nearest system where the Dark Wheel is present"* |
 | [Faction states](faction-states.md) | **system** by its controlling faction's state | *"find the nearest system at war"* |
 | [Signals & structures](signals.md) | **structure** — megaship, settlement, outpost, starport | *"find the nearest megaship"* |
+| [Body finder](bodies.md) | **body** by type or biological signal | *"find the nearest Earth-like world"* |
 
 !!! tip "Not sure which to use? Just ask"
     You don't need to know the categories. Ask for what you want ("where can I buy a Python?",

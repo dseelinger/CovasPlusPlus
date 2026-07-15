@@ -1,0 +1,454 @@
+{
+  "count": 10000,
+  "from": 0,
+  "reference": {
+    "id64": 10477373803,
+    "name": "Sol",
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+  },
+  "results": [
+    {
+      "arg_of_periapsis": 286.536985,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Nitrogen",
+          "share": 91.16993
+        },
+        {
+          "name": "Oxygen",
+          "share": 8.682851
+        },
+        {
+          "name": "Water",
+          "share": 0.095125
+        }
+      ],
+      "axis_tilt": 0.439648,
+      "body_id": 5,
+      "distance": 0.0,
+      "distance_to_arrival": 773.30987,
+      "earth_masses": 0.107,
+      "estimated_mapping_value": 896273,
+      "estimated_scan_value": 246681,
+      "gravity": 0.377025390027531,
+      "id": "180143995572193643",
+      "id64": 180143995572193643,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": false,
+      "name": "Mars",
+      "orbital_eccentricity": 0.0934,
+      "orbital_inclination": 1.85,
+      "orbital_period": 686.971001602986,
+      "orbital_synchronicity": 685.945044539757,
+      "parents": [
+        {
+          "id64": 10477373803,
+          "subtype": "G (White-Yellow) Star",
+          "type": "Star"
+        }
+      ],
+      "radius": 3396.2,
+      "rotational_period": 1.02595706322917,
+      "semi_major_axis": 1.52367856711137,
+      "signal_count": 8,
+      "signals": [
+        {
+          "count": 8,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2022-11-25 22:39:41+00",
+      "solid_composition": [
+        {
+          "name": "Ice",
+          "share": 0.0
+        },
+        {
+          "name": "Metal",
+          "share": 30.0
+        },
+        {
+          "name": "Rock",
+          "share": 70.0
+        }
+      ],
+      "subtype": "Earth-like world",
+      "surface_pressure": 2.30339069824821,
+      "surface_temperature": 260.81189,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 10477373803,
+      "system_name": "Sol",
+      "system_power_state": "Stronghold",
+      "system_region": "Inner Orion Spur",
+      "system_x": 0.0,
+      "system_y": 0.0,
+      "system_z": 0.0,
+      "terraforming_state": "Terraformed",
+      "type": "Planet",
+      "updated_at": "2026-07-15 12:46:09+00"
+    },
+    {
+      "arg_of_periapsis": 114.207832,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Argon",
+          "share": 0.931637
+        },
+        {
+          "name": "Nitrogen",
+          "share": 77.886406
+        },
+        {
+          "name": "Oxygen",
+          "share": 20.892998
+        }
+      ],
+      "axis_tilt": 0.401426,
+      "body_id": 3,
+      "distance": 0.0,
+      "distance_to_arrival": 492.951966,
+      "earth_masses": 1.0,
+      "estimated_mapping_value": 1030514,
+      "estimated_scan_value": 283628,
+      "gravity": 0.999057713877842,
+      "id": "108086401534265707",
+      "id64": 108086401534265707,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": false,
+      "name": "Earth",
+      "orbital_eccentricity": 0.0167,
+      "orbital_inclination": 0.0,
+      "orbital_period": 365.256373253137,
+      "orbital_synchronicity": 364.259103500938,
+      "parents": [
+        {
+          "id64": 10477373803,
+          "subtype": "G (White-Yellow) Star",
+          "type": "Star"
+        }
+      ],
+      "radius": 6378.1,
+      "rotational_period": 0.997269752199074,
+      "semi_major_axis": 1.00000072121293,
+      "signal_count": 8,
+      "signals": [
+        {
+          "count": 5,
+          "name": "Human"
+        },
+        {
+          "count": 3,
+          "name": "Other"
+        }
+      ],
+      "signals_updated_at": "2022-11-29 06:56:13+00",
+      "solid_composition": [
+        {
+          "name": "Ice",
+          "share": 0.0
+        },
+        {
+          "name": "Metal",
+          "share": 30.0
+        },
+        {
+          "name": "Rock",
+          "share": 70.0
+        }
+      ],
+      "subtype": "Earth-like world",
+      "surface_pressure": 0.999078768813225,
+      "surface_temperature": 288.0,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 10477373803,
+      "system_name": "Sol",
+      "system_power_state": "Stronghold",
+      "system_region": "Inner Orion Spur",
+      "system_x": 0.0,
+      "system_y": 0.0,
+      "system_z": 0.0,
+      "terraforming_state": "Not terraformable",
+      "type": "Planet",
+      "updated_at": "2026-07-15 12:46:09+00",
+      "volcanism_type": "Rocky Magma"
+    },
+    {
+      "arg_of_periapsis": 30.964123,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Nitrogen",
+          "share": 91.288467
+        },
+        {
+          "name": "Oxygen",
+          "share": 8.694139
+        }
+      ],
+      "axis_tilt": -0.237772,
+      "body_id": 6,
+      "distance": 9.68896158329158,
+      "distance_to_arrival": 12.144411,
+      "earth_masses": 0.04,
+      "estimated_mapping_value": 853727,
+      "estimated_scan_value": 234971,
+      "gravity": 0.325224839400428,
+      "id": "216180050138047913",
+      "id64": 216180050138047913,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": true,
+      "name": "Merlin",
+      "orbital_eccentricity": 0.026,
+      "orbital_inclination": 29.899999,
+      "orbital_period": 1.79897165960648,
+      "orbital_synchronicity": 0.000327763703710016,
+      "parents": [
+        {
+          "id64": 180151253119083945,
+          "subtype": "Class II gas giant",
+          "type": "Planet"
+        }
+      ],
+      "radius": 2235.75775,
+      "rotational_period": 1.79929942331019,
+      "semi_major_axis": 0.00200000148226911,
+      "signal_count": 12,
+      "signals": [
+        {
+          "count": 12,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2022-10-13 18:10:42+00",
+      "solid_composition": [
+        {
+          "name": "Ice",
+          "share": 0.0
+        },
+        {
+          "name": "Metal",
+          "share": 30.0
+        },
+        {
+          "name": "Rock",
+          "share": 70.0
+        }
+      ],
+      "subtype": "Earth-like world",
+      "surface_pressure": 2.30039970392302,
+      "surface_temperature": 268.19397,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 7268024264105,
+      "system_name": "Ross 154",
+      "system_power_state": "Fortified",
+      "system_region": "Inner Orion Spur",
+      "system_x": -1.9375,
+      "system_y": -1.84375,
+      "system_z": 9.3125,
+      "terraforming_state": "Terraformed",
+      "type": "Planet",
+      "updated_at": "2026-07-15 10:51:18+00",
+      "volcanism_type": "Major Rocky Magma"
+    },
+    {
+      "arg_of_periapsis": 266.654591,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Carbon dioxide",
+          "share": 0.277867
+        },
+        {
+          "name": "Nitrogen",
+          "share": 83.748932
+        },
+        {
+          "name": "Oxygen",
+          "share": 15.950695
+        }
+      ],
+      "axis_tilt": 1.486566,
+      "body_id": 12,
+      "distance": 9.88310585038934,
+      "distance_to_arrival": 546.368628,
+      "earth_masses": 1.493017,
+      "estimated_mapping_value": 1061597,
+      "estimated_scan_value": 292183,
+      "gravity": 1.30151310288569,
+      "id": "432349904031975787",
+      "id64": 432349904031975787,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": false,
+      "name": "Duamta 4",
+      "orbital_eccentricity": 6.9e-05,
+      "orbital_inclination": -0.024235,
+      "orbital_period": 405.134405526852,
+      "orbital_synchronicity": 403.031795346887,
+      "parents": [
+        {
+          "id64": 4339804408171,
+          "subtype": "F (White) Star",
+          "type": "Star"
+        }
+      ],
+      "radius": 6828.02,
+      "rotational_period": 2.10261017996528,
+      "semi_major_axis": 1.09484369897282,
+      "signal_count": 1,
+      "signals": [
+        {
+          "count": 1,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2022-09-20 18:57:46+00",
+      "solid_composition": [
+        {
+          "name": "Ice",
+          "share": 0.0
+        },
+        {
+          "name": "Metal",
+          "share": 33.8487
+        },
+        {
+          "name": "Rock",
+          "share": 66.1513
+        }
+      ],
+      "subtype": "Earth-like world",
+      "surface_pressure": 1.25384445164569,
+      "surface_temperature": 329.224915,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 4339804408171,
+      "system_name": "Duamta",
+      "system_power_state": "Fortified",
+      "system_region": "Inner Orion Spur",
+      "system_x": 2.1875,
+      "system_y": 6.625,
+      "system_z": -7.0,
+      "terraforming_state": "Terraformed",
+      "type": "Planet",
+      "updated_at": "2026-07-14 19:40:59+00",
+      "volcanism_type": "Major Rocky Magma"
+    },
+    {
+      "arg_of_periapsis": 210.809783,
+      "atmosphere": "No atmosphere",
+      "atmosphere_composition": [
+        {
+          "name": "Carbon dioxide",
+          "share": 0.110051
+        },
+        {
+          "name": "Nitrogen",
+          "share": 55.025452
+        },
+        {
+          "name": "Oxygen",
+          "share": 44.864494
+        }
+      ],
+      "axis_tilt": -0.170829,
+      "body_id": 13,
+      "distance": 10.5191881964579,
+      "distance_to_arrival": 296.409045,
+      "earth_masses": 0.25,
+      "estimated_mapping_value": 940335,
+      "estimated_scan_value": 258808,
+      "gravity": 0.631578770266136,
+      "id": "468378018511852242",
+      "id64": 468378018511852242,
+      "is_landable": false,
+      "is_main_star": null,
+      "is_rotational_period_tidally_locked": true,
+      "name": "New California",
+      "orbital_eccentricity": 0.0,
+      "orbital_inclination": 358.899991,
+      "orbital_period": 81.9999993675231,
+      "orbital_synchronicity": 111.064598106852,
+      "parents": [
+        {
+          "id64": 3657265320658,
+          "subtype": "K (Yellow-Orange) Star",
+          "type": "Star"
+        }
+      ],
+      "radius": 4010.90925,
+      "rotational_period": 193.064597474375,
+      "semi_major_axis": 0.594000406725757,
+      "signal_count": 9,
+      "signals": [
+        {
+          "count": 9,
+          "name": "Human"
+        }
+      ],
+      "signals_updated_at": "2022-11-19 20:56:17+00",
+      "solid_composition": [
+        {
+          "name": "Ice",
+          "share": 0.0
+        },
+        {
+          "name": "Metal",
+          "share": 30.0
+        },
+        {
+          "name": "Rock",
+          "share": 70.0
+        }
+      ],
+      "subtype": "Earth-like world",
+      "surface_pressure": 0.363468110041944,
+      "surface_temperature": 261.284393,
+      "system_controlling_power": "Jerome Archer",
+      "system_id64": 3657265320658,
+      "system_name": "Epsilon Eridani",
+      "system_power_state": "Fortified",
+      "system_region": "Inner Orion Spur",
+      "system_x": 1.9375,
+      "system_y": -7.75,
+      "system_z": -6.84375,
+      "terraforming_state": "Terraformed",
+      "type": "Planet",
+      "updated_at": "2026-07-13 06:45:37+00"
+    }
+  ],
+  "search": {
+    "filters": {
+      "subtype": {
+        "value": [
+          "Earth-like world"
+        ]
+      }
+    },
+    "page": 0,
+    "reference_system": "Sol",
+    "reference_system_details": {
+      "id64": 10477373803,
+      "name": "Sol",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "size": 5,
+    "sort": [
+      {
+        "distance": {
+          "direction": "asc"
+        }
+      }
+    ]
+  },
+  "search_reference": "BFAAD076-8053-11F1-B9DD-C2E5FC55B674",
+  "size": 5
+}
