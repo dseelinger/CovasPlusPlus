@@ -208,6 +208,10 @@ class App:
         # of the Tier-1 combat guard. Opt-in ([reflex].enabled, off by default); shares the
         # keybind executor + binds so the one hard abort releases every held key.
         self.reflex = None
+        # Ambient auto-reflex layer (#37): fires the same reflexes automatically off Status/journal
+        # thresholds (no voice), behind the same combat-permissive guard + a per-reflex cooldown.
+        # Opt-in per reflex ([reflex.auto.<name>].enabled, off by default).
+        self.auto_reflex = None
         # Send in-game comms text by voice (issue #49): compose a message, read it back, and
         # send on confirm (local/wing/squadron/direct). Outward-facing (other Commanders see
         # it), so it's behind a MANDATORY read-back-before-send gate — no un-confirmed sends.
@@ -945,7 +949,8 @@ class App:
         snapshot (so it needs [elite].enabled to positively confirm you're IN danger before
         firing a reflex)."""
         try:
-            from .capabilities.reflex_capability import ReflexCapability, ReflexConfig
+            from .capabilities.reflex_capability import (
+                REFLEX_ACTIONS, ReflexCapability, ReflexConfig)
 
             rcfg = ReflexConfig.from_cfg(self.cfg)
             binds = self._ed_binds()
@@ -976,10 +981,53 @@ class App:
                     f"Tier-2 combat reflexes ON (combat-permissive guard "
                     f"{'on' if rcfg.combat_guard else 'off'}; allowlist: "
                     f"{', '.join(rcfg.allowlist) or 'empty'})."})
+
+            # AMBIENT auto-reflex layer (#37): fire the same reflexes automatically off Status/
+            # journal thresholds, no voice. Opt-in per reflex ([reflex.auto.<name>].enabled) and
+            # off by default. Shares the binds/executor/snapshot + the combat-permissive guard.
+            self._start_auto_reflex(binds, executor)
         except Exception as e:  # noqa: BLE001 — optional; never block startup
             self.reflex = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Tier-2 reflexes failed to start: {e}"})
+
+    def _start_auto_reflex(self, binds: dict, executor: object) -> None:
+        """Build + register the ambient auto-reflex capability when opted in ([reflex.auto].
+        enabled). Fail soft: a startup problem just leaves the automatic layer off — the verbal
+        reflexes still work. Needs the event pump (it reacts to bus ed_events) and ED monitoring
+        (for the trigger snapshot + the guard)."""
+        from .capabilities.auto_reflex_capability import AutoReflexCapability, AutoReflexConfig
+        from .capabilities.reflex_capability import REFLEX_ACTIONS
+
+        acfg = AutoReflexConfig.from_cfg(self.cfg)
+        if not acfg.enabled:
+            return
+        snapshot = ((lambda: self.ed_ctx.snapshot()) if self.ed_ctx is not None else None)
+        self.auto_reflex = AutoReflexCapability(
+            binds=binds, executor=executor, config=acfg,
+            status_snapshot=snapshot,
+            log=lambda msg: self._log("reflex", msg))
+        self.registry.register(self.auto_reflex)
+        self._start_event_pump()
+
+        enabled = self.auto_reflex.enabled_reflexes()
+        if not enabled:
+            self.bus.publish({"type": "log", "who": "system", "text":
+                "Auto-reflexes ON but no reflex is enabled — set [reflex.auto.<name>].enabled "
+                "(heat_sink, chaff) to opt one in."})
+            return
+        for trig in enabled:
+            b = binds.get(REFLEX_ACTIONS[trig.name].action)
+            usable = b is not None and b.usable
+            detail = (f"{trig.name} -> {b.key}" if usable
+                      else f"{trig.name} UNUSABLE (no keyboard bind for "
+                           f"{REFLEX_ACTIONS[trig.name].action})")
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Auto-reflex: {detail} ({trig.summary})"})
+        if self.ed_ctx is None:
+            self.bus.publish({"type": "log", "who": "system", "text":
+                "Auto-reflexes ON but ED monitoring is OFF — no trigger events, and the guard "
+                "can't confirm danger, so nothing will fire until [elite].enabled."})
 
     # ---- Send in-game comms (issue #49) -----------------------------------
     def _start_comms(self) -> None:
@@ -2145,7 +2193,10 @@ def _banner(cfg: dict) -> str:
     kb = "ON" if cfg.get("keybinds", {}).get("enabled") else "OFF"
     reflex_on = cfg.get("reflex", {}).get("enabled")
     reflex_ptt = str((cfg.get("reflex", {}) or {}).get("ptt", "")).strip()
-    reflex = ("ON" if reflex_on else "OFF") + (f" (fast-PTT [{reflex_ptt}])" if reflex_ptt else "")
+    auto_reflex_on = (cfg.get("reflex", {}) or {}).get("auto", {}).get("enabled")
+    reflex = (("ON" if reflex_on else "OFF")
+              + (f" (fast-PTT [{reflex_ptt}])" if reflex_ptt else "")
+              + (" (auto ON)" if auto_reflex_on else ""))
     honk = "ON" if cfg.get("honk", {}).get("enabled") else "OFF"
     nav = "ON" if cfg.get("nav", {}).get("enabled") else "OFF"
     return (

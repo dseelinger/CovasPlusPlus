@@ -409,6 +409,48 @@ SCHEMA: list[Setting] = [
             "disables it. A non-combat phrase on it falls through to a normal turn.",
             default="", phrasings=("reflex key", "reflex push to talk", "combat reflex key"),
             example="set the reflex key to right bracket"),
+    # The AMBIENT (no-voice) auto-reflex layer (#37): fire the same reflexes off ED Status/journal
+    # thresholds. Off at BOTH levels by default — the master switch AND every per-reflex enable.
+    # Shares [reflex].combat_guard (the guard toggle isn't duplicated here).
+    Setting("reflex.auto.enabled", ("reflex", "auto", "enabled"), "bool",
+            "Auto-reflexes", "Combat reflexes",
+            "Fire defensive reflexes AUTOMATICALLY (no voice) when ED status crosses a threshold — "
+            "a heat sink on overheat, chaff when targeted. Off by default; needs ED monitoring, "
+            "[reflex].enabled, and a per-reflex enable below. Same combat-permissive guard as the "
+            "spoken reflexes.",
+            default=False, phrasings=("auto reflexes", "automatic reflexes", "reflex automation"),
+            example="turn auto reflexes on"),
+    Setting("reflex.auto.min_interval", ("reflex", "auto", "min_interval"), "float",
+            "Auto-reflex min interval", "Combat reflexes",
+            "Global governor: no two auto-reflexes fire within this many seconds.",
+            default=3.0, min=0.0, max=60.0, unit="s",
+            phrasings=("auto reflex interval", "reflex min interval")),
+    Setting("reflex.auto.heat_sink.enabled", ("reflex", "auto", "heat_sink", "enabled"), "bool",
+            "Auto heat sink", "Combat reflexes",
+            "Automatically deploy a heat sink when the ship overheats. Needs DeployHeatSink bound "
+            "to a key in ED.",
+            default=False, phrasings=("auto heat sink", "automatic heat sink")),
+    Setting("reflex.auto.heat_sink.threshold", ("reflex", "auto", "heat_sink", "threshold"),
+            "float", "Heat-sink threshold", "Combat reflexes",
+            "Heat percent to react at. ED signals overheating at >100%, so 100 fires on that flag; "
+            "a value above 100 disables the reaction by threshold.",
+            default=100.0, min=0.0, max=200.0, unit="%",
+            phrasings=("heat sink threshold", "heat threshold")),
+    Setting("reflex.auto.heat_sink.cooldown", ("reflex", "auto", "heat_sink", "cooldown"), "float",
+            "Heat-sink cooldown", "Combat reflexes",
+            "Minimum seconds between automatic heat-sink deployments.",
+            default=10.0, min=0.0, max=300.0, unit="s",
+            phrasings=("heat sink cooldown",)),
+    Setting("reflex.auto.chaff.enabled", ("reflex", "auto", "chaff", "enabled"), "bool",
+            "Auto chaff", "Combat reflexes",
+            "Automatically fire chaff when a hostile locks on or you're interdicted. Needs "
+            "FireChaffLauncher bound to a key in ED.",
+            default=False, phrasings=("auto chaff", "automatic chaff")),
+    Setting("reflex.auto.chaff.cooldown", ("reflex", "auto", "chaff", "cooldown"), "float",
+            "Chaff cooldown", "Combat reflexes",
+            "Minimum seconds between automatic chaff bursts.",
+            default=8.0, min=0.0, max=300.0, unit="s",
+            phrasings=("chaff cooldown",)),
 
     # --- Send in-game comms (issue #49) -----------------------------------
     Setting("comms_send.enabled", ("comms_send", "enabled"), "bool",

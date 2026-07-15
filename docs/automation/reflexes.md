@@ -8,15 +8,18 @@ ship when it's **safe** — and refuse the moment you're in combat. Some ship ac
 make sense **while** you're being shot at: **chaff**, heat sink, shield cell, boost. Those are
 *reflexes*, and they run under a **separate, inverted policy** — the *combat-permissive* guard.
 
-Today COVAS++ ships exactly **one** validated reflex: **fire chaff**. It's a prototype for the
-inverted safety model; more reflexes (heat sink, shield cell, boost) build on the same guard.
+COVAS++ ships two validated reflexes — **fire chaff** and **deploy heat sink** — on three paths: ask
+the assistant, a **second push-to-talk** hotword that fires locally, or **automatically** when your
+status crosses a threshold. All run under the same inverted safety model (shield cell and boost
+build on the same guard next).
 
 **Example:** *"chaff!"* — while you're in danger or being interdicted.
 
 !!! danger "Off by default — opt in deliberately"
-    This sends **real keypresses into Elite Dangerous.** Set `[reflex].enabled = true` **and** add
-    `chaff` to `[reflex].allowlist` to use it. The allowlist ships **empty**, so nothing fires until
-    you name it.
+    This sends **real keypresses into Elite Dangerous.** For the **spoken/hotword** reflexes, set
+    `[reflex].enabled = true` **and** add `chaff` / `heat_sink` to `[reflex].allowlist`. The allowlist
+    ships **empty**, so nothing fires until you name it. The **automatic** reflexes are separate and
+    also off by default — see [Automatic reflexes](#automatic-reflexes) below.
 
 ## Tier-1 vs Tier-2 — the two safety models
 
@@ -67,30 +70,56 @@ normal conversation turn.
 - **Say anything that isn't a combat keyword** on that key and it simply **falls through to a normal
   turn** — so it doubles as an ordinary talk key if you mis-hit it.
 
-Today the same one reflex — **chaff** — is wired to fire (heat sink, shield cell, and boost are
-recognised by the spotter but not yet pressed). It requires `[reflex].enabled` and `chaff` in the
-allowlist, exactly like the assistant path.
+Two reflexes — **chaff** and **heat sink** — are wired to fire (shield cell and boost are recognised
+by the spotter but not yet pressed). They require `[reflex].enabled` and the reflex in the allowlist,
+exactly like the assistant path.
+
+## Automatic reflexes
+
+The **automatic** layer fires the same reflexes the instant your Elite Dangerous status crosses a
+threshold — **no voice, no key, no assistant round-trip.** It's the fastest path (sub-100ms), and it
+runs under the **same** combat-permissive guard as everything above: it can only fire a defensive
+reflex, only while you're in danger, and never a dangerous action.
+
+It's part of the same Tier-2 subsystem, so it needs `[reflex].enabled = true` (the master switch)
+**and** `[reflex.auto].enabled = true`, then a per-reflex enable. Two automatic reflexes ship, both
+**off by default** and enabled one at a time by name:
+
+- **Heat sink** — deploys a heat sink when your ship **overheats**. Elite Dangerous reports
+  overheating above **100%** heat; the `threshold` setting is the heat percent to react at (a value
+  above 100 turns it off by threshold). With the combat guard on it fires only while you're *also*
+  in danger; set `reflex.combat_guard = false` if you'd rather it fire on any overheat (e.g. fuel
+  scooping). Needs **DeployHeatSink** bound to a key in ED.
+- **Chaff** — fires chaff when a hostile **locks on** or you're **interdicted**. Needs
+  **FireChaffLauncher** bound to a key in ED.
+
+Each reflex has its own **cooldown** (minimum seconds between fires) and there's a global
+**min-interval** across all of them, so a sustained overheat or a long fight can't spam presses. If
+the guard refuses a fire (status says you're safe, or it can't read your status), the cooldown is
+*not* used up — a real danger trigger can still fire. Say **"abort"** to release every held key.
 
 ## Settings
 
 | Setting | What it does |
 |---------|--------------|
-| `reflex.enabled` | Master switch (**off** by default) |
-| `reflex.combat_guard` | Permit reflexes only while in danger/interdiction; always refuse dangerous actions (leave on) |
-| `reflex.allowlist` | Reflex names allowed to fire — ships **empty**; add `"chaff"` to opt in |
+| `reflex.enabled` | Master switch for the **spoken/hotword** reflexes (**off** by default) |
+| `reflex.combat_guard` | Permit reflexes only while in danger/interdiction; always refuse dangerous actions (leave on). Shared by every reflex path |
+| `reflex.allowlist` | Spoken/hotword reflex names allowed to fire — ships **empty**; add `"chaff"` / `"heat_sink"` to opt in |
 | `reflex.ptt` | Second push-to-talk for the instant fast path — a snap *"chaff!"* fires locally with no LLM. Bind a **different** key than the talk key; **blank** disables it |
+| `reflex.auto.enabled` | Master switch for the **automatic** reflexes (**off** by default) |
+| `reflex.auto.min_interval` | Global governor — no two auto-reflexes fire within this many seconds |
+| `reflex.auto.heat_sink.enabled` | Auto-deploy a heat sink on overheat (**off** by default) |
+| `reflex.auto.heat_sink.threshold` | Heat percent to react at (default `100`) |
+| `reflex.auto.heat_sink.cooldown` | Minimum seconds between auto heat-sink deployments |
+| `reflex.auto.chaff.enabled` | Auto-fire chaff when targeted/interdicted (**off** by default) |
+| `reflex.auto.chaff.cooldown` | Minimum seconds between auto chaff bursts |
 
 Requires [game-state monitoring](../elite/monitoring.md) (`[elite].enabled = true`) — the guard must
-read your status to confirm you're in danger before firing. See the
-[Configuration reference](../configuration.md).
+read your status to confirm you're in danger before firing, and the automatic layer reads it for the
+triggers. See the [Configuration reference](../configuration.md).
 
 ## Roadmap
 
-The chaff reflex is the foundation, not the finish line. The **instant hotword** fast path (the
-second push-to-talk above) is already here. One follow-up still builds on this guard:
-
-- **Auto-reflexes** — fire chaff automatically the moment your status flips to *in danger*, no
-  command needed.
-
-Heat sink, shield cell, and boost are recognised by the phrase-spotter and the guard today; wiring
-each to actually press its key follows the same pattern as chaff.
+Chaff and heat sink — spoken, hotword, and automatic — are the foundation. Shield cell and boost are
+recognised by the phrase-spotter and the guard today; wiring each to actually press its key follows
+the same pattern as chaff and heat sink.

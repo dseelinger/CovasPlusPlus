@@ -45,7 +45,7 @@ your own dropped into `<data dir>/sounds/<type>/` — see §2):
 Notes:
 
 ### 0.2 Launch
-- [ ] **Headless:** `run_covas.bat` (or `python run_covas.py`) → console banner shows your model, voice, Whisper size, and the capability on/off lines (Router, ED monitor, Proactive, Keybinds, **Reflexes**, **Auto-honk**, Find module, Personality). No browser.
+- [ ] **Headless:** `run_covas.bat` (or `python run_covas.py`) → console banner shows your model, voice, Whisper size, and the capability on/off lines (Router, ED monitor, Proactive, Keybinds, **Reflexes** — shows `(fast-PTT […])` / `(auto ON)` when those are set, **Auto-honk**, Find module, Personality). No browser.
 - [ ] **With panel:** `run_covas_ui.bat` (or `python run_covas_ui.py`) → same banner **plus** the browser opens http://127.0.0.1:8765 and the status light reads **IDLE**.
 - [ ] Console prints the PTT scan codes line, and `QUIT: Ctrl+Alt+Q`.
 
@@ -62,7 +62,8 @@ the next restart** (only Whisper reloads live). Confirm each before running its 
 - [ ] `[hud].enabled = true` — Companion HUD overlay (**off** by default; applies **live**, no restart). (§5a)
 - [ ] `[hud].vr_enabled = true` — in-headset VR HUD overlay (**off** by default; needs SteamVR + `pip install openvr`). (§5b)
 - [ ] `[keybinds].enabled = true` — Landing-gear automation. Keep `require_confirmation`/`combat_guard = true`. (§6.1)
-- [ ] `[reflex].enabled = true` — Tier-2 combat reflex (fire chaff). **Off** by default, allowlist ships empty — set `[reflex].allowlist = ["chaff"]` to opt in. Keep `combat_guard = true`. (§6.3)
+- [ ] `[reflex].enabled = true` — Tier-2 combat reflexes (fire chaff / heat sink). **Off** by default, allowlist ships empty — set `[reflex].allowlist = ["chaff", "heat_sink"]` to opt in the spoken/hotword path. Keep `combat_guard = true`. (§6.3)
+- [ ] `[reflex.auto].enabled = true` — Tier-2 **ambient** auto-reflexes (no voice). **Off** by default; needs `[reflex].enabled` too, plus a per-reflex enable (`[reflex.auto.heat_sink].enabled` / `[reflex.auto.chaff].enabled`). (§6.3.2)
 - [ ] `[honk].enabled = true` — Auto-honk on arrival (**on** by default). No fire-group setup — it probes and backs out of a Surface-Scanner misfire. Set `[honk].trigger` only if your scanner is on secondary fire. (§6.2)
 - [ ] `[comms_send].enabled = true` — send in-game chat by voice (**off** by default). Bind **Quick Comms Panel** to a key; outward-facing, so it always reads back and sends only on a separate confirm. (§6.4)
 - [ ] `[nav].enabled = true` — outfitting "find the closest module". (§7)
@@ -406,7 +407,7 @@ Notes:
 
 ### 6.3 Tier-2 combat reflex — fire chaff (#36 — `[reflex].enabled = true`, allowlist `chaff`)
 > The **inverse** of §6.1: reflexes fire ONLY while you're in danger. Chaff is purely **defensive**, so firing it is always safe — you never shoot at anyone. Set `[reflex].enabled = true` and `[reflex].allowlist = ["chaff"]`, keep `[reflex].combat_guard = true`, and bind your **chaff launcher** to a **key** in ED (a HOTAS/mouse-only bind can't be pressed). Requires `[elite].enabled`.
-- [ ] **Startup readiness:** launch reports `Reflex: chaff -> <key>` (or `chaff UNUSABLE (no keyboard bind for FireChaffLauncher)` if it's not bound to a key), and a `Tier-2 combat reflexes ON …` line.
+- [ ] **Startup readiness:** launch reports `Reflex: chaff -> <key>` (or `chaff UNUSABLE (no keyboard bind for FireChaffLauncher)` if it's not bound to a key), and a `Tier-2 combat reflexes ON …` line. (Add `heat_sink` to the allowlist to also see `Reflex: heat_sink -> <key>` and say *"heat sink!"* to deploy one under fire — same guard as chaff.)
 - [ ] **Refused when safe (fully combat-SAFE test — do this parked/docked):** say *"chaff"* while NOT in danger → COVAS **refuses** ("you're not in combat…") and **nothing is pressed**. This is the safe way to prove the guard without a fight.
 - [ ] **Refused with monitoring off:** set `[elite].enabled = false`, say *"chaff"* → refused ("can't confirm you're in danger — … status isn't available"); nothing fires.
 - [ ] **Fires under fire (defensive — safe):** let a **weak NPC interdict** you (or take fire from a low-threat hostile), say *"chaff"* → it presses your chaff key **once**, log `fired chaff -> <key>`, and chaff deploys. Because chaff is defensive, this is safe even mid-combat.
@@ -425,6 +426,17 @@ Notes:
 - [ ] **Falls through to a normal turn:** on the reflex key, say a **non-combat** request (*"what's my fuel level?"*) → it is **not** treated as a reflex; it runs as an ordinary conversation turn and COVAS answers.
 - [ ] **Main PTT untouched:** the normal `[keys].push_to_talk` key still opens a normal conversation turn exactly as before; the two keys don't interfere.
 - [ ] **Disabled by default:** clear `[reflex].ptt` (blank) → no second hook; only the main PTT works.
+
+### 6.3.2 Tier-2 ambient auto-reflexes (#37 — `[reflex.auto].enabled = true`, per-reflex enable)
+> The **automatic** (no-voice, no-key) version of §6.3: the SAME reflexes fire the instant your ED status crosses a threshold — no command. Same combat-permissive guard, same shared abort. Set `[reflex].enabled = true` and `[reflex.auto].enabled = true`, then opt a reflex in: `[reflex.auto.heat_sink].enabled = true` and/or `[reflex.auto.chaff].enabled = true`. Keep `[reflex].combat_guard = true`. Bind **DeployHeatSink** and/or **FireChaffLauncher** to **keys** in ED. Requires `[elite].enabled`. **These fire real keypresses with no prompt — test the "fires" cases against weak NPCs only.**
+- [ ] **Startup readiness:** launch reports the banner line `Reflexes : ON (auto ON)` and, per enabled reflex, `Auto-reflex: heat_sink -> <key>` / `chaff -> <key>` (or `… UNUSABLE (no keyboard bind for DeployHeatSink/FireChaffLauncher)`).
+- [ ] **Auto chaff under fire (defensive — safe):** with auto-chaff on, let a **weak NPC interdict** you → chaff fires **automatically once** shortly after the danger/interdiction begins. Log: `auto-chaff on EnteredDanger|Interdicted: Chaff away …`.
+- [ ] **Cooldown holds the repeat:** stay in the fight past the danger onset → it does **not** re-fire until the `[reflex.auto.chaff].cooldown` (default 8s) elapses. Log shows `chaff suppressed: chaff cooldown (8s)` for held attempts.
+- [ ] **Auto heat sink on overheat (in combat):** while in danger, push your ship over **100% heat** (e.g. hard boosting/weapons in a fight) → a heat sink deploys automatically. Log: `auto-heat_sink on Overheating: Heat sink deployed …`.
+- [ ] **Guard blocks when safe:** overheat while **NOT** in danger (e.g. flying too close to a star, parked) with `combat_guard = true` → it **refuses** and nothing fires (log `auto-heat_sink … refused: you're not in combat …`). Then set `[reflex].combat_guard = false`, repeat → it **does** deploy on overheat regardless of danger (the escape hatch).
+- [ ] **Disabled reflex stays quiet:** turn `[reflex.auto.chaff].enabled = false` (leave heat_sink on) → interdiction fires **no** chaff; overheat still deploys a heat sink.
+- [ ] **Hard abort:** say *"abort"* mid-reaction → releases every held key (shared with keybinds/honk/verbal reflexes).
+- [ ] **Master off:** set `[reflex.auto].enabled = false` → nothing auto-fires (verbal §6.3 still works if allowlisted).
 
 Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_DETECT_WINDOW`, the Exit-Mode bind):
 
