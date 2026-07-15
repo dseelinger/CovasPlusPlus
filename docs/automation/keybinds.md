@@ -113,6 +113,43 @@ Then bind the matching controls in ED (throttle sets under *Flight Throttle*, ta
 *Targeting*, FSD/supercruise under *Flight Miscellaneous*). Anything you leave off the allowlist
 won't be offered or run, even if you ask for it. Consequential actions still need a separate
 "confirm"; the combat guard and mode gate apply to all of them.
+## Odyssey on-foot actions (opt-in)
+
+When you're **disembarked** (on foot in Odyssey), COVAS++ can press a handful of **benign, utility**
+controls for you. These are **mode-gated**: they're only offered while you're actually on foot, and
+never while you're flying — just as landing gear is never offered on foot. This is the improvement
+over a flat action list: the companion offers what makes sense for what you're *currently* doing.
+
+They're all benign (a toggle or a selection — nothing here ever *fires a weapon or throws a
+grenade*, which are out of scope on purpose), so unlike landing gear they fire **immediately** on
+request (no separate confirmation) — still behind the allowlist, the combat guard, and the mode
+gate. **None is enabled by default:** add the ones you want to `[keybinds].allowlist` by name.
+
+| Macro name (allowlist) | Voice tool | What it does | ED binding |
+|---|---|---|---|
+| `on_foot_flashlight` | toggle flashlight | Suit flashlight on/off | Toggle Flashlight |
+| `on_foot_night_vision` | toggle night vision | Suit night vision on/off | Toggle Night Vision |
+| `on_foot_select_primary` | draw primary weapon | Select primary weapon | Select Primary Weapon |
+| `on_foot_select_secondary` | draw secondary weapon | Select secondary weapon | Select Secondary Weapon |
+| `on_foot_select_utility` | draw utility weapon | Select utility weapon | Select Utility Weapon |
+| `on_foot_holster` | holster weapon | Holster / hide weapon | Hide Weapon |
+| `on_foot_energylink` | switch to energy link | Select the recharge tool | Switch to Recharge Tool |
+| `on_foot_profile_analyser` | switch to profile analyser | Select the profile analyser | Switch to Comp. Analyser |
+| `on_foot_suit_tool` | switch to suit tool | Select the suit tool | Switch to Suit Tool |
+| `on_foot_crouch` | toggle crouch | Crouch | Crouch |
+| `on_foot_galaxy_map` | open galaxy map | Open the galaxy map on foot | Galaxy Map (on foot) |
+
+Each control must be **bound to a key** in Elite Dangerous (Controls → On Foot); a joystick-only
+bind can't be pressed, and COVAS will say so. Example allowlist:
+
+```toml
+[keybinds]
+allowlist = ["landing_gear", "on_foot_flashlight", "on_foot_night_vision"]
+```
+
+!!! note "The combat guard still applies on foot"
+    Even though these are benign, COVAS won't press them while your suit reports **danger** (or when
+    it can't read your status). That's the same conservative guard as the ship controls.
 
 ## It reads *your* bindings
 

@@ -489,6 +489,21 @@ actions (jump/supercruise/flight-assist) keep `confirm_required=True`; benign, r
 (throttle set, target cycling, nav-lock) set it `False` to fire immediately — all still behind the
 allowlist + combat + mode guards. **None are in the default allowlist** — each is opt-in via
 `[keybinds].allowlist`, so default behavior is unchanged. `KeybindCapability` was not touched.
+### Implemented — Odyssey on-foot action batch (Tier-1, #34)
+The first **non-ship** action batch on the registry seam — and the payoff of mode-gating. A new
+module `keybinds/actions/on_foot.py` registers a benign, utility-focused set of Odyssey on-foot
+macros (flashlight + night-vision toggles, weapon SELECT + holster — draw/holster only, never
+*fires* — the three suit-tool switches, crouch, and the galaxy map), each declaring
+`modes={on_foot}`. That single field is the whole feature: `KeybindCapability` advertises them
+**only** while the Commander is disembarked (Odyssey `Flags2` OnFoot), so the model is never
+offered "toggle flashlight" in the cockpit and the ship's landing-gear toggle never appears on
+foot — correct mode-aware actions, unlike a flat action list. Combat actions (fire, grenade,
+melee) are deliberately excluded. All are benign (`confirm_required=False`) so they fire
+immediately, still behind the allowlist + combat + mode guards; **none is in the default
+allowlist** (`[keybinds].allowlist` stays `landing_gear` only) — a Commander opts each macro in
+by name. Landing this batch was a new module + one import line in `actions/__init__.py`, no edit
+to `KeybindCapability` — the Phase-1 lever working as designed. Action tokens were verified
+against a real Odyssey `.binds` file (the night-vision token is `HumanoidToggleNightVisionButton`).
 
 ### Implemented — auto-honk (`[honk]`, default off, N5)
 The second keybind-driven action, and the first PROACTIVE one — fire the Discovery Scanner

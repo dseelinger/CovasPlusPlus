@@ -241,6 +241,16 @@ Notes:
 - [ ] **Mode gate — fighter:** deploy a **ship-launched fighter**; `throttle_*` and target cycling are still offered, but `supercruise` / `hyperspace` / `frame_shift_drive` / `target_next_route_system` / `nav_lock` are **not** (main-ship only) and refuse if asked.
 - [ ] **Unbound token:** allowlist `nav_lock` but leave **WingNavLock** unbound in ED → asking to toggle nav lock says to **bind it in-game**; nothing fires.
 - [ ] **Off-allowlist still refused:** an action you did **not** add (e.g. `hyperspace` when only `throttle_zero` is allowlisted) → won't do it.
+### 6.1b Odyssey on-foot actions (#34 — `[keybinds].enabled = true`)
+> **Disembark first** (be on foot in Odyssey). Add the macros under test to `[keybinds].allowlist`, e.g. `["landing_gear", "on_foot_flashlight", "on_foot_night_vision"]`. Bind the matching **On Foot** controls to keys in ED. These are benign, so they fire **immediately** (no separate confirm).
+- [ ] **Mode gating — offered only on foot:** **in your ship**, ask to *"toggle my flashlight"* → **refused** ("only works on foot"), and the action isn't offered. **Disembark**, ask again → it fires immediately (flashlight toggles in-game). This is the core check: on-foot actions are hidden while flying.
+- [ ] **Flashlight / night vision:** on foot, *"flashlight"* and *"night vision"* each toggle the suit light / night vision.
+- [ ] **Weapon select + holster:** on foot, *"draw your primary weapon"* / *"secondary"* / *"utility"* selects that weapon; *"holster your weapon"* puts it away. It never **fires** — only draws/holsters.
+- [ ] **Suit tools:** on foot, *"switch to your energy link"* / *"profile analyser"* / *"suit tool"* selects that gadget.
+- [ ] **Crouch / galaxy map:** on foot, *"crouch"* and *"open the galaxy map"* work.
+- [ ] **Combat guard on foot:** get into **danger** on foot, ask to toggle flashlight → **refused** (benign still guarded). With `[elite]` OFF it also refuses.
+- [ ] **Off-allowlist refusal:** ask for an on-foot macro you did **not** add to the allowlist → won't do it.
+- [ ] **Ship control hidden on foot (regression):** while on foot, *"toggle landing gear"* → **refused** and not offered (proves the gate both ways).
 
 ### 6.2 Auto-honk (N5 + K2 — `[honk].enabled = true`, **on by default**)
 > Fires the Discovery Scanner shortly after you jump into a **new** system — no button press, and **no fire-group setup**. Bind the Discovery Scanner's fire to a **key** in ED (a HOTAS/mouse-only bind can't be pressed; a keyboard secondary, even with a modifier, is fine). At launch the log reports "Auto-honk ON …" or a "bind it in-game" warning.

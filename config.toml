@@ -585,6 +585,13 @@ confirm_window = 60
 #   target_next_route_system                      — target next route system (benign)
 #   nav_lock                                      — toggle nav lock      (benign)
 # e.g. allowlist = ["landing_gear", "throttle_zero", "target_next_route_system"]
+# for others. Ship default stays landing_gear (toggle) so you opt each extra action in by name.
+# Odyssey ON-FOOT batch (#34) — benign, mode-gated to disembarked (never offered while flying).
+# Add any you want (all fire immediately behind the combat guard; none need a spoken confirm):
+#   on_foot_flashlight, on_foot_night_vision, on_foot_select_primary, on_foot_select_secondary,
+#   on_foot_select_utility, on_foot_holster, on_foot_energylink, on_foot_profile_analyser,
+#   on_foot_suit_tool, on_foot_crouch, on_foot_galaxy_map
+# e.g. allowlist = ["landing_gear", "on_foot_flashlight", "on_foot_night_vision"]
 allowlist = ["landing_gear"]
 
 
