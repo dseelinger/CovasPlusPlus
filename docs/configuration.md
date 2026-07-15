@@ -251,7 +251,7 @@ See [Keybind automation](automation/keybinds.md). **Off by default** — it send
 | `keybinds.binding_preference` | `"primary"` | Which `.binds` slot to read the key from: `primary` or `secondary` |
 | `keybinds.confirm_window` | `60` | Seconds an armed action stays confirmable |
 | `keybinds.binds_file` | *(blank)* | Override the auto-detected bindings file |
-| `keybinds.allowlist` | `["landing_gear"]` | The only macros the companion may run |
+| `keybinds.allowlist` | `["landing_gear"]` | The only macros the companion may run. Opt in to more by name — Tier-1 benign UI actions (#32): `focus_left_panel`, `focus_right_panel`, `focus_comms_panel`, `focus_role_panel`, `quick_comms`, `open_galaxy_map`, `open_system_map`, `cycle_fire_group_next`, `cycle_fire_group_previous`, `ui_back`, `ui_focus`, `toggle_headlook`. See [keybind automation](automation/keybinds.md#more-actions-tier-1-panels-maps-fire-groups). |
 
 ## Auto-honk (`[honk]`)
 

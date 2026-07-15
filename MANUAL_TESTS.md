@@ -222,6 +222,19 @@ Notes:
 
 Notes:
 
+### 6.1a Tier-1 UI actions — panels / maps / fire groups (#32)
+> Benign, **fire-immediately** actions (no confirm step). Opt in by NAME: add to `[keybinds].allowlist`, e.g. `allowlist = ["landing_gear", "open_galaxy_map", "cycle_fire_group_next"]`. Each ED control must be **bound to a key** in-game; `[keybinds].enabled` and `[elite].enabled` on (combat guard). Do first tests **parked and docked**.
+- [ ] **Fires immediately (no confirm):** with `open_galaxy_map` allowlisted, *"open the galaxy map"* → the map opens on the spoken command — no separate confirm turn. Say it again to close.
+- [ ] **Panels:** allowlist a panel (e.g. `focus_left_panel`) → *"open the navigation panel"* focuses the correct HUD panel. Spot-check `focus_right_panel`, `focus_comms_panel`, `focus_role_panel`, `quick_comms`, `open_system_map`.
+- [ ] **Fire groups:** with `cycle_fire_group_next` / `cycle_fire_group_previous` allowlisted, *"next fire group"* / *"previous fire group"* steps the active fire group (top-right HUD).
+- [ ] **UI / head-look:** allowlist `ui_back`, `ui_focus`, `toggle_headlook` → each presses the matching control.
+- [ ] **Not allowlisted = refused:** with a macro NOT in the allowlist, asking for it → won't do it (even though the action exists).
+- [ ] **Combat guard still applies:** while **interdicted / in danger**, ask to open the galaxy map → **refused** (benign actions are still gated).
+- [ ] **Mode gating:** **on foot**, ask to open the galaxy map / focus a panel → **refused** ("only works in your ship"); fire-group cycling also works **in a deployed fighter**.
+- [ ] **Unbound control:** if the ED control is HOTAS/mouse-only (no keyboard bind), the action reports "bind it in-game" and nothing fires. Startup log shows each allowlisted macro `-> <Key>`.
+
+Notes:
+
 ### 6.2 Auto-honk (N5 + K2 — `[honk].enabled = true`, **on by default**)
 > Fires the Discovery Scanner shortly after you jump into a **new** system — no button press, and **no fire-group setup**. Bind the Discovery Scanner's fire to a **key** in ED (a HOTAS/mouse-only bind can't be pressed; a keyboard secondary, even with a modifier, is fine). At launch the log reports "Auto-honk ON …" or a "bind it in-game" warning.
 - [ ] **Happy path:** with the **Discovery Scanner** in your current fire group, **jump** to a new system → after a short probe it **holds** the fire button ~`hold_seconds` (default 5) and honks; the system map populates. Log: `honked — current fire group`.
