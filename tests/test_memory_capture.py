@@ -8,7 +8,7 @@ dicts (no watcher, no game), and no embedding/network is touched — so this run
 from __future__ import annotations
 
 from covas.capabilities.memory_capability import MemoryCapability
-from covas.memory import MemoryStore, describe_highlight
+from covas.memory import MemoryStore, Retriever, describe_highlight
 from covas.memory.capture import HIGHLIGHT_TYPE, NOTABLE_CREDITS, MemoryCapture
 
 
@@ -18,6 +18,11 @@ def _store(tmp_path) -> MemoryStore:
 
 def _capture(tmp_path, **kw) -> MemoryCapture:
     return MemoryCapture(_store(tmp_path), **kw)
+
+
+def _capability(capture: MemoryCapture) -> MemoryCapability:
+    """A capability wired to the capture's own store for recall — keyword-only (no embedder)."""
+    return MemoryCapability(capture, Retriever(capture._store))
 
 
 # --- describers (pure, deterministic) ----------------------------------------
@@ -161,7 +166,7 @@ def test_cap_falls_back_to_oldest_when_only_user_facts(tmp_path):
 
 def test_capability_on_event_captures_only_ed_events(tmp_path):
     cap = MemoryCapture(_store(tmp_path))
-    capability = MemoryCapability(cap)
+    capability = _capability(cap)
     # a non-ed_event bus message is ignored
     capability.on_event({"type": "log", "who": "system", "text": "hi"})
     assert cap._store.all() == []
@@ -172,7 +177,7 @@ def test_capability_on_event_captures_only_ed_events(tmp_path):
 
 def test_capability_remember_tool_stores_and_reports_dupes(tmp_path):
     cap = MemoryCapture(_store(tmp_path))
-    capability = MemoryCapability(cap)
+    capability = _capability(cap)
     out = capability.run_tool("remember_this",
                               {"text": "Prefers to be called Commander", "type": "preference",
                                "tags": ["address"]})
@@ -183,16 +188,73 @@ def test_capability_remember_tool_stores_and_reports_dupes(tmp_path):
 
 
 def test_capability_remember_tool_rejects_empty(tmp_path):
-    capability = MemoryCapability(MemoryCapture(_store(tmp_path)))
+    capability = _capability(MemoryCapture(_store(tmp_path)))
     assert "nothing to remember" in capability.run_tool("remember_this", {"text": ""}).lower()
 
 
 def test_capability_help_meta_is_complete():
     from covas.capabilities.base import help_meta_problems
-    capability = MemoryCapability(MemoryCapture(MemoryStore("unused.jsonl")))
+    capability = _capability(MemoryCapture(MemoryStore("unused.jsonl")))
     assert help_meta_problems(capability.help_meta()) == []
 
 
 def test_capability_tools_advertises_remember_this():
-    capability = MemoryCapability(MemoryCapture(MemoryStore("unused.jsonl")))
-    assert [t["name"] for t in capability.tools()] == ["remember_this"]
+    capability = _capability(MemoryCapture(MemoryStore("unused.jsonl")))
+    assert [t["name"] for t in capability.tools()] == ["remember_this", "recall_memory"]
+
+
+# --- recall (issue #61): recall_memory tool + recall_block ------------------
+
+def _seeded_capability(tmp_path):
+    cap = MemoryCapture(_store(tmp_path))
+    cap.remember("Main ship is a Krait Mk II", type="fact", tags=["ship"])
+    cap.remember("Prefers to be addressed as Commander", type="preference", tags=["name"])
+    return _capability(cap)
+
+
+def test_recall_tool_returns_matching_fact(tmp_path):
+    capability = _seeded_capability(tmp_path)
+    out = capability.run_tool("recall_memory", {"query": "what's my ship"})
+    assert "Krait Mk II" in out
+
+
+def test_recall_tool_tag_filter_narrows(tmp_path):
+    capability = _seeded_capability(tmp_path)
+    # tag filter restricts to name facts, so the ship fact is excluded even if words overlap.
+    out = capability.run_tool("recall_memory", {"query": "how to address me", "tags": ["name"]})
+    assert "Commander" in out and "Krait" not in out
+
+
+def test_recall_tool_reports_empty_on_miss(tmp_path):
+    capability = _seeded_capability(tmp_path)
+    assert "nothing on file" in capability.run_tool(
+        "recall_memory", {"query": "my favourite music"}).lower()
+
+
+def test_recall_block_formats_relevant_facts(tmp_path):
+    capability = _seeded_capability(tmp_path)
+    block = capability.recall_block("do you remember my ship")
+    assert block is not None
+    assert block.startswith("(Remembered about the Commander")
+    assert "Krait Mk II" in block
+
+
+def test_recall_block_returns_none_on_miss(tmp_path):
+    capability = _seeded_capability(tmp_path)
+    assert capability.recall_block("my favourite music") is None
+
+
+def test_recall_block_returns_none_on_empty_store(tmp_path):
+    capability = _capability(MemoryCapture(_store(tmp_path)))
+    assert capability.recall_block("anything at all") is None
+
+
+def test_recall_is_fail_soft(tmp_path):
+    """A retriever that raises must not crash recall_block — it degrades to None."""
+    class _BoomRetriever:
+        def recall(self, *a, **k):
+            raise RuntimeError("boom")
+
+    from covas.capabilities.memory_capability import MemoryCapability
+    capability = MemoryCapability(MemoryCapture(_store(tmp_path)), _BoomRetriever())
+    assert capability.recall_block("my ship") is None

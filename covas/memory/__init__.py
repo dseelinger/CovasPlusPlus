@@ -11,12 +11,15 @@ An OPTIONAL embedding-backed similarity seam exists (a tiny Protocol, mirroring 
 but is OFF unless a backend is configured and injected, so the default path stays free and the
 bare `pytest` run stays hermetic.
 
-This module is the store + retrieval foundation only. Wiring recall into the live voice loop and
-exposing a memory capability/tool to the LLM is a later issue (#61); nothing here edits `app.py`.
+This module is the store + retrieval foundation plus the recall detector (#61). The capture sink
+(#60) and recall injection into the live voice loop live in `capabilities/memory_capability.py`
+and `app.py`; the `MemoryDetector` here is pure policy (which turns reference the past), mirroring
+the ED `ContextDetector`.
 """
 from __future__ import annotations
 
 from covas.memory.capture import MemoryCapture, describe_highlight
+from covas.memory.detector import MemoryDetector, MemoryDetectorConfig, MemoryRef
 from covas.memory.embedding import EmbeddingProvider, build_embedder, cosine
 from covas.memory.retrieval import Retriever, keyword_score
 from covas.memory.store import MemoryRecord, MemoryStore, store_from_config
@@ -29,6 +32,9 @@ __all__ = [
     "keyword_score",
     "MemoryCapture",
     "describe_highlight",
+    "MemoryDetector",
+    "MemoryDetectorConfig",
+    "MemoryRef",
     "EmbeddingProvider",
     "build_embedder",
     "cosine",

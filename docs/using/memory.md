@@ -6,10 +6,10 @@ memory in other Elite assistants, this one is **transparent**: it's a plain text
 read, edit, or delete, and it never leaves your machine.
 
 !!! note "What's live"
-    COVAS++ ships the memory **store and recall engine** (issue #59) and **automatic capture**
-    (issue #60): it now populates memory on its own — from journal milestones and from durable
-    facts you mention — so you don't have to seed it by hand. *Recalling* memories aloud mid-
-    conversation ("what do you remember about…") is the remaining follow-up (issue #61).
+    COVAS++ ships the memory **store and recall engine** (issue #59), **automatic capture**
+    (issue #60), and **recall in conversation** (issue #61): it populates memory on its own — from
+    journal milestones and from durable facts you mention — and brings the right facts back into a
+    turn when you reach for them ("do you remember my main ship?"), all offline and free.
 
 ## What gets remembered automatically
 
@@ -81,11 +81,32 @@ perfectly valid — the rest fills in. If a line ever gets mangled (a stray comm
 line after a crash), COVAS++ **skips just that line** and keeps the rest of your memory — one typo
 never wipes the file. Blank lines and lines starting with `#` are ignored, so you can annotate it.
 
-## How recall works
+## Recall in conversation
 
-Recall finds the facts most relevant to a question. By default it uses **keyword and tag matching**
-— fast, fully **offline, and free**, with no API and no extra software. Tags are weighted above
-body words, so tagging a fact with `name` makes "what's my name?" find it reliably.
+COVAS++ brings relevant memories into a turn **two** ways — and both are careful never to bloat the
+prompt or bust the model's cache.
+
+**Automatic, when your question reaches into the past.** A tiny rules pass (the same trick as the
+"where am I" game-context detector) watches for turns that reference memory — *"do you remember…",
+"what's my favourite…", "have I been here before", "remind me what…"*. When one matches, the most
+relevant stored facts are found and prepended as a short reference block **to that one turn's
+message only** — never to the cached system prompt — so the companion answers from what it actually
+knows instead of guessing. If nothing relevant is on file, nothing is added. A turn that doesn't
+reference the past is left completely untouched (no memory, no extra tokens). You can force a lookup
+for a turn with the **`recall` wake word** ("recall, what's my main ship?"), which is scrubbed from
+what the model sees.
+
+**On demand, when the companion decides to check.** COVAS++ also has a `recall_memory` tool it can
+call mid-reply to look something up explicitly. Both paths are a **free, offline read** of your
+local file.
+
+Under the hood, recall finds the facts most relevant to a question with **keyword and tag matching**
+— fast, fully **offline, and free**, with no API and no extra software. Tags are weighted above body
+words, so tagging a fact with `name` makes "what's my name?" find it reliably.
+
+The trigger phrases are tunable in [`config.toml`](../configuration.md) via `[memory].recall_phrases`
+(the natural asks) and `[memory].recall_wake` (the manual override word) — the same shape as the
+`[elite]` context phrases.
 
 There's an **optional** semantic-recall mode backed by text embeddings that can match by *meaning*
 rather than shared words. It is **off by default** on purpose: embeddings cost money and send text
@@ -93,15 +114,22 @@ to a provider, which runs against COVAS++'s privacy-first, cost-first stance. No
 ships yet; leaving `[memory.embedding].enabled = false` (the default) keeps recall on the free,
 offline keyword path.
 
+!!! tip "Cache-safe by design"
+    The recall block rides the **current turn's user message**, which the model never caches, and
+    your stored conversation history keeps the *clean* question. So injecting memories never grows
+    the cached system prefix — recall costs nothing against the prompt cache.
+
 ## Settings
 
 In [`config.toml`](../configuration.md):
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `[memory].enabled` | `true` | Master switch for loading/saving memory **and** automatic capture. |
+| `[memory].enabled` | `true` | Master switch for loading/saving memory, automatic capture, **and** recall. |
 | `[memory].dir` | `"memory"` | Folder (under your data dir) holding `memory.jsonl`. Git-ignored. |
 | `[memory].cap` | `500` | Upper bound on stored records; oldest journal milestones are pruned first. |
+| `[memory].recall_phrases` | *(list)* | Phrases that trigger automatic recall into a turn ("do you remember"…). |
+| `[memory].recall_wake` | `["recall"]` | Manual-override word forcing a lookup for a turn; scrubbed from the model's input. |
 | `[memory.embedding].enabled` | `false` | Opt in to semantic recall (costs money; off keeps keyword recall). |
 | `[memory.embedding].provider` | `""` | Name of an embedding backend (none available yet). |
 

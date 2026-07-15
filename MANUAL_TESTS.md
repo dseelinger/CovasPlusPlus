@@ -544,7 +544,7 @@ Notes:
 ## 13b. Persistent memory — automatic capture (issue #60)  🎮 ED 🔊 HW 📋 FILE
 > Memory now populates itself. Needs `[memory].enabled = true` (default) and, for milestones,
 > `[elite].enabled = true`. Memory lives at `<data dir>/memory/memory.jsonl` (git-ignored).
-- [ ] On launch the log shows `Persistent memory capture ON.`
+- [ ] On launch the log shows `Persistent memory ON (capture + recall).`
 - [ ] 🎮 **Journal milestone (deterministic, no cost):** in-game, do something notable — jump to
       an unexplored system and **detailed-scan a first-discovery body**, or fully map a body. A new
       line appears in `memory/memory.jsonl` (`First to discover …` / `Fully mapped …`, `type:
@@ -561,6 +561,29 @@ Notes:
       (capture only sees live events; startup priming doesn't republish).
 - [ ] Ask **"what can you do"** → the **memory** capability is listed; drilling in mentions
       remembering facts and milestones.
+
+Notes:
+
+## 13c. Persistent memory — recall in conversation (issue #61)  🔊 HW 📋 FILE
+> Memory now comes back into a turn when you reach for it. Needs `[memory].enabled = true`
+> (default). Seed a fact first: say **"remember that my main ship is a Krait Mk II"** (or hand-add
+> a line to `memory/memory.jsonl`). Recall is keyword/tag, **offline and free** — no router/usage
+> line for the recall block itself.
+- [ ] 🔊 **Automatic recall injection:** ask **"do you remember my main ship?"** → COVAS answers
+      **from the stored fact** ("a Krait Mk II"), not a guess. The log shows a `memory-recall`
+      line with the matched reason.
+- [ ] 🔊 **No-match is silent:** ask **"do you remember my favourite music?"** (nothing stored) →
+      COVAS says it doesn't have that on file; the log's `memory-recall` note reads `(no matching
+      memory)` and nothing is injected.
+- [ ] 🔊 **Plain turn untouched:** ask an unrelated question (**"tell me a joke"**) → no
+      `memory-recall` line, no memory block — recall only fires on past-referencing turns.
+- [ ] 🔊 **Wake-word override:** say **"recall, what's my main ship"** → forces a lookup; the word
+      *recall* is scrubbed from what COVAS answers about (it doesn't echo it back).
+- [ ] 🔊 **Explicit tool path:** ask **"what do you know about my ship?"** → COVAS may call the
+      `recall_memory` tool and reports the stored fact; a miss returns "nothing on file".
+- [ ] 📋 **Cache-safe (no prefix growth):** across several recall turns, replies stay quick and the
+      cached-prompt token count doesn't climb turn-over-turn — the memory block rides the current
+      user message only, never the cached system prompt.
 
 Notes:
 

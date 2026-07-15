@@ -443,6 +443,22 @@ dir = "memory"
 # full, the oldest auto-captured journal milestones are pruned FIRST (they're reproducible from
 # the journal); facts you explicitly asked to remember are pruned only if they alone exceed it.
 cap = 500
+# Recall detection (issue #61). When a spoken turn reaches into the past ("do you remember…",
+# "what's my favourite…", "have I been here before"), the most relevant stored facts are
+# prepended to THAT turn so the companion answers from memory instead of guessing — it goes in
+# the user message, NEVER the cached system prompt, so recall can't bust the prompt cache. The
+# LLM can also look memory up explicitly via the recall_memory tool. Case-insensitive substring
+# phrases; tune these from real transcripts (mirrors [elite]'s context detection).
+#   recall_wake     = force a memory look-up for this turn (manual override; word is scrubbed
+#                     from what the model sees), e.g. "recall, what's my main ship".
+#   recall_phrases  = natural asks that trigger a look-up ("do you remember", "what's my"…).
+recall_wake    = ["recall"]
+recall_phrases = ["do you remember", "you remember", "do you recall", "what do you remember",
+                  "what do you know about", "remind me what", "remind me of", "did i tell you",
+                  "did i ever tell you", "i told you", "we talked about", "we discussed",
+                  "last time", "have i been", "have i done", "have i ever", "my favourite",
+                  "my favorite", "my preferred", "i prefer", "what's my", "what is my",
+                  "how do i like", "how i like", "what do you call me", "my usual"]
 
 [memory.embedding]
 # OPTIONAL semantic recall via text embeddings. DEFAULT OFF — and off is the whole point:

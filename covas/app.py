@@ -26,6 +26,7 @@ from .providers.base import LLMProvider, STTProvider, TTSProvider
 from .providers.factory import make_llm, make_stt, make_tts
 from .router import Router
 from .ed import ContextDetector
+from .memory import MemoryDetector
 
 # Claude replies can contain Unicode (arrows, em-dashes, emoji) the default Windows
 # console can't encode. Make console output lossy-safe so a stray glyph never crashes
@@ -781,31 +782,37 @@ class App:
 
     # ---- Persistent memory capture (issue #60) ----------------------------
     def _start_memory(self) -> None:
-        """Wire persistent-memory CAPTURE: register a capability that (a) captures curated
-        journal milestones off the bus (deterministic describers — no LLM per event) and (b)
-        exposes a 'remember that' store tool the LLM calls in-turn (no extra model call). Both
-        paths dedup against the store and enforce a cap so the git-ignored memory file stays
-        bounded. Opt-in ([memory].enabled). Fail soft — any wiring problem just leaves capture
-        off; it must never block startup. Recall (#61) extends the capability later."""
+        """Wire persistent memory (CAPTURE #60 + RECALL #61): register a capability that
+        (a) captures curated journal milestones off the bus (deterministic describers — no LLM
+        per event), (b) exposes a 'remember that' store tool the LLM calls in-turn, (c) exposes a
+        'recall_memory' tool for explicit look-ups, and (d) provides `recall_block` so the worker
+        loop can prepend relevant facts to a recall-referencing turn's USER message (cache-safe —
+        never the system prompt). Capture dedups + caps the git-ignored file; recall is keyword/tag
+        only (free, offline). Opt-in ([memory].enabled). Fail soft — any wiring problem just leaves
+        memory off; it must never block startup."""
         try:
             from .capabilities.memory_capability import MemoryCapability
-            from .memory import MemoryCapture, store_from_config
+            from .memory import MemoryCapture, Retriever, store_from_config
 
             store = store_from_config(self.cfg)
             cap = int(self.cfg.get("memory", {}).get("cap", 500))
             capture = MemoryCapture(store, cap=cap, log=lambda m: self._log("memory", m))
-            self.memory = MemoryCapability(capture, log=lambda m: self._log("memory", m))
+            # Recall side (#61): keyword/tag retriever over the SAME store — embedder stays None
+            # (the default free, offline path), so recall never costs money or touches the network.
+            retriever = Retriever(store, embedder=None)
+            self.memory = MemoryCapability(capture, retriever,
+                                           log=lambda m: self._log("memory", m))
             self.registry.register(self.memory)
             # Journal-highlight capture rides the shared bus/event pump (live-only, so an
             # existing journal isn't re-captured on every launch — the watcher primes context
             # WITHOUT publishing). The 'remember that' tool works regardless of the pump.
             self._start_event_pump()
             self.bus.publish({"type": "log", "who": "system",
-                              "text": "Persistent memory capture ON."})
+                              "text": "Persistent memory ON (capture + recall)."})
         except Exception as e:  # noqa: BLE001 — optional; never block startup
             self.memory = None
             self.bus.publish({"type": "log", "who": "system",
-                              "text": f"Memory capture failed to start: {e}"})
+                              "text": f"Memory failed to start: {e}"})
 
     # ---- Keybind automation (DESIGN §6) -----------------------------------
     def _start_keybinds(self) -> None:
@@ -1524,6 +1531,23 @@ class App:
                     self.bus.publish({"type": "ed_context", "matched": True,
                                       "wants_log": ref.wants_log, "injected": bool(block),
                                       "reason": ref.reason})
+
+            # Memory recall (#61): if this turn reaches into the past ("do you remember…",
+            # "what's my favourite…"), prepend a COMPACT block of relevant stored facts to THIS
+            # call only. Composes with the ED block exactly as that one does — it prepends to
+            # `llm_text` (which may already carry the ED telemetry) while `history` keeps the
+            # clean `user_text`, and it rides the (uncached) user message, NOT the cached system
+            # prefix — so recall can't bust the prompt cache. Fail soft: a miss injects nothing.
+            if self.memory is not None:
+                mref = MemoryDetector.from_cfg(self.cfg).decide(text)
+                if mref.matched:
+                    mblock = self.memory.recall_block(user_text)
+                    if mblock:
+                        llm_text = f"{mblock}\n\n{llm_text}"
+                    note = mref.reason if mblock else f"{mref.reason} (no matching memory)"
+                    self._log("memory-recall", note)
+                    self.bus.publish({"type": "memory_recall", "matched": True,
+                                      "injected": bool(mblock), "reason": mref.reason})
 
             self.history.append({"role": "user", "content": user_text})
             self._trim_history()

@@ -1,6 +1,6 @@
-"""Memory-capture capability (issue #60) — populate persistent memory without being asked.
+"""Memory capability — capture (issue #60) + recall (issue #61) over persistent memory.
 
-Two capture paths, both cheap and self-contained (capabilities over loop edits):
+Capture paths, both cheap and self-contained (capabilities over loop edits):
 
   * `on_event` — the bus hook. When ED monitoring publishes a journal `ed_event`, a curated
     DETERMINISTIC describer (`memory.capture.describe_highlight`) turns the milestone-worthy
@@ -10,16 +10,29 @@ Two capture paths, both cheap and self-contained (capabilities over loop edits):
     already producing when the Commander states a standing preference/instruction (or says
     "remember that…"), so there's NO extra model call. `MemoryCapture.remember` is the sink.
 
-This capability is CAPTURE/STORE ONLY. Recall — injecting relevant memories into a turn and a
-"what do you remember about…" tool — is issue #61, which extends this class. Nothing here reads
-memory back into a turn.
+Recall paths (issue #61), both keyword/tag by default — free, offline, no embedding:
+
+  * `recall_block(query)` — the cache-safe injection. When the worker loop's `MemoryDetector`
+    decides a turn reaches into the past, it asks for a COMPACT block of the most relevant
+    facts and prepends it to THAT turn's user message only (never the cached system prompt), so
+    recall can't bust the prompt cache — the exact trick the ED telemetry block uses.
+  * `recall_memory` tool — the explicit path. The LLM calls it for "what do you remember
+    about…" so it can answer from stored facts rather than guess. A free local read.
+
+Recall never crashes the loop: a miss (or any error) just yields nothing to inject.
 """
 from __future__ import annotations
 
 from typing import Callable, Optional
 
 from ..memory.capture import MemoryCapture
+from ..memory.retrieval import Retriever
+from ..memory.store import MemoryRecord
 from .base import HelpMeta
+
+# How many facts a recall surfaces, and the tag-name whitelist a query token may hard-filter on.
+# Kept small on purpose: the injected block rides the (uncached) user message, so it stays tiny.
+RECALL_LIMIT = 5
 
 MEMORY_TOOLS = [
     {
@@ -58,17 +71,51 @@ MEMORY_TOOLS = [
             "required": ["text"],
         },
     },
+    {
+        "name": "recall_memory",
+        "description": (
+            "Look up DURABLE facts previously saved about the Commander (via remember_this or "
+            "auto-captured journal milestones) and return the most relevant ones. Call this when "
+            "the Commander asks what you remember/know about something, references a past "
+            "conversation, or asks about a standing preference of theirs ('what's my main ship', "
+            "'do you remember my callsign'). A free local read — no cost, no network. Returns "
+            "'nothing on file' when memory holds no match; answer accordingly instead of guessing."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "What to recall, in the Commander's own words, e.g. 'main ship' or "
+                        "'how they like to be addressed'. Matched by keyword/tag against memory."
+                    ),
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Optional hard filter — only facts carrying one of these tags are "
+                        "considered, e.g. ['ship'] or ['name']. Omit to search all memory."
+                    ),
+                },
+            },
+            "required": ["query"],
+        },
+    },
 ]
 
 
 class MemoryCapability:
-    """Capture side of persistent memory: journal-highlight `on_event` + the `remember_this`
-    store tool. Holds a `MemoryCapture` (the dedup/cap sink). Store-only — issue #61 adds
-    recall by extending this."""
+    """Persistent memory, both sides: CAPTURE (journal-highlight `on_event` + the
+    `remember_this` store tool, via a `MemoryCapture` dedup/cap sink) and RECALL (a cache-safe
+    `recall_block` for the worker loop + a `recall_memory` tool, via a `Retriever`). Recall is
+    keyword/tag by default — free and offline; the embedding seam stays OFF."""
 
-    def __init__(self, capture: MemoryCapture,
+    def __init__(self, capture: MemoryCapture, retriever: Retriever,
                  *, log: Optional[Callable[[str], None]] = None) -> None:
         self.capture = capture
+        self.retriever = retriever
         self._log = log
 
     # -- capability interface ----------------------------------------------------------
@@ -79,6 +126,8 @@ class MemoryCapability:
         try:
             if name == "remember_this":
                 return self._remember(inp)
+            if name == "recall_memory":
+                return self._recall(inp)
             return f"Unknown tool: {name}"
         except Exception as e:  # noqa: BLE001 — the loop must survive any tool error
             return f"Tool error: {e}"
@@ -89,9 +138,42 @@ class MemoryCapability:
             group="your companion",
             one_liner=("I remember durable facts you tell me — how you like to be addressed, "
                        "your main ship, standing preferences — plus milestones from your "
-                       "journal, in a plain file you control."),
+                       "journal, in a plain file you control, and I bring them up when they're "
+                       "relevant. Ask 'what do you remember about…' any time."),
             example="remember that I prefer the Krait Mk II",
         )
+
+    # -- recall (issue #61) ------------------------------------------------------------
+    def recall_block(self, query: str, *, tags: Optional[list[str]] = None) -> Optional[str]:
+        """A COMPACT block of the facts most relevant to `query`, for the worker loop to prepend
+        to a recall-referencing turn's USER message (never the cached system prompt — this is the
+        cache-safe injection). Returns None when nothing relevant is on file, so a miss injects
+        nothing. Fail-soft: any recall error yields None rather than crashing the turn."""
+        try:
+            hits = self.retriever.recall(query, tags=tags, limit=RECALL_LIMIT)
+        except Exception as e:  # noqa: BLE001 — recall must never take down the loop
+            if self._log is not None:
+                self._log(f"recall_block failed ({e})")
+            return None
+        return self._format_block(hits)
+
+    @staticmethod
+    def _format_block(records: list[MemoryRecord]) -> Optional[str]:
+        """Render recalled facts as a parenthesized, labelled reference block — mirrors the ED
+        telemetry block so the model treats it as grounding, not something to read aloud."""
+        if not records:
+            return None
+        lines = "; ".join(r.text for r in records)
+        return f"(Remembered about the Commander, for reference — {lines})"
+
+    def _recall(self, inp: dict) -> str:
+        query = str(inp.get("query") or "").strip()
+        raw_tags = inp.get("tags") or None
+        tags = [str(t) for t in raw_tags] if isinstance(raw_tags, (list, tuple)) else None
+        hits = self.retriever.recall(query, tags=tags, limit=RECALL_LIMIT)
+        if not hits:
+            return "Nothing on file about that."
+        return "Here's what I remember: " + "; ".join(r.text for r in hits)
 
     # -- journal-highlight capture -----------------------------------------------------
     def on_event(self, event: dict) -> None:
