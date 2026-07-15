@@ -96,6 +96,11 @@ class EDContext:
         # structured, and read on demand by the LoadoutCapability's tools — never injected
         # into the (cached) system prompt.
         self._loadout = None
+        # Stored ships / modules inventories (frozen ed/stored snapshots), replaced wholesale
+        # on every StoredShips / StoredModules event. Same rationale as _loadout: big,
+        # structured, read on demand by the StoredCapability's tools (issue #67).
+        self._stored_ships = None
+        self._stored_modules = None
 
     def update(self, **changes) -> None:
         """Atomically set one or more fields. Unknown keys raise (fail loud) so a typo
@@ -160,6 +165,31 @@ class EDContext:
         The snapshot is immutable, so handing out the reference is thread-safe."""
         with self._lock:
             return self._loadout
+
+    # -- stored ships & modules (issue #67) ----------------------------------------------
+    def set_stored_ships(self, snapshot) -> None:
+        """Replace the stored-ships inventory (each StoredShips event is a full snapshot).
+        `snapshot` is a frozen `ed/stored.StoredShipsSnapshot` (or None to clear)."""
+        with self._lock:
+            self._stored_ships = snapshot
+
+    def stored_ships_snapshot(self):
+        """The current `StoredShipsSnapshot`, or None when no StoredShips event has been seen
+        yet. Immutable, so handing out the reference is thread-safe."""
+        with self._lock:
+            return self._stored_ships
+
+    def set_stored_modules(self, snapshot) -> None:
+        """Replace the stored-modules inventory (each StoredModules event is a full snapshot).
+        `snapshot` is a frozen `ed/stored.StoredModulesSnapshot` (or None to clear)."""
+        with self._lock:
+            self._stored_modules = snapshot
+
+    def stored_modules_snapshot(self):
+        """The current `StoredModulesSnapshot`, or None when no StoredModules event has been
+        seen yet. Immutable, so handing out the reference is thread-safe."""
+        with self._lock:
+            return self._stored_modules
 
     def fuel_pct(self) -> float | None:
         with self._lock:

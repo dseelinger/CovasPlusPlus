@@ -17,6 +17,7 @@ from typing import Callable
 from ..events import EventBus
 from .context import EDContext
 from .loadout import parse_loadout
+from .stored import parse_stored_ships, parse_stored_modules
 
 # ED's journals live under the Windows user profile. Resolved at runtime (never a
 # hardcoded C:\Users\... path — see the repo guardrails) so it's portable per machine.
@@ -179,16 +180,21 @@ _HANDLERS: dict[str, Callable[[dict], dict]] = {
 def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     """Fold one parsed journal event into the rolling context. Returns the patch that was
     applied (empty when the event doesn't affect context) — handy for tests."""
-    handler = _HANDLERS.get(event.get("event", ""))
-    if handler is None:
-        return {}
-    patch = handler(event)
+    name = event.get("event", "")
+    handler = _HANDLERS.get(name)
+    patch = handler(event) if handler is not None else {}
     if patch:
         ctx.update(**patch)
-    # Loadout carries far more than the context patch (per-module engineering, N9): store
-    # the full structured snapshot alongside — each event is complete, so replace wholesale.
-    if event.get("event") == "Loadout":
+    # A few events carry far more than a "current context" patch — a full structured snapshot
+    # stored alongside for its capability's tools (each event is complete -> replace wholesale).
+    # These have NO context patch of their own (Loadout's ship/fuel aside), so they're handled
+    # here even when the event isn't in _HANDLERS.
+    if name == "Loadout":                                   # per-module engineering (N9)
         ctx.set_loadout(parse_loadout(event))
+    elif name == "StoredShips":                             # stored-ships inventory (#67)
+        ctx.set_stored_ships(parse_stored_ships(event))
+    elif name == "StoredModules":                           # stored-modules inventory (#67)
+        ctx.set_stored_modules(parse_stored_modules(event))
     return patch
 
 
