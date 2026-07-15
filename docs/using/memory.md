@@ -7,9 +7,11 @@ read, edit, or delete, and it never leaves your machine.
 
 !!! note "What's live"
     COVAS++ ships the memory **store and recall engine** (issue #59), **automatic capture**
-    (issue #60), and **recall in conversation** (issue #61): it populates memory on its own — from
-    journal milestones and from durable facts you mention — and brings the right facts back into a
-    turn when you reach for them ("do you remember my main ship?"), all offline and free.
+    (issue #60), **recall in conversation** (issue #61), and a **memory browser** in the control
+    panel (issue #62): it populates memory on its own — from journal milestones and from durable
+    facts you mention — brings the right facts back into a turn when you reach for them ("do you
+    remember my main ship?"), and lets you read, search, edit, delete, and add memories yourself,
+    all offline and free.
 
 ## What gets remembered automatically
 
@@ -80,6 +82,26 @@ You can hand-edit this file in any text editor. A bare `{"text": "likes metric u
 perfectly valid — the rest fills in. If a line ever gets mangled (a stray comma, a half-written
 line after a crash), COVAS++ **skips just that line** and keeps the rest of your memory — one typo
 never wipes the file. Blank lines and lines starting with `#` are ignored, so you can annotate it.
+
+## Browse and edit it in the control panel
+
+Prefer not to open a text editor? The **Memory** tab of the [control panel](../control-panel.md)
+(the 🧠 link in the header, or `http://127.0.0.1:8765/memory`) is a full read/write view of the
+same file:
+
+- **See everything on file** — each memory with its type, tags, and when it was recorded.
+- **Search** — filter live by any word in the text, a tag, or the type.
+- **Edit** — change a memory's text, type, or tags in place. The `id` and original timestamp are
+  preserved, so it round-trips losslessly.
+- **Delete** — remove a memory you don't want kept.
+- **Add** — jot a fact by hand (text, an optional type, and comma-separated tags).
+
+The browser edits the **exact same `memory.jsonl`** the voice loop reads and writes, so a memory
+you add here is recalled in conversation immediately, and anything the companion learns shows up
+here on reload. Because both sides share one file, saves carry a **stale-write guard**: if the
+voice loop wrote to memory while you had the tab open, the panel notices the file changed and asks
+you to reload rather than silently overwriting that change — the same protection the checklist
+editor uses.
 
 ## Recall in conversation
 

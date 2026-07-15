@@ -1,6 +1,6 @@
 """Localhost control panel: live log/status (index.html), a schema-driven
-settings page (settings.html), and a WYSIWYG checklist editor (checklist.html,
-N10). Served with Flask.
+settings page (settings.html), a WYSIWYG checklist editor (checklist.html,
+N10), and a memory browser (memory.html, issue #62). Served with Flask.
 
 Every settings write — from the quick-config card, the full settings page, or a
 future client — is validated against the ONE schema in `settings_schema.py`
@@ -31,6 +31,7 @@ from . import settings_schema as schema
 from . import updates
 from .__version__ import __version__
 from .checklist import ITEM_RE
+from .memory.store import MemoryRecord, MemoryStore, store_from_config
 
 # Config sections whose `api_key_file` the masked "API keys" Settings card manages (issue #23),
 # in display order. The card is write-only: keys are stored ENCRYPTED per section and never read
@@ -384,6 +385,129 @@ def create_app(core) -> Flask:
                                   f"({done}/{len(items)} complete)."})
         return jsonify({"ok": True, "version": _file_version(path),
                         "items": len(items), "done": done})
+
+    # ---- Memory browser (issue #62) --------------------------------------------
+    # The transparent, user-editable ship's log competitors don't offer: read / search / edit /
+    # delete / add memories from the panel. It shares the SAME physical JSONL file the voice path
+    # writes to — the content-hash stale-write guard (mirroring the checklist editor) is what makes
+    # that concurrency safe: a web save is a whole-file `store.save`, refused (409) when a voice
+    # append/prune landed since the client loaded. When memory is ON we reach the app's live store
+    # instance (so mutating it keeps the in-memory list authoritative — a later voice prune can't
+    # clobber a web edit); otherwise we build one from config pointing at the same file.
+    def _memory_store() -> MemoryStore | None:
+        mem = getattr(core, "memory", None)
+        if mem is not None:
+            return mem.store
+        try:
+            return store_from_config(core.cfg)
+        except Exception:  # noqa: BLE001 — no resolvable memory dir: browser simply unavailable
+            return None
+
+    def _memory_matches(record: MemoryRecord, q: str) -> bool:
+        """Case-insensitive substring match across a record's text, type, and tags — the same
+        search the browser runs client-side, offered server-side for API clients (and tests)."""
+        hay = " ".join((record.text, record.type, " ".join(record.tags))).lower()
+        return q in hay
+
+    def _memory_snapshot(store: MemoryStore, q: str = "") -> dict:
+        """Re-read the file into the (possibly shared) store, then render the list + version.
+        Reloading syncs the shared in-memory list to disk so the content-hash `version` and the
+        returned records always describe the same on-disk state (picks up voice appends and any
+        hand-edits to the file). `version` and `total` always describe the WHOLE file, so a
+        filtered read still carries the correct stale-write token to write back with."""
+        records = store.load()
+        shown = [r for r in records if not q or _memory_matches(r, q)]
+        return {"memories": [r.to_dict() for r in shown], "total": len(records),
+                "version": _file_version(store.path), "name": store.path.name}
+
+    @flask_app.route("/memory")
+    def memory_page():
+        return render_template("memory.html")
+
+    @flask_app.route("/api/memory")
+    def memory_state():
+        store = _memory_store()
+        if store is None:
+            return jsonify({"ok": False, "error": "no memory store configured"}), 400
+        q = str(request.args.get("q") or "").strip().lower()
+        return jsonify({"ok": True, **_memory_snapshot(store, q)})
+
+    def _memory_guard(store: MemoryStore, b: dict):
+        """Shared stale-write guard for every mutation. Returns a Flask 409 response to bail with
+        when the file changed since the client loaded it (unless `force`), else None to proceed."""
+        current = _file_version(store.path)
+        if not b.get("force") and b.get("base_version") != current:
+            return jsonify({"ok": False, "error": "stale", **_memory_snapshot(store)}), 409
+        return None
+
+    def _memory_saved(store: MemoryStore, records: list[MemoryRecord]):
+        """Persist the mutated list (one whole-file atomic rewrite, shared with the voice path),
+        log the sync, and hand back the refreshed snapshot with the new stale-write token."""
+        store.save(records)
+        core.bus.publish({"type": "log", "who": "system",
+                          "text": f"Memory updated from the web browser "
+                                  f"({len(records)} on file)."})
+        return jsonify({"ok": True, **_memory_snapshot(store)})
+
+    @flask_app.route("/api/memory/add", methods=["POST"])
+    def memory_add():
+        """Add one memory by hand. Guarded like a save so a concurrent voice append isn't lost."""
+        store = _memory_store()
+        if store is None:
+            return jsonify({"ok": False, "error": "no memory store configured"}), 400
+        b = request.get_json(force=True) or {}
+        stale = _memory_guard(store, b)
+        if stale is not None:
+            return stale
+        text = str(b.get("text") or "").strip()
+        if not text:
+            return jsonify({"ok": False, "error": "a memory needs some text"}), 400
+        records = store.load()                     # fresh, file-synced list to append to
+        records.append(MemoryRecord(text=text, type=str(b.get("type") or "note") or "note",
+                                    tags=b.get("tags") or ()))
+        return _memory_saved(store, records)
+
+    @flask_app.route("/api/memory/edit", methods=["POST"])
+    def memory_edit():
+        """Edit one memory's text / type / tags BY id. `id`, `when`, and creation order are kept;
+        only the edited fields change, round-tripping losslessly through the store."""
+        store = _memory_store()
+        if store is None:
+            return jsonify({"ok": False, "error": "no memory store configured"}), 400
+        b = request.get_json(force=True) or {}
+        stale = _memory_guard(store, b)
+        if stale is not None:
+            return stale
+        rec_id = str(b.get("id") or "")
+        text = str(b.get("text") or "").strip()
+        if not text:
+            return jsonify({"ok": False, "error": "a memory needs some text"}), 400
+        records = store.load()
+        for i, r in enumerate(records):
+            if r.id == rec_id:
+                # Rebuild (not mutate) so tags re-normalize; preserve id + original timestamp.
+                records[i] = MemoryRecord(text=text,
+                                          type=str(b.get("type") or r.type) or "note",
+                                          tags=b.get("tags") or (), when=r.when, id=r.id)
+                return _memory_saved(store, records)
+        return jsonify({"ok": False, "error": f"no memory with id {rec_id!r}"}), 404
+
+    @flask_app.route("/api/memory/delete", methods=["POST"])
+    def memory_delete():
+        """Delete one memory BY id (whole-file rewrite)."""
+        store = _memory_store()
+        if store is None:
+            return jsonify({"ok": False, "error": "no memory store configured"}), 400
+        b = request.get_json(force=True) or {}
+        stale = _memory_guard(store, b)
+        if stale is not None:
+            return stale
+        rec_id = str(b.get("id") or "")
+        records = store.load()
+        kept = [r for r in records if r.id != rec_id]
+        if len(kept) == len(records):
+            return jsonify({"ok": False, "error": f"no memory with id {rec_id!r}"}), 404
+        return _memory_saved(store, kept)
 
     @flask_app.route("/api/cancel", methods=["POST"])
     def cancel():

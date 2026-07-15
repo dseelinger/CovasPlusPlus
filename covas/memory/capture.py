@@ -196,6 +196,13 @@ class MemoryCapture:
         self._dedup = float(dedup_threshold)
         self._log = log
 
+    @property
+    def store(self) -> MemoryStore:
+        """The backing store, exposed so the web browser (issue #62) can read/edit/delete/add
+        against the SAME instance the voice path writes to — sharing the instance keeps the
+        in-memory list authoritative, so a later voice prune (`save`) never clobbers a web edit."""
+        return self._store
+
     # -- journal highlights ------------------------------------------------------------
     def capture_journal_event(self, event: dict) -> Optional[MemoryRecord]:
         """Fold one journal event into memory when it's a curated milestone. Returns the new
