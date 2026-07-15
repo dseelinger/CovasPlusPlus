@@ -44,7 +44,7 @@ your own dropped into `<data dir>/sounds/<type>/` — see §2):
 Notes:
 
 ### 0.2 Launch
-- [ ] **Headless:** `run_covas.bat` (or `python run_covas.py`) → console banner shows your model, voice, Whisper size, and the capability on/off lines (Router, ED monitor, Proactive, Keybinds, **Auto-honk**, Find module, Personality). No browser.
+- [ ] **Headless:** `run_covas.bat` (or `python run_covas.py`) → console banner shows your model, voice, Whisper size, and the capability on/off lines (Router, ED monitor, Proactive, Keybinds, **Reflexes**, **Auto-honk**, Find module, Personality). No browser.
 - [ ] **With panel:** `run_covas_ui.bat` (or `python run_covas_ui.py`) → same banner **plus** the browser opens http://127.0.0.1:8765 and the status light reads **IDLE**.
 - [ ] Console prints the PTT scan codes line, and `QUIT: Ctrl+Alt+Q`.
 
@@ -60,6 +60,7 @@ the next restart** (only Whisper reloads live). Confirm each before running its 
 - [ ] `[route].enabled = true` — Route callouts while flying a plotted route. (§5.3)
 - [ ] `[hud].enabled = true` — Companion HUD overlay (**off** by default; applies **live**, no restart). (§5a)
 - [ ] `[keybinds].enabled = true` — Landing-gear automation. Keep `require_confirmation`/`combat_guard = true`. (§6.1)
+- [ ] `[reflex].enabled = true` — Tier-2 combat reflex (fire chaff). **Off** by default, allowlist ships empty — set `[reflex].allowlist = ["chaff"]` to opt in. Keep `combat_guard = true`. (§6.3)
 - [ ] `[honk].enabled = true` — Auto-honk on arrival (**on** by default). No fire-group setup — it probes and backs out of a Surface-Scanner misfire. Set `[honk].trigger` only if your scanner is on secondary fire. (§6.2)
 - [ ] `[nav].enabled = true` — outfitting "find the closest module". (§7)
 - [ ] `[star_systems].enabled = true` / `[search].enabled = true` — voice search categories. (§8)
@@ -344,6 +345,17 @@ Notes:
 - [ ] **Unbound fire:** if the fire button is HOTAS/mouse-only (no keyboard bind) → it **skips** with a "no keyboard binding" note; nothing fires.
 - [ ] **Hard abort:** with `[keybinds]` also on, jump and during the hold say *"abort"* → the held fire key releases immediately.
 - [ ] **Disabled:** set `[honk].enabled = false` → no honk on arrival.
+
+### 6.3 Tier-2 combat reflex — fire chaff (#36 — `[reflex].enabled = true`, allowlist `chaff`)
+> The **inverse** of §6.1: reflexes fire ONLY while you're in danger. Chaff is purely **defensive**, so firing it is always safe — you never shoot at anyone. Set `[reflex].enabled = true` and `[reflex].allowlist = ["chaff"]`, keep `[reflex].combat_guard = true`, and bind your **chaff launcher** to a **key** in ED (a HOTAS/mouse-only bind can't be pressed). Requires `[elite].enabled`.
+- [ ] **Startup readiness:** launch reports `Reflex: chaff -> <key>` (or `chaff UNUSABLE (no keyboard bind for FireChaffLauncher)` if it's not bound to a key), and a `Tier-2 combat reflexes ON …` line.
+- [ ] **Refused when safe (fully combat-SAFE test — do this parked/docked):** say *"chaff"* while NOT in danger → COVAS **refuses** ("you're not in combat…") and **nothing is pressed**. This is the safe way to prove the guard without a fight.
+- [ ] **Refused with monitoring off:** set `[elite].enabled = false`, say *"chaff"* → refused ("can't confirm you're in danger — … status isn't available"); nothing fires.
+- [ ] **Fires under fire (defensive — safe):** let a **weak NPC interdict** you (or take fire from a low-threat hostile), say *"chaff"* → it presses your chaff key **once**, log `fired chaff -> <key>`, and chaff deploys. Because chaff is defensive, this is safe even mid-combat.
+- [ ] **Not offered unless allowlisted:** remove `chaff` from `[reflex].allowlist` (leave enabled), ask for chaff → it's neither advertised nor run.
+- [ ] **Hard abort:** say *"abort"* → releases every held key (shared with keybinds/honk). Log: `aborted — released all keys`.
+- [ ] **Tier-1 unaffected:** with reflexes on, confirm §6.1 landing gear still behaves exactly as before — it still **refuses in combat** (the two policies are independent).
+- [ ] **Disabled:** set `[reflex].enabled = false` → no chaff tool offered; asking for chaff does nothing.
 
 Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_DETECT_WINDOW`, the Exit-Mode bind):
 

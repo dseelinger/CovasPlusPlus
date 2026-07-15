@@ -196,6 +196,11 @@ class App:
         # Auto-honk (N5): fire the Discovery Scanner on arrival in a new system. Opt-in
         # ([honk].enabled, off by default), combat-gated. Shares the keybind executor + binds.
         self.honk = None
+        # Tier-2 combat reflexes (DESIGN §6, issue #36): a SEPARATE, combat-PERMISSIVE policy —
+        # fire chaff (and later heat sink / shields / boost) ONLY while under fire, the inverse
+        # of the Tier-1 combat guard. Opt-in ([reflex].enabled, off by default); shares the
+        # keybind executor + binds so the one hard abort releases every held key.
+        self.reflex = None
         # Shared scancode executor + parsed .binds, built once and reused by keybinds and
         # auto-honk so a hard abort releases keys held by either (and the .binds file is parsed
         # a single time). Lazily populated by the helpers below.
@@ -239,6 +244,8 @@ class App:
             self._start_keybinds()
         if self.cfg.get("honk", {}).get("enabled"):
             self._start_honk()
+        if self.cfg.get("reflex", {}).get("enabled"):
+            self._start_reflex()
         if self.cfg.get("nav", {}).get("enabled"):
             self._start_nav()
             self._start_ship_nav()
@@ -892,6 +899,51 @@ class App:
             from .keybinds.executor import KeyExecutor
             self._shared_executor = KeyExecutor()
         return self._shared_executor
+
+    # ---- Tier-2 combat reflexes (#36) -------------------------------------
+    def _start_reflex(self) -> None:
+        """Build the Tier-2 combat-reflex capability: parse the active ED bindings (shared),
+        build the shared scancode executor, and register the capability behind the SEPARATE
+        combat-permissive guard. Fail soft — a missing bindings file or a non-Windows host just
+        leaves reflexes off; it must never block startup. The guard reads the live ED context
+        snapshot (so it needs [elite].enabled to positively confirm you're IN danger before
+        firing a reflex)."""
+        try:
+            from .capabilities.reflex_capability import ReflexCapability, ReflexConfig
+
+            rcfg = ReflexConfig.from_cfg(self.cfg)
+            binds = self._ed_binds()
+            executor = self._key_executor()   # raises ExecutorError off-Windows -> caught below
+            snapshot = ((lambda: self.ed_ctx.snapshot()) if self.ed_ctx is not None else None)
+            self.reflex = ReflexCapability(
+                binds=binds, executor=executor, config=rcfg,
+                status_snapshot=snapshot,
+                log=lambda msg: self._log("reflex", msg))
+            self.registry.register(self.reflex)
+
+            # Report per-reflex readiness so the manual test knows what's wired.
+            for r in self.reflex._allowed_reflexes():
+                b = binds.get(r.action)
+                if b is not None and b.usable:
+                    detail = f"{r.name} -> {b.key}"
+                else:
+                    detail = f"{r.name} UNUSABLE (no keyboard bind for {r.action})"
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"Reflex: {detail}"})
+            if rcfg.combat_guard and self.ed_ctx is None:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    "Tier-2 reflexes ON but ED monitoring is OFF — the combat-permissive guard "
+                    "can't confirm you're in danger, so reflexes will be refused until "
+                    "[elite].enabled."})
+            else:
+                self.bus.publish({"type": "log", "who": "system", "text":
+                    f"Tier-2 combat reflexes ON (combat-permissive guard "
+                    f"{'on' if rcfg.combat_guard else 'off'}; allowlist: "
+                    f"{', '.join(rcfg.allowlist) or 'empty'})."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.reflex = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Tier-2 reflexes failed to start: {e}"})
 
     # ---- Auto-honk (N5) ---------------------------------------------------
     def _start_honk(self) -> None:
@@ -1892,6 +1944,7 @@ def _banner(cfg: dict) -> str:
     ed = "ON" if cfg.get("elite", {}).get("enabled") else "OFF"
     pro = "ON" if cfg.get("proactive", {}).get("enabled") else "OFF"
     kb = "ON" if cfg.get("keybinds", {}).get("enabled") else "OFF"
+    reflex = "ON" if cfg.get("reflex", {}).get("enabled") else "OFF"
     honk = "ON" if cfg.get("honk", {}).get("enabled") else "OFF"
     nav = "ON" if cfg.get("nav", {}).get("enabled") else "OFF"
     return (
@@ -1903,6 +1956,7 @@ def _banner(cfg: dict) -> str:
         f"  ED monitor : {ed}\n"
         f"  Proactive  : {pro}\n"
         f"  Keybinds   : {kb}\n"
+        f"  Reflexes   : {reflex}\n"
         f"  Auto-honk  : {honk}\n"
         f"  Find module: {nav}\n"
         f"  Personality: {p}\n"
