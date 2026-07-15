@@ -284,6 +284,18 @@ See [Keybind automation](automation/keybinds.md). **Off by default** — it send
 | `keybinds.allowlist` | `["landing_gear"]` | The only macros the companion may run. Add flight/nav actions (#30) to opt in: `throttle_zero`/`throttle_50`/`throttle_100`, `frame_shift_drive`, `supercruise`, `hyperspace`, `flight_assist`, `select_target_ahead`, `cycle_next_target`/`cycle_previous_target`, `target_next_route_system`, `nav_lock` — see [Keybind automation](automation/keybinds.md#tier-1-flight-navigation-actions-30) |
 | `keybinds.allowlist` | `["landing_gear"]` | The only macros the companion may run. Opt in to more by name — Tier-1 benign UI actions (#32): `focus_left_panel`, `focus_right_panel`, `focus_comms_panel`, `focus_role_panel`, `quick_comms`, `open_galaxy_map`, `open_system_map`, `cycle_fire_group_next`, `cycle_fire_group_previous`, `ui_back`, `ui_focus`, `toggle_headlook`. See [keybind automation](automation/keybinds.md#more-actions-tier-1-panels-maps-fire-groups). |
 
+## Combat reflexes (`[reflex]`)
+
+See [Combat reflexes](automation/reflexes.md). **Off by default**, allowlist ships **empty** — a
+separate, *combat-permissive* policy (the inverse of `[keybinds]`): it fires defensive reflexes
+(chaff today) only while you're in danger, and hard-refuses dangerous actions always.
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `reflex.enabled` | `false` | Master switch |
+| `reflex.combat_guard` | `true` | Permit reflexes only while in danger/interdiction; always refuse dangerous actions (leave on) |
+| `reflex.allowlist` | `[]` | Reflex names allowed to fire (separate from `keybinds.allowlist`). Add `"chaff"` to opt in |
+
 ## Auto-honk (`[honk]`)
 
 See [Auto-honk](automation/auto-honk.md). **Off by default** — it presses a fire button.

@@ -680,6 +680,34 @@ confirm_window = 60
 allowlist = ["landing_gear"]
 
 
+[reflex]
+# Tier-2 COMBAT REFLEXES (DESIGN §6, issue #36) — a SEPARATE, combat-PERMISSIVE control policy
+# that deliberately INVERTS the [keybinds] one above. Where keybinds REFUSE to touch controls
+# during combat/interdiction, a reflex only makes sense WHILE under fire: chaff, heat sink,
+# shield cell, boost. So this guard permits its small set ONLY when ED Status reports danger or
+# interdiction, and still HARD-REFUSES dangerous actions (eject cargo, self-destruct, landing
+# gear) at all times. It shares the same key executor as [keybinds]/[honk], so one hard abort
+# ("abort") releases every held key.
+#
+# DEFAULT OFF and the allowlist ships EMPTY — the whole Tier-2 path is opt-in; with it off the
+# app behaves exactly as if reflexes didn't exist. Requires [elite].enabled: the guard must read
+# ED Status to positively confirm you're in danger before firing (no telemetry -> refused).
+#
+# PROTOTYPE: exactly one reflex is wired end-to-end today — chaff (fire_chaff). Auto-firing
+# reflexes (#37) and a local phrase-spotter (#38) build ON this guard later.
+enabled = false
+# Enforce the combat-permissive guard (leave ON). OFF is an escape hatch that lets a permitted
+# reflex fire regardless of Status — but the always-refused set stays refused even then.
+combat_guard = true
+# Allowlist of reflex NAMES the companion may fire — the ONLY reflexes permitted, and entirely
+# SEPARATE from [keybinds].allowlist. Ships EMPTY (opt-in). Available reflexes:
+#   chaff        — fire the chaff launcher (FireChaffLauncher)   [wired end-to-end today]
+#   heat_sink, shields, boost                                    [policy-recognized; not yet wired]
+# The action must also be bound to a KEY in Elite Dangerous; an unbound one degrades to a spoken
+# "bind it in-game" message. Example: allowlist = ["chaff"]
+allowlist = []
+
+
 [honk]
 # Auto-honk (N5) — fire the Discovery Scanner shortly after arriving in a NEW system, so you scan
 # the system without lifting a finger. The model isn't involved — arrival triggers a deterministic

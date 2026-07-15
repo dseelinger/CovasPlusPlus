@@ -110,6 +110,7 @@ nav:
       - Mining helper: search/mining.md
   - Ship automation:
       - Keybind automation: automation/keybinds.md
+      - Combat reflexes: automation/reflexes.md
       - Auto-honk: automation/auto-honk.md
   - Ambient audio: audio/ambient-audio.md
   - The control panel: control-panel.md

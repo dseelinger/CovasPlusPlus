@@ -626,6 +626,55 @@ reacts to the journal's `FSDJump`. It reuses the keybind executor + safety layer
   Everything (binds, executor, status snapshot, spawner) is injected, so the whole sequence is
   unit-tested offline with a recording fake executor.
 
+### The two-tier control model — Tier-1 (combat-refusing) vs Tier-2 (combat-permissive)
+Everything above is **Tier-1**: control the ship when it's *safe* to. Its guard (`combat_state`
++ `_GUARD_MESSAGES`) permits an action only when ED Status proves you're clear of
+danger/interdiction, and refuses when Status is unavailable (can't prove safe). That's correct
+for landing gear, panels, jumps, the launch sequence — things you do when nothing is shooting.
+
+But some ship actions only make sense *while* something is shooting. Chaff, heat sink, shield
+cell, boost are **defensive/evasive reflexes** — firing them the moment you're safe would be
+pointless, and Tier-1's guard would (rightly, for its purpose) refuse them mid-fight. So Tier-2
+is a **separate, deliberately INVERTED policy**, not the Tier-1 guard relaxed:
+
+| | Tier-1 (`KeybindCapability`) | Tier-2 (`ReflexCapability`) |
+|---|---|---|
+| Purpose | act when it's safe | act *because* it's dangerous |
+| Guard verdict | permit only when Status = **SAFE** | permit only when Status = **COMBAT / INTERDICTION** |
+| No telemetry | refuse (can't prove safe) | refuse (can't prove *in danger*) |
+| Confirmation | consequential actions arm-and-confirm | fire immediately (speed is the point) |
+| Allowlist | `[keybinds].allowlist`, default `["landing_gear"]` | `[reflex].allowlist`, default **empty** |
+
+### Implemented — Tier-2 combat-permissive guard + validated chaff reflex (`[reflex]`, default off, #36)
+A PROTOTYPE proving the inverted policy end-to-end on the *same* scancode executor as Tier-1
+(`covas/capabilities/reflex_capability.py`):
+
+- **Combat-permissive guard (a distinct policy object).** A pure `combat_permissive_verdict(
+  action, snap)` returns `None` (permit) or a Commander-facing refusal. It **reuses** Tier-1's
+  `combat_state` classification so both tiers read danger identically — only the verdict flips:
+  Tier-2 permits a member of the small `COMBAT_PERMISSIVE` set (`chaff`, `heat_sink`, `shields`,
+  `boost`) ONLY in COMBAT/INTERDICTION, refuses it when SAFE or when Status is UNKNOWN (never
+  fire blind), and **hard-refuses** the `ALWAYS_REFUSED` set (`eject_cargo`, `self_destruct`,
+  `landing_gear`) in combat or out — so relaxing the guard *for* combat can't become a backdoor
+  to eject cargo or self-destruct. The two sets are asserted disjoint.
+- **One validated reflex end-to-end — fire chaff.** `ReflexCapability` advertises a `fire_chaff`
+  tool (dispatch is the simplest direct-call path — the LLM SELECTS the named reflex, never keys)
+  and presses `FireChaffLauncher` through the shared executor, behind the combat-permissive guard.
+  A reflex FIRES immediately: no arm-and-confirm, because a defensive reflex you have to confirm
+  is useless — the guard, not a prompt, is the safety. An unbound chaff key degrades to a spoken
+  "bind it in-game" (fail-soft).
+- **Hard abort preserved.** `abort_reflex` calls the shared `KeyExecutor.release_all()`, lifting
+  every held key (the executor is shared with keybinds/honk, so one abort covers all three), and
+  the executor still clamps hold duration. Off by default and the allowlist ships **empty** — the
+  Tier-1 default allowlist is untouched and this whole path is opt-in per reflex name.
+- Everything (binds, executor, status snapshot) is injected, so the guard's three cases
+  (permitted-in-combat / always-refused / permitted-but-not-in-combat), the chaff dispatch, and
+  the hard abort are all unit-tested offline with a recording fake executor + a fake Status feed.
+- **Next (separate issues, building ON this guard):** an auto-reflex framework that fires chaff
+  automatically on a Status danger transition (#37), and a local phrase-spotter for a
+  sub-second "chaff!" hotword that bypasses the LLM round-trip (#38). Neither is built here — this
+  issue only lands the guard + the one validated reflex they both stand on.
+
 ---
 
 ## 7. Build status & roadmap
