@@ -118,6 +118,12 @@ class MemoryCapability:
         self.retriever = retriever
         self._log = log
 
+    @property
+    def store(self):
+        """The shared `MemoryStore` (issue #62): the web memory browser mutates this exact
+        instance so voice and web stay coherent — same physical file, same in-memory list."""
+        return self.capture.store
+
     # -- capability interface ----------------------------------------------------------
     def tools(self) -> list[dict]:
         return MEMORY_TOOLS
@@ -139,7 +145,8 @@ class MemoryCapability:
             one_liner=("I remember durable facts you tell me — how you like to be addressed, "
                        "your main ship, standing preferences — plus milestones from your "
                        "journal, in a plain file you control, and I bring them up when they're "
-                       "relevant. Ask 'what do you remember about…' any time."),
+                       "relevant. Ask 'what do you remember about…' any time, or read, edit, add, "
+                       "and delete memories yourself in the Memory tab of the control panel."),
             example="remember that I prefer the Krait Mk II",
         )
 

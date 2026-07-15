@@ -821,6 +821,21 @@ keyword/tag by default (free, offline):
 Recall is fail-soft: a miss (or any retriever error) injects nothing and never crashes the turn.
 Gated on `[memory].enabled`; the embedding seam stays OFF, so the default path is free and offline.
 
+### Memory browser — the user-editable ship's log (#62, `web.py` + `templates/memory.html`)
+A `/memory` tab in the control panel makes the store's transparency **actionable**: read, search,
+edit, delete, and add memories from the panel — the differentiator EDCoPilot / COVAS:NEXT don't
+offer. It deliberately mirrors the checklist editor (N10): the web routes (`memory_page`,
+`memory_state`, and `memory_add` / `memory_edit` / `memory_delete`) reuse the same content-hash
+`_file_version` **stale-write guard** — every read hands the client a `version`, and any mutation
+whose `base_version` no longer matches the file on disk (a voice append/prune landed underneath) is
+refused with **409** carrying the current state, so the panel reloads instead of clobbering. Web and
+voice share the **one physical `memory.jsonl`**: the routes edit the app's live `MemoryStore`
+instance (exposed as `MemoryCapability.store`) when memory is on — so mutating it keeps the
+in-memory list authoritative and a later voice prune can't lose a web edit — falling back to
+`store_from_config(cfg)` (same file) when capture is off. Every write is a whole-file atomic
+`store.save(records)`; edits target a record **by `id`**, preserving its `id` and original `when` so
+they round-trip losslessly. The template is pure vanilla JS (no CDN), so the tab works fully offline.
+
 ### Cost & privacy stance — and how this beats the competitors
 Two deliberate defaults, both cost- and privacy-forward:
 - **Transparent, not opaque.** Memory is a human-readable file you own, can read, edit line by line,

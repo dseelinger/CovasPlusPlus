@@ -2,7 +2,7 @@
 
 Launch with the UI build and COVAS++ opens a local dashboard in your browser at
 **[http://127.0.0.1:8765](http://127.0.0.1:8765)** — a status light, a live log, and full editors
-for settings, personality, and your checklist.
+for settings, personality, your checklist, and your memory.
 
 ```powershell
 .\run_covas_ui.bat
@@ -88,6 +88,23 @@ clickable checkboxes, not a plain text box. It edits the **same file** the voice
 
 The checklist editor uses a rich-text library loaded from a CDN, so it needs internet; if the CDN
 is unreachable it falls back to a plain editor.
+
+## Memory tab — `/memory`
+
+A browser for your [persistent memory](using/memory.md) — the transparent ship's log other Elite
+assistants don't let you see into. It reads and writes the **same `memory.jsonl`** the voice loop
+uses:
+
+- **List & search** — every remembered fact with its type, tags, and timestamp; filter live by any
+  word, tag, or type.
+- **Edit** — change a memory's text, type, or tags in place (its id and original timestamp are kept,
+  so it round-trips losslessly).
+- **Delete** — drop a memory you don't want kept.
+- **Add** — record a fact by hand.
+- **Stale-write guard** — if the voice loop wrote to memory while you had the tab open, it warns you
+  and offers a reload instead of clobbering — the same protection the checklist editor uses.
+
+Pure vanilla JS with **no CDN**, so this tab works fully offline.
 
 ## What needs what
 

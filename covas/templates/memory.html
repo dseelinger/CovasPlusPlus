@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COVAS++ Memory</title>
+<!-- The memory browser (issue #62): read / search / edit / delete / add the transparent
+     ship's log. Pure vanilla JS — no CDN — so the panel works fully offline. Every write
+     carries the content-hash base_version; a 409 (a voice edit landed) reloads instead of
+     clobbering, mirroring the checklist editor's stale-write guard. -->
+<style>
+  :root{
+    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
+    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,#12181f,#0a0d12)}
+  header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
+  header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
+  header a.sub{color:var(--accent2);text-decoration:none}
+  .wrap{padding:16px;max-width:1000px}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:16px;margin-bottom:16px}
+  .card h2{margin:0 0 12px;font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  input,select,textarea{background:#0c1119;color:var(--text);border:1px solid var(--edge);
+      border-radius:6px;padding:8px 10px;font-family:inherit;font-size:13px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent2)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1 1 240px}
+  button{padding:9px 16px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+      border-radius:6px;font-family:inherit;font-size:13px;letter-spacing:1px;cursor:pointer}
+  button:hover{background:#162836}
+  button.primary{background:var(--accent);color:#0a0d12;border-color:var(--accent);font-weight:bold}
+  button.primary:hover{filter:brightness(1.1)}
+  button.danger{color:#ff9d9d}
+  button.small{padding:5px 10px;font-size:12px}
+  .msg{color:#39d353;font-size:12px}
+  .msg.err{color:#ff9d9d}
+  .hint{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.6}
+  .count{color:var(--muted);font-size:12px;margin-left:auto}
+  ul#list{list-style:none;margin:0;padding:0}
+  li.mem{border:1px solid var(--edge);border-radius:6px;padding:12px;margin-bottom:10px;background:#0e141d}
+  li.mem .txt{font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+  li.mem .meta{color:var(--muted);font-size:11px;margin-top:6px;letter-spacing:.5px}
+  li.mem .tag{display:inline-block;background:#12202c;border:1px solid var(--edge);border-radius:10px;
+      padding:1px 8px;margin-right:5px;color:var(--accent2)}
+  li.mem .type{color:var(--accent);text-transform:uppercase;margin-right:8px}
+  li.mem .actions{margin-top:10px;display:flex;gap:8px}
+  li.mem .editor{display:none;margin-top:10px}
+  li.mem.editing .editor{display:block}
+  li.mem.editing .view{display:none}
+  .editor textarea{width:100%;min-height:56px;resize:vertical;line-height:1.5}
+  .empty{color:var(--muted);font-size:13px;padding:8px 0}
+  .conflict{display:none;margin-top:12px;padding:12px;border:1px solid #7a5a2a;border-radius:6px;
+      background:#2a2114;color:#ffce7a;font-size:13px;line-height:1.6}
+  .conflict.show{display:block}
+  .conflict button{margin-right:8px;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>COVAS++</h1>
+  <span class="sub">MEMORY</span>
+  <a href="/" class="sub">← control panel</a>
+  <a href="/settings" class="sub">⚙ settings</a>
+  <a href="/checklist" class="sub">☑ checklist</a>
+  <span class="sub" id="fileName" style="margin-left:auto"></span>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Add a memory</h2>
+    <div class="row">
+      <input class="grow" id="addText" placeholder="A durable fact — e.g. Prefers to be addressed as Commander">
+      <select id="addType" title="Kind of fact">
+        <option value="note">note</option>
+        <option value="preference">preference</option>
+        <option value="fact">fact</option>
+      </select>
+      <input id="addTags" style="flex:1 1 160px" placeholder="tags, comma-separated">
+      <button class="primary" id="add">ADD</button>
+    </div>
+    <div class="hint">
+      Memories live in a plain JSON-lines file the voice loop shares live. What you add here is
+      recalled in conversation; what the companion learns shows up here on reload.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Remembered</h2>
+    <div class="row">
+      <input class="grow" id="search" placeholder="search text, tags, or type…">
+      <button id="reload">RELOAD FROM DISK</button>
+      <span class="count" id="count"></span>
+    </div>
+    <span class="msg" id="msg"></span>
+    <div class="conflict" id="conflict">
+      ⚠ The memory file changed on disk since you loaded it — probably a voice edit.<br>
+      <button id="reloadTheirs" class="small">RELOAD (discard my pending edit)</button>
+    </div>
+    <ul id="list" style="margin-top:12px"></ul>
+    <div class="empty" id="empty" style="display:none">No memories yet.</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let VERSION = null;          // content-hash of the file as we last loaded/saved it
+let MEMORIES = [];           // last snapshot from the server (source for filtering + edits)
+
+function flash(text, isErr){
+  const el = $("msg");
+  el.textContent = text; el.classList.toggle("err", !!isErr);
+  clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = ""; }, 3000);
+}
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const parseTags = s => String(s || "").split(",").map(t => t.trim()).filter(Boolean);
+
+function render(){
+  const q = $("search").value.trim().toLowerCase();
+  const rows = MEMORIES.filter(m => {
+    if (!q) return true;
+    const hay = (m.text + " " + m.type + " " + (m.tags || []).join(" ")).toLowerCase();
+    return hay.includes(q);
+  });
+  $("count").textContent = q ? rows.length + " / " + MEMORIES.length : MEMORIES.length + " on file";
+  $("empty").style.display = MEMORIES.length ? "none" : "block";
+  const list = $("list");
+  list.innerHTML = "";
+  for (const m of rows){
+    const li = document.createElement("li");
+    li.className = "mem"; li.dataset.id = m.id;
+    const tags = (m.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join("");
+    li.innerHTML = `
+      <div class="view">
+        <div class="txt">${esc(m.text)}</div>
+        <div class="meta"><span class="type">${esc(m.type)}</span>${tags}
+          <span title="when recorded">${esc(m.when)}</span></div>
+        <div class="actions">
+          <button class="small edit">EDIT</button>
+          <button class="small danger del">DELETE</button>
+        </div>
+      </div>
+      <div class="editor">
+        <textarea class="eText">${esc(m.text)}</textarea>
+        <div class="row" style="margin-top:8px">
+          <select class="eType">
+            <option value="note">note</option>
+            <option value="preference">preference</option>
+            <option value="fact">fact</option>
+          </select>
+          <input class="eTags grow" placeholder="tags, comma-separated" value="${esc((m.tags||[]).join(', '))}">
+          <button class="small primary saveEdit">SAVE</button>
+          <button class="small cancelEdit">CANCEL</button>
+        </div>
+      </div>`;
+    li.querySelector(".eType").value = m.type || "note";
+    li.querySelector(".edit").onclick = () => li.classList.add("editing");
+    li.querySelector(".cancelEdit").onclick = () => li.classList.remove("editing");
+    li.querySelector(".saveEdit").onclick = () => saveEdit(m.id, li);
+    li.querySelector(".del").onclick = () => del(m.id);
+    list.appendChild(li);
+  }
+}
+
+function apply(data){                     // fold a server snapshot into local state + UI
+  VERSION = data.version;
+  MEMORIES = data.memories || [];
+  $("fileName").textContent = data.name || "";
+  $("conflict").classList.remove("show");
+  render();
+}
+
+async function load(){
+  const r = await fetch("/api/memory");
+  const data = await r.json();
+  if (!r.ok) { flash(data.error || "load failed", true); return; }
+  apply(data);
+}
+
+// Every write shares one shape: send base_version, handle a 409 by surfacing the conflict and
+// stashing the on-disk snapshot so the client can reload instead of clobbering the voice edit.
+async function write(url, body){
+  const r = await fetch(url, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...body, base_version: VERSION }),
+  });
+  const data = await r.json();
+  if (r.status === 409) {                 // voice edited the file underneath us
+    $("conflict").classList.add("show");
+    $("conflict")._theirs = data;
+    flash("Memory changed on disk — reload before editing.", true);
+    return null;
+  }
+  if (!r.ok) { flash(data.error || "save failed", true); return null; }
+  apply(data);
+  return data;
+}
+
+$("add").onclick = async () => {
+  const text = $("addText").value.trim();
+  if (!text) { flash("Enter a fact to remember.", true); return; }
+  const ok = await write("/api/memory/add", {
+    text, type: $("addType").value, tags: parseTags($("addTags").value),
+  });
+  if (ok) { $("addText").value = ""; $("addTags").value = ""; flash("Added."); }
+};
+
+async function saveEdit(id, li){
+  const ok = await write("/api/memory/edit", {
+    id, text: li.querySelector(".eText").value.trim(),
+    type: li.querySelector(".eType").value,
+    tags: parseTags(li.querySelector(".eTags").value),
+  });
+  if (ok) flash("Saved.");
+}
+
+async function del(id){
+  if (!window.confirm("Delete this memory? This rewrites the shared file.")) return;
+  const ok = await write("/api/memory/delete", { id });
+  if (ok) flash("Deleted.");
+}
+
+$("search").addEventListener("input", render);
+$("reload").onclick = async () => { await load(); flash("Reloaded."); };
+$("reloadTheirs").onclick = () => {
+  const theirs = $("conflict")._theirs;
+  if (theirs) apply(theirs);
+  flash("Loaded the on-disk version.");
+};
+
+// Coming back to the tab after a voice session: surface drift early rather than only on save.
+window.addEventListener("focus", async () => {
+  if (VERSION === null) return;
+  try {
+    const data = await (await fetch("/api/memory")).json();
+    if (data.ok && data.version !== VERSION) {
+      $("conflict").classList.add("show");
+      $("conflict")._theirs = data;
+    }
+  } catch (e) { /* offline blip — the save-time guard still protects the file */ }
+});
+
+load();
+</script>
+</body>
+</html>

@@ -639,6 +639,17 @@ Notes:
 - [ ] **Stale-write guard:** load the tab, make a voice edit, then click SAVE in the tab → an **amber warning** appears (file changed on disk) instead of clobbering; **RELOAD THEIR VERSION** shows the voice edit, or **OVERWRITE ANYWAY** forces yours.
 - [ ] **Save feedback:** a successful save flashes "Saved — N/M complete" and the Live Log (All filter) shows "Checklist updated from the web editor".
 
+### 14.7 Memory browser (issue #62) — http://127.0.0.1:8765/memory  🌐 PANEL 📋 FILE
+> Reads/writes the SAME `memory/memory.jsonl` the voice loop uses. Needs `[memory].enabled = true`
+> (default). Pure vanilla JS — **no CDN**, so it works offline. Use **throwaway** facts.
+- [ ] **Tab + nav:** the 🧠 memory link exists on the control-panel, settings, and checklist headers; opening it lists **every** memory with its type, tags, and timestamp; the header shows the file name.
+- [ ] **Add:** type a fact (e.g. *"prefers metric units"*), pick a type, add a tag → **ADD** → 📋 a new JSON line appears in `memory/memory.jsonl`; ask by voice *"do you remember what units I use?"* → COVAS answers **from the new fact** (same file, read live).
+- [ ] **Search:** type in the search box → the list filters live by text, tag, or type; the count shows `N / total`; clearing restores all.
+- [ ] **Edit:** click **EDIT** on a memory, change its text/type/tags → **SAVE** → 📋 the file line updates; the memory's `id` and original `when` are **unchanged** (round-trips losslessly), only the edited fields differ.
+- [ ] **Delete:** click **DELETE** on a throwaway memory, confirm → 📋 that line is gone from the file; the rest survive.
+- [ ] **Voice → web:** say *"remember that my callsign is Ghost"*, then click **RELOAD FROM DISK** (or refocus the tab) → the captured fact appears in the list.
+- [ ] **Stale-write guard:** load the tab, make a voice memory (*"remember that…"*) so the file changes, then try to **ADD/EDIT/DELETE** in the tab → an **amber warning** appears (file changed on disk) and the write is refused instead of clobbering; **RELOAD** pulls in the voice memory. The Live Log (All filter) shows "Memory updated from the web browser" on a successful web write.
+
 Notes:
 
 ## 15. Settings persistence  🌐 PANEL 📋 FILE
