@@ -21,9 +21,9 @@ Everything I/O-bound is injected so the default `pytest` never hits the network 
 """
 from .spansh import (Http, NavError, RequestsHttp, distance_sort, execute_search,
                      is_fleet_carrier, largest_pad, pad_filter_key, pad_ok)
-from .categories import (BODIES, CATEGORIES, CategorySpec, ParamSpec, StationRecord,
+from .categories import (BODIES, CATEGORIES, BodyRecord, CategorySpec, ParamSpec, StationRecord,
                          SystemRecord, UnknownParamError, build_filters, build_query,
-                         category, parse_results, parse_stations, parse_systems)
+                         category, parse_bodies, parse_results, parse_stations, parse_systems)
 from .routes import (RICHES_ROUTE_URL, ROUTE_URL, RESULTS_URL, TRADE_ROUTE_URL, RoutePlotter,
                      RouteWaypoint, TradeHop, build_galaxy_request, build_trade_request,
                      parse_galaxy_route, parse_trade_route, stale_age_caveat, submit_and_poll)
@@ -32,6 +32,7 @@ from .mining import (Hotspot, SellMarket, best_sell, build_hotspot_request, buil
 
 __all__ = [
     "BODIES",
+    "BodyRecord",
     "CATEGORIES",
     "CategorySpec",
     "Hotspot",
@@ -66,6 +67,7 @@ __all__ = [
     "build_filters",
     "build_query",
     "category",
+    "parse_bodies",
     "parse_results",
     "distance_sort",
     "execute_search",

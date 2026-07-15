@@ -285,6 +285,18 @@ The [voice search](search/index.md) categories.
 The `[nav]`, `[star_systems]`, and `[search]` sections also carry `base_url` / `user_agent` values
 for the Spansh API — you rarely need to touch these.
 
+## Body finder (`[bodies]`)
+
+See [Body finder](search/bodies.md). **Off by default.**
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `bodies.enabled` | `false` | Master switch — voice-find the nearest body by type or biological signal |
+| `bodies.search_size` | `50` | How many nearby matching bodies to fetch; the closest is the answer |
+
+Needs [`[elite].enabled`](elite/monitoring.md) for the current-system reference. The match's system
+is copied to your clipboard for the galaxy map.
+
 ## Trade-route planner (`[route_plan]`)
 
 See [Trade-route planner](search/trade-routes.md). **Off by default.**

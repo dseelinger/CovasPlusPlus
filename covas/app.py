@@ -235,6 +235,8 @@ class App:
             self._start_system_search()
         if self.cfg.get("search", {}).get("enabled"):
             self._start_searches()
+        if self.cfg.get("bodies", {}).get("enabled"):
+            self._start_bodies()
         if self.cfg.get("route_plan", {}).get("enabled"):
             self._start_route_plan()
         if self.cfg.get("neutron_plan", {}).get("enabled"):
@@ -1036,6 +1038,30 @@ class App:
             self.searches = []
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Search categories failed to start: {e}"})
+
+    # ---- Body / bio-geo signal finder (#68) -------------------------------
+    def _start_bodies(self) -> None:
+        """Build + register the body finder (#68) — nearest body by type / biological signal over
+        the `bodies/search` endpoint. Fail soft: a startup problem just leaves it off. Its own
+        `[bodies]` toggle (defaults OFF); shares the injected HTTP client + current-system seam;
+        the nearest match's system is copied to the clipboard for the galaxy map."""
+        try:
+            from .search import RequestsHttp
+            from .capabilities._search_support import SearchConfig
+            from .capabilities.body_search_capability import BodySearchCapability
+
+            bcfg = SearchConfig.from_cfg(self.cfg, "bodies")
+            self.body_search = BodySearchCapability(
+                bcfg, http=RequestsHttp(),
+                get_current_system=self._current_system,
+                log=lambda msg: self._log("bodies", msg))
+            self.registry.register(self.body_search)
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": "Body finder ON (nearest world / biological signal)."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.body_search = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Body finder failed to start: {e}"})
 
     # ---- Route planning (#41 foundation proof) ----------------------------
     def _start_route_plan(self) -> None:

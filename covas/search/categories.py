@@ -19,7 +19,10 @@ Outfitting is the ONE category with a bespoke builder/parser: it reuses the modu
 `find_closest_module`), so its `CategorySpec` records the endpoint + params for the registry
 but delegates the actual request to closest.py.
 
-Bodies/planets are OUT OF SCOPE for now — `BODIES` is a clearly-marked, unimplemented seam.
+Bodies/planets are the SEVENTH category (issue #68, the body / bio-geo signal finder): the
+`BODIES` spec below binds the `bodies/search` endpoint with its verified filter params, and
+`parse_bodies` turns a raw body into a `BodyRecord`. Its enum/bool/range filters render through
+the same generic machinery as every other category — the only body-specific piece is the parser.
 """
 from __future__ import annotations
 
@@ -66,7 +69,7 @@ class CategorySpec:
       * `key`         — our internal category key ("star_systems", "outfitting", …).
       * `endpoint`    — the Spansh /search URL it POSTs to.
       * `params`      — the accepted filter params; `build_query` rejects anything else.
-      * `result_kind` — "station" | "system", selects the parser.
+      * `result_kind` — "station" | "system" | "body", selects the parser.
       * `subject` / `lookup_name` — spoken wording for `execute_search`'s error lines.
       * `bespoke`     — True for outfitting: request/parse live in `nav/closest.py`, so
                         `build_query` here refuses (call closest.py instead).
@@ -220,6 +223,26 @@ class StationRecord:
     extra: dict = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class BodyRecord:
+    """A body (planet/moon) result from `bodies/search`. `distance_ly` is from the reference
+    system; `distance_to_arrival_ls` is in-system light-seconds from the main star. `signals`
+    maps a signal category ("Biological", "Geological", "Human", …) to its count, and `landmarks`
+    lists the distinct surface-feature subtypes present (the exobiology species live here), so a
+    spoken line can confirm the biological signal the Commander asked for."""
+    name: str
+    system: str
+    distance_ly: float
+    subtype: str | None = None
+    distance_to_arrival_ls: float | None = None
+    is_landable: bool = False
+    terraforming_state: str | None = None
+    atmosphere: str | None = None
+    signals: dict = field(default_factory=dict)
+    landmarks: tuple[str, ...] = ()
+    extra: dict = field(default_factory=dict)
+
+
 def _f(value, default: float = 0.0) -> float:
     try:
         return float(value)
@@ -272,12 +295,64 @@ def parse_stations(results: list[dict], *, include_carriers: bool = False) -> li
     return out
 
 
+def _signals_map(raw) -> dict:
+    """Spansh's `signals` list ([{"name": "Biological", "count": 3}, …]) as a name->count dict.
+    An absent/odd shape yields {} (never raises — a body without signals is normal)."""
+    out: dict = {}
+    if isinstance(raw, list):
+        for s in raw:
+            if isinstance(s, dict) and s.get("name"):
+                out[str(s["name"])] = s.get("count")
+    return out
+
+
+def _landmark_subtypes(raw) -> tuple[str, ...]:
+    """The distinct `subtype`s in a body's `landmarks` list, order preserved. That's where the
+    exobiology species show up (a body can list a genus's species many times, once per plotted
+    location), so we de-duplicate to the set of feature TYPES present."""
+    out: list[str] = []
+    if isinstance(raw, list):
+        for lm in raw:
+            if isinstance(lm, dict):
+                sub = lm.get("subtype")
+                if sub and str(sub) not in out:
+                    out.append(str(sub))
+    return tuple(out)
+
+
+def parse_bodies(results: list[dict]) -> list[BodyRecord]:
+    """Map raw Spansh body results (already distance-sorted) to `BodyRecord`s."""
+    out: list[BodyRecord] = []
+    for r in results:
+        arrival = r.get("distance_to_arrival")
+        out.append(BodyRecord(
+            name=r.get("name") or "an unnamed body",
+            system=r.get("system_name") or "an unknown system",
+            distance_ly=_f(r.get("distance")),
+            subtype=r.get("subtype"),
+            distance_to_arrival_ls=_f(arrival) if arrival is not None else None,
+            is_landable=bool(r.get("is_landable")),
+            terraforming_state=r.get("terraforming_state"),
+            atmosphere=r.get("atmosphere"),
+            signals=_signals_map(r.get("signals")),
+            landmarks=_landmark_subtypes(r.get("landmarks")),
+            # `signals_updated_at` dates the crowdsourced signal/landmark data (the volatile part
+            # of a body record — its structure doesn't change); kept for a spoken age caveat on a
+            # bio-signal search. `updated_at` is the record's last touch as a fallback.
+            extra={k: r.get(k) for k in ("signals_updated_at", "updated_at")
+                   if r.get(k) is not None},
+        ))
+    return out
+
+
 def parse_results(spec: CategorySpec, results: list[dict]):
     """Parse raw results per the category's `result_kind`."""
     if spec.result_kind == "system":
         return parse_systems(results)
     if spec.result_kind == "station":
         return parse_stations(results)
+    if spec.result_kind == "body":
+        return parse_bodies(results)
     raise ValueError(f"category '{spec.key}' has no parser for result_kind {spec.result_kind!r}")
 
 
@@ -389,12 +464,27 @@ def _misc_spec() -> CategorySpec:
     )
 
 
-# Bodies/planets: intentionally UNIMPLEMENTED (out of scope, Search Prompt 3). Left as a seam
-# so the endpoint + result_kind are recorded and a future prompt fills in params + a parser;
-# `build_query`/`build_filters` refuse it until then.
+# Bodies/planets (issue #68): nearest body by subtype (Earth-like / Ammonia / Water world, gas
+# giants, …), biological signal of type X (`landmark_subtype` — the exobiology species), plus
+# atmosphere / terraforming / landability / arrival distance. Every param below was verified
+# accepted against the live `bodies/search` API (2026-07) by watching the filter NARROW results
+# — an unknown key is silently ignored, so this was confirmed empirically, not from docs. NOTE:
+# the signal-CATEGORY count filter ("has any Biological signal") is NOT honoured by the API under
+# any shape tried, so "biological signals of type X" is served precisely via `landmark_subtype`
+# (a genus expands to an OR over its species; see `search/bodies.py`).
+_BODY_SUBJECT = ("the bodies database", "body lookup")
+
 BODIES = CategorySpec(
-    key="bodies", endpoint=BODIES_URL, result_kind="body", implemented=False,
-    subject="the bodies database", lookup_name="body lookup",
+    key="bodies", endpoint=BODIES_URL, result_kind="body",
+    subject=_BODY_SUBJECT[0], lookup_name=_BODY_SUBJECT[1],
+    params=(
+        ParamSpec("subtype", "enum"),             # Earth-like world, Ammonia world, Water world, …
+        ParamSpec("landmark_subtype", "enum"),    # exobiology species (bio signals of type X)
+        ParamSpec("atmosphere", "enum"),          # Nitrogen, Ammonia, No atmosphere, …
+        ParamSpec("terraforming_state", "enum"),  # Terraformable, Terraformed, Not terraformable
+        ParamSpec("is_landable", "bool"),
+        ParamSpec("distance_to_arrival", "range"),  # light-seconds from the main star
+    ),
 )
 
 
@@ -406,11 +496,12 @@ CATEGORIES: dict[str, CategorySpec] = {
         _minor_factions_spec(),
         _signals_spec(),
         _misc_spec(),
+        BODIES,
     )
 }
 
 
 def category(key: str) -> CategorySpec:
-    """The `CategorySpec` for a category key. Raises KeyError for the bodies seam / unknowns —
-    callers must go through `CATEGORIES` or `BODIES` deliberately."""
+    """The `CategorySpec` for a category key ("stations", "bodies", …). Raises KeyError for an
+    unknown key — callers name a real category deliberately."""
     return CATEGORIES[str(key).strip().lower()]
