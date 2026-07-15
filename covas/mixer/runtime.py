@@ -33,7 +33,7 @@ from .content import (
     status_summary,
     threat_lines,
 )
-from .cues import CueRegistry
+from .cues import PERSONA, CueRegistry
 from .driver import CueDriver
 from .eligibility import EligibilityEngine
 from .example_cues import DEFAULT_THREAT_LINES, InterdictionCue, SfxPlayer, sfx_cues
@@ -49,6 +49,10 @@ from .voices import VoiceCast, build_cast
 _ARRIVAL_EVENTS = frozenset({"FSDJump", "CarrierJump", "Location"})
 # How many recent players keep a stable random voice (a wing/operation's worth).
 _PLAYER_VOICE_MEMORY = 25
+# Anti-repeat window (issue #57): avoid re-handing-out any of the last N cast voices, so the ambient
+# soundscape spreads across the pool instead of clustering on a few voices (a shuffled-soundboard
+# feel). Relaxes automatically when the pool is smaller than the window, so it never starves.
+_ANTI_REPEAT_WINDOW = 5
 
 
 def _default_sting() -> str:
@@ -121,12 +125,16 @@ class AudioLayer:
         # cast fresh per line (below). All degrade to the persona voice on an empty pool.
         self._rng = random.Random()
         self._comms_voices = StickyVoicePool(
-            self._cast.pool, rng=self._rng, fallback=self._cast.persona())
+            self._cast.pool, rng=self._rng, fallback=self._cast.persona(),
+            anti_repeat=_ANTI_REPEAT_WINDOW)
         self._player_voices = StickyVoicePool(
             self._cast.pool, rng=self._rng, capacity=_PLAYER_VOICE_MEMORY,
-            fallback=self._cast.persona())
+            fallback=self._cast.persona(), anti_repeat=_ANTI_REPEAT_WINDOW)
+        # Per-line chatter is the most repetition-prone (no stickiness to spread it), so it carries
+        # the anti-repeat window too — consecutive lines won't reuse a recent voice.
         self._chatter_voices = StickyVoicePool(
-            self._cast.pool, rng=self._rng, fallback=self._cast.persona())
+            self._cast.pool, rng=self._rng, fallback=self._cast.persona(),
+            anti_repeat=_ANTI_REPEAT_WINDOW)
         # Live game state that drives chatter frequency + comms re-casting.
         self._population: Optional[float] = None
         self._system: str = ""
@@ -168,6 +176,12 @@ class AudioLayer:
         chatter_gen = _text_generator(llm, cheap_model) if (llm is not None and chatter_flavor) else None
         self._chatter = ChatterPlayer(self._speak_bus, generate=chatter_gen,
                                       min_interval=self._chatter_interval, clock=clock)
+        # "Our"-perspective musings (issue #57): a cue tagged voice_role=PERSONA is something the
+        # companion itself notices, so it speaks in COVAS's OWN voice on the clean COVAS bus instead
+        # of a random radioed cast voice. Same player shape (flavor generator + frequency gate) as
+        # ambient chatter, just a different `speak` seam.
+        self._persona_chatter = ChatterPlayer(self._speak_persona, generate=chatter_gen,
+                                               min_interval=self._chatter_interval, clock=clock)
         self._sfx = SfxPlayer(self._play_sample)
         # Carrier context voices (#19): each role speaks its own configured voice (or a stable
         # cast-pool fallback) with its display name woven in. Pool-only (fact-safe), no LLM.
@@ -263,9 +277,22 @@ class AudioLayer:
         )
 
     def _speak_bus(self, text: str, bus: str) -> bool:
-        """Speak a chatter line on its bus with a FRESH RANDOM cast voice per line, so the ambient
-        radio sounds like many different anonymous speakers."""
+        """Speak an AMBIENT chatter line on its bus with a FRESH RANDOM cast voice per line, so the
+        ambient radio sounds like many different anonymous speakers (issue #57: the anti-repeat
+        window on the pool keeps those voices from clustering)."""
         return self._submit_voice(self._chatter_voices.random(), text, bus)
+
+    def _speak_persona(self, text: str, bus: str) -> bool:
+        """Speak an "our"-perspective musing in COVAS's OWN persona voice, via the app's real TTS
+        provider, on the clean COVAS bus — the attribution rule (issue #57): something WE notice
+        comes from the companion, never an anonymous radioed cast voice. Uses `self.tts` (the same
+        provider as the companion's replies), mirroring the interdiction COVAS line. Fails soft."""
+        try:
+            speak_on_bus(self.mixer, self.tts, text, bus=bus)
+            return True
+        except Exception as e:  # noqa: BLE001 — a dead persona voice degrades to nothing, never crashes
+            self._log(f"persona musing failed: {e}")
+            return False
 
     def _carrier_voice(self, role: str):  # noqa: ANN201 — a Voice
         """The Voice for a carrier role (#19): the one configured under `[audio.carrier].<role>`,
@@ -304,9 +331,14 @@ class AudioLayer:
     def _dispatch_play(self, cue) -> bool:  # noqa: ANN001 — the driver's play callback
         if self.muted:
             return False
-        # A carrier cue (voice_role set) speaks in its role's dedicated voice — checked first since
-        # it also carries phrasings (which would otherwise route to the anonymous chatter path).
-        if getattr(cue, "voice_role", ""):
+        # Attribution by voice_role (issue #57), checked first since these cues also carry phrasings
+        # (which would otherwise route to the anonymous radioed-chatter path):
+        #   * PERSONA -> an "our"-perspective line in COVAS's own voice on the clean bus;
+        #   * any other role (captain/tower/chatter) -> the carrier cue's dedicated voice.
+        role = getattr(cue, "voice_role", "")
+        if role == PERSONA:
+            return self._persona_chatter(cue) if self.chatter_on else False
+        if role:
             return self._carrier(cue) if self.carrier_on else False
         if cue.samples:
             return self._sfx(cue) if self.sfx_on else False

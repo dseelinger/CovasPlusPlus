@@ -502,6 +502,18 @@ on in config (or the Settings page) before testing.
   entries → the cast reverts to **free local Piper** voices (no ElevenLabs credits). A voice you
   can't use (an ElevenLabs ™/famous voice) is never selected.
 
+### 18.5a Context-aware voice quality — variety + perspective (issue #57)
+- [ ] 🔊 **Variety (anti-repeat):** in a **busy populated** system with `[audio.cues].enabled` and
+  the random ElevenLabs cast, listen to a run of **ambient chatter / NPC comms** lines → consecutive
+  lines **spread across many voices** and you should **not** hear the same handful of voices repeat
+  back-to-back (no "shuffled soundboard" feel). The bigger your ElevenLabs library, the more variety.
+- [ ] 🔊 **Perspective (attribution):** when the **companion muses about the world** (an
+  "our"-perspective line like *"nice to have some company out here"*), it's spoken in **your
+  companion's OWN voice, clean** (the same voice as its replies), **not** a random radioed cast
+  voice — and it does **not** carry the radio/static comms treatment. By contrast, **station
+  traffic / patrol / market** ambient lines come from a **random radioed cast voice** on the
+  comms bus. Confirm the perspective always matches the source.
+
 ### 18.6 Drop-in content (C11)
 - [ ] On first run with the layer enabled, confirm the skeleton appears: **`audio/sfx/<cue>/`**,
   **`audio/music/<context>/`**, **`content/chatter/*.txt`**, **`content/interdiction_threat.txt`**,

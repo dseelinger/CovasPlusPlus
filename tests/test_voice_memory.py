@@ -37,6 +37,43 @@ def test_random_has_no_memory():
     assert len(picks) >= 2                            # varies per call (no stickiness)
 
 
+# ---- anti-repeat variety (issue #57) --------------------------------------------------------
+
+def test_anti_repeat_window_never_reuses_a_voice_within_the_window():
+    # A window of 3 over a 6-voice pool: no voice may recur among any 4 consecutive picks
+    # (the pick itself + the 3 remembered before it). Deterministic via the seeded rng.
+    mem = _seeded(_pool(6), anti_repeat=3)
+    picks = [mem.random().ref for _ in range(30)]
+    for i in range(3, len(picks)):
+        assert picks[i] not in picks[i - 3:i]         # not among the previous 3
+
+
+def test_anti_repeat_widens_effective_variety_vs_off():
+    # With the window on, a short run visits more distinct voices than the plain random pick.
+    off = _seeded(_pool(6), anti_repeat=0)
+    on = _seeded(_pool(6), anti_repeat=4)
+    n = 12
+    off_distinct = len({off.random().ref for _ in range(n)})
+    on_distinct = len({on.random().ref for _ in range(n)})
+    assert on_distinct >= off_distinct
+    assert on_distinct == 6                           # the window spreads across the whole pool
+
+
+def test_anti_repeat_relaxes_on_a_too_small_pool():
+    # Window bigger than the pool must not deadlock — it relaxes and still returns a voice.
+    mem = _seeded(_pool(2), anti_repeat=5)
+    picks = [mem.random().ref for _ in range(6)]
+    assert set(picks) == {"v0", "v1"}                 # both voices used, no crash/empty
+    assert len(picks) == 6
+
+
+def test_anti_repeat_off_by_default_preserves_behaviour():
+    # Default (anti_repeat=0) keeps the plain "prefer not-in-use" behaviour for assignments.
+    mem = _seeded(_pool(4))
+    refs = {mem.assign(f"npc-{i}").ref for i in range(4)}
+    assert len(refs) == 4                             # unchanged distinct-until-exhausted behaviour
+
+
 # ---- gender filtering -----------------------------------------------------------------------
 
 def test_gender_hint_narrows_then_falls_back():

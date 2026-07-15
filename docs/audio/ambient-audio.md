@@ -83,6 +83,30 @@ play session**:
   wing or an operation keeps stable per-person voices.
 - **Chatter** picks a fresh random voice per line, so the background radio sounds like many people.
 
+### Variety — no shuffled soundboard
+
+To stop the cast recurring so often it sounds like a small shuffled soundboard, each pool keeps a
+short **anti-repeat window**: it won't re-use any of the last few voices it just handed out, so
+consecutive lines and freshly-cast speakers **spread across the whole pool** instead of clustering
+on a handful of voices. (The window relaxes automatically if your pool is smaller than the window,
+so it never runs dry.) A bigger pool still means more variety — the random ElevenLabs default draws
+from your **entire** library.
+
+### Perspective — the right speaker says it
+
+A context line is attributed to whoever it actually belongs to, so the soundscape stays coherent
+rather than random:
+
+- **Something *we* do or notice** — the companion's own observation about the world around you — is
+  spoken in **your companion's own voice, clean, on the COVAS bus** (the same voice as its replies),
+  not by an anonymous radio voice. (This is also the seam a *crew member's* voice will slot into
+  once interactive crew lands.)
+- **Everything external / ambient** — other ships, station traffic, NPC comms — is a **random
+  "radioed" cast voice** on the comms bus.
+
+So a musing like *"nice to have some company out here"* comes from your companion, while station
+chatter comes from the anonymous radio cast — the perspective always matches the source.
+
 !!! warning "This uses ElevenLabs credits"
     The cast now defaults to **ElevenLabs**, which burns credits on every comms/chatter line. To go
     back to the free, game-friendly local path, set `[audio.voices].cast_provider = "piper"` and add
