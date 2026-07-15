@@ -32,6 +32,11 @@ so you can see exactly where a turn is.
 The tap-versus-hold threshold is `[keys].tap_cancel_ms` (default 400 ms) in
 [`config.toml`](../configuration.md).
 
+!!! tip "Prefer not to hold a key?"
+    Turn on **[hands-free listening](hands-free.md)** — a local voice-activity gate starts a turn
+    when you begin talking and ends it after a short silence, reusing this same loop (barge-in and
+    cancel included). Push-to-talk stays the default.
+
 ## Sound cues
 
 COVAS++ plays a short local sound at each stage so you get instant, zero-latency feedback without

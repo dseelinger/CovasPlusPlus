@@ -18,6 +18,7 @@ import keyboard
 from .config import load_config, load_overrides, save_overrides, deep_merge, mock_enabled
 from . import settings_schema as schema
 from .audio import CuePlayer, Recorder
+from .listen import VadListener
 from .events import EventBus
 from .checklist import Checklist
 from .capabilities import CapabilityRegistry
@@ -97,6 +98,10 @@ class App:
                 print(f"Audio mixer init failed ({e}); using direct playback.", flush=True)
         self.cues = CuePlayer(self.cfg, mixer=self.mixer)
         self.recorder = Recorder(self.cfg)
+        # Hands-free continuous listening (issue #63). Off by default ([listen].mode = "ptt");
+        # when "continuous", a VAD mic listener is started in start() and reconciled live on a
+        # settings change. Built lazily so PTT-only runs (and the offline tests) never touch it.
+        self.listener: VadListener | None = None
         if self.mock:
             print("Dev mock ON — LLM/TTS/STT are fakes; zero API calls, zero cost.", flush=True)
         elif stt is None:
@@ -1309,6 +1314,12 @@ class App:
             self.cues.stop()
             self.set_state("Idle", "cancelled")
             return
+        self._dispatch_utterance(audio)
+
+    def _dispatch_utterance(self, audio) -> None:
+        """Run ONE turn on the worker thread for a captured utterance. Shared by PTT release
+        and the hands-free VAD listener (issue #63) so both drive the exact same
+        transcribe→LLM→TTS + cancellation path."""
         self.cues.play("processing")
         # Arm the soft "thinking" bed for THIS user turn (issue #5): the one-shot processing tick
         # above acknowledges receipt; the bed then fills the transcribe/think/search wait. The
@@ -1320,6 +1331,72 @@ class App:
             target=self._process, args=(audio, cancel), daemon=True
         )
         self.worker.start()
+
+    # ---- hands-free / VAD listen (issue #63) ------------------------------
+    def _on_vad_speech_start(self) -> None:
+        """Speech onset in continuous mode = barge-in, exactly like on_ptt_down: interrupt any
+        in-flight thinking/speaking (including a proactive callout) and flip to Listening, under
+        the proactive lock so a callout can't slip in. A physical PTT hold wins — if the user is
+        holding the key, ignore the VAD onset so the two inputs don't fight."""
+        if self.ptt_held:
+            return
+        with self._proactive_lock:
+            self._interrupt()
+            self.set_state("Listening")
+        self.cues.play("listening")
+
+    def _on_vad_utterance(self, audio) -> None:
+        """A completed hands-free utterance: dispatch it down the shared turn path. Skipped
+        while PTT is held so a physical hold wins and we never double-fire a turn."""
+        if self.ptt_held:
+            return
+        self._dispatch_utterance(audio)
+
+    def _listen_mode(self) -> str:
+        return str(self.cfg.get("listen", {}).get("mode", "ptt")).strip().lower()
+
+    def _start_listener(self) -> None:
+        """Start the VAD mic listener (idempotent). Fail-soft: if the mic won't open, log and
+        stay on PTT — continuous mode simply doesn't engage rather than crashing the loop."""
+        if self.mock:
+            return  # dev-mock has no real audio; nothing to listen to
+        if self.listener is not None and self.listener.running:
+            return
+        try:
+            self.listener = VadListener(
+                self.cfg,
+                on_speech_start=self._on_vad_speech_start,
+                on_utterance=self._on_vad_utterance,
+                log=lambda m: self._log("listen", m))
+            if self.listener.start():
+                self._log("listen", "Hands-free continuous listening ON.")
+            else:
+                self.listener = None  # start() already logged the fall-back to PTT
+        except Exception as e:  # noqa: BLE001 — never let listen setup crash the loop
+            self.listener = None
+            self._log("listen", f"continuous listen failed to start: {e}; staying on PTT.")
+
+    def _stop_listener(self) -> None:
+        if self.listener is None:
+            return
+        try:
+            self.listener.stop()
+        except Exception as e:  # noqa: BLE001 — teardown must never raise
+            self._log("listen", f"stopping the listener failed: {e}")
+        self.listener = None
+        self._log("listen", "Hands-free continuous listening OFF (push-to-talk).")
+
+    def _reconcile_listener(self) -> None:
+        """Start/stop the VAD listener to match [listen].mode — the live mode switch. Mirrors
+        _reconcile_hud: called directly (not via the pump) so the toggle works from the Settings
+        page or by voice even when no other ambient feature is running."""
+        try:
+            if self._listen_mode() == "continuous":
+                self._start_listener()
+            else:
+                self._stop_listener()
+        except Exception as e:  # noqa: BLE001 — a toggle glitch must not crash the loop
+            self._log("listen", f"reconcile failed: {e}")
 
     def on_cancel(self) -> None:
         self._interrupt()
@@ -1361,6 +1438,9 @@ class App:
         self.bus.publish({"type": "settings", "settings": self.public_settings()})
         # Companion HUD (issue #47): apply an [hud].enabled toggle live (Settings page or voice).
         self._reconcile_hud()
+        # Activation mode (issue #63): apply a [listen].mode switch live — start/stop the VAD
+        # mic listener to match, so "switch to continuous listening" takes effect immediately.
+        self._reconcile_listener()
         # Audio settings (bus volumes, enable toggles, comms treatment) apply live.
         if self.audio is not None:
             try:
@@ -1678,6 +1758,9 @@ class App:
                         self.tts = make_tts(self.cfg)
                     except Exception:  # noqa: BLE001 — keep whatever tts we had
                         pass
+        # Hands-free continuous listening (issue #63): start the VAD mic listener now if
+        # [listen].mode = "continuous". Fail-soft — a mic that won't open falls back to PTT.
+        self._reconcile_listener()
         self.set_state("Idle")
 
     def wait_for_quit(self) -> None:
@@ -1694,6 +1777,7 @@ class App:
         """Stop the watchers/pump and close the log. Safe to call once on the way out."""
         self._stop_event_pump()
         self._stop_ed_monitoring()
+        self._stop_listener()  # close the hands-free mic listener if it's running (issue #63)
         if self.hud is not None:
             try:
                 self.hud.shutdown()  # tear the overlay window down
