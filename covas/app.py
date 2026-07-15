@@ -392,6 +392,7 @@ class App:
             from .capabilities.ed_context_capability import EDContextCapability
             from .capabilities.engineers_capability import EngineersCapability
             from .capabilities.loadout_capability import LoadoutCapability
+            from .capabilities.blueprint_capability import BlueprintCapability
             from .capabilities.stored_capability import StoredCapability
             from .nav import copy as _nav_copy
 
@@ -404,6 +405,12 @@ class App:
             self.registry.register(LoadoutCapability(
                 get_loadout=self.ed_ctx.loadout_snapshot,
                 log=lambda m: self._log("loadout", m)))
+            # Blueprint / material sourcing (#66): crosses the bundled engineering tables with the
+            # live material inventory the journal watcher keeps on EDContext (the Materials event).
+            # Registered with monitoring since the journal inventory is its only live data source.
+            self.registry.register(BlueprintCapability(
+                get_materials=self.ed_ctx.materials_snapshot,
+                log=lambda m: self._log("blueprint", m)))
             # Stored ships & modules finder (issue #67): reads the StoredShips/StoredModules
             # snapshots the journal watcher keeps on EDContext. Copies a destination system to
             # the clipboard for a resolved remote ship/module (galaxy-map handoff).

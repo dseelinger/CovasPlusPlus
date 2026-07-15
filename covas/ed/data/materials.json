@@ -1,0 +1,961 @@
+{
+ "adaptiveencryptors": {
+  "category": "Encoded",
+  "grade": 5,
+  "group": "Encryption Files",
+  "name": "Adaptive Encryptors Capture",
+  "source": "Trade at an Encoded Material Trader (swaps within the Encryption Files group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "ancientbiologicaldata": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "None",
+  "name": "Pattern Alpha Obelisk Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "ancientculturaldata": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "None",
+  "name": "Pattern Beta Obelisk Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "ancienthistoricaldata": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "None",
+  "name": "Pattern Gamma Obelisk Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "ancientlanguagedata": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "None",
+  "name": "Pattern Delta Obelisk Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "ancienttechnologicaldata": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "None",
+  "name": "Pattern Epsilon Obelisk Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "antimony": {
+  "category": "Raw",
+  "grade": 4,
+  "group": "7",
+  "name": "Antimony",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "archivedemissiondata": {
+  "category": "Encoded",
+  "grade": 2,
+  "group": "Emission Data",
+  "name": "Irregular Emission Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the Emission Data group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "arsenic": {
+  "category": "Raw",
+  "grade": 2,
+  "group": "6",
+  "name": "Arsenic",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "basicconductors": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "Conductive",
+  "name": "Basic Conductors",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Conductive group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "biotechconductors": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "Conductive",
+  "name": "Biotech Conductors",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Conductive group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "boron": {
+  "category": "Raw",
+  "grade": 3,
+  "group": "7",
+  "name": "Boron",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "bulkscandata": {
+  "category": "Encoded",
+  "grade": 1,
+  "group": "Data Archives",
+  "name": "Anomalous Bulk Scan Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the Data Archives group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "cadmium": {
+  "category": "Raw",
+  "grade": 3,
+  "group": "3",
+  "name": "Cadmium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "carbon": {
+  "category": "Raw",
+  "grade": 1,
+  "group": "1",
+  "name": "Carbon",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "chemicaldistillery": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "Chemical",
+  "name": "Chemical Distillery",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Chemical group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "chemicalmanipulators": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "Chemical",
+  "name": "Chemical Manipulators",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Chemical group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "chemicalprocessors": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "Chemical",
+  "name": "Chemical Processors",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Chemical group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "chemicalstorageunits": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "Chemical",
+  "name": "Chemical Storage Units",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Chemical group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "chromium": {
+  "category": "Raw",
+  "grade": 2,
+  "group": "2",
+  "name": "Chromium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "classifiedscandata": {
+  "category": "Encoded",
+  "grade": 5,
+  "group": "Data Archives",
+  "name": "Classified Scan Fragment",
+  "source": "Trade at an Encoded Material Trader (swaps within the Data Archives group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "compactcomposites": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "Composite",
+  "name": "Compact Composites",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Composite group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "compactemissionsdata": {
+  "category": "Encoded",
+  "grade": 5,
+  "group": "Emission Data",
+  "name": "Abnormal Compact Emissions Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the Emission Data group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "compoundshielding": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "Shielding",
+  "name": "Compound Shielding",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Shielding group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "conductiveceramics": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "Conductive",
+  "name": "Conductive Ceramics",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Conductive group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "conductivecomponents": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "Conductive",
+  "name": "Conductive Components",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Conductive group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "conductivepolymers": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "Conductive",
+  "name": "Conductive Polymers",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Conductive group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "configurablecomponents": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "Mechanical Components",
+  "name": "Configurable Components",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Mechanical Components group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "consumerfirmware": {
+  "category": "Encoded",
+  "grade": 2,
+  "group": "Encoded Firmware",
+  "name": "Modified Consumer Firmware",
+  "source": "Trade at an Encoded Material Trader (swaps within the Encoded Firmware group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "crystalshards": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "Crystals",
+  "name": "Crystal Shards",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Crystals group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "dataminedwake": {
+  "category": "Encoded",
+  "grade": 5,
+  "group": "Wake Scans",
+  "name": "Datamined Wake Exceptions",
+  "source": "Trade at an Encoded Material Trader (swaps within the Wake Scans group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "decodedemissiondata": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "Emission Data",
+  "name": "Decoded Emission Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the Emission Data group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "disruptedwakeechoes": {
+  "category": "Encoded",
+  "grade": 1,
+  "group": "Wake Scans",
+  "name": "Atypical Disrupted Wake Echoes",
+  "source": "Trade at an Encoded Material Trader (swaps within the Wake Scans group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "electrochemicalarrays": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "Capacitors",
+  "name": "Electrochemical Arrays",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Capacitors group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "embeddedfirmware": {
+  "category": "Encoded",
+  "grade": 5,
+  "group": "Encoded Firmware",
+  "name": "Modified Embedded Firmware",
+  "source": "Trade at an Encoded Material Trader (swaps within the Encoded Firmware group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "emissiondata": {
+  "category": "Encoded",
+  "grade": 3,
+  "group": "Emission Data",
+  "name": "Unexpected Emission Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the Emission Data group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "encodedscandata": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "Data Archives",
+  "name": "Divergent Scan Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the Data Archives group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "encryptedfiles": {
+  "category": "Encoded",
+  "grade": 1,
+  "group": "Encryption Files",
+  "name": "Unusual Encrypted Files",
+  "source": "Trade at an Encoded Material Trader (swaps within the Encryption Files group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "encryptionarchives": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "Encryption Files",
+  "name": "Atypical Encryption Archives",
+  "source": "Trade at an Encoded Material Trader (swaps within the Encryption Files group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "encryptioncodes": {
+  "category": "Encoded",
+  "grade": 2,
+  "group": "Encryption Files",
+  "name": "Tagged Encryption Codes",
+  "source": "Trade at an Encoded Material Trader (swaps within the Encryption Files group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "exquisitefocuscrystals": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "Crystals",
+  "name": "Exquisite Focus Crystals",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Crystals group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "fedcorecomposites": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "Composite",
+  "name": "Core Dynamics Composites",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Composite group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "fedproprietarycomposites": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "Composite",
+  "name": "Proprietary Composites",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Composite group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "filamentcomposites": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "Composite",
+  "name": "Filament Composites",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Composite group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "focuscrystals": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "Crystals",
+  "name": "Focus Crystals",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Crystals group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "fsdtelemetry": {
+  "category": "Encoded",
+  "grade": 2,
+  "group": "Wake Scans",
+  "name": "Anomalous FSD Telemetry",
+  "source": "Trade at an Encoded Material Trader (swaps within the Wake Scans group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "galvanisingalloys": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "Alloys",
+  "name": "Galvanising Alloys",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Alloys group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "germanium": {
+  "category": "Raw",
+  "grade": 2,
+  "group": "5",
+  "name": "Germanium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "gridresistors": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "Capacitors",
+  "name": "Grid Resistors",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Capacitors group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "guardian_moduleblueprint": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "None",
+  "name": "Guardian Module Blueprint Segment",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "guardian_powercell": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "None",
+  "name": "Guardian Power Cell",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "guardian_powerconduit": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "None",
+  "name": "Guardian Power Conduit",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "guardian_sentinel_weaponparts": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "None",
+  "name": "Guardian Sentinel Weapon Parts",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "guardian_sentinel_wreckagecomponents": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "None",
+  "name": "Guardian Sentinel Wreckage Components",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "guardian_techcomponent": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "None",
+  "name": "Guardian Technology Component",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "guardian_vesselblueprint": {
+  "category": "Encoded",
+  "grade": 5,
+  "group": "None",
+  "name": "Guardian Vessel Blueprint Segment",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "guardian_weaponblueprint": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "None",
+  "name": "Guardian Weapon Blueprint Segment",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "heatconductionwiring": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "Heat",
+  "name": "Heat Conduction Wiring",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Heat group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "heatdispersionplate": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "Heat",
+  "name": "Heat Dispersion Plate",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Heat group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "heatexchangers": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "Heat",
+  "name": "Heat Exchangers",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Heat group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "heatresistantceramics": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "Thermic",
+  "name": "Heat Resistant Ceramics",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Thermic group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "heatvanes": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "Heat",
+  "name": "Heat Vanes",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Heat group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "highdensitycomposites": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "Composite",
+  "name": "High Density Composites",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Composite group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "hybridcapacitors": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "Capacitors",
+  "name": "Hybrid Capacitors",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Capacitors group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "hyperspacetrajectories": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "Wake Scans",
+  "name": "Eccentric Hyperspace Trajectories",
+  "source": "Trade at an Encoded Material Trader (swaps within the Wake Scans group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "imperialshielding": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "Shielding",
+  "name": "Imperial Shielding",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Shielding group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "improvisedcomponents": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "Mechanical Components",
+  "name": "Improvised Components",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Mechanical Components group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "industrialfirmware": {
+  "category": "Encoded",
+  "grade": 3,
+  "group": "Encoded Firmware",
+  "name": "Cracked Industrial Firmware",
+  "source": "Trade at an Encoded Material Trader (swaps within the Encoded Firmware group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "iron": {
+  "category": "Raw",
+  "grade": 1,
+  "group": "4",
+  "name": "Iron",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "lead": {
+  "category": "Raw",
+  "grade": 1,
+  "group": "7",
+  "name": "Lead",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "legacyfirmware": {
+  "category": "Encoded",
+  "grade": 1,
+  "group": "Encoded Firmware",
+  "name": "Specialised Legacy Firmware",
+  "source": "Trade at an Encoded Material Trader (swaps within the Encoded Firmware group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "manganese": {
+  "category": "Raw",
+  "grade": 2,
+  "group": "3",
+  "name": "Manganese",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "mechanicalcomponents": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "Mechanical Components",
+  "name": "Mechanical Components",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Mechanical Components group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "mechanicalequipment": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "Mechanical Components",
+  "name": "Mechanical Equipment",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Mechanical Components group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "mechanicalscrap": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "Mechanical Components",
+  "name": "Mechanical Scrap",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Mechanical Components group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "mercury": {
+  "category": "Raw",
+  "grade": 3,
+  "group": "6",
+  "name": "Mercury",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "militarygradealloys": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "Thermic",
+  "name": "Military Grade Alloys",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Thermic group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "militarysupercapacitors": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "Capacitors",
+  "name": "Military Supercapacitors",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Capacitors group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "molybdenum": {
+  "category": "Raw",
+  "grade": 3,
+  "group": "2",
+  "name": "Molybdenum",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "nickel": {
+  "category": "Raw",
+  "grade": 1,
+  "group": "5",
+  "name": "Nickel",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "niobium": {
+  "category": "Raw",
+  "grade": 3,
+  "group": "1",
+  "name": "Niobium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "pharmaceuticalisolators": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "Chemical",
+  "name": "Pharmaceutical Isolators",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Chemical group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "phasealloys": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "Alloys",
+  "name": "Phase Alloys",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Alloys group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "phosphorus": {
+  "category": "Raw",
+  "grade": 1,
+  "group": "2",
+  "name": "Phosphorus",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "polonium": {
+  "category": "Raw",
+  "grade": 4,
+  "group": "6",
+  "name": "Polonium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "polymercapacitors": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "Capacitors",
+  "name": "Polymer Capacitors",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Capacitors group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "precipitatedalloys": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "Thermic",
+  "name": "Precipitated Alloys",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Thermic group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "protoheatradiators": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "Heat",
+  "name": "Proto Heat Radiators",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Heat group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "protolightalloys": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "Alloys",
+  "name": "Proto Light Alloys",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Alloys group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "protoradiolicalloys": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "Alloys",
+  "name": "Proto Radiolic Alloys",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Alloys group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "refinedfocuscrystals": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "Crystals",
+  "name": "Refined Focus Crystals",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Crystals group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "rhenium": {
+  "category": "Raw",
+  "grade": 1,
+  "group": "6",
+  "name": "Rhenium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "ruthenium": {
+  "category": "Raw",
+  "grade": 4,
+  "group": "3",
+  "name": "Ruthenium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "salvagedalloys": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "Alloys",
+  "name": "Salvaged Alloys",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Alloys group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "scanarchives": {
+  "category": "Encoded",
+  "grade": 2,
+  "group": "Data Archives",
+  "name": "Unidentified Scan Archives",
+  "source": "Trade at an Encoded Material Trader (swaps within the Data Archives group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "scandatabanks": {
+  "category": "Encoded",
+  "grade": 3,
+  "group": "Data Archives",
+  "name": "Classified Scan Databanks",
+  "source": "Trade at an Encoded Material Trader (swaps within the Data Archives group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "scrambledemissiondata": {
+  "category": "Encoded",
+  "grade": 1,
+  "group": "Emission Data",
+  "name": "Exceptional Scrambled Emission Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the Emission Data group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "securityfirmware": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "Encoded Firmware",
+  "name": "Security Firmware Patch",
+  "source": "Trade at an Encoded Material Trader (swaps within the Encoded Firmware group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "selenium": {
+  "category": "Raw",
+  "grade": 4,
+  "group": "4",
+  "name": "Selenium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "shieldcyclerecordings": {
+  "category": "Encoded",
+  "grade": 1,
+  "group": "Shield Data",
+  "name": "Distorted Shield Cycle Recordings",
+  "source": "Trade at an Encoded Material Trader (swaps within the Shield Data group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "shielddensityreports": {
+  "category": "Encoded",
+  "grade": 3,
+  "group": "Shield Data",
+  "name": "Untypical Shield Scans",
+  "source": "Trade at an Encoded Material Trader (swaps within the Shield Data group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "shieldemitters": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "Shielding",
+  "name": "Shield Emitters",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Shielding group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "shieldfrequencydata": {
+  "category": "Encoded",
+  "grade": 5,
+  "group": "Shield Data",
+  "name": "Peculiar Shield Frequency Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the Shield Data group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "shieldingsensors": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "Shielding",
+  "name": "Shielding Sensors",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Shielding group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "shieldpatternanalysis": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "Shield Data",
+  "name": "Aberrant Shield Pattern Analysis",
+  "source": "Trade at an Encoded Material Trader (swaps within the Shield Data group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "shieldsoakanalysis": {
+  "category": "Encoded",
+  "grade": 2,
+  "group": "Shield Data",
+  "name": "Inconsistent Shield Soak Analysis",
+  "source": "Trade at an Encoded Material Trader (swaps within the Shield Data group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "sulphur": {
+  "category": "Raw",
+  "grade": 1,
+  "group": "3",
+  "name": "Sulphur",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "symmetrickeys": {
+  "category": "Encoded",
+  "grade": 3,
+  "group": "Encryption Files",
+  "name": "Open Symmetric Keys",
+  "source": "Trade at an Encoded Material Trader (swaps within the Encryption Files group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "technetium": {
+  "category": "Raw",
+  "grade": 4,
+  "group": "2",
+  "name": "Technetium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "tellurium": {
+  "category": "Raw",
+  "grade": 4,
+  "group": "5",
+  "name": "Tellurium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "temperedalloys": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "Thermic",
+  "name": "Tempered Alloys",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Thermic group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "tg_biomechanicalconduits": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "None",
+  "name": "Bio-Mechanical Conduits",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "tg_compositiondata": {
+  "category": "Encoded",
+  "grade": 3,
+  "group": "None",
+  "name": "Thargoid Material Composition Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "tg_propulsionelement": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "None",
+  "name": "Propulsion Elements",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "tg_residuedata": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "None",
+  "name": "Thargoid Residue Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "tg_shipflightdata": {
+  "category": "Encoded",
+  "grade": 3,
+  "group": "None",
+  "name": "Ship Flight Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "tg_shipsystemsdata": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "None",
+  "name": "Ship Systems Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "tg_structuraldata": {
+  "category": "Encoded",
+  "grade": 2,
+  "group": "None",
+  "name": "Thargoid Structural Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "tg_weaponparts": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "None",
+  "name": "Weapon Parts",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "tg_wreckagecomponents": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "None",
+  "name": "Wreckage Components",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "thermicalloys": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "Thermic",
+  "name": "Thermic Alloys",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Thermic group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "tin": {
+  "category": "Raw",
+  "grade": 3,
+  "group": "4",
+  "name": "Tin",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "tungsten": {
+  "category": "Raw",
+  "grade": 3,
+  "group": "5",
+  "name": "Tungsten",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "uncutfocuscrystals": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "Crystals",
+  "name": "Flawed Focus Crystals",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Crystals group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "unknowncarapace": {
+  "category": "Manufactured",
+  "grade": 2,
+  "group": "None",
+  "name": "Thargoid Carapace",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "unknownenergycell": {
+  "category": "Manufactured",
+  "grade": 3,
+  "group": "None",
+  "name": "Thargoid Energy Cell",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "unknownenergysource": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "None",
+  "name": "Sensor Fragment",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "unknownorganiccircuitry": {
+  "category": "Manufactured",
+  "grade": 5,
+  "group": "None",
+  "name": "Thargoid Organic Circuitry",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "unknownshipsignature": {
+  "category": "Encoded",
+  "grade": 3,
+  "group": "None",
+  "name": "Thargoid Ship Signature",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "unknowntechnologycomponents": {
+  "category": "Manufactured",
+  "grade": 4,
+  "group": "None",
+  "name": "Thargoid Technological Components",
+  "source": "Trade at a Manufactured Material Trader (swaps within the None group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "unknownwakedata": {
+  "category": "Encoded",
+  "grade": 4,
+  "group": "None",
+  "name": "Thargoid Wake Data",
+  "source": "Trade at an Encoded Material Trader (swaps within the None group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "vanadium": {
+  "category": "Raw",
+  "grade": 2,
+  "group": "1",
+  "name": "Vanadium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "wakesolutions": {
+  "category": "Encoded",
+  "grade": 3,
+  "group": "Wake Scans",
+  "name": "Strange Wake Solutions",
+  "source": "Trade at an Encoded Material Trader (swaps within the Wake Scans group), or scan ship wakes, data points and megaships (the Jameson crash site at HIP 12099 is a classic data farm)."
+ },
+ "wornshieldemitters": {
+  "category": "Manufactured",
+  "grade": 1,
+  "group": "Shielding",
+  "name": "Worn Shield Emitters",
+  "source": "Trade at a Manufactured Material Trader (swaps within the Shielding group), or salvage High-Grade Emission signal sources and combat/mission rewards (Dav's Hope in Hyades Sector DR-V c2-23 is a reliable hand-farm)."
+ },
+ "yttrium": {
+  "category": "Raw",
+  "grade": 4,
+  "group": "1",
+  "name": "Yttrium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "zinc": {
+  "category": "Raw",
+  "grade": 2,
+  "group": "4",
+  "name": "Zinc",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ },
+ "zirconium": {
+  "category": "Raw",
+  "grade": 2,
+  "group": "7",
+  "name": "Zirconium",
+  "source": "Trade at a Raw Material Trader (swaps within its raw grid group), or surface-prospect metallic/rocky bodies (crystalline-shard sites yield grade 4-5)."
+ }
+}

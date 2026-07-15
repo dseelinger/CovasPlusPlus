@@ -215,6 +215,15 @@ Notes:
 - [ ] **Callout row:** trigger a proactive or route callout (§5.2/§5.3) → the last-callout row shows that line.
 - [ ] **Click-through (Windows):** move the mouse over the panel and click → the click lands on the window/game **behind** it (the HUD is non-interactive).
 - [ ] **Fail-soft:** it never blocks startup or the voice loop; with `[hud].enabled = false` no window appears and nothing is logged as an error.
+### 5.4 Blueprint / material sourcing (#66)  🎮 ED
+> Requires `[elite].enabled = true`. The material inventory comes from the journal `Materials`
+> event, written when you load into the game — so launch ED (any ship) before testing.
+- [ ] **Missing-mat gap:** *"What do I need for a grade 5 FSD?"* → names the grade-5 Increased Range recipe **and** the materials you're **short** on (not the full list), each with a sourcing hint. Cross-check a couple of counts against your in-game Inventory → Materials.
+- [ ] **Grade + blueprint phrasing:** *"What am I missing for grade 3 dirty drive tuning?"* → the grade-3 shortfall for that blueprint. Try a name-only form (*"increased range"*) and a module+grade form (*"grade 5 FSD"*).
+- [ ] **Disambiguation:** *"Grade 5 FSD"* alone (a module with several blueprints) → COVAS lists the candidate blueprints and asks which, rather than guessing.
+- [ ] **Have-everything path:** ask for a low grade whose mats you already hold → *"You have everything for a roll — nothing to farm."*
+- [ ] **Farm plan onto the checklist (the differentiator):** after a shortfall, *"Add these to my checklist."* → one objective per short material appears (name + count + where to farm). Open the [checklist](using/checklist.md) panel and confirm; tick one off.
+- [ ] **Honest when blind:** with ED not yet loaded (no `Materials` seen), the recipe is still spoken but COVAS says it hasn't read your materials yet.
 
 Notes:
 
