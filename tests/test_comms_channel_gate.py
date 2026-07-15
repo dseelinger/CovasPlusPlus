@@ -25,6 +25,7 @@ from covas.mixer.comms import (
     VOICE_DEFAULT,
     VOICE_FEMALE,
     VOICE_MALE,
+    is_channel_notice,
     npc_voice,
 )
 
@@ -95,6 +96,35 @@ def test_classifier_never_voices_a_real_player_broadcast():
     # The single invariant, asserted across every firehose channel with a CMDR sender.
     for channel in FIREHOSE:
         assert not classify(_rt(channel, from_localised="CMDR RandomStranger")).voiceable
+
+
+# ---- system channel-notification chrome is dropped (issue #56) -----------------------------
+
+def test_entering_channel_chrome_is_dropped_by_raw_token():
+    # ED posts this on every jump: raw "$COMMS_entered:..." on the npc channel. It must NOT voice.
+    ev = _rt("npc", from_localised="", from_raw="",
+             msg="$COMMS_entered:#name=Sol;")
+    ev["Message_Localised"] = "Entering channel Sol."
+    assert is_channel_notice(ev)
+    d = classify(ev)
+    assert not d.voiceable and d.kind == "dropped"
+    assert not capture(ev).voiceable
+
+
+def test_entering_channel_chrome_dropped_by_localised_fallback():
+    # An event carrying only the localised text (no raw token) is still recognised (English-only).
+    for text in ("Entering channel Shinrarta Dezhra.", "In channel LHS 3447"):
+        ev = {"event": "ReceiveText", "Channel": "npc", "From_Localised": "",
+              "Message_Localised": text}
+        assert is_channel_notice(ev)
+        assert not classify(ev).voiceable
+
+
+def test_real_npc_line_is_not_mistaken_for_channel_chrome():
+    # A genuine station/NPC line that merely mentions a channel elsewhere still voices normally.
+    ev = _rt("npc", from_localised="Station Control", msg="Switch to channel two for docking.")
+    assert not is_channel_notice(ev)
+    assert classify(ev).voiceable
 
 
 # ---- voice selection (deterministic, never random) -----------------------------------------

@@ -32,6 +32,8 @@ that's then validated and routed, never live audio. Two consequences you'll noti
   lightly varied, and only when validated.
 - **The Open-play firehose is dropped.** Local/wing chatter and anything it can't clearly attribute
   is *not* voiced — the gate fails closed. Repeated station lines aren't re-read every jump either.
+- **System chrome is dropped.** The game's own "Entering channel &lt;system&gt;." notification (posted
+  on every jump) is *not* voiced — it just narrates a jump you already made.
 
 ## Space chatter
 

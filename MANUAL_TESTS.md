@@ -450,6 +450,9 @@ on in config (or the Settings page) before testing.
   radio-treated comms bus. A **direct player DM** is read **verbatim** (fixed male voice). Confirm
   the Open-play **local/wing chatter is NOT voiced** (the fail-closed gate). Repeated station spam
   isn't re-read every jump (template dedup).
+- [ ] 🎮 **Jump to a new system** (with comms enabled) → the game's **"Entering channel &lt;system&gt;."**
+  notification is **NOT spoken** (issue #56 — jump chrome is dropped by the comms gate). Listen for its
+  absence on every jump regardless of population/settings.
 
 ### 18.3 Space chatter — populated-only + population-scaled frequency (C6)
 - [ ] 🎮 With `[audio.cues].enabled`, sit in a **populated** system → occasional ambient **chatter**

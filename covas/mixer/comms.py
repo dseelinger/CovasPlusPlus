@@ -53,6 +53,24 @@ _MALE_MARKERS = frozenset({
 
 _WORD = re.compile(r"[A-Za-z0-9']+")
 
+# ED's own system channel-notification CHROME — not NPC dialogue. On every jump the game posts a
+# ReceiveText whose raw Message is a "$COMMS_..." token (e.g. "$COMMS_entered:#name=Sol;",
+# localised "Entering channel Sol.") on the npc channel. Voicing it just narrates a jump the
+# Commander already made — useless noise (issue #56). Detected by the language-independent raw
+# token, with an English localised-text fallback (the app is English-only) for events that carry
+# only Message_Localised. Dropped outright, before classification.
+_CHANNEL_NOTICE = re.compile(r"^\s*(?:entering|in)\s+channel\b", re.IGNORECASE)
+
+
+def is_channel_notice(event: dict) -> bool:
+    """True for a system channel-entry notification ('Entering channel <System>.'), which is UI
+    chrome the game emits on a jump, not a real NPC line. Pure."""
+    if not isinstance(event, dict):
+        return False
+    if str(event.get("Message") or "").strip().lower().startswith("$comms_"):
+        return True
+    return bool(_CHANNEL_NOTICE.match(str(event.get("Message_Localised") or "")))
+
 
 @dataclass(frozen=True)
 class Decision:
@@ -124,6 +142,10 @@ def classify(event: dict) -> Decision:
     if not isinstance(event, dict):
         return _drop("", "not an event dict")
     channel = _norm_channel(event)
+
+    if is_channel_notice(event):
+        # Drop ED's own 'Entering channel <System>.' jump chrome — not a voiceable NPC line (#56).
+        return _drop(channel or "system", "system channel notification (jump chrome)")
 
     if channel == PLAYER:
         # A real human directly messaging the Commander — always read, exactly, fixed male voice
