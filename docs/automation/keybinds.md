@@ -48,6 +48,40 @@ Three voice commands are involved:
 | `confirm_keybind` | Confirms and executes the armed action (refused in the same turn it was armed) |
 | `abort_keybinds` | Hard abort — cancels anything armed and releases every held key |
 
+## Tier-1 flight & navigation actions (#30)
+
+Beyond landing gear, COVAS++ ships a **flight/navigation** action batch. Every action is still
+behind the full safety layer, and **none are on by default** — add the ones you want to
+`[keybinds].allowlist`, and bind each to a **key** in Elite Dangerous. Consequential actions
+(starting a jump, engaging supercruise, flipping flight assist) still **arm-and-confirm** on a
+separate command; benign, repeatable ones (throttle, target cycling, nav-lock) **fire
+immediately** — but only after the allowlist, combat guard, and mode gate pass.
+
+| Voice action (allowlist name) | Does | Mode | Confirm? |
+|---|---|---|---|
+| `throttle_zero` / `throttle_50` / `throttle_100` | Set throttle to 0 / 50% / full | ship or fighter | fires immediately |
+| `frame_shift_drive` | Engage the FSD (supercruise, or jump if a system is targeted) | ship | arm-and-confirm |
+| `supercruise` | Engage supercruise | ship | arm-and-confirm |
+| `hyperspace` | Jump to the targeted system | ship | arm-and-confirm |
+| `flight_assist` | Toggle flight assist | ship or fighter | arm-and-confirm |
+| `select_target_ahead` | Target the ship directly ahead | ship or fighter | fires immediately |
+| `cycle_next_target` / `cycle_previous_target` | Cycle through targets | ship or fighter | fires immediately |
+| `target_next_route_system` | Target the next system in your route | ship | fires immediately |
+| `nav_lock` | Toggle nav lock | ship | fires immediately |
+
+**To enable, for example:**
+
+```toml
+[keybinds]
+enabled = true
+allowlist = ["landing_gear", "throttle_zero", "cycle_next_target", "target_next_route_system"]
+```
+
+Then bind the matching controls in ED (throttle sets under *Flight Throttle*, targeting under
+*Targeting*, FSD/supercruise under *Flight Miscellaneous*). Anything you leave off the allowlist
+won't be offered or run, even if you ask for it. Consequential actions still need a separate
+"confirm"; the combat guard and mode gate apply to all of them.
+
 ## It reads *your* bindings
 
 COVAS++ reads your **actual** Elite Dangerous key bindings (it resolves your active preset and pulls
