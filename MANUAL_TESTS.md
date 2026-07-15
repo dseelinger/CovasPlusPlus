@@ -396,6 +396,19 @@ Notes:
 
 Notes:
 
+## 9a. Stored ships & modules finder (issue #67)  🎮 ED 🔊 HW 📋 clipboard
+> `[elite].enabled = true`. **Dock at a station with a shipyard AND outfitting first** so the game writes the `StoredShips` / `StoredModules` events — the data (and the transfer quotes) are as of that last dock. Cross-check the spoken transfer figures against the in-game Shipyard / Outfitting transfer screen — they should match exactly.
+- [ ] **Locate a stored ship:** *"Where's my \<ship\>?"* (one you have parked elsewhere) → names its **system** and speaks the **transfer cost + time**, then **copies** that system to the clipboard (paste to confirm). Numbers match the in-game transfer screen.
+- [ ] **Ship that's here:** *"Where's my \<ship\>?"* for one stored **at your current station** → "it's here, no transfer needed" and does **NOT** copy anything.
+- [ ] **Already-there rule:** ask for a stored ship while you're **in the system it's stored in** → it says you're already there and does **NOT** copy.
+- [ ] **Stored-fleet rundown:** *"What ships do I have in storage?"* → a count plus which are here vs. elsewhere (with systems).
+- [ ] **Locate a stored module:** *"Where's my spare \<module\>?"* (e.g. fuel scoop, shield generator, FSD) → its **system** + **transfer cost/time**, copying the system unless you're already there. In-transit items report "in transit".
+- [ ] **Stored-modules rundown:** *"What modules do I have stored?"* → grouped here / elsewhere / in transit.
+- [ ] **Honest miss:** ask for a ship/module you have **not** stored → it says it doesn't see one and **lists what you actually have** (never invents a location).
+- [ ] **Not seen yet:** ask before docking at a shipyard/outfitting this session → it says to dock at one first (no crash).
+
+Notes:
+
 ## 10. Community Goals (N6)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
 > Journal-primary (works offline for CGs you've visited). Add an **Inara API key** (Settings API keys card, stored encrypted in `InaraAPIKey.txt`) to also surface CGs you HAVEN'T visited. Visit a CG board in-game first so the journal has your standing.
 - [ ] **List:** *"List the community goals."* → active CGs (title + system + expiry). With an Inara key, ones you haven't visited are flagged ("…one in <system> you haven't visited yet").

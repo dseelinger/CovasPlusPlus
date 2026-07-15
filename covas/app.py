@@ -379,6 +379,8 @@ class App:
                              resolve_journal_dir, status_path)
             from .capabilities.ed_context_capability import EDContextCapability
             from .capabilities.loadout_capability import LoadoutCapability
+            from .capabilities.stored_capability import StoredCapability
+            from .nav import copy as _nav_copy
 
             el = self.cfg.get("elite", {})
             jdir = resolve_journal_dir(self.cfg)
@@ -389,6 +391,15 @@ class App:
             self.registry.register(LoadoutCapability(
                 get_loadout=self.ed_ctx.loadout_snapshot,
                 log=lambda m: self._log("loadout", m)))
+            # Stored ships & modules finder (issue #67): reads the StoredShips/StoredModules
+            # snapshots the journal watcher keeps on EDContext. Copies a destination system to
+            # the clipboard for a resolved remote ship/module (galaxy-map handoff).
+            self.registry.register(StoredCapability(
+                get_stored_ships=self.ed_ctx.stored_ships_snapshot,
+                get_stored_modules=self.ed_ctx.stored_modules_snapshot,
+                get_current_system=self._current_system,
+                clipboard=_nav_copy,
+                log=lambda m: self._log("stored", m)))
             self._start_carriers(jdir)
             self._start_cg(jdir)
 
