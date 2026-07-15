@@ -74,9 +74,9 @@ Want the same neural voices as Edge, but **dependable**? Set `[tts].provider = "
 that comfortably covers a lot of talking before any spend. It's the shippable, no-asterisk way to give
 the [voice cast](../audio/ambient-audio.md#voices-for-the-cast) big voice variety at low/zero cost.
 
-Setup: create a **Speech** resource in the Azure portal, then provide its **key** (set the
-`AZURE_SPEECH_KEY` environment variable, or paste it into `AzureSpeechKey.txt`) and its **region**
-(`[azure].region`, e.g. `eastus`). Pick a voice ShortName in `[azure].voice` (same names as Edge), and
+Setup: create a **Speech** resource in the Azure portal, then provide its **key** (enter it on the
+Settings **API keys** card, or paste it into `AzureSpeechKey.txt` — stored DPAPI-encrypted at rest)
+and its **region** (`[azure].region`, e.g. `eastus`). Pick a voice ShortName in `[azure].voice` (same names as Edge), and
 optionally an SSML speaking style in `[azure].style` (e.g. `cheerful`, `newscast` — voice-dependent).
 If the key/region is missing or the service errors, the persona degrades to text and cast voices fall
 silent — it never crashes the loop.
@@ -85,8 +85,8 @@ silent — it never crashes the loop.
 
 Set `[tts].provider = "openai"` to speak through an **OpenAI-compatible** `audio/speech` endpoint — a
 **cheap** cloud voice with a small, fixed voice set (great as a persona, or a supplemental cast voice).
-Provide `OPENAI_API_KEY` (env var, or paste into `OpenAIAPIKey.txt` — the same key a future OpenAI LLM
-provider will use). Pick a voice in `[openai_tts].voice` (`alloy`, `nova`, `shimmer`, …), a model in
+Provide the key on the Settings **API keys** card (or paste it into `OpenAIAPIKey.txt` — stored
+DPAPI-encrypted at rest; the same key a future OpenAI LLM provider will use). Pick a voice in `[openai_tts].voice` (`alloy`, `nova`, `shimmer`, …), a model in
 `[openai_tts].model` (`gpt-4o-mini-tts` is cheap; `tts-1` also works), and optionally a tone steer in
 `[openai_tts].instructions` (honored by newer models). `[openai_tts].base_url` is configurable, so any
 OpenAI-compatible endpoint works. A missing key or service error degrades the persona to text (cast
@@ -98,7 +98,8 @@ Want the **snappiest** persona voice? Set `[tts].provider = "cartesia"` to use *
 premium alternative to ElevenLabs tuned for very low **time-to-first-audio**, which is what a live
 companion feels most. It **streams**, so COVAS starts talking sooner. This is a **persona-only** voice —
 it's deliberately *not* offered for the NPC/comms/chatter cast (it's premium, and its value is the live
-reply, not background chatter). Provide `CARTESIA_API_KEY` (env var or `CartesiaAPIKey.txt`) and a
+reply, not background chatter). Provide the key on the Settings **API keys** card (or paste it into
+`CartesiaAPIKey.txt` — stored DPAPI-encrypted at rest) and a
 **voice id** in `[cartesia].voice` (browse the library at [play.cartesia.ai](https://play.cartesia.ai)
 or `GET https://api.cartesia.ai/voices`); set the model in `[cartesia].model` (e.g. `sonic-2`). A
 missing key/voice or service error degrades the persona to text — it never crashes the loop.

@@ -349,8 +349,10 @@ file    = "personality.txt"
 
 
 [elevenlabs]
-# API key is read from this file (not stored here). Git-ignored; copy
-# ElevenLabsAPIKey.txt.example to ElevenLabsAPIKey.txt and paste your key.
+# API key file (git-ignored). The first-run wizard / Settings "API keys" card write the key here,
+# ENCRYPTED at rest with Windows DPAPI (the file holds "DPAPI:<blob>", not plaintext; a legacy
+# plaintext key — or one you paste into ElevenLabsAPIKey.txt yourself — is migrated to encrypted on
+# first read). Env vars are NOT read for keys (#22). Never commit it.
 api_key_file = "ElevenLabsAPIKey.txt"
 # TTS model + voice. Voice id is what actually gets used; name is for display.
 model      = "eleven_flash_v2_5"

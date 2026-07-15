@@ -162,7 +162,9 @@ python -m venv .venv
 # 2. Secrets & personal files (copies of the .example templates)
 Copy-Item ElevenLabsAPIKey.txt.example ElevenLabsAPIKey.txt   # paste your key (cloud TTS only)
 Copy-Item personality.example.txt personality.txt             # make the character yours
-#   ANTHROPIC_API_KEY: set as a Windows *User* environment variable (cloud LLM only)
+Set-Content AnthropicAPIKey.txt 'sk-ant-...'                  # paste your key (cloud LLM, required)
+#   Keys are DPAPI-encrypted at rest on first read — never stored plaintext, never read from env vars.
+#   Easier: skip this and enter keys in the first-run wizard / Settings "API keys" card.
 
 # 3. (Optional) sound cues: drop your own .wav files in sounds/ — see config.toml
 
@@ -254,7 +256,7 @@ fully exercised in CI.
 | `config.toml` | All defaults, commented. Portable. |
 | `overrides.json` | *(git-ignored)* live UI/voice changes, layered over `config.toml`. |
 | `personality.txt` / `campaign.txt` | *(git-ignored)* your character + personal Commander facts. |
-| `ElevenLabsAPIKey.txt` | *(git-ignored)* your ElevenLabs key. |
+| `AnthropicAPIKey.txt` / `ElevenLabsAPIKey.txt` | *(git-ignored)* your provider keys, DPAPI-encrypted at rest. |
 | `DESIGN_AND_ROADMAP.md` | Architecture, cost strategy, and build status. |
 | `CLAUDE.md` | Repo context/conventions. |
 
@@ -262,12 +264,19 @@ fully exercised in CI.
 
 ## Keys & secrets
 
-- **`ANTHROPIC_API_KEY`** — a Windows *User* environment variable. Never stored in a file. *(Cloud LLM only.)*
-- **ElevenLabs key** — read from `ElevenLabsAPIKey.txt` (git-ignored). *(Cloud TTS only.)*
-- **Inara key** (optional) — for the full Community Goals list; lives in `config.toml` or `overrides.json`.
+Enter keys in the **first-run wizard** or the Settings **API keys** card (or paste them into the
+git-ignored files below). Every key is **encrypted at rest with Windows DPAPI** (`CurrentUser`
+scope) — never stored plaintext, and **environment variables are no longer read for keys** (#22).
+A plaintext key you drop into a file is migrated to an encrypted `DPAPI:<blob>` on first read; a
+blob won't decrypt on a different machine/account, so re-enter keys after a move.
+
+- **Anthropic key** — `AnthropicAPIKey.txt` (git-ignored). **Required.** *(Cloud LLM.)*
+- **ElevenLabs key** — `ElevenLabsAPIKey.txt` (git-ignored). *(Cloud TTS only.)*
+- **Inara key** (optional) — for the full Community Goals list; `InaraAPIKey.txt` (git-ignored).
 
 This is a public repo: API keys, personality/campaign files, logs, checklists, sounds, voice
-models, and `overrides.json` are all git-ignored. Keep them that way.
+models, and `overrides.json` are all git-ignored. Keep them that way. Tip: create **spend-capped
+or restricted keys** at each provider as defense-in-depth.
 
 ---
 
