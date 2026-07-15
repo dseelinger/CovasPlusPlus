@@ -3,6 +3,30 @@
   "app": "COVAS++",
   "tests": [
     {
+      "id": "build-version-check",
+      "title": "Correct build under test",
+      "section": "0. Preflight",
+      "tags": [
+        "GUI"
+      ],
+      "requires": "You installed the release intended for this test pass.",
+      "expected": "The control panel version banner shows the build under test (0.10.1), so every result maps to the right code. A stale install must never masquerade as a bug.",
+      "steps": [
+        {
+          "id": "s1",
+          "text": "Open the control panel (http://127.0.0.1:8765) or the packaged app window."
+        },
+        {
+          "id": "s2",
+          "text": "Confirm the version banner reads 0.10.1 - it must match the installer you just ran."
+        },
+        {
+          "id": "s3",
+          "text": "If it does NOT match, STOP and install the correct build first - results from a stale build are invalid."
+        }
+      ]
+    },
+    {
       "id": "hud-companion-overlay",
       "title": "Companion HUD overlay: transparent always-on-top panel, state/checklist/route/callout rows, click-through (issue #47)",
       "section": "5a. Companion HUD overlay",
