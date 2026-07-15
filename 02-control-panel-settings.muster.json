@@ -292,7 +292,7 @@
         "FILE"
       ],
       "requires": "Panel open at http://127.0.0.1:8765/settings.",
-      "expected": "The Settings page renders grouped sections with the right control per type + inline help, filters live, saves to `overrides.json` (config.toml pristine) with a per-setting RESET, rejects out-of-range values, and reloads Whisper live.",
+      "expected": "The Settings page renders grouped sections with the right control per type + inline help, filters live, saves to `overrides.json` (config.toml pristine) with a visible \"Settings saved.\" acknowledgement and a per-setting RESET, rejects out-of-range values, and reloads Whisper live.",
       "steps": [
         {
           "id": "s1",
@@ -304,7 +304,7 @@
         },
         {
           "id": "s3",
-          "text": "Change + save: change a value → the save bar appears with a count; SAVE CHANGES → written to `overrides.json` (config.toml stays pristine)."
+          "text": "Change + save: change a value → the save bar appears with a count; SAVE CHANGES → written to `overrides.json` (config.toml stays pristine) AND a visible \"Settings saved.\" acknowledgement (toast, top-right) appears confirming success."
         },
         {
           "id": "s4",
