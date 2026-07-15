@@ -10,5 +10,6 @@ from . import ship           # noqa: F401 — imported for the register() side e
 from . import ship_systems   # noqa: F401 — Tier-1 ship-systems batch (#31)
 from . import flight         # noqa: F401 — Tier-1 flight/nav batch (#30)
 from . import on_foot        # noqa: F401 — Odyssey on-foot batch (#34)
+from . import srv            # noqa: F401 — SRV / buggy batch (#35)
 
-__all__ = ["ship", "ship_systems", "flight", "on_foot"]
+__all__ = ["ship", "ship_systems", "flight", "on_foot", "srv"]

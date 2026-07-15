@@ -251,6 +251,17 @@ Notes:
 - [ ] **Combat guard on foot:** get into **danger** on foot, ask to toggle flashlight → **refused** (benign still guarded). With `[elite]` OFF it also refuses.
 - [ ] **Off-allowlist refusal:** ask for an on-foot macro you did **not** add to the allowlist → won't do it.
 - [ ] **Ship control hidden on foot (regression):** while on foot, *"toggle landing gear"* → **refused** and not offered (proves the gate both ways).
+### 6.1a SRV / buggy controls (#35 — `[keybinds].enabled = true`, allowlist the SRV macros)
+> New SRV batch. Add the ones you want to `[keybinds].allowlist`, e.g. `["landing_gear", "drive_assist", "srv_headlights", "srv_night_vision", "srv_cargo_scoop", "srv_auto_brake", "recall_ship"]`. Bind the matching **Buggy** controls to keys in ED. **Deploy the SRV first** (drive the buggy) — these are offered ONLY while driving.
+- [ ] **Benign toggle fires immediately (in SRV):** while **driving the SRV**, say *"COVAS, turn on the headlights."* → headlights toggle **right away** (no separate confirm needed); same for *"toggle drive assist"*, *"night vision"*, *"cargo scoop"*, *"auto-brake"*. Log shows e.g. `executed srv_headlights -> <Key>`.
+- [ ] **Recall ship arms-and-confirms:** in the SRV, *"recall my ship."* → says it's **armed but not done**; confirm on a **separate** turn (*"confirm"*) → the ship recall/dismiss fires. Same-turn confirm is refused.
+- [ ] **Mode gating — not in the SRV:** back **in the main ship** (or on foot), ask for any SRV control (*"headlights"*, *"recall my ship"*) → **refused** with an "only works in the SRV" style message, and the SRV actions aren't offered.
+- [ ] **Mode gating — exit SRV after arming recall:** in the SRV, **arm** `recall_ship`; before confirming, **board your ship** (leave the SRV); then *"confirm"* → **refused** (mode re-checked at confirm), nothing fires.
+- [ ] **Combat guard:** in the SRV, get **into danger**, then ask for any SRV toggle → **refuses**. With `[elite]` OFF it also refuses.
+- [ ] **Off-allowlist refusal:** ask for an SRV control you did **not** allowlist → won't do it. Weapons/turret are never offered.
+- [ ] **Unbound control:** if a Buggy control (e.g. Night Vision) is HOTAS/mouse-only → COVAS says to bind it to a key; nothing fires.
+
+Notes:
 
 ### 6.2 Auto-honk (N5 + K2 — `[honk].enabled = true`, **on by default**)
 > Fires the Discovery Scanner shortly after you jump into a **new** system — no button press, and **no fire-group setup**. Bind the Discovery Scanner's fire to a **key** in ED (a HOTAS/mouse-only bind can't be pressed; a keyboard secondary, even with a modifier, is fine). At launch the log reports "Auto-honk ON …" or a "bind it in-game" warning.

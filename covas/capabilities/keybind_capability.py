@@ -199,10 +199,10 @@ class KeybindCapability:
         return HelpMeta(
             category="ship controls",
             group="your ship",
-            one_liner=("I can toggle your landing gear on a separate spoken confirmation, and — "
-                       "when you're on foot — press benign suit controls like your flashlight or "
-                       "night vision (only the actions you've allowlisted, always mode-aware, "
-                       "with a combat safety check). Say 'abort' any time to cancel."),
+            one_liner=("I can press the ship, SRV, and on-foot controls you've allowlisted — "
+                       "landing gear, throttle, ship-systems toggles, panels, suit tools, buggy "
+                       "controls — always mode-aware and behind a combat safety check. Disruptive "
+                       "actions need a separate spoken confirmation; say 'abort' to cancel."),
             example="toggle my landing gear",
         )
 
