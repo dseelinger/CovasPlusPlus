@@ -285,6 +285,25 @@ Notes:
 - [ ] **Squadron carrier:** *"Where's my squadron carrier?"* → explains it's only available **in-game** on the Squadron menu's Carrier Management tab (may name your squadron); it does **not** attempt a lookup or copy.
 - [ ] **Already-there rule:** ask for the fleet carrier while you're **in the carrier's system** → it says you're already there and does **NOT** copy to the clipboard.
 
+### 9.1 Fleet-carrier context voices (issue #19)  🎮 ED 🔊 HW
+> Needs `[audio].enabled = true` (restart to apply) + `[audio.carrier].enabled = true` (on by
+> default). Roles + voices are under `[audio.carrier.captain|tower|chatter]`. The context is pinned
+> to your carrier's `CarrierID`, so a **squadron/other** carrier must **not** trigger it.
+- [ ] **Aboard your own carrier:** dock at the carrier you **own** → within a minute or two you hear
+      the **Captain**, **Tower Control**, and/or **deck chatter** on the radio-treated comms bus,
+      each in a **different voice** from COVAS and from each other. Lines are spoken, never text.
+- [ ] **In-system (not docked):** be in the carrier's **home system** without docking → the
+      **Captain** greets you from across the system; **Tower Control** does **not** speak (docking
+      control is docked-only).
+- [ ] **Away:** somewhere that is **not** your carrier's system and not docked at it → **no** carrier
+      voices at all.
+- [ ] **Not a squadron carrier:** dock at a **squadron** or someone else's carrier → the carrier
+      voices stay **silent** (identity mismatch), while normal station/NPC comms still work.
+- [ ] **Configured voice + name:** set `[audio.carrier.captain].voice_ref` and `name` (e.g.
+      "Reynolds"), restart → the Captain now uses **that** voice and the name is woven into the lines.
+- [ ] **Voice control:** *"mute the carrier"* → carrier voices stop; *"carrier voices on"* → they
+      resume. *"silence all the background audio"* also mutes them. Your own replies are unaffected.
+
 Notes:
 
 ## 10. Community Goals (N6)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET

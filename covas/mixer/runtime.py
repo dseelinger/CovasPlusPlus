@@ -21,6 +21,7 @@ from typing import Callable, Optional
 
 from ..capabilities.base import HelpMeta, Slot
 from .buses import ALERT, AMBIENT, COMMS, COVAS, MUSIC
+from .carrier import CarrierPlayer, build_carrier_config, carrier_cues
 from .chatter import ChatterPlayer, chatter_cues, chatter_interval
 from .comms import capture
 from .content import (
@@ -137,12 +138,21 @@ class AudioLayer:
         self.sfx_on = self.chatter_on
         self.comms_on = bool((audio.get("comms", {}) or {}).get("enabled", True))
         self.music_on = bool((cfg.get("music", {}) or {}).get("enabled", False))
+        # Fleet-carrier context voices (issue #19) — captain/tower/carrier-chatter, gated on being
+        # at/near the OWN carrier. Independently toggleable; default on (they're naturally silent
+        # unless you own a carrier and are there).
+        self._carrier_cfg = build_carrier_config(cfg)
+        self.carrier_on = self._carrier_cfg.enabled
         self.muted = False
 
         # Cues: chatter + SFX in one registry the driver governs, with drop-in content overlaid
-        # (folder SFX samples / chatter line files replace the shipped defaults when present).
+        # (folder SFX samples / chatter line files replace the shipped defaults when present). The
+        # carrier context cues (#19) register straight in — they have curated pools + a voice_role,
+        # so they're out of the drop-in overlay path.
         self._registry = CueRegistry()
         for cue in overlay_cues(list(chatter_cues()) + list(sfx_cues(cfg)), self._content):
+            self._registry.register(cue)
+        for cue in carrier_cues():
             self._registry.register(cue)
         # The governor only THROTTLES (cooldowns + global rate) here — the audio layer's own
         # per-category flags are the on/off gates, so force it enabled (its [audio.cues].enabled
@@ -159,6 +169,10 @@ class AudioLayer:
         self._chatter = ChatterPlayer(self._speak_bus, generate=chatter_gen,
                                       min_interval=self._chatter_interval, clock=clock)
         self._sfx = SfxPlayer(self._play_sample)
+        # Carrier context voices (#19): each role speaks its own configured voice (or a stable
+        # cast-pool fallback) with its display name woven in. Pool-only (fact-safe), no LLM.
+        self._carrier = CarrierPlayer(self._submit_voice, self._carrier_voice,
+                                      names=self._carrier_cfg.name_map(), log=self._log)
         self._driver = CueDriver(self._registry, self._engine, self._governor,
                                  self._dispatch_play, context=ed_ctx, clock=clock)
 
@@ -211,6 +225,21 @@ class AudioLayer:
         except Exception:  # noqa: BLE001
             return None
 
+    # -- own-carrier location context (#19) -------------------------------------
+    def _refresh_carrier_context(self) -> None:
+        """Fold the live 'am I at / near my own carrier' context into the eligibility engine so the
+        carrier voices become eligible there. Read from EDContext (updated by the journal watcher
+        before the event reaches us), on every ed_event, so docking/undocking tracks immediately."""
+        if self._ed_ctx is None:
+            return
+        try:
+            self._engine.note_carrier(
+                at_own=bool(self._ed_ctx.at_own_carrier()),
+                near_own=bool(self._ed_ctx.near_own_carrier()),
+            )
+        except Exception:  # noqa: BLE001 — a context glitch must never break the pump
+            pass
+
     # -- routing helpers (all fail soft) ----------------------------------------
     def _submit_voice(self, voice, text: str, bus: str) -> bool:  # noqa: ANN001 — a Voice
         """Synthesize `text` with a cast Voice (routed to its provider) and play it on `bus`."""
@@ -237,6 +266,15 @@ class AudioLayer:
         """Speak a chatter line on its bus with a FRESH RANDOM cast voice per line, so the ambient
         radio sounds like many different anonymous speakers."""
         return self._submit_voice(self._chatter_voices.random(), text, bus)
+
+    def _carrier_voice(self, role: str):  # noqa: ANN201 — a Voice
+        """The Voice for a carrier role (#19): the one configured under `[audio.carrier].<role>`,
+        else a deterministic distinct cast-pool voice (stable per role) so captain/tower/chatter
+        still sound like separate people with zero configuration."""
+        cr = self._carrier_cfg.roles.get(role)
+        if cr is not None and cr.voice is not None:
+            return cr.voice
+        return self._cast.assign(f"carrier:{role}")
 
     def _comms_play(self, text: str, record) -> bool:  # noqa: ANN001 — a VoiceableComms
         """Voice a gated comms line with a random-but-sticky voice: a real player keeps one voice
@@ -266,6 +304,10 @@ class AudioLayer:
     def _dispatch_play(self, cue) -> bool:  # noqa: ANN001 — the driver's play callback
         if self.muted:
             return False
+        # A carrier cue (voice_role set) speaks in its role's dedicated voice — checked first since
+        # it also carries phrasings (which would otherwise route to the anonymous chatter path).
+        if getattr(cue, "voice_role", ""):
+            return self._carrier(cue) if self.carrier_on else False
         if cue.samples:
             return self._sfx(cue) if self.sfx_on else False
         if cue.phrasings:
@@ -317,12 +359,13 @@ class AudioLayer:
                 self._interdiction.on_event(event)
             # State-driven layers.
             self._engine.note_event(event)
+            self._refresh_carrier_context()
             if self.muted:
                 return
             if self.music_on:
                 states = self._engine.states(fuel_pct=self._fuel())
                 self._realize_music(self._music.update(states))
-            if self.chatter_on or self.sfx_on:
+            if self.chatter_on or self.sfx_on or self.carrier_on:
                 self._driver.tick()
         except Exception as e:  # noqa: BLE001 — the audio layer must never take down the pump
             self._log(f"audio layer error: {e}")
@@ -355,6 +398,11 @@ class AudioLayer:
         if not self.music_on:
             self.mixer.clear_bus(MUSIC)
         return self.music_on
+
+    def set_carrier(self, on: bool) -> bool:
+        """Toggle the fleet-carrier context voices (captain/tower/carrier chatter, #19)."""
+        self.carrier_on = bool(on)
+        return self.carrier_on
 
     def bump_music_volume(self, delta_db: float) -> float:
         """Nudge the music bus volume (dB), clamped to a sane range, and apply it live."""
@@ -391,6 +439,10 @@ class AudioLayer:
         self.sfx_on = self.chatter_on
         self.set_comms(bool((audio.get("comms", {}) or {}).get("enabled", True)))
         self.set_music(bool((self.cfg.get("music", {}) or {}).get("enabled", False)))
+        # Re-read the carrier roles (voices/names/enable) so a Settings change applies live (#19).
+        self._carrier_cfg = build_carrier_config(self.cfg)
+        self.set_carrier(self._carrier_cfg.enabled)
+        self._carrier.set_names(self._carrier_cfg.name_map())
         self._interdiction.set_enabled(
             bool((audio.get("interdiction", {}) or {}).get("enabled", False)))
 
@@ -401,17 +453,19 @@ _AUDIO_TOOLS = [
         "name": "control_ambient_audio",
         "description": (
             "Turn the atmospheric AUDIO LAYER on or off by part: the ambient SPACE CHATTER, the "
-            "COMMS voices (NPC/station/player radio), the ambient MUSIC (louder/quieter/off/on), "
-            "or ALL ambient audio at once. Use when the Commander says things like 'mute the "
-            "chatter', 'quiet the comms', 'turn the music up', 'turn the music down', 'stop the "
-            "music', 'silence all the background audio', or 'turn the ambient audio back on'. This "
-            "does NOT affect your own spoken replies — only the background/atmosphere layer."
+            "COMMS voices (NPC/station/player radio), the FLEET-CARRIER voices (your carrier's "
+            "captain, tower control, and deck chatter when you're at your own carrier), the ambient "
+            "MUSIC (louder/quieter/off/on), or ALL ambient audio at once. Use when the Commander "
+            "says things like 'mute the chatter', 'quiet the comms', 'silence the carrier', 'mute "
+            "my carrier captain', 'turn the music up', 'turn the music down', 'stop the music', "
+            "'silence all the background audio', or 'turn the ambient audio back on'. This does NOT "
+            "affect your own spoken replies — only the background/atmosphere layer."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "target": {"type": "string",
-                           "enum": ["chatter", "comms", "music", "all"],
+                           "enum": ["chatter", "comms", "carrier", "music", "all"],
                            "description": "Which part of the ambient audio to control."},
                 "action": {"type": "string",
                            "enum": ["on", "off", "up", "down"],
@@ -460,6 +514,9 @@ class AudioControlsCapability:
             if target == "chatter":
                 self.layer.set_chatter(action == "on")
                 return "Space chatter on." if action == "on" else "Space chatter muted."
+            if target == "carrier":
+                self.layer.set_carrier(action == "on")
+                return "Carrier voices on." if action == "on" else "Carrier voices muted."
             return f"I can't control '{target}'."
         except Exception as e:  # noqa: BLE001 — a control glitch must never crash the loop
             self._log(f"audio control error: {e}")
@@ -468,14 +525,16 @@ class AudioControlsCapability:
     def help_meta(self) -> HelpMeta:
         return HelpMeta(
             category="ambient audio",
-            one_liner="Control the atmospheric audio layer — space chatter, comms voices, and music.",
+            one_liner=("Control the atmospheric audio layer — space chatter, comms voices, your "
+                       "fleet carrier's voices, and music."),
             example="mute the chatter",
             group="settings",
             slots=(
                 Slot(param="target",
-                     phrasings=("the chatter", "the comms", "the music", "all ambient audio"),
+                     phrasings=("the chatter", "the comms", "the carrier", "the music",
+                                "all ambient audio"),
                      example="turn the music down",
-                     help_text="Pick what to control: chatter, comms, music, or all of it."),
+                     help_text="Pick what to control: chatter, comms, carrier, music, or all of it."),
                 Slot(param="action",
                      phrasings=("on", "off", "up", "down", "mute", "quiet", "stop"),
                      example="stop the music",

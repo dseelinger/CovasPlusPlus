@@ -127,6 +127,43 @@ max_seconds = 240.0       # slowest gap (barely-populated system)
 # chatter and small outposts near the slow end. Lower it to make more systems feel "busy".
 full_population = 1000000000
 
+[audio.carrier]
+# Fleet-carrier context voices (issue #19). When you're at (or in the same system as) the fleet
+# carrier you OWN, three named roles bring it to life on the radio-treated comms bus, each with its
+# OWN configurable voice and display name: the Captain (welcome/status flavor, in-system + aboard),
+# Tower Control (docking/traffic flavor, while docked), and anonymous carrier chatter (deck/crew
+# buzz, while docked). Every line is from a curated pool (never the LLM), and literal docking
+# messages still come through the normal comms voices — this layer is pure atmosphere on top.
+#
+# Requires [audio].enabled + [elite].enabled (the "at my own carrier" context is derived from the
+# journal). The voices are naturally SILENT unless you own a carrier and are there, so this is on
+# by default. Say "mute the carrier" / "carrier voices on" to toggle at runtime.
+enabled = true
+# Each role below takes:
+#   name          — the spoken display name, woven into the role's lines (Captain / Tower Control).
+#   voice_ref     — the voice: an ElevenLabs voice_id or a Piper .onnx path. BLANK = a distinct,
+#                   stable voice auto-picked from the cast pool, so each role still sounds like a
+#                   different person with zero setup.
+#   voice_provider — optional; the TTS provider for this role ("elevenlabs" / "piper" / "edge" /
+#                   "azure" / "openai"). Blank = the [audio.voices.providers] override for the role,
+#                   else the cast provider. Any registered provider works.
+#   gender        — optional hint ("male" / "female" / "neutral") for the auto-picked fallback.
+[audio.carrier.captain]
+name           = "Captain"
+voice_ref      = ""
+voice_provider = ""
+gender         = "neutral"
+[audio.carrier.tower]
+name           = "Tower Control"
+voice_ref      = ""
+voice_provider = ""
+gender         = "neutral"
+[audio.carrier.chatter]
+name           = ""
+voice_ref      = ""
+voice_provider = ""
+gender         = "neutral"
+
 [audio.sfx]
 # Ambient SFX cues (C8): local samples (git-ignored, supply your own) on the ambient bus,
 # eligibility-gated (hyperspace / deep space). Each is a LIST of sample paths; empty = silent.

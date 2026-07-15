@@ -291,12 +291,16 @@ The optional [atmospheric audio layer](audio/ambient-audio.md). **All off by def
 | `audio.comms.enabled` | `true` | Comms voices (within the layer) |
 | `music.enabled` | `false` | Ambient music (needs local track files) |
 | `audio.interdiction.enabled` | `false` | The layered pirate-interdiction cue |
+| `audio.carrier.enabled` | `true` | [Fleet-carrier voices](audio/ambient-audio.md#fleet-carrier-voices) (captain/tower/chatter) — silent unless you're at your own carrier |
+| `audio.carrier.<role>.name` | *(role default)* | Display name woven into the role's lines (`captain` → "Captain", `tower` → "Tower Control") |
+| `audio.carrier.<role>.voice_ref` | *(unset)* | Voice for the role (EL voice_id / Piper `.onnx`); blank = a distinct stable cast-pool voice |
+| `audio.carrier.<role>.voice_provider` | *(unset)* | TTS provider for the role; blank = its `[audio.voices.providers]` override, else `cast_provider` |
 | `audio.buses.*.volume_db` | *(varies)* | Per-bus volume trims (COVAS, comms, ambient, music, alert) |
 | `audio.chatter.min_seconds` | `45` | Fastest gap between chatter lines (busiest systems) |
 | `audio.chatter.max_seconds` | `240` | Slowest gap between chatter lines (barely-populated) |
 | `audio.chatter.full_population` | `1000000000` | Population at/above which chatter runs at the min gap |
 | `audio.voices.cast_provider` | `elevenlabs` | Default TTS for the NPC/comms/chatter cast: `elevenlabs` (random voices, burns credits), `piper` (local, free), `edge` (free neural, no key/SLA), `azure` (official Azure Neural, free tier + SLA), or `openai` (cheap cloud) |
-| `audio.voices.providers.*` | *(unset)* | Per-role provider overrides (`comms`/`chatter`/`player`/`interdiction`); fall back to `cast_provider`. Persona uses `[tts].provider` |
+| `audio.voices.providers.*` | *(unset)* | Per-role provider overrides (`comms`/`chatter`/`player`/`interdiction`/`captain`/`tower`); fall back to `cast_provider`. Persona uses `[tts].provider` |
 | `audio.voices.random_el` | `true` | With no pool set, cast from random ElevenLabs voices (minus the COVAS voice) |
 
 The comms radio treatment (band limits, static, compression), the SFX/music track lists, and the

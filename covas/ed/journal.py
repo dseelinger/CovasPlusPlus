@@ -90,6 +90,10 @@ def _location(e: dict) -> dict:
     if e.get("StarSystem"):
         patch["system"] = e["StarSystem"]
     patch["station"] = e.get("StationName") if docked else None
+    # Carry the docked station's type + MarketID so "am I at my own carrier?" is answerable when
+    # the Commander logs in already docked (issue #19). Cleared when not docked.
+    patch["docked_station_type"] = e.get("StationType") if docked else None
+    patch["docked_market_id"] = e.get("MarketID") if docked else None
     patch["body"] = e.get("Body")
     return patch
 
@@ -109,6 +113,8 @@ def _carrier_jump(e: dict) -> dict:
     if e.get("StarSystem"):
         patch["system"] = e["StarSystem"]
     patch["station"] = e.get("StationName") if docked else None
+    patch["docked_station_type"] = e.get("StationType") if docked else None
+    patch["docked_market_id"] = e.get("MarketID") if docked else None
     patch["body"] = e.get("Body")
     return patch
 
@@ -119,11 +125,16 @@ def _docked(e: dict) -> dict:
         patch["station"] = e["StationName"]
     if e.get("StarSystem"):
         patch["system"] = e["StarSystem"]
+    # StationType ("FleetCarrier" for a carrier) + MarketID (== the carrier's CarrierID) let the
+    # audio layer tell when you're docked at your OWN carrier (issue #19). Absent -> None.
+    patch["docked_station_type"] = e.get("StationType")
+    patch["docked_market_id"] = e.get("MarketID")
     return patch
 
 
 def _undocked(_e: dict) -> dict:
-    return {"docked": False, "station": None}
+    return {"docked": False, "station": None,
+            "docked_station_type": None, "docked_market_id": None}
 
 
 def _supercruise_entry(e: dict) -> dict:

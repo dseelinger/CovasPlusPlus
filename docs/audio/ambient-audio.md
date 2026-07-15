@@ -16,6 +16,7 @@ big, entirely optional subsystem, and it's **off by default.**
 |------|--------------|--------|
 | **Comms voices** | Voices the game's comms-panel lines (NPC/station messages and direct player DMs) over a radio-treated bus | `audio.comms.enabled` (on by default *within* the layer) |
 | **Space chatter & SFX** | Occasional ambient radio chatter (**populated systems only**) and sound effects | `audio.cues.enabled` |
+| **Fleet-carrier voices** | A named **Captain**, **Tower Control**, and deck chatter that come alive at **your own fleet carrier**, each with its own voice | `audio.carrier.enabled` |
 | **Ambient music** | Context-crossfaded background music from your own local tracks | `music.enabled` |
 | **Interdiction cue** | A layered "pirate interdiction" moment — a warning sting, your companion's threat line, and the pirate's line | `audio.interdiction.enabled` |
 
@@ -40,6 +41,31 @@ speaks **scales with the system's population**: a busy hub chatters near the fas
 outpost near the slow end. You set the two bounds — `[audio.chatter].min_seconds` (busiest systems)
 and `max_seconds` (barely-populated) — and lower `full_population` to make more systems feel lively.
 All three are on the Settings page.
+
+## Fleet-carrier voices
+
+When you're **at, or in the same system as, the fleet carrier you own**, the carrier comes alive
+with three named roles — a **context voice**, chosen because of *where you are*, not just who's
+speaking:
+
+- **Captain** — welcome/status flavor, both aboard and when you arrive in the carrier's home system.
+- **Tower Control** — docking and traffic-control flavor, while you're **docked** at the carrier.
+- **Carrier chatter** — anonymous deck/crew/services buzz, while docked.
+
+Each role has its **own voice and display name**, set under `[audio.carrier].<role>` (`captain`,
+`tower`, `chatter`). Leave a role's `voice_ref` blank and it's auto-assigned a distinct, stable
+voice from the cast pool, so the three still sound like different people with zero setup; set a
+`voice_ref` (an ElevenLabs voice_id or Piper `.onnx` path) and optional `voice_provider` to pin an
+exact voice through [any registered provider](#per-role-providers-the-voice-ladder). The `name` you
+give the Captain and Tower is woven into their lines.
+
+The whole feature is **on by default** but naturally silent — it only speaks when you actually own a
+carrier and are there. It needs [game-state monitoring](../elite/monitoring.md) (the "at my own
+carrier" context is read from the journal, pinned to your carrier's identity so a **squadron** or
+other carrier never triggers it). Every line is drawn from a curated pool (the language model is
+never in this path), and literal docking messages still come through the normal
+[comms voices](#voices-for-the-cast) — this layer is pure atmosphere on top. Say *"mute the
+carrier"* / *"carrier voices on"* to toggle it at runtime.
 
 ## Voices for the cast
 
@@ -67,8 +93,9 @@ play session**:
 
 Every cast voice is synthesized through a small **provider registry**, so each cast **role** can use
 a different TTS provider. Set overrides in `[audio.voices.providers]`; roles you don't list fall back
-to `cast_provider`. Roles: `comms`, `chatter`, `player`, `interdiction` (and `cast` = the pool
-default). COVAS's own **persona** voice is not a cast role — it stays on `[tts].provider`.
+to `cast_provider`. Roles: `comms`, `chatter`, `player`, `interdiction`, `captain`, `tower` (and
+`cast` = the pool default). COVAS's own **persona** voice is not a cast role — it stays on
+`[tts].provider`.
 
 ```toml
 [audio.voices.providers]
@@ -132,14 +159,14 @@ logs a content-status summary showing what's populated and what's still silent. 
 git-ignored — the assets are yours to supply.
 
 !!! note "Voice control"
-    You can steer the layer by voice: *"mute the chatter," "quiet the comms," "turn the music
-    down," "stop the music," "silence all the background audio," "turn the ambient audio back on."*
-    Your own replies are never affected.
+    You can steer the layer by voice: *"mute the chatter," "quiet the comms," "silence the carrier,"
+    "turn the music down," "stop the music," "silence all the background audio," "turn the ambient
+    audio back on."* Your own replies are never affected.
 
 ## Settings
 
 The audio layer lives under the `[audio]`, `[audio.buses.*]`, `[audio.comms]`, `[audio.voices]`,
-`[music]`, and related sections. The Settings page has an **"Ambient audio"** group for the common
+`[audio.carrier.*]`, `[music]`, and related sections. The Settings page has an **"Ambient audio"** group for the common
 knobs — master and per-part enables, per-bus volumes, and the voice-cast provider — most of which
 apply live. See the [Configuration reference](../configuration.md#ambient-audio-audio-music) for the
 full set.
