@@ -230,6 +230,8 @@ class App:
             self._start_system_search()
         if self.cfg.get("search", {}).get("enabled"):
             self._start_searches()
+        if self.cfg.get("route_plan", {}).get("enabled"):
+            self._start_route_plan()
         # C9: compose the audio layer once the mixer, providers, and ED context all exist.
         if self.mixer is not None:
             self._start_audio_layer()
@@ -952,6 +954,39 @@ class App:
             self.searches = []
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Search categories failed to start: {e}"})
+
+    # ---- Route planning (#41 foundation proof) ----------------------------
+    def _start_route_plan(self) -> None:
+        """Build + register the trade-route planner (#41), the foundation proof for the Spansh
+        route client + galaxy-map plot handoff. Fail soft — a startup problem just leaves it off.
+        Shares the current-system/station seams; the plot handoff copies the next stop to the
+        clipboard until the galaxy-map keybind automation (#32) lands."""
+        try:
+            from .search import RequestsHttp
+            from .capabilities.route_plan_capability import RoutePlanCapability, RoutePlanConfig
+
+            rcfg = RoutePlanConfig.from_cfg(self.cfg)
+            self.route_plan = RoutePlanCapability(
+                rcfg, http=RequestsHttp(),
+                get_current_system=self._current_system,
+                get_current_station=self._current_station,
+                log=lambda msg: self._log("route", msg))
+            self.registry.register(self.route_plan)
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": "Trade-route planner ON (plot handoff via clipboard)."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.route_plan = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Trade-route planner failed to start: {e}"})
+
+    def _current_station(self) -> str | None:
+        """The station the Commander is currently DOCKED at, from live ED context — or None when
+        not docked / no telemetry (the trade planner then asks for a start station)."""
+        if self.ed_ctx is not None:
+            snap = self.ed_ctx.snapshot()
+            if snap.get("docked") and snap.get("station"):
+                return snap["station"]
+        return None
 
     def _current_system(self) -> str | None:
         """The Commander's current star system: live ED context first, else the newest

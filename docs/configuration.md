@@ -283,6 +283,19 @@ The [voice search](search/index.md) categories.
 The `[nav]`, `[star_systems]`, and `[search]` sections also carry `base_url` / `user_agent` values
 for the Spansh API — you rarely need to touch these.
 
+## Trade-route planner (`[route_plan]`)
+
+See [Trade-route planner](search/trade-routes.md). **Off by default.**
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `route_plan.enabled` | `false` | Master switch — voice-plan a Spansh trade loop from where you're docked |
+| `route_plan.default_max_hops` | `4` | Hops in the loop when you don't say |
+| `route_plan.max_price_age_days` | `2` | Prices older than this get a spoken "may have moved" caveat |
+
+Needs [`[elite].enabled`](elite/monitoring.md) for the live docked-station start. The next stop is
+copied to your clipboard for the galaxy map (in-game course-set arrives with the keybind actions).
+
 ## Community goals (`[cg]`)
 
 See [Community goals](elite/community-goals.md).

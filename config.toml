@@ -662,6 +662,26 @@ user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
 search_size = 50
 
 
+[route_plan]
+# Trade-route planner (#41) — the foundation proof for the Spansh ROUTE planners. Voice: "plan
+# me a trade route from here". Plans a Spansh trade loop starting from the station you're docked
+# at, speaks the best first hop (what to buy, where to sell, profit per ton), and hands the next
+# stop to the galaxy map — via the CLIPBOARD for now (paste it into the galaxy-map search); the
+# in-game "set course" keybind handoff arrives with the Tier-1 galaxy-map action (#32). Needs
+# [elite].enabled for the live docked-station start. DEFAULT OFF — opt in.
+#
+# The richer planners (Road to Riches, the full trade planner, mining) build on the SAME route
+# client as separate features; this is the minimal proof.
+enabled = false
+# Sent as the HTTP User-Agent — be a polite API citizen and identify the app.
+user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
+# Default number of hops in the trade loop when you don't specify one.
+default_max_hops = 4
+# Market-price freshness: hops whose source price is older than this (days) get a spoken "these
+# prices are ~N days old" caveat — volatile market data answered honestly, not silently stale.
+max_price_age_days = 2
+
+
 # Location & carrier voice commands (N3) — "copy my current system" and "where's my fleet
 # carrier" — need no configuration: the PERSONAL (owned) carrier is auto-tracked from the
 # journal (name, callsign, current system via CarrierStats / CarrierLocation), pinned to the

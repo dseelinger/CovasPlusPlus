@@ -660,3 +660,24 @@ Two deliberate defaults, both cost- and privacy-forward:
 - **Ties:** **#50 (aim/distance)** — ED does not stream live distance-to-target, so an on-demand vision **read** ("look now — within 7.5 km?") is the only way to answer the tier-2 ceiling today, but as a *check*, **not a continuous trigger** (that's polling); tier-3 analog aiming stays out (2–4 s latency makes closed-loop aiming infeasible/unsafe). **#40 (HUD/VR overlay)** — #55 is **not** required for #40 and must not block/bloat it; note the relationship, keep them decoupled.
 - **Beats-competitors thesis:** EDCoPilot / COVAS:NEXT are **blind to anything ED doesn't write to disk** (journal / `Status.json` / EDDN only). On-demand vision lets COVAS++ answer from **what's literally on screen** (distance-to-target, sub-target, panel contents) — a capability axis competitors *structurally* cannot reach — while staying cost-disciplined (on-demand, cheapest capable tier, pennies/session), not a dollars/hour vision loop.
 - **Unverified (needs on-hardware validation):** whether a **cheap-tier** model (Haiku/Flash) reliably reads small orange-on-black ED HUD text at 1080p (the single most important prototype question); exact OpenAI/Gemini per-image token counts; fullscreen-exclusive capture on Doug's exact GPU/ED install; VR mirror-window legibility. The throwaway PoC is byte-compiled but **un-run against a live game**.
+
+---
+
+## 12. Route & activity planners (epic #39 — foundation #41)
+
+The activity planners (Road to Riches #42, neutron/galaxy #43, trade #44, mining #45) all sit on one piece of shared plumbing built here (`covas/search/routes.py`). Two things make COVAS++'s planners better than the competitors': **closed-loop plotting** (a computed route is handed to the galaxy map, not just read aloud) and **freshness** (volatile market data is answered honestly).
+
+### The async route client (`search/routes.py`)
+Spansh's ROUTE endpoints are **asynchronous**, unlike the synchronous `/search` transport (§ outfitting/search): a `POST` enqueues a job and returns **HTTP 202** with `{"job": "<id>"}`, then you **GET `/api/results/<id>`** until it completes. `submit_and_poll(http, url, params, …)` runs that whole flow over the SAME injected `Http` seam (`get_json` added alongside `post_json`), with a bounded poll (mirrors the frontend's ~20×@1 s), injected `sleep` (tests run instantly), and spoken-friendly `NavError`s on any failure. Route params ride on the **query string** (Spansh's route convention — booleans as `true`/`false`), not the structured JSON the `/search` filters use.
+
+- **Galaxy/neutron plotter** (`build_galaxy_request` / `parse_galaxy_route`) — `POST /api/route?efficiency&range&from&to` → `result.system_jumps[]` of `{system, jumps}`. **Confirmed from a live client.**
+- **Trade planner** (`build_trade_request` / `parse_trade_route`) — `POST /api/trade/route`, the foundation's end-to-end proof (`RoutePlanCapability`, `plan_trade_route`). The request params + result hop fields are built to the observed trade planner (its form fields + the shared job/poll pattern) and are **LIVE-VERIFY** — isolated in those two functions so an on-hardware field-name correction is a one-function change. Road-to-Riches/mining (#42/#45) add sibling builders on the same client.
+
+### Freshness discipline (the differentiator, built once)
+Market prices rotate constantly, so a trade route carries a per-hop `updated_at`. The client-side backstop reuses the search layer's day-window age helper (`spansh.data_age_days`): `stale_age_caveat(hops)` returns a spoken **age caveat** when the freshest hop price is older than `max_price_age_days` (default 2). A stale-but-only answer is **spoken WITH the caveat**, never silently dropped — the "answer stale, honestly" fallback. The request also carries the server-side max-age param (Maximum Market Age in the trade form; unit LIVE-VERIFY), but the client backstop is authoritative regardless.
+
+### Plot handoff — closed loop (`RoutePlotter`)
+`RoutePlotter.plot_next(waypoints)` hands the next stop to the galaxy map. Until the Tier-1 galaxy-map keybind automation (**#32**) lands, it degrades to **copying the next waypoint's system name to the clipboard** so the Commander pastes it into the galaxy-map search; when a `set_course` callable is later injected (the keybind path), it's tried first and the clipboard is the fallback — so planners call `plot_next` unchanged across that transition. Both seams are injected and fail soft.
+
+### How this beats the competitors
+Competitors surface raw crowdsourced route data and (EDCoPilot) set course via a VoiceAttack layer. This foundation makes every COVAS++ planner **verified-fresh** (an old price is flagged, not passed off as current) and **voice-plotted end-to-end** (clipboard now, in-game course-set once #32 lands) — using machinery only COVAS++ has.

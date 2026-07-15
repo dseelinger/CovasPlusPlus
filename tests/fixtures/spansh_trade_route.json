@@ -1,0 +1,28 @@
+{
+  "_comment": "LIVE-VERIFY fixture (#41). Built to the observed Spansh trade planner result shape (nested source/destination nodes + per-hop commodity/prices/profit + source price updated_at). Full /api/results/<job> envelope; the client returns body.result. Field names to be confirmed on-hardware and corrected in parse_trade_route if they drift.",
+  "status": "ok",
+  "result": {
+    "hops": [
+      {
+        "source": {"system": "Shinrarta Dezhra", "station": "Jameson Memorial"},
+        "destination": {"system": "Sol", "station": "Galileo"},
+        "commodity": "Palladium",
+        "buy_price": 51000,
+        "sell_price": 58200,
+        "profit": 7200,
+        "total_profit": 5184000,
+        "updated_at": "2026-07-14 22:10:03+00"
+      },
+      {
+        "source": {"system": "Sol", "station": "Galileo"},
+        "destination": {"system": "Alioth", "station": "Golden Gate"},
+        "commodity": "Progenitor Cells",
+        "buy_price": 6800,
+        "sell_price": 9100,
+        "profit": 2300,
+        "total_profit": 1656000,
+        "updated_at": "2026-07-15 06:41:20+00"
+      }
+    ]
+  }
+}

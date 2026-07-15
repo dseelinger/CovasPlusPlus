@@ -58,11 +58,17 @@ class NavError(Exception):
 
 
 class Http(Protocol):
-    """Tiny injected HTTP seam — one method, so tests pass a fake and the default run is
-    hermetic (DESIGN §9)."""
+    """Tiny injected HTTP seam so tests pass a fake and the default run is hermetic (DESIGN §9).
+    `post_json` covers the synchronous /search endpoints; `get_json` is the GET sibling used by the
+    async route poll (`search/routes.py`) and EDSM's GET endpoints. `RequestsHttp` implements both."""
     def post_json(self, url: str, payload: dict, *, headers: dict | None = None,
                   timeout: float = 20.0) -> tuple[int, object]:
         """POST `payload` as JSON; return (status_code, parsed_json_or_None)."""
+        ...
+
+    def get_json(self, url: str, params: dict | None = None, *, headers: dict | None = None,
+                 timeout: float = 20.0) -> tuple[int, object]:
+        """GET `url` (optional query `params`); return (status_code, parsed_json_or_None)."""
         ...
 
 
