@@ -234,6 +234,8 @@ class App:
             self._start_route_plan()
         if self.cfg.get("neutron_plan", {}).get("enabled"):
             self._start_neutron_plan()
+        if self.cfg.get("riches_plan", {}).get("enabled"):
+            self._start_riches_plan()
         # C9: compose the audio layer once the mixer, providers, and ED context all exist.
         if self.mixer is not None:
             self._start_audio_layer()
@@ -1003,6 +1005,30 @@ class App:
             self.neutron_plan = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Neutron-route planner failed to start: {e}"})
+
+    # ---- Road to Riches (#42, on the #41 foundation) ----------------------
+    def _start_riches_plan(self) -> None:
+        """Build + register the Road-to-Riches planner (#42) — nearby high-value UNSCANNED bodies
+        to First-Discovery-scan for exploration credits — on the shared Spansh route client +
+        galaxy-map plot handoff. Fail soft: a startup problem just leaves it off. Only needs the
+        current SYSTEM (not a docked station); the plot handoff copies the first system to the
+        clipboard until the galaxy-map keybind automation (#32) lands."""
+        try:
+            from .search import RequestsHttp
+            from .capabilities.riches_plan_capability import RichesPlanCapability, RichesPlanConfig
+
+            rcfg = RichesPlanConfig.from_cfg(self.cfg)
+            self.riches_plan = RichesPlanCapability(
+                rcfg, http=RequestsHttp(),
+                get_current_system=self._current_system,
+                log=lambda msg: self._log("route", msg))
+            self.registry.register(self.riches_plan)
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": "Road-to-Riches planner ON (plot handoff via clipboard)."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.riches_plan = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Road-to-Riches planner failed to start: {e}"})
 
     def _current_station(self) -> str | None:
         """The station the Commander is currently DOCKED at, from live ED context — or None when

@@ -311,6 +311,21 @@ Needs [`[elite].enabled`](elite/monitoring.md) for the current-system default st
 waypoint is copied to your clipboard for the galaxy map (in-game course-set arrives with the keybind
 actions).
 
+## Road-to-Riches planner (`[riches_plan]`)
+
+See [Road-to-Riches planner](search/road-to-riches.md). **Off by default.**
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `riches_plan.enabled` | `false` | Master switch — voice-plan a Spansh exploration-credit route from your current system |
+| `riches_plan.default_radius` | `50.0` | Search radius in ly when you don't say |
+| `riches_plan.default_max_results` | `25` | Systems in the route when you don't say |
+| `riches_plan.default_min_value` | `300000` | Minimum per-body scan value (cr) to include |
+| `riches_plan.use_mapping_value` | `true` | Fold FSS-mapping value into each body's estimated worth |
+
+Needs [`[elite].enabled`](elite/monitoring.md) for the live current-system start. The first system is
+copied to your clipboard for the galaxy map (in-game course-set arrives with the keybind actions).
+
 ## Community goals (`[cg]`)
 
 See [Community goals](elite/community-goals.md).

@@ -36,7 +36,7 @@ from .spansh import _BASE, Http, NavError, data_age_days
 # Async route endpoints: POST -> 202 {"job"} -> GET RESULTS_URL + job until done.
 ROUTE_URL = f"{_BASE}/route"                 # galaxy / neutron plotter (confirmed live)
 TRADE_ROUTE_URL = f"{_BASE}/trade/route"     # trade planner (namespace confirmed; shape LIVE-VERIFY)
-RICHES_ROUTE_URL = f"{_BASE}/riches/route"   # Road to Riches (seam for #42)
+RICHES_ROUTE_URL = f"{_BASE}/riches/route"   # Road to Riches (namespace confirmed; shape LIVE-VERIFY)
 RESULTS_URL = f"{_BASE}/results/"            # GET <job> until the job completes (confirmed live)
 
 _DEFAULT_UA = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion; +https://github.com/)"
@@ -244,6 +244,108 @@ def parse_trade_route(result: object) -> list[TradeHop]:
             commodity=commodity, buy_price=buy, sell_price=sell,
             profit_per_unit=per, profit_total=total,
             price_updated=(str(h.get("updated_at")) if h.get("updated_at") else None)))
+    return out
+
+
+# ---- Road-to-Riches planner (namespace confirmed; request/result shape LIVE-VERIFY) --------
+
+@dataclass(frozen=True)
+class RichesBody:
+    """One body worth scanning in a Road-to-Riches system. `value` is the estimated
+    First-Discovery scan credit value (mapping value folded in when the request asks for it)."""
+    name: str
+    value: int
+    subtype: str = ""
+
+
+@dataclass(frozen=True)
+class RichesSystem:
+    """One stop on a Road-to-Riches route: a system with high-value UNSCANNED bodies to
+    First-Discovery-scan. `jumps` is how many jumps to reach it from the previous stop."""
+    system: str
+    bodies: tuple[RichesBody, ...]
+    total_value: int
+    jumps: int = 0
+
+    @property
+    def body_count(self) -> int:
+        return len(self.bodies)
+
+
+def build_riches_request(*, from_system: str, jump_range: float, radius: float = 50.0,
+                         max_results: int = 25, min_value: int = 300_000,
+                         use_mapping_value: bool = True,
+                         max_distance: int | None = None) -> dict:
+    """Query params for the Road-to-Riches planner (`POST /api/riches/route`).
+
+    LIVE-VERIFY: these param NAMES are built to the observed Road-to-Riches form (Reference System,
+    Maximum Jump Range, Maximum Radius, Minimum Scan Value, Maximum Results, Use Mapping Value,
+    Maximum Distance To Arrival) + Spansh's shared route convention. Kept in this one function so a
+    name correction after on-hardware validation is a single edit."""
+    params: dict = {
+        "reference_system": str(from_system),
+        "range": float(jump_range),
+        "radius": float(radius),
+        "max_results": int(max_results),
+        "min_value": int(min_value),
+        "use_mapping_value": bool(use_mapping_value),
+        "loop": False,                      # linear route out from the reference system
+    }
+    if max_distance is not None:
+        params["max_distance"] = int(max_distance)   # arrival distance cap (ls); LIVE-VERIFY name
+    return params
+
+
+def _riches_bodies(node: object) -> tuple[list[RichesBody], int]:
+    """Pull the scan-worthy bodies + summed value from a Road-to-Riches system node, tolerant of
+    both a per-body `value`/`estimated_value` and a system-level `value`/`estimated_mapping_value`."""
+    bodies: list[RichesBody] = []
+    total = 0
+    raw = node.get("bodies") if isinstance(node, dict) else None
+    for b in raw or []:
+        if not isinstance(b, dict) or not b.get("name"):
+            continue
+        try:
+            val = int(b.get("value") or b.get("estimated_value")
+                      or b.get("estimated_mapping_value") or 0)
+        except (TypeError, ValueError):
+            continue
+        bodies.append(RichesBody(name=str(b["name"]), value=val,
+                                 subtype=str(b.get("subtype") or b.get("type") or "")))
+        total += val
+    if isinstance(node, dict):
+        try:                                # prefer a system-level total when present
+            total = int(node.get("value") or node.get("total_value") or total)
+        except (TypeError, ValueError):
+            pass
+    return bodies, total
+
+
+def parse_riches_route(result: object) -> list[RichesSystem]:
+    """Parse the Road-to-Riches `result` into `RichesSystem`s, skipping malformed entries (fail
+    soft).
+
+    LIVE-VERIFY: field names below (`system`/`name`, `bodies[]` with `name`/`value`/`subtype`,
+    `jumps`) are built to the observed Spansh Road-to-Riches result; tolerant of the result being
+    either a bare list of systems or `{"systems": [...]}`. Isolated so a correction is one edit."""
+    systems = result if isinstance(result, list) else (
+        result.get("systems") if isinstance(result, dict) else None)
+    out: list[RichesSystem] = []
+    for s in systems or []:
+        if not isinstance(s, dict):
+            continue
+        name = str(s.get("system") or s.get("name") or "")
+        if not name:
+            continue
+        bodies, total = _riches_bodies(s)
+        if not bodies:
+            continue
+        try:
+            jumps = int(s.get("jumps") or 0)
+        except (TypeError, ValueError):
+            jumps = 0
+        out.append(RichesSystem(system=name, bodies=tuple(bodies),
+                                total_value=total, jumps=jumps))
     return out
 
 

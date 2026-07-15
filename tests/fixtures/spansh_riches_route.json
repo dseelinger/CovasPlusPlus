@@ -1,0 +1,34 @@
+{
+  "_comment": "LIVE-VERIFY fixture (#42). Built to the observed Spansh Road-to-Riches planner result shape (a list of systems under `systems`, each with `system`/`jumps` and a `bodies[]` of `{name, subtype, value}` estimated first-discovery scan values, plus a system-level `value` total). Full /api/results/<job> envelope; the client returns body.result. Field names to be confirmed on-hardware and corrected in parse_riches_route if they drift.",
+  "status": "ok",
+  "result": {
+    "systems": [
+      {
+        "system": "Hypoe Flyi HW-W e1-7966",
+        "jumps": 0,
+        "value": 3120000,
+        "bodies": [
+          {"name": "Hypoe Flyi HW-W e1-7966 A 1", "subtype": "Earth-like world", "value": 2200000},
+          {"name": "Hypoe Flyi HW-W e1-7966 A 2", "subtype": "Ammonia world", "value": 920000}
+        ]
+      },
+      {
+        "system": "Byoomao MI-S e4-5423",
+        "jumps": 2,
+        "value": 1580000,
+        "bodies": [
+          {"name": "Byoomao MI-S e4-5423 B 3", "subtype": "Water world", "value": 880000},
+          {"name": "Byoomao MI-S e4-5423 B 4", "subtype": "High metal content world", "value": 700000}
+        ]
+      },
+      {
+        "system": "Pru Aescs NC-M d7-192",
+        "jumps": 1,
+        "value": 640000,
+        "bodies": [
+          {"name": "Pru Aescs NC-M d7-192 1", "subtype": "High metal content world", "value": 640000}
+        ]
+      }
+    ]
+  }
+}
