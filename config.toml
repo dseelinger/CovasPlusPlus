@@ -761,6 +761,33 @@ default_min_value = 300000
 use_mapping_value = true
 
 
+[mining_helper]
+# Mining helper (#45) — plan and run a mining session. Voice: "where's the nearest Painite hotspot"
+# or "plan a Low Temperature Diamonds run". From your CURRENT system (or a start you name) it finds
+# the nearest ring HOTSPOT for the material (Spansh bodies/search), the best FRESH place to SELL it
+# (Spansh stations/search, sell price highest-first), drops the go-to-hotspot / mine / sell-here
+# loop onto your checklist as trackable steps, and hands the hotspot system to the galaxy map — via
+# the CLIPBOARD for now (paste it into the galaxy-map search); the in-game "set course" keybind
+# handoff arrives with the Tier-1 galaxy-map action (#32). Needs [elite].enabled for the live
+# current-system start. DEFAULT OFF — opt in.
+#
+# The DIFFERENTIATOR is freshness: mining prices swing hard and the highest headline sell prices are
+# usually YEARS-stale fleet-carrier data, so transient carriers are dropped and a stale quote is
+# spoken only WITH an age caveat — never trusted silently.
+#
+# Per-run refinements (large-pad-only, a tighter price-age window, skip the checklist, skip the
+# plot) are spoken tool args, not config — just mention them. The settings below are the defaults.
+enabled = false
+# Sent as the HTTP User-Agent — be a polite API citizen and identify the app.
+user_agent = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
+# Sell-price freshness: a best-sell quote older than this (days) is spoken with a "that price is ~N
+# days old" caveat. A per-run "max_price_age_days" tool arg overrides this for one plan.
+max_price_age_days = 2
+# Drop the mining loop (go to hotspot -> mine -> sell here) onto your checklist as trackable steps.
+# A per-run "add_to_checklist" tool arg overrides this for one plan.
+add_to_checklist = true
+
+
 # Location & carrier voice commands (N3) — "copy my current system" and "where's my fleet
 # carrier" — need no configuration: the PERSONAL (owned) carrier is auto-tracked from the
 # journal (name, callsign, current system via CarrierStats / CarrierLocation), pinned to the

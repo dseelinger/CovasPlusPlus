@@ -1,0 +1,99 @@
+{
+  "results": [
+    {
+      "name": "V3J-N4N",
+      "system_name": "Hyades Sector DB-X d1-112",
+      "distance": 116.181881083874,
+      "distance_to_arrival": 138.481189,
+      "type": "Drake-Class Carrier",
+      "has_large_pad": true,
+      "market_updated_at": "2020-08-18 15:43:49+00",
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Minerals",
+          "commodity": "Painite",
+          "demand": 633,
+          "sell_price": 715960,
+          "supply": 0
+        }
+      ]
+    },
+    {
+      "name": "V2Q-80T",
+      "system_name": "Anja",
+      "distance": 195.79712126411,
+      "distance_to_arrival": 0.0,
+      "type": "Drake-Class Carrier",
+      "has_large_pad": true,
+      "market_updated_at": "2020-11-22 22:01:11+00",
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Minerals",
+          "commodity": "Painite",
+          "demand": 995,
+          "sell_price": 715960,
+          "supply": 0
+        }
+      ]
+    },
+    {
+      "name": "Bell Vision",
+      "system_name": "Osane",
+      "distance": 228.984310495556,
+      "distance_to_arrival": 557.069794,
+      "type": "Ocellus Starport",
+      "has_large_pad": true,
+      "market_updated_at": "2026-07-15 05:42:44+00",
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Minerals",
+          "commodity": "Painite",
+          "demand": 694,
+          "sell_price": 467596,
+          "supply": 0
+        }
+      ]
+    },
+    {
+      "name": "Sabathius Wisdom",
+      "system_name": "Col 285 Sector HB-C b14-2",
+      "distance": 133.81840029612,
+      "distance_to_arrival": 3079.590035,
+      "type": "Outpost",
+      "has_large_pad": false,
+      "market_updated_at": "2026-07-15 01:13:08+00",
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Minerals",
+          "commodity": "Painite",
+          "demand": 433,
+          "sell_price": 434151,
+          "supply": 0
+        }
+      ]
+    },
+    {
+      "name": "Viktorenko Holdings",
+      "system_name": "CD-33 8748",
+      "distance": 64.3809690800589,
+      "distance_to_arrival": 166.960468,
+      "type": "Ocellus Starport",
+      "has_large_pad": true,
+      "market_updated_at": "2026-07-15 04:00:13+00",
+      "market": [
+        {
+          "buy_price": 0,
+          "category": "Minerals",
+          "commodity": "Painite",
+          "demand": 0,
+          "sell_price": 271413,
+          "supply": 0
+        }
+      ]
+    }
+  ]
+}

@@ -27,11 +27,22 @@ from .categories import (BODIES, CATEGORIES, CategorySpec, ParamSpec, StationRec
 from .routes import (RICHES_ROUTE_URL, ROUTE_URL, RESULTS_URL, TRADE_ROUTE_URL, RoutePlotter,
                      RouteWaypoint, TradeHop, build_galaxy_request, build_trade_request,
                      parse_galaxy_route, parse_trade_route, stale_age_caveat, submit_and_poll)
+from .mining import (Hotspot, SellMarket, best_sell, build_hotspot_request, build_sell_request,
+                     find_best_sell, find_hotspots, parse_hotspots, parse_sell_markets)
 
 __all__ = [
     "BODIES",
     "CATEGORIES",
     "CategorySpec",
+    "Hotspot",
+    "SellMarket",
+    "best_sell",
+    "build_hotspot_request",
+    "build_sell_request",
+    "find_best_sell",
+    "find_hotspots",
+    "parse_hotspots",
+    "parse_sell_markets",
     "Http",
     "NavError",
     "RESULTS_URL",

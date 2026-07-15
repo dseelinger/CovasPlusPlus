@@ -368,6 +368,20 @@ Notes:
 
 Notes:
 
+## 8d. Mining helper (#45)  🎮 ED 🔊 HW 📋 clipboard 📝 checklist 🌍 NET
+> `[mining_helper].enabled = true` + `[elite].enabled = true`. Finds the nearest ring **hotspot** for a material (Spansh bodies/search), the best **FRESH** place to **sell** it (Spansh stations/search), drops the go-mine-sell **loop onto your checklist**, and copies the hotspot system to the clipboard. **This is the on-hardware validation of the LIVE-VERIFY Spansh hotspot + sell-price request/result shapes.**
+- [ ] **Plan a run (happy path):** somewhere near inhabited space, *"Where's the nearest Painite hotspot?"* → speaks a real **ring in a system, N light-years away, with a hotspot / M overlapping hotspots**, then the **best sell** (station, system, ~credits/ton), and says the loop was **added to your checklist** and the system **copied**.
+- [ ] **⚠️ LIVE-VERIFY the hotspot shape:** confirm the spoken **ring / system / hotspot count** are real and correct (cross-check on [spansh.co.uk/bodies](https://spansh.co.uk/bodies) — filter `Ring signals` = Painite, reference = your system). If the ring/count is blank/wrong, the `ring_signals` request or result fields have drifted — fix `build_hotspot_request` / `parse_hotspots` in `covas/search/mining.py` (isolated for exactly this).
+- [ ] **⚠️ LIVE-VERIFY the sell shape + FRESHNESS:** confirm the spoken **station / price** are real (cross-check on [spansh.co.uk/stations](https://spansh.co.uk/stations) — `Market` = Painite, sort by sell price). Crucially, verify the quote is **fresh** (not a years-old fleet carrier): the helper should skip carriers and either give a recent price or add *"that's the freshest quote I found and it's about N days old."* If a stale carrier price is quoted as fact, the freshness/carrier filter in `parse_sell_markets` / `best_sell` needs a look.
+- [ ] **Checklist loop:** after a plan, *"What's next on my checklist?"* → the **three new steps** are there in order (fly to the hotspot → mine → sell at the named station). Check one off and it advances normally.
+- [ ] **Plot handoff:** **paste** (Ctrl-V) into the galaxy-map search box → it's the **hotspot system**; it sets course. (In-game auto course-set is the later keybind action #32.)
+- [ ] **Material aliases:** try *"Find me an LTD hotspot"* and *"…void opals"* → resolves to **Low Temperature Diamonds** / **Void Opal** (correct hotspot + sell commodity), not a miss.
+- [ ] **Refinements:** *"…large pad only to sell it"* → the sell station has a large pad; *"…don't add it to my checklist"* → no new checklist lines; *"…just the hotspot, don't plot it"* → nothing copied.
+- [ ] **Asks for the material:** *"Plan a mining run."* with nothing else → it asks **what to mine** rather than guessing.
+- [ ] **Fail-soft:** with the internet briefly off, ask for a hotspot → a spoken "couldn't reach" note, and the voice loop keeps working (no crash). A **sell** lookup that fails still leaves you the **hotspot** and the plot.
+
+Notes:
+
 ## 9. Location & carriers (N3)  🎮 ED 🔊 HW 📋 clipboard
 > `[elite].enabled = true`. The owned fleet carrier is tracked from the journal (pinned to its `CarrierID`).
 - [ ] **Copy current system:** *"Copy my current system."* → copies your **current** system to the clipboard (paste to confirm).
