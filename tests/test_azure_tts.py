@@ -12,17 +12,19 @@ import threading
 
 import pytest
 
+from covas import firstrun
 from covas.mixer import CastSynth, Voice
 from covas.providers import azure_tts as az
 
 
 # ---- test doubles ----------------------------------------------------------
 def _azure(monkeypatch=None, *, key="test-key", **azure_cfg):
-    """Build an AzureTTS with region/voice defaults; when a key is given, export it so `_key()`
-    resolves without a real service. Extra kwargs land in the [azure] config table."""
+    """Build an AzureTTS with region/voice defaults; when a key is given, patch the firstrun
+    resolver so `_key()` resolves without a real service (keys are file-only/DPAPI now, not env
+    vars). Extra kwargs land in the [azure] config table."""
     cfg = {"azure": {"region": "eastus", "voice": "en-US-AriaNeural", **azure_cfg}}
     if monkeypatch is not None and key is not None:
-        monkeypatch.setenv("AZURE_SPEECH_KEY", key)
+        monkeypatch.setattr(firstrun, "azure_key", lambda cfg: key)
     return az.AzureTTS(cfg)
 
 
@@ -117,7 +119,6 @@ def test_synth_pcm_empty_text_is_silent(monkeypatch):
 
 
 def test_synth_pcm_no_key_raises(monkeypatch):
-    monkeypatch.delenv("AZURE_SPEECH_KEY", raising=False)
     monkeypatch.setattr(az, "_collect_pcm", lambda *a: (b"PCM", False))  # never reached
     with pytest.raises(RuntimeError):
         _azure(monkeypatch, key=None).synth_pcm("hi")  # no key -> raise; CastSynth degrades to silence
@@ -153,7 +154,6 @@ def test_speak_empty_text_noop(monkeypatch):
 
 
 def test_speak_no_key_raises(monkeypatch):
-    monkeypatch.delenv("AZURE_SPEECH_KEY", raising=False)
     with pytest.raises(RuntimeError):
         _azure(monkeypatch, key=None).speak("hi", threading.Event())
 
@@ -161,7 +161,7 @@ def test_speak_no_key_raises(monkeypatch):
 def test_play_via_mixer_feeds_and_finishes(monkeypatch):
     monkeypatch.setattr(az, "_collect_pcm", lambda key, region, ssml, cancel: (b"\x00\x01" * 500, False))
     sink = _FakeSink()
-    monkeypatch.setenv("AZURE_SPEECH_KEY", "k")
+    monkeypatch.setattr(firstrun, "azure_key", lambda cfg: "k")
     e = az.AzureTTS({"azure": {"region": "eastus", "voice": "en-US-AriaNeural"}}, mixer=_FakeMixer(sink))
     e.speak("hi", threading.Event())
     assert sink.fed and sink.finished and not sink.cancelled
@@ -172,7 +172,7 @@ def test_play_via_mixer_cancel_aborts(monkeypatch):
     sink = _FakeSink()
     cancel = threading.Event()
     cancel.set()
-    monkeypatch.setenv("AZURE_SPEECH_KEY", "k")
+    monkeypatch.setattr(firstrun, "azure_key", lambda cfg: "k")
     az.AzureTTS({"azure": {"region": "eastus", "voice": "en-US-AriaNeural"}},
                 mixer=_FakeMixer(sink)).speak("hi", cancel)
     assert sink.cancelled and not sink.finished
@@ -180,7 +180,6 @@ def test_play_via_mixer_cancel_aborts(monkeypatch):
 
 # ---- list_voices fails soft ------------------------------------------------
 def test_list_voices_fails_soft_to_empty(monkeypatch):
-    monkeypatch.delenv("AZURE_SPEECH_KEY", raising=False)
     assert _azure(monkeypatch, key=None).list_voices() == []   # no key -> [] (never raises)
 
 
@@ -202,7 +201,6 @@ def test_azure_is_cast_eligible_via_registry(monkeypatch):
 
 def test_azure_cast_voice_fails_soft_to_silence(monkeypatch):
     # No key -> synth_pcm raises -> CastSynth swallows it -> the NPC line degrades to silence.
-    monkeypatch.delenv("AZURE_SPEECH_KEY", raising=False)
     e = _azure(monkeypatch, key=None)
     cs = CastSynth(el_synth=None, piper_loader=None)
     cs.registry.register("azure", lambda text, ref: e.synth_pcm(text, ref or None))

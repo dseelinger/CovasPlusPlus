@@ -11,7 +11,7 @@ cast backend, since it's premium and its value is the live reply, not background
 
 Uses the Cartesia REST endpoint via `requests` (already a dep — no SDK). We request a `raw` /
 `pcm_s16le` output format, so the streamed bytes ARE the raw 16-bit mono PCM the audio/cancel path
-expects (no decode step). Needs a key (`CARTESIA_API_KEY` env or `[cartesia].api_key_file`) and a
+expects (no decode step). Needs a key (`[cartesia].api_key_file`, DPAPI-encrypted) and a
 `voice` id. Fail soft: no key / service error makes the persona degrade to text — never crashes.
 """
 from __future__ import annotations
@@ -53,7 +53,7 @@ class CartesiaTTS:
         key = cartesia_key(self._cfg)
         if not key:
             raise RuntimeError(
-                "Cartesia TTS selected but no key found (set CARTESIA_API_KEY or "
+                "Cartesia TTS selected but no key found (add it in Settings, or to "
                 "[cartesia].api_key_file)."
             )
         return key

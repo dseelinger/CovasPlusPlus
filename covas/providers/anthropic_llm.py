@@ -14,9 +14,11 @@ from .base import OnEvent, ToolHandler
 class AnthropicLLM:
     def __init__(self, cfg: dict) -> None:
         self.cfg = cfg
-        # Key resolution: ANTHROPIC_API_KEY env var first (dev), else the key file the
-        # first-run wizard writes under data_dir. Pass it explicitly when found; otherwise let
-        # the SDK read the env itself (and raise its own clear error if truly absent).
+        # Key resolution: the DPAPI-encrypted key file the first-run wizard writes under data_dir
+        # (file-only since #22 — no env-var read). Pass it explicitly when found; otherwise fall
+        # through to the bare SDK client. The SDK will read its own ANTHROPIC_API_KEY as a last
+        # resort, but that's moot in practice: `is_configured` gates the app on a FILE key, so an
+        # env-only setup never gets this far — the wizard runs first.
         from ..firstrun import anthropic_key
         key = anthropic_key(cfg)
         self.client = anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic()

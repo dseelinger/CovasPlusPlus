@@ -18,7 +18,7 @@ is costed via the shared `[pricing]` table (`llm.estimate_cost`). No web-search 
 chat/completions API has none — that stays an Anthropic-only capability). Fail soft: a request error
 raises a clear RuntimeError the app already guards, degrading the turn to text, never crashing.
 
-Key: `OPENAI_API_KEY` env (shared with the OpenAI TTS provider, #16) else `[openai].api_key_file`.
+Key: `[openai].api_key_file` (DPAPI-encrypted; shared with the OpenAI TTS provider, #16).
 """
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ class OpenAILLM:
         key = openai_key(self._cfg)
         if not key:
             raise RuntimeError(
-                "OpenAI LLM selected but no key found (set OPENAI_API_KEY or [openai].api_key_file)."
+                "OpenAI LLM selected but no key found (add it in Settings, or to [openai].api_key_file)."
             )
         return key
 

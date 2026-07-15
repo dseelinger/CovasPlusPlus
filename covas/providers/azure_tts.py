@@ -11,7 +11,7 @@ Uses the Speech REST endpoint via `requests` (already a dep — no Azure SDK nee
 expects (no decode step, unlike Edge's MP3). Streaming with prompt cancellation keeps tap-cancel and
 barge-in snappy, mirroring the ElevenLabs/Piper paths; the mixer path mirrors Piper's.
 
-Needs a key + region (`[azure].key`/env `AZURE_SPEECH_KEY`, `[azure].region`). Fail soft: with no key
+Needs a key + region (`[azure].api_key_file`, DPAPI-encrypted; `[azure].region`). Fail soft: with no key
 or a service error the persona degrades to text and cast voices fall silent — never crashes the loop.
 """
 from __future__ import annotations
@@ -48,13 +48,13 @@ class AzureTTS:
         self._out_device = cfg.get("audio", {}).get("tts_output_device") or None
 
     def _key(self) -> str:
-        """Resolve the Azure Speech key (env `AZURE_SPEECH_KEY` first, else the key file). Raises a
-        clear error if unconfigured — callers fail soft (persona -> text, cast -> silence)."""
+        """Resolve the Azure Speech key from its (DPAPI-encrypted) key file. Raises a clear error if
+        unconfigured — callers fail soft (persona -> text, cast -> silence)."""
         from ..firstrun import azure_key
         key = azure_key(self._cfg)
         if not key:
             raise RuntimeError(
-                "Azure TTS selected but no key found (set AZURE_SPEECH_KEY or [azure].api_key_file)."
+                "Azure TTS selected but no key found (add it in Settings, or to [azure].api_key_file)."
             )
         return key
 

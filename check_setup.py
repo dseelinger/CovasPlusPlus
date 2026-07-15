@@ -3,7 +3,7 @@ COVAS++  —  Phase 1 setup checker.
 
 Run this to confirm the whole foundation is solid BEFORE we build the voice loop:
   - config file loads
-  - ANTHROPIC_API_KEY env var is present
+  - the Anthropic key file exists (DPAPI-encrypted; env vars are no longer read — issue #22)
   - ElevenLabs key file + personality.txt exist and are readable
   - both API keys actually work (Anthropic model list + ElevenLab voice lookup)
   - all Python packages import
@@ -12,9 +12,7 @@ Run this to confirm the whole foundation is solid BEFORE we build the voice loop
 It changes nothing and sends no billable requests (both API calls are free lookups).
 """
 from __future__ import annotations
-import os
 import sys
-import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -35,8 +33,10 @@ def load_config() -> dict:
         print(BAD + f"config.toml not found at {cfg_path}")
         problems.append("config.toml missing")
         sys.exit(1)
-    with open(cfg_path, "rb") as f:
-        cfg = tomllib.load(f)
+    # Use the app's own loader so key-file paths resolve under data_dir exactly as the app sees
+    # them (and so the DPAPI-aware key helpers read the same files).
+    from covas.config import load_config as _load
+    cfg = _load()
     print(OK + f"loaded {cfg_path}")
     return cfg
 
@@ -61,26 +61,24 @@ def check_imports() -> None:
             problems.append(f"import {label}")
 
 
-def check_files(cfg: dict) -> str | None:
+def check_files(cfg: dict) -> tuple[str | None, str | None]:
     section("Keys & files")
-    # Anthropic env var
-    ak = os.environ.get("ANTHROPIC_API_KEY", "")
-    if ak.startswith("sk-ant-"):
-        print(OK + f"ANTHROPIC_API_KEY present (len={len(ak)})")
+    from covas import firstrun
+    # Anthropic key file (DPAPI-encrypted, file-only — env vars are no longer read, issue #22).
+    anth_key = firstrun.anthropic_key(cfg)
+    if anth_key:
+        print(OK + f"Anthropic key file present (len={len(anth_key)})")
     else:
-        print(BAD + "ANTHROPIC_API_KEY not visible to this process")
-        print("        (If you JUST set it, close this terminal and open a new one.)")
-        problems.append("ANTHROPIC_API_KEY")
+        print(BAD + "Anthropic key file missing or unreadable")
+        print("        (Run the setup wizard, or paste your key in the control-panel Settings.)")
+        problems.append("Anthropic key file")
 
-    # ElevenLabs key file
-    el_path = Path(cfg["elevenlabs"]["api_key_file"])
-    el_key = None
-    if el_path.exists():
-        el_key = el_path.read_text(encoding="utf-8").strip()
+    # ElevenLabs key file (optional — no key => text-only mode).
+    el_key = firstrun.elevenlabs_key(cfg)
+    if el_key:
         print(OK + f"ElevenLabs key file ({len(el_key)} chars)")
     else:
-        print(BAD + f"ElevenLabs key file missing: {el_path}")
-        problems.append("ElevenLabs key file")
+        print(WARN + "ElevenLabs key file missing (optional - the app runs text-only without it)")
 
     # personality.txt
     p_path = Path(cfg["personality"]["file"])
@@ -90,14 +88,17 @@ def check_files(cfg: dict) -> str | None:
     else:
         print(BAD + f"personality.txt missing: {p_path}")
         problems.append("personality.txt")
-    return el_key
+    return anth_key, el_key
 
 
-def check_anthropic() -> None:
+def check_anthropic(anth_key: str | None) -> None:
     section("Anthropic API (free model-list call)")
+    if not anth_key:
+        print(WARN + "skipped (no key)")
+        return
     try:
         import anthropic
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(api_key=anth_key)
         models = client.models.list(limit=20)
         ids = [m.id for m in models.data]
         print(OK + f"reachable — {len(ids)} models")
@@ -146,8 +147,8 @@ def main() -> None:
     print("COVAS++ setup check")
     cfg = load_config()
     check_imports()
-    el_key = check_files(cfg)
-    check_anthropic()
+    anth_key, el_key = check_files(cfg)
+    check_anthropic(anth_key)
     check_elevenlabs(el_key)
     check_audio(cfg)
 

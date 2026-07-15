@@ -12,13 +12,15 @@ import threading
 
 import pytest
 
+from covas import firstrun
 from covas.providers import openai_llm as oai
 
 
 # ---- helpers ---------------------------------------------------------------
 def _llm(monkeypatch=None, *, key="test-key", **cfg):
+    # Keys are file-only (DPAPI) now — patch the firstrun resolver instead of exporting an env var.
     if monkeypatch is not None and key is not None:
-        monkeypatch.setenv("OPENAI_API_KEY", key)
+        monkeypatch.setattr(firstrun, "openai_key", lambda cfg: key)
     return oai.OpenAILLM({
         "openai": {"model": "gpt-4o-mini", **cfg},
         "personality": {"enabled": False},
@@ -189,7 +191,7 @@ def test_cancel_stops_streaming(monkeypatch):
         yield _text_chunk("second")
 
     monkeypatch.setattr(oai, "_stream_chat", fake_stream)
-    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    monkeypatch.setattr(firstrun, "openai_key", lambda cfg: "k")
     out = list(oai.OpenAILLM({"openai": {}, "personality": {"enabled": False}}).stream_reply(
         [{"role": "user", "content": "hi"}], cancel, lambda *a: None))
     assert out == [("text", "first ")]              # stopped before the second chunk
@@ -197,7 +199,7 @@ def test_cancel_stops_streaming(monkeypatch):
 
 # ---- no key -----------------------------------------------------------------
 def test_no_key_raises(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(firstrun, "openai_key", lambda cfg: None)
     with pytest.raises(RuntimeError):
         list(oai.OpenAILLM({"openai": {}, "personality": {"enabled": False}}).stream_reply(
             [{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))

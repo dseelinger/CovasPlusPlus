@@ -1,13 +1,15 @@
 """Fetch the user's ElevenLabs voices and TTS-capable models for the UI dropdowns."""
 from __future__ import annotations
-from pathlib import Path
 import requests
 
 BASE = "https://api.elevenlabs.io/v1"
 
 
 def _key(cfg: dict) -> str:
-    return Path(cfg["elevenlabs"]["api_key_file"]).read_text(encoding="utf-8").strip()
+    """The ElevenLabs key, via firstrun so it's DPAPI-aware (decrypts / migrates plaintext) rather
+    than reading the file raw. Returns "" when unconfigured — callers surface the auth error."""
+    from .firstrun import elevenlabs_key
+    return elevenlabs_key(cfg) or ""
 
 
 def is_famous(v: dict) -> bool:
