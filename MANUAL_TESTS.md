@@ -62,7 +62,7 @@ the next restart** (only Whisper reloads live). Confirm each before running its 
 - [ ] `[honk].enabled = true` — Auto-honk on arrival (**on** by default). No fire-group setup — it probes and backs out of a Surface-Scanner misfire. Set `[honk].trigger` only if your scanner is on secondary fire. (§6.2)
 - [ ] `[nav].enabled = true` — outfitting "find the closest module". (§7)
 - [ ] `[star_systems].enabled = true` / `[search].enabled = true` — voice search categories. (§8)
-- [ ] `[cg].enabled` is implicit (`[cg].source`); set `[cg].inara_api_key` to also see CGs you haven't visited. (§10)
+- [ ] `[cg].enabled` is implicit (`[cg].source`); add an **Inara API key** on the Settings API keys card to also see CGs you haven't visited. (§10)
 - [ ] `[router].enabled = true` — cost router (cheap tier by default). (§4)
 - [ ] `[web_search].enabled = true` — automatic web search. (§16)
 - [ ] `[personality].enabled = true` — "Commander" address + campaign context.
@@ -288,7 +288,7 @@ Notes:
 Notes:
 
 ## 10. Community Goals (N6)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
-> Journal-primary (works offline for CGs you've visited). Set `[cg].inara_api_key` to also surface CGs you HAVEN'T visited. Visit a CG board in-game first so the journal has your standing.
+> Journal-primary (works offline for CGs you've visited). Add an **Inara API key** (Settings API keys card, stored encrypted in `InaraAPIKey.txt`) to also surface CGs you HAVEN'T visited. Visit a CG board in-game first so the journal has your standing.
 - [ ] **List:** *"List the community goals."* → active CGs (title + system + expiry). With an Inara key, ones you haven't visited are flagged ("…one in <system> you haven't visited yet").
 - [ ] **CG system:** *"What system is the <CG title> community goal in?"* → resolves by (fuzzy) title, speaks the system, and **copies** it — unless it's your current system (then says so, no copy).
 - [ ] **Standing:** *"What's my standing in the <CG title> community goal?"* → "Top 10 Commanders" or "top X%". For a CG not in your journal it says it doesn't have your standing (visit the board).
@@ -665,6 +665,26 @@ Notes:
   key and it works.
 - [ ] 🔊 **check_setup:** `check_setup.bat` reports the **Anthropic key file** present (no
   `ANTHROPIC_API_KEY` env line anymore) and the Anthropic API call succeeds using the file key.
+- [ ] 📋 **Inara key folded in (issue #24):** put a **plaintext** Inara key in `[cg].inara_api_key`
+  (in `overrides.json`), launch → community goals still authenticate (unvisited CGs surface), a new
+  **`InaraAPIKey.txt`** appears holding a **`DPAPI:`** blob, and the inline `inara_api_key` in
+  `overrides.json` is **blanked**. A fresh key entered on the Settings **API keys** card also works
+  (takes effect on restart).
+
+### 19.9 Masked "API keys" Settings card — rotate any key (issue #23)  🌐 PANEL 📋 FILE
+> The Settings page (`/settings`) has a write-only **API keys** card covering every provider
+> (Anthropic, ElevenLabs, OpenAI, Gemini, Azure, Cartesia, Inara). Keys are never displayed — only a
+> set/not-set badge — and are stored DPAPI-encrypted, never in `overrides.json`.
+- [ ] 🌐 **Badges reflect reality:** open `/settings` → the **API keys** card shows **set** for
+  providers whose key file has a key, **not set** for the rest. No key value is visible anywhere.
+- [ ] 🌐📋 **Set / rotate:** paste a key into a **not set** provider → **Save** → the badge flips to
+  **set**, the field clears, and the message says it takes effect on restart. The provider's
+  `*APIKey.txt` now holds a **`DPAPI:`** blob (not your raw key). **Rotate** an already-set key the
+  same way and the file's blob changes.
+- [ ] 🌐📋 **Clear:** click **Clear** on a set provider → badge flips to **not set** and the key file
+  is emptied. A **blank** Save is a no-op (an existing key is NOT wiped).
+- [ ] 🌐 **Never leaks:** with a key set, reload `/settings` and check the field is still empty and
+  the page source / network never contains the key text (only the boolean badge).
 
 Notes:
 

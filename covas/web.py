@@ -25,11 +25,18 @@ from flask import Flask, jsonify, render_template, request
 from flask_sock import Sock
 
 from . import elevenlabs as el
+from . import firstrun
 from . import personality as persona
 from . import settings_schema as schema
 from . import updates
 from .__version__ import __version__
 from .checklist import ITEM_RE
+
+# Config sections whose `api_key_file` the masked "API keys" Settings card manages (issue #23),
+# in display order. The card is write-only: keys are stored ENCRYPTED per section and never read
+# back to the client — only a set/not-set boolean per section is exposed.
+_KEY_SECTIONS = ("anthropic", "elevenlabs", "openai", "gemini", "azure", "cartesia", "cg")
+_KEY_SECTION_SET = frozenset(_KEY_SECTIONS)
 
 
 def _file_version(path: Path) -> str:
@@ -206,6 +213,36 @@ def create_app(core) -> Flask:
             })
         except Exception as e:  # noqa: BLE001
             return jsonify({"error": str(e)}), 502
+
+    def _key_flags() -> dict:
+        """Set/not-set boolean per managed provider section — the ONLY key info the client sees."""
+        return {s: firstrun.key_available(core.cfg, s) for s in _KEY_SECTIONS}
+
+    @flask_app.route("/api/keys")
+    def keys_state():
+        """Per-provider set/not-set flags for the masked "API keys" card (issue #23). BOOLEANS
+        ONLY — never the key material — so the page renders badges without exposing secrets."""
+        return jsonify({"keys": _key_flags()})
+
+    @flask_app.route("/api/keys", methods=["POST"])
+    def keys_save():
+        """Rotate or clear ONE provider's key. `{section, value}` writes the encrypted key; a blank
+        value is a NO-OP (never clobbers a stored key), and `{section, clear: true}` explicitly
+        removes it. Returns the refreshed flags. Write-only: no stored key is ever sent back."""
+        b = request.get_json(force=True) or {}
+        section = str(b.get("section") or "")
+        if section not in _KEY_SECTION_SET:
+            return jsonify({"ok": False, "error": f"unknown key section {section!r}"}), 400
+        try:
+            if b.get("clear"):
+                firstrun.clear_key(core.cfg, section)
+            else:
+                value = str(b.get("value") or "").strip()
+                if value:
+                    firstrun.save_key(core.cfg, section, value)
+        except Exception as e:  # noqa: BLE001 — surface a write failure, don't crash the panel
+            return jsonify({"ok": False, "error": str(e)}), 500
+        return jsonify({"ok": True, "keys": _key_flags()})
 
     @flask_app.route("/api/settings", methods=["POST"])
     def settings():

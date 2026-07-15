@@ -153,20 +153,83 @@ def cartesia_key(cfg: dict) -> str | None:
     return _read_key(_key_path(cfg, "cartesia"))
 
 
+def inara_key(cfg: dict) -> str | None:
+    """The Inara Community-Goals key (issue #24). Prefers the DPAPI-encrypted key file
+    (`[cg].api_key_file`, default InaraAPIKey.txt under data_dir); if that's empty but a LEGACY inline
+    `[cg].inara_api_key` is present (the old plaintext-in-overrides.json path), MIGRATE it — encrypt
+    into the key file, blank the inline value — so no plaintext CG key lingers. File-only thereafter,
+    so the "zero plaintext keys anywhere" guarantee (issue #21) holds for the one inline secret."""
+    key = _read_key(_key_path(cfg, "cg"))
+    if key:
+        return key
+    legacy = str((cfg.get("cg", {}) or {}).get("inara_api_key", "") or "").strip()
+    if legacy:
+        return _migrate_inline_inara_key(cfg, legacy)
+    return None
+
+
+def _migrate_inline_inara_key(cfg: dict, key: str) -> str:
+    """One-time move of a legacy inline `[cg].inara_api_key` into the encrypted key file: encrypt it
+    into InaraAPIKey.txt, then blank the inline value in overrides.json AND the live cfg so it's never
+    read (or re-migrated) again. Best-effort on the write side — if encryption/persist fails we still
+    return the key so this run's feed keeps working; the plaintext just isn't cleared yet."""
+    try:
+        _write_key(_key_path(cfg, "cg"), key)
+        overrides = load_overrides()
+        overrides.setdefault("cg", {})["inara_api_key"] = ""
+        save_overrides(overrides)
+        cfg.setdefault("cg", {})["inara_api_key"] = ""
+        print("Migrated the inline Inara API key to an encrypted InaraAPIKey.txt "
+              "(the plaintext value has been cleared from overrides.json).",
+              file=sys.stderr, flush=True)
+    except Exception:  # noqa: BLE001 — migration is opportunistic; the key still works this run
+        pass
+    return key
+
+
+# ---- Generic, section-keyed key management (issue #23) -------------------------------
+# The masked "API keys" Settings card rotates ANY provider's key, so the write/clear/presence
+# helpers are keyed by config SECTION (anthropic, elevenlabs, openai, gemini, azure, cartesia,
+# cg) rather than one function per provider. Each section's `api_key_file` is the single store;
+# the provider-specific savers/readers below stay as thin, named wrappers.
+
+def save_key(cfg: dict, section: str, key: str) -> None:
+    """Write a provider's key ENCRYPTED to its section's `api_key_file`. A blank/whitespace key
+    writes an empty file (i.e. clears it) — callers that want blank to be a no-op guard first."""
+    _write_key(_key_path(cfg, section), key)
+
+
+def clear_key(cfg: dict, section: str) -> None:
+    """Remove a provider's stored key by writing an empty key file (badge flips to not-set)."""
+    _write_key(_key_path(cfg, section), "")
+
+
+def key_available(cfg: dict, section: str) -> bool:
+    """Whether a usable key is stored for a provider SECTION (its `api_key_file` decrypts to a
+    non-empty key). Section-keyed so the Settings card's set/not-set badges need no per-provider
+    knowledge. Reading also transparently migrates a legacy plaintext key file to encrypted."""
+    return bool(_read_key(_key_path(cfg, section)))
+
+
 def save_anthropic_key(cfg: dict, key: str) -> None:
-    _write_key(_key_path(cfg, "anthropic"), key)
+    save_key(cfg, "anthropic", key)
 
 
 def save_elevenlabs_key(cfg: dict, key: str) -> None:
-    _write_key(_key_path(cfg, "elevenlabs"), key)
+    save_key(cfg, "elevenlabs", key)
+
+
+def save_inara_key(cfg: dict, key: str) -> None:
+    """Write the Inara CG key ENCRYPTED to its key file (Settings/wizard entry). Blank clears it."""
+    save_key(cfg, "cg", key)
 
 
 def anthropic_key_available(cfg: dict) -> bool:
-    return bool(anthropic_key(cfg))
+    return key_available(cfg, "anthropic")
 
 
 def elevenlabs_key_available(cfg: dict) -> bool:
-    return bool(elevenlabs_key(cfg))
+    return key_available(cfg, "elevenlabs")
 
 
 def text_only_mode(cfg: dict, *, mock: bool = False, tts_injected: bool = False) -> bool:

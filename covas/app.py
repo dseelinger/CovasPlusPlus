@@ -454,18 +454,23 @@ class App:
         external Inara feed is added only when a key is configured. Fail soft — never blocks
         startup. The Inara key is a restart-level setting, so config is snapshotted here."""
         try:
+            from . import firstrun
             from .capabilities.cg_capability import CGCapability
             from .cg import CGConfig, cg_from_journals, fetch_inara_goals
             from .nav import copy as _nav_copy
             from .search import RequestsHttp
 
             ccfg = CGConfig.from_cfg(self.cfg)
+            # The Inara key now lives DPAPI-encrypted in InaraAPIKey.txt (issue #24); reading it here
+            # also migrates any legacy inline `[cg].inara_api_key` off plaintext on first run.
+            api_key = firstrun.inara_key(self.cfg) or ""
+            use_feed = ccfg.source == "inara" and bool(api_key)
             fetch_external = None
-            if ccfg.external_enabled:
+            if use_feed:
                 http = RequestsHttp()
 
                 def fetch_external():   # stamp the Inara envelope timestamp per call
-                    return fetch_inara_goals(http, api_key=ccfg.inara_api_key,
+                    return fetch_inara_goals(http, api_key=api_key,
                                              timestamp=_dt.datetime.now().isoformat())
 
             self.cg = CGCapability(
@@ -475,7 +480,7 @@ class App:
                 fetch_external=fetch_external,
                 log=lambda m: self._log("cg", m))
             self.registry.register(self.cg)
-            src = "feed: Inara" if ccfg.external_enabled else "journal-only (no Inara key)"
+            src = "feed: Inara" if use_feed else "journal-only (no Inara key)"
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Community Goals ON ({src})."})
         except Exception as e:  # noqa: BLE001 — optional; never block startup

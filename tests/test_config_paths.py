@@ -62,6 +62,7 @@ def test_all_path_fields_resolved():
         "openai": {"api_key_file": "OpenAIAPIKey.txt"},
         "gemini": {"api_key_file": "GeminiAPIKey.txt"},
         "cartesia": {"api_key_file": "CartesiaAPIKey.txt"},
+        "cg": {"api_key_file": "InaraAPIKey.txt"},
         "checklist": {"file": "ultimate_checklist.md"},
         "logging": {"dir": "logs"},
         "piper": {"model": "voices/en.onnx"},

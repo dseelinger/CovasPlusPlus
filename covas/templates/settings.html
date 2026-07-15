@@ -39,7 +39,7 @@
   .reset{color:#5c6b7d;font-size:11px;letter-spacing:1px;cursor:pointer;visibility:hidden;white-space:nowrap}
   .reset:hover{color:var(--accent2)}
   .setting.overridden .reset{visibility:visible}
-  select,input[type=text],input[type=number]{background:#0c1119;color:var(--text);border:1px solid var(--edge);
+  select,input[type=text],input[type=number],input[type=password]{background:#0c1119;color:var(--text);border:1px solid var(--edge);
     border-radius:5px;padding:7px 9px;font-family:inherit;font-size:13px;min-width:200px}
   input[type=number]{min-width:120px;text-align:right}
   input.invalid,select.invalid{border-color:var(--err)}
@@ -63,6 +63,16 @@
   .toast.show{opacity:1;transform:translateY(0)}
   .toast.bad{background:#3a1414;color:var(--err);border-color:#7a2a2a}
   .empty{color:var(--muted);padding:40px;text-align:center}
+  .kbadge{font-size:11px;letter-spacing:1px;padding:3px 8px;border-radius:10px;text-transform:uppercase;
+    border:1px solid #4a2530;color:var(--err);background:#2a1418;flex:0 0 auto}
+  .kbadge.on{border-color:#1f6b34;color:var(--ok);background:#10321a}
+  .kbtn{background:transparent;color:var(--muted);border:1px solid var(--edge);border-radius:5px;
+    padding:7px 12px;font-family:inherit;font-size:12px;letter-spacing:1px;cursor:pointer}
+  .kbtn:hover{color:var(--text);border-color:var(--accent2)}
+  .kbtn.set{color:#120a04;background:var(--accent);border-color:var(--accent)}
+  .kbtn.set:hover{filter:brightness(1.1);color:#120a04}
+  .setting .kmsg{color:var(--muted);font-size:12px;margin-top:6px;min-height:0}
+  .setting .kmsg.ok{color:var(--ok)} .setting .kmsg.bad{color:var(--err)}
 </style>
 </head>
 <body>
@@ -94,6 +104,19 @@ const ORIG = {};                 // key -> current (saved) value
 const EDITS = {};                // key -> pending new value
 let EL = null;                   // {models:[...], voices:[...]} once fetched
 
+// Masked "API keys" card (issue #23) — hand-built, NOT schema-driven, so keys never touch
+// overrides.json. Write-only: we send new keys, only ever read a set/not-set boolean back.
+const KEY_PROVIDERS = [
+  {section:"anthropic",  label:"Anthropic",    placeholder:"sk-ant-…",   url:"https://console.anthropic.com/settings/keys"},
+  {section:"elevenlabs", label:"ElevenLabs",   placeholder:"paste key",  url:"https://elevenlabs.io/app/settings/api-keys"},
+  {section:"openai",     label:"OpenAI",       placeholder:"sk-…",       url:"https://platform.openai.com/api-keys"},
+  {section:"gemini",     label:"Gemini",       placeholder:"paste key",  url:"https://aistudio.google.com/apikey"},
+  {section:"azure",      label:"Azure Speech", placeholder:"paste key",  url:"https://portal.azure.com/"},
+  {section:"cartesia",   label:"Cartesia",     placeholder:"paste key",  url:"https://play.cartesia.ai/"},
+  {section:"cg",         label:"Inara",        placeholder:"paste key",  url:"https://inara.cz/settings-api/"},
+];
+let KEYS = {};                   // section -> bool (set/not-set); NEVER the key material
+
 function esc(s){return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function slug(name){return "g-"+name.toLowerCase().replace(/[^a-z0-9]+/g,"-");}
 
@@ -105,6 +128,8 @@ async function load(){
     const r = await (await fetch("/api/elevenlabs")).json();
     if(!r.error) EL = r;
   }catch(e){ /* leave EL null; those selects show the current value only */ }
+  try{ KEYS = (await (await fetch("/api/keys")).json()).keys || {}; }
+  catch(e){ KEYS = {}; /* card still renders; badges default to not-set */ }
   render();
 }
 
@@ -121,6 +146,9 @@ function optionsFor(s){
 function render(){
   const nav = $("groupNav"); nav.innerHTML="";
   const main = $("main"); main.innerHTML="";
+  nav.appendChild(Object.assign(document.createElement("a"),
+    {href:"#g-api-keys", textContent:"API keys"}));
+  main.appendChild(keysCard());
   for(const g of GROUPS){
     nav.appendChild(Object.assign(document.createElement("a"),
       {href:"#"+slug(g.name), textContent:g.name}));
@@ -280,6 +308,86 @@ function filter(){
     const any=[...card.querySelectorAll(".setting")].some(e=>!e.classList.contains("hidden"));
     card.style.display = any?"":"none";
   }
+}
+
+// ---- API keys card (hand-built, write-only) ----------------------------------------
+function keysCard(){
+  const card = document.createElement("section");
+  card.className="card"; card.id="g-api-keys";
+  card.innerHTML='<h2>API keys</h2>';
+  const note=document.createElement("div"); note.className="help"; note.style.margin="4px 0 2px";
+  note.innerHTML="Stored <b>encrypted</b> on this PC (Windows DPAPI) and never shown here. Paste a "+
+    "key to set or rotate it — changes take effect on restart. <b>Anthropic</b> is required; the "+
+    "rest are optional (only the providers you actually use).";
+  card.appendChild(note);
+  for(const p of KEY_PROVIDERS) card.appendChild(keyRow(p));
+  return card;
+}
+
+function keyRow(p){
+  const wrap=document.createElement("div"); wrap.className="setting";
+  wrap.dataset.section=p.section;
+  wrap.dataset.search=(p.label+" api key "+p.section).toLowerCase();
+
+  const top=document.createElement("div"); top.className="top";
+  const label=document.createElement("div"); label.className="label"; label.textContent=p.label;
+  const control=document.createElement("div"); control.className="control";
+  const badge=document.createElement("span"); badge.className="kbadge";
+  const inp=document.createElement("input"); inp.type="password"; inp.autocomplete="off";
+  inp.spellcheck=false; inp.placeholder=p.placeholder;
+  const saveB=document.createElement("button"); saveB.className="kbtn set ksave";
+  const clrB=document.createElement("button"); clrB.className="kbtn kclear"; clrB.textContent="Clear";
+  control.appendChild(badge); control.appendChild(inp); control.appendChild(saveB); control.appendChild(clrB);
+  top.appendChild(label); top.appendChild(control);
+  wrap.appendChild(top);
+
+  const help=document.createElement("div"); help.className="help";
+  help.innerHTML='<a href="'+p.url+'" target="_blank" rel="noopener">Get a key →</a>';
+  wrap.appendChild(help);
+  const msg=document.createElement("div"); msg.className="kmsg"; wrap.appendChild(msg);
+
+  saveB.onclick=()=>saveKey(wrap, inp, msg);
+  clrB.onclick=()=>clearKey(wrap, msg);
+  inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); saveKey(wrap, inp, msg); } };
+  applyRowState(wrap);
+  return wrap;
+}
+
+function applyRowState(row){
+  const set=!!KEYS[row.dataset.section];
+  const badge=row.querySelector(".kbadge");
+  badge.className="kbadge"+(set?" on":""); badge.textContent=set?"set":"not set";
+  row.querySelector(".ksave").textContent=set?"Rotate":"Save";
+  row.querySelector(".kclear").style.display=set?"":"none";
+}
+
+function kmsg(el, text, ok){ el.textContent=text; el.className="kmsg"+(ok===true?" ok":ok===false?" bad":""); }
+
+async function postKeys(body){
+  try{
+    const r=await fetch("/api/keys",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify(body)});
+    const data=await r.json().catch(()=>({}));
+    return r.ok ? data : {ok:false, error:(data&&data.error)||"request failed"};
+  }catch(e){ return {ok:false, error:"request failed"}; }
+}
+
+async function saveKey(row, inp, msg){
+  const value=(inp.value||"").trim();
+  if(!value){ kmsg(msg,"Paste a key first.",false); return; }
+  kmsg(msg,"Saving…",null);
+  const data=await postKeys({section:row.dataset.section, value});
+  if(!data.ok){ kmsg(msg, data.error||"save failed", false); return; }
+  KEYS=data.keys||KEYS; inp.value=""; applyRowState(row);
+  kmsg(msg,"Saved — restart to use it.",true);
+}
+
+async function clearKey(row, msg){
+  kmsg(msg,"Clearing…",null);
+  const data=await postKeys({section:row.dataset.section, clear:true});
+  if(!data.ok){ kmsg(msg, data.error||"clear failed", false); return; }
+  KEYS=data.keys||KEYS; applyRowState(row);
+  kmsg(msg,"Cleared.",true);
 }
 
 $("saveBtn").onclick=save;
