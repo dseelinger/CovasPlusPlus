@@ -20,6 +20,9 @@ Every safeguard is on by default:
 
 - **Allowlist** — only explicitly permitted macros can run. The default allows exactly one:
   `landing_gear`. Ask for anything you haven't allowlisted ("deploy hardpoints") and it won't do it.
+- **Allowlist** — only explicitly permitted macros can run. It ships allowing exactly one:
+  `landing_gear`. Ask for anything else ("deploy hardpoints") and it won't do it, unless you
+  add that macro's name to `[keybinds].allowlist` yourself (see *More actions* below).
 - **Separate-turn confirmation** — asking arms the action but does **not** fire it. You must
   confirm on a *separate* command. The model can't arm and fire in one breath, by design.
 - **Combat / interdiction guard** — it refuses to touch controls while you're in danger or being
@@ -180,6 +183,40 @@ allowlist = ["landing_gear", "drive_assist", "srv_headlights", "srv_night_vision
 Combat controls (SRV weapons and the turret) are deliberately **not** exposed. As always, the
 matching ED bindings (Drive Assist, Headlights, Night Vision, Cargo Scoop, Auto Brake, Recall/Dismiss
 Ship) must be bound to a **key** in-game for COVAS to press them.
+## More actions (Tier-1: panels, maps, fire groups)
+
+Beyond landing gear, COVAS++ ships a set of **benign, repeatable** cockpit actions you can opt
+into. Opening a panel or map, cycling a fire group, or toggling head-look changes nothing about
+your ship's state and is instantly reversible — so unlike landing gear these **fire immediately**
+(no separate confirmation). They're still behind the **allowlist**, the **combat/interdiction
+guard**, and **mode gating** (all are main-ship actions; fire-group cycling also works in a
+deployed fighter).
+
+They are **off until you allowlist them.** Add the ones you want to `[keybinds].allowlist`, e.g.:
+
+```toml
+allowlist = ["landing_gear", "open_galaxy_map", "focus_left_panel"]
+```
+
+| Macro name | Says | ED control it presses |
+|------------|------|-----------------------|
+| `focus_left_panel` | *"open the nav panel"* | Focus Left Panel (navigation/target) |
+| `focus_right_panel` | *"open the systems panel"* | Focus Right Panel (systems) |
+| `focus_comms_panel` | *"open comms"* | Focus Comms Panel |
+| `focus_role_panel` | *"open the role panel"* | Focus Role Panel (radar/role) |
+| `quick_comms` | *"quick comms"* | Quick Comms Panel |
+| `open_galaxy_map` | *"open the galaxy map"* | Galaxy Map (main-ship) |
+| `open_system_map` | *"open the system map"* | System Map (main-ship) |
+| `cycle_fire_group_next` | *"next fire group"* | Cycle Fire Group Next |
+| `cycle_fire_group_previous` | *"previous fire group"* | Cycle Fire Group Previous |
+| `ui_back` | *"go back"* | UI Back |
+| `ui_focus` | *"toggle UI focus"* | UI Focus |
+| `toggle_headlook` | *"toggle head-look"* | Head Look Toggle |
+
+Each control must be **bound to a key in-game** (COVAS presses *your* binding); if it's only on a
+joystick, COVAS will say so. On-foot and SRV variants of the panels and maps come with later
+tiers (they use different ED controls). `open_galaxy_map` is also the first building block of the
+future "set course" voice-plot handoff (it opens the map the destination gets typed into).
 
 ## It reads *your* bindings
 

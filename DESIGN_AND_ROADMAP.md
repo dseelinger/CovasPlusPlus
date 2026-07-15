@@ -517,6 +517,28 @@ buggy element names (including ED's own misspelling `AutoBreakBuggyButton`); **S
 turret are deliberately excluded**. None are in the default allowlist — the Commander opts each in
 by name. *Beats-competitors:* EDCoPilot/COVAS:NEXT narrate the SRV but don't press its controls;
 COVAS++ drives the buggy's convenience controls hands-free behind the full safety layer.
+### Implemented — Tier-1 action batch: panels / maps / fire groups (#32)
+The first *real* batch on the #29 registry seam (`covas/keybinds/actions/panels.py` + one import
+line in `actions/__init__.py`; **no** `KeybindCapability` edit — the lever working as designed).
+Twelve **benign, repeatable** cockpit actions: focus the four HUD panels (`FocusLeftPanel`,
+`FocusRightPanel`, `FocusCommsPanel`, `FocusRadarPanel`) + `QuickCommsPanel`, open the galaxy /
+system map (`GalaxyMapOpen` / `SystemMapOpen`, main-ship variants), cycle fire groups
+(`CycleFireGroup{Next,Previous}`), UI back / focus (`UI_Back`, `UIFocus`), and `HeadLookToggle`.
+
+- **Confirmation policy.** All set `confirm_required=False` — opening a panel/map or cycling a
+  fire group changes no ship state and is instantly reversible, so it fires immediately. Still
+  fully behind the allowlist + combat/interdiction guard + mode-gating (the #29 scaffold reused,
+  not bypassed).
+- **Modes.** Panels, maps, UI nav, and head-look are `MODE_MAINSHIP`; fire-group cycling is
+  main-ship **or** fighter (a deployed fighter has its own fire groups; same control token).
+  On-foot / SRV panel + map variants use *different* ED controls and are deferred to #34/#35.
+- **Allowlist unchanged.** The default allowlist stays `["landing_gear"]` — these are opt-in per
+  macro name (documented in the `[keybinds]` config comment + `docs/automation/keybinds.md`).
+- **Route handoff building block (#41).** `open_galaxy_map` is the first half of an in-game "set
+  course": `search/routes.py::RoutePlotter` already accepts an injected `set_course(system)->bool`
+  (clipboard fallback today). A future `set_course` opens the galaxy map via this macro, types the
+  destination into the map search, and selects it — closing the plot loop. That cross-cutting wire
+  is intentionally NOT done here; only the building block is in place.
 
 ### Implemented — auto-honk (`[honk]`, default off, N5)
 The second keybind-driven action, and the first PROACTIVE one — fire the Discovery Scanner

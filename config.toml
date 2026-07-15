@@ -597,6 +597,14 @@ confirm_window = 60
 #   srv_night_vision, srv_cargo_scoop, srv_auto_brake (benign toggles), and recall_ship
 #   (summons/dismisses your ship — arms-and-confirms). e.g.
 #   allowlist = ["landing_gear", "drive_assist", "srv_headlights", "recall_ship"]
+# for others. Ships exactly one by default: landing_gear (toggle). Add names to opt in.
+#
+# Tier-1 benign UI actions (#32) — panels, maps, fire groups: no confirmation needed (opening
+# a panel/map or cycling a fire group is harmless), but still behind the combat + mode guards.
+# Add any you want to enable, e.g. allowlist = ["landing_gear", "open_galaxy_map"]. Available:
+#   focus_left_panel, focus_right_panel, focus_comms_panel, focus_role_panel, quick_comms,
+#   open_galaxy_map, open_system_map, cycle_fire_group_next, cycle_fire_group_previous,
+#   ui_back, ui_focus, toggle_headlook
 allowlist = ["landing_gear"]
 
 
