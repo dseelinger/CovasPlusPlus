@@ -738,6 +738,42 @@ must not queue behind the main conversation turn. #38 adds a **local fast path**
   allowlist+guard+abort; and the app path (a spotted keyword fires the reflex and never calls the
   LLM, a non-combat capture falls through to a normal turn, abort routes to release_all).
 
+### Implemented — send in-game comms text by voice (`[comms_send]`, default off, #49)
+The first Tier-1 action that needs **character input**, not a single scancode — compose ED chat
+by voice and send it (`covas/capabilities/comms_capability.py` + `covas/comms/`). The LLM composes
+the words + picks the channel (local / wing / squadron / direct); a deterministic sequence does
+the input. It reuses the keybind executor + `.binds` but introduces a **new text-injection
+mechanism** and a **different safety model** to the rest of §6:
+
+- **Text injection = clipboard-paste (the new mechanism).** Unlike every other action (one named
+  scancode), a message is arbitrary text. Per-character `SendInput` is fragile (keyboard-layout /
+  dead-key / IME dependent), so we take the more reliable path: put the composed string on the
+  Windows clipboard (reusing `nav/clipboard.py`'s `clip.exe` writer — no new dependency) and
+  **paste** it into ED's focused chat box with **Ctrl+V**, then press **Enter**. `Ctrl+V` and
+  `Enter` are CONSTRUCTED `KeyBinding`s (`comms/injector.py`), not ED `.binds` tokens — they're
+  OS/chat-field keystrokes the game doesn't rebind — pressed through the same shared scancode
+  executor. The injector is an injected seam (clipboard writer + executor both faked in tests), so
+  the whole path is unit-tested offline with a recording fake executor + fake clipboard.
+- **Safety = mandatory read-back-before-send, NOT a combat guard.** This is **outward-facing** —
+  other Commanders see the message — and the real risk is a garbled STT reaching strangers, not
+  ship danger. So the gate is an **unconditional** read-back: `send_comms_message` composes + arms
+  and returns the words for the model to read back, injecting nothing; `confirm_comms_send` fires
+  only on a **separate** Commander turn (turn-gated via the same `new_turn()` counter as keybinds,
+  with a `confirm_window` expiry) and `cancel_comms_send` discards. Unlike benign keybinds there is
+  **no** `confirm_required=False` path — confirmation can't be switched off. The message is
+  normalised to a single line first (whitespace/newlines collapsed, length capped) so it can't
+  commit early or run away.
+- **Channel routing + fail-soft.** The scripted sequence is *open comms box → (optional) select
+  channel → paste → Enter*. `open_bind` (default `QuickCommsPanel`) and the per-channel select
+  tokens resolve through the `.binds` like any action; an unbound/joystick-only key degrades to a
+  spoken "bind it in-game". Elite has no universal per-channel *send* key, so `channel_*` default
+  **blank** = "send on the currently-selected channel" (fine for local chat), and are Commander-
+  configurable for anyone who's bound channel-switch keys.
+- Off by default; no ED-monitoring dependency (the read-back is the safety). Shares the keybind
+  executor so a hard "abort" releases any key it pressed. *Beats-competitors:* EDCoPilot/COVAS:NEXT
+  narrate *incoming* comms; COVAS++ composes + sends *outgoing* chat hands-free, gated so nothing
+  garbled reaches another Commander.
+
 ---
 
 ## 7. Build status & roadmap
