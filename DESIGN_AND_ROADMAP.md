@@ -739,8 +739,8 @@ The provider seam *is* the dependency-injection boundary. Build real providers o
 A companion that forgets your name between sessions doesn't feel like a companion. Persistent
 memory lets COVAS++ carry a handful of small facts about you — how you like to be addressed, your
 main ship, standing preferences — across restarts. Issue #59 is the **foundation** (store + recall
-API); issue #60 is **automatic capture** (populating the store without being asked); wiring
-*recall* into the live turn and a "what do you remember about…" tool is the remaining issue (#61).
+API); issue #60 is **automatic capture** (populating the store without being asked); issue #61 wires
+*recall* into the live turn (a cache-safe memory block) plus a "what do you remember about…" tool.
 
 ### The store — transparent by design (`covas/memory/store.py`)
 Facts live in a plain **JSON Lines** file, `memory.jsonl`, under the user's writable data dir
@@ -799,6 +799,27 @@ default 500) bounds the file: over cap, the oldest auto `milestone` records are 
 (reproducible from the journal), and facts the Commander explicitly asked to keep are evicted only
 if they alone exceed the cap. Every capture method is fail-soft — a bad event or store error is
 logged, never raised, so capture can't take down the event pump or the voice loop.
+
+### Recall in conversation — cache-safe injection + explicit tool (#61, `memory/detector.py`)
+Recall extends the same `MemoryCapability` (still capabilities-over-loop-edits). Two paths, both
+keyword/tag by default (free, offline):
+
+- **Automatic injection (cache-safe).** A pure-rules `MemoryDetector` — the exact twin of the ED
+  `ContextDetector` (§5): `from_cfg` → `.decide(text) -> MemoryRef(.matched, .reason)` + `.strip()`
+  — classifies whether a turn reaches into the past (`[memory].recall_phrases` like "do you
+  remember", "what's my…", plus a `recall_wake` override, both config-tunable). On a match, the
+  worker loop asks `MemoryCapability.recall_block(query)` for a **compact** parenthesized block of
+  the top facts and **prepends it to THAT turn's user message only** — composing with the ED
+  telemetry block identically (both prepend to the per-call `llm_text` while `self.history` keeps
+  the clean `user_text`). It rides the **uncached** user message, never the cached system prefix,
+  so recall **cannot bust the prompt cache** — the crux of the issue, and asserted by a test
+  (`test_memory_recall_is_cache_safe`) that checks the block lands in the per-turn tail while
+  stored history and the cacheable prefix stay clean.
+- **Explicit tool.** A `recall_memory` tool lets the LLM look memory up mid-reply ("what do you
+  remember about my ship") and answer from stored facts instead of guessing.
+
+Recall is fail-soft: a miss (or any retriever error) injects nothing and never crashes the turn.
+Gated on `[memory].enabled`; the embedding seam stays OFF, so the default path is free and offline.
 
 ### Cost & privacy stance — and how this beats the competitors
 Two deliberate defaults, both cost- and privacy-forward:

@@ -345,3 +345,101 @@ def test_ed_context_wake_word_stripped_and_log_injected(tmp_path):
         app._stop_ed_monitoring()
     assert "Jumped to Sol" in llm.last_user                 # recent-events log injected
     assert app.history[0]["content"] == "what have I been up to?"   # wake word scrubbed
+
+
+# --- memory recall (#61): cache-safe injection into the per-turn user message ----------
+
+class _MsgListCapturingLLM:
+    """Records the FULL messages list App hands the LLM, so a test can prove the injection
+    is isolated to the per-turn tail (the cacheable prefix — system + prior history — is
+    untouched)."""
+
+    def __init__(self) -> None:
+        self.messages: Optional[list] = None
+
+    def stream_reply(self, messages, cancel, on_event,
+                     tool_handler=None, tools=None,
+                     model=None, max_tokens=None) -> Iterator[tuple[str, str]]:
+        self.messages = [dict(m) for m in messages]     # snapshot (App may mutate history after)
+        yield ("text", "ok")
+
+
+def _memory_cfg(tmp_path) -> dict:
+    cfg = _cfg(tmp_path)
+    cfg["memory"] = {"enabled": True, "dir": str(tmp_path / "mem"), "cap": 500}
+    return cfg
+
+
+def _seed(app, text: str, *, type: str = "preference", tags=()) -> None:
+    """Store a durable fact directly via the capture sink (the real store the app recalls from)."""
+    app.memory.capture.remember(text, type=type, tags=list(tags))
+
+
+def test_memory_recall_injected_on_matching_turn(tmp_path):
+    """A turn that reaches into the past gets the relevant fact prepended to what the LLM sees."""
+    llm = _MsgCapturingLLM()
+    app = App(_memory_cfg(tmp_path), stt=FakeSTT(text="do you remember my main ship?"),
+              llm=llm, tts=FakeTTS())
+    _seed(app, "Main ship is a Krait Mk II", tags=["ship"])
+    app._process(object(), threading.Event())
+    assert "Krait Mk II" in llm.last_user
+    assert "Remembered about the Commander" in llm.last_user
+
+
+def test_memory_recall_not_injected_on_plain_turn(tmp_path):
+    """An off-topic turn is left completely alone — no memory block, no extra tokens."""
+    llm = _MsgCapturingLLM()
+    app = App(_memory_cfg(tmp_path), stt=FakeSTT(text="tell me a joke, COVAS"),
+              llm=llm, tts=FakeTTS())
+    _seed(app, "Main ship is a Krait Mk II", tags=["ship"])
+    app._process(object(), threading.Event())
+    assert llm.last_user == "tell me a joke, COVAS"
+
+
+def test_memory_recall_miss_injects_nothing(tmp_path):
+    """A recall-referencing turn with no matching fact injects nothing (fail-soft miss)."""
+    llm = _MsgCapturingLLM()
+    app = App(_memory_cfg(tmp_path), stt=FakeSTT(text="do you remember my favourite music?"),
+              llm=llm, tts=FakeTTS())
+    _seed(app, "Main ship is a Krait Mk II", tags=["ship"])
+    app._process(object(), threading.Event())
+    assert llm.last_user == "do you remember my favourite music?"
+
+
+def test_memory_recall_is_cache_safe(tmp_path):
+    """CACHE-SAFETY (DoD #61): the recall block rides the per-turn USER message ONLY, never the
+    cacheable prefix. Proven across TWO recall turns:
+      * turn 1's block appears only in the per-turn TAIL the model saw;
+      * stored `history` keeps the CLEAN user text (no block) — so nothing lingers;
+      * on turn 2, everything the model sees BEFORE its own tail (turn-1's user + assistant, the
+        cacheable prefix) is CLEAN — the block from turn 1 never entered the prompt-cache prefix.
+    The system prompt is built separately in llm.py and this path never touches it."""
+    llm = _MsgListCapturingLLM()
+    app = App(_memory_cfg(tmp_path), stt=FakeSTT(text="do you remember my main ship?"),
+              llm=llm, tts=FakeTTS())
+    _seed(app, "Main ship is a Krait Mk II", tags=["ship"])
+
+    # -- turn 1 --
+    app._process(object(), threading.Event())
+    turn1 = llm.messages
+    assert "Krait Mk II" in turn1[-1]["content"]                 # block in the per-turn tail
+    assert app.history[0] == {"role": "user", "content": "do you remember my main ship?"}
+    assert "Krait Mk II" not in app.history[0]["content"]        # clean text stored, nothing lingers
+
+    # -- turn 2 --
+    app.stt = FakeSTT(text="and do you remember my callsign?")
+    app._process(object(), threading.Event())
+    turn2 = llm.messages
+    # Everything before turn 2's own (augmented) tail is the cacheable prefix — it must be clean.
+    assert all("Remembered about the Commander" not in m["content"] for m in turn2[:-1])
+    assert turn2[:-1] == app.history[:-2]                        # prefix == clean stored history
+
+
+def test_memory_recall_off_when_disabled(tmp_path):
+    """No [memory] section -> no recall capability, and a recall phrase injects nothing."""
+    llm = _MsgCapturingLLM()
+    app = App(_cfg(tmp_path), stt=FakeSTT(text="do you remember my main ship?"),
+              llm=llm, tts=FakeTTS())
+    assert app.memory is None
+    app._process(object(), threading.Event())
+    assert llm.last_user == "do you remember my main ship?"

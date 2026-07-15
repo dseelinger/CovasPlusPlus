@@ -193,8 +193,11 @@ Transparent, human-readable facts about you — see [Persistent memory](using/me
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `memory.enabled` | `true` | Master switch for loading/saving memory |
+| `memory.enabled` | `true` | Master switch for loading/saving memory, capture, and recall |
 | `memory.dir` | `memory` | Folder (under your data dir) holding `memory.jsonl` (git-ignored) |
+| `memory.cap` | `500` | Upper bound on stored records; oldest journal milestones pruned first |
+| `memory.recall_phrases` | *(list)* | Phrases that trigger automatic recall into a turn ("do you remember"…) |
+| `memory.recall_wake` | `["recall"]` | Manual-override word forcing a lookup; scrubbed from the model's input |
 | `memory.embedding.enabled` | `false` | Opt in to semantic recall (costs money; off = free keyword recall) |
 | `memory.embedding.provider` | *(blank)* | Name of an embedding backend (none available yet) |
 
