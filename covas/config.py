@@ -91,6 +91,7 @@ _DATA_PATH_FIELDS = (
     ("checklist", "file"),
     ("crew", "file"),
     ("memory", "dir"),
+    ("macros", "file"),
     ("logging", "dir"),
     ("piper", "model"),
     ("whisper", "download_root"),

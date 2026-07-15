@@ -782,6 +782,38 @@ channel_squadron = ""
 channel_direct = ""
 
 
+[macros]
+# Custom macros (issue #50) — the HEADLINE feature: you AUTHOR your own named macros by voice
+# (or in the control panel), instead of only invoking the fixed [keybinds] catalog. Example:
+#   "Create a macro called Dock ASAP. When docking is granted, throttle to zero and drop the
+#    landing gear." -> saved, and it auto-runs next time docking is granted. Say "run Dock ASAP"
+# to trigger it manually, or "list my macros" / "delete Dock ASAP" to manage them.
+#
+# A custom macro is DELIBERATELY confined: it may ONLY use actions in [keybinds].allowlist above
+# (so it can never do anything you haven't already opted into — weapons/eject are impossible),
+# only gate on game-status flags COVAS already reads, and only bind to journal/Status events it
+# already folds. Anything else is refused at authoring with a templated error — COVAS never
+# invents an action. Macros run through the SAME executor + combat guard + hard abort as
+# [keybinds], and consequential ones need a separate spoken "confirm" before they run.
+#
+# DEFAULT OFF — opt in deliberately. Requires [keybinds] set up (bound keys + an allowlist) to
+# actually press anything, and [elite].enabled for the combat guard and for triggers to fire.
+enabled = false
+# Require a separate spoken confirmation before a consequential macro runs (a macro is treated as
+# consequential if any of its actions is, or if you asked for confirmation). Leave ON.
+require_confirmation = true
+# Refuse to run a macro during danger/interdiction (and when ED status is unavailable — we won't
+# act unless we can prove it's safe). Leave ON.
+combat_guard = true
+# Only run a macro whose actions are valid for your CURRENT game mode. Leave ON.
+mode_guard = true
+# Seconds an armed macro stays confirmable before it expires for safety.
+confirm_window = 60
+# Where saved macros live (JSONL, one macro per line). Relative paths resolve under the writable
+# data dir; git-ignored (a macro is your content). Blank/default: custom_macros.jsonl there.
+file = "custom_macros.jsonl"
+
+
 [honk]
 # Auto-honk (N5) — fire the Discovery Scanner shortly after arriving in a NEW system, so you scan
 # the system without lifting a finger. The model isn't involved — arrival triggers a deterministic

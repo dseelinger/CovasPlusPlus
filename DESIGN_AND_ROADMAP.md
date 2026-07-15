@@ -774,6 +774,61 @@ mechanism** and a **different safety model** to the rest of §6:
   narrate *incoming* comms; COVAS++ composes + sends *outgoing* chat hands-free, gated so nothing
   garbled reaches another Commander.
 
+### Implemented — voice/UI-authored custom macros (`[macros]`, default off, #50) — the differentiator
+Every batch above is a **fixed catalogue**: the LLM picks a macro someone wrote in code. This is
+the inversion that makes COVAS++ different — the **Commander composes** a *new named macro*
+conversationally ("call it Dock ASAP; when docking is granted, throttle to zero and drop the
+gear"), which is validated, persisted, and later invoked by name or fired by its trigger. It is a
+self-contained capability (`covas/macros/` + `covas/capabilities/macro_capability.py`) that adds
+**no new runner and no new executor** — a compiled custom macro is an ordinary `Macro` with
+`steps`, run through the exact #33 `run_sequence` behind the exact Tier-1 guard.
+
+The design turns on one idea: **the LLM authors/selects; the deterministic validator + executor
+run.** Authoring safety is *structural*, not prompt-trust:
+
+- **Registry-validated authoring (anti-hallucination, structural).** `macros/compile.py`
+  `compile_macro(spec, actions, allowlist)` resolves EVERY step and trigger against closed
+  registries or FAILS with a templated error that lists the real options — it can never invent an
+  action. An action step must name a macro that is BOTH in the live keybind action registry AND in
+  `[keybinds].allowlist` (so a custom macro is confined to actions the Commander already opted into
+  — weapons/eject aren't registered *and* aren't allowlisted, doubly impossible); a status gate
+  must name a key in `macros/registry.STATUS_CONDITIONS` (the boolean `EDContext` snapshot keys the
+  runner reads); a trigger must name an id in `macros/registry.TRIGGERS` (below). Nothing is
+  persisted on a failure. The web editor (`/macros`) posts through the SAME `_spec_from_input` →
+  `compile_macro`, so voice and UI share one validator.
+- **Two safety properties computed, not trusted.** Effective confirmation = the author's request
+  **OR** any referenced action's own `confirm_required` — a custom macro is never *less* cautious
+  than its most-consequential step. `modes` = the **intersection** of the referenced actions'
+  modes — a macro is only valid where every step is, and a cross-mode mix (ship + on-foot) has an
+  empty intersection and is **rejected at authoring**, not left to misfire.
+- **Triggers = the folded events we already publish.** `TRIGGERS` maps a Commander-facing id to the
+  bus `ed_event` names both watchers emit (`supercruise_exit`, `docked`, `undocked`,
+  `docking_granted`, `arrival`, `landing_gear_down`, `low_fuel`, `overheating`, …). The capability's
+  `on_event` routes a folded event to the macros bound to it. Danger/interdiction are deliberately
+  **not** triggers — the combat guard would always veto the resulting Tier-1 action, so offering
+  them would be dead; that's what Tier-2 reflexes (#36) are for. A per-macro cooldown swallows the
+  journal-vs-Status double-emit of the same moment (both `Docked`s run the macro once).
+- **Same guard / confirm / abort as keybinds.** A voice `run <name>` (or a benign trigger) runs
+  immediately behind the combat + mode + binding guards; a consequential macro (or a consequential
+  *triggered* macro) ARMS and waits for a **separate spoken confirm** via a shared, turn-gated
+  `ConfirmGate` (`keybinds/confirm.py`, extracted so authoring and future callers don't re-copy the
+  arm/confirm/window logic). A consequential trigger doesn't fire itself — it arms and **speaks** a
+  prompt. The **hard abort** shares one `threading.Event` with the keybind capability (injected), so
+  a single "abort" stops a running sequence from either and `release_all()` lifts every held key.
+- **Persistence.** `macros/store.py` is a fail-soft JSONL store (one spec per line, mirroring the
+  memory store) under the writable data dir (`[macros].file`, git-ignored — a macro is Commander
+  content). A corrupt hand-edited line is skipped, not fatal.
+- Everything is injected (store, binds, executor, status snapshot, allowlist provider, speak,
+  spawn, clock, sleep, abort event), so author → validate → persist → run, a bus-triggered run, and
+  every validation-failure path are unit-tested offline with a recording fake executor + fake
+  Status feed — no real keys, no network, no real time.
+- **Deferred by design (Tier-2/Tier-3 spikes, NOT built).** Continuous-distance conditions ("within
+  7.5 km") — ED streams no live distance-to-target, so there's nothing to threshold; and analog /
+  spatial actions ("boost *toward* the station") — need visual aiming COVAS++ doesn't do. Both are
+  captured in `docs/spikes/custom-macros-tiers-50.md` (Tier-2 depends on the #55 vision path and only
+  on-demand; Tier-3 is a separate safety design, likely NO-GO). This issue lands **Tier-1 only** —
+  digital allowlisted actions with waits, status gates, and folded-event triggers.
+
 ---
 
 ## 7. Build status & roadmap

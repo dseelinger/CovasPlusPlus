@@ -289,6 +289,21 @@ See [Keybind automation](automation/keybinds.md). **Off by default** — it send
 | `keybinds.allowlist` | `["landing_gear"]` | The only macros the companion may run. Add flight/nav actions (#30) to opt in: `throttle_zero`/`throttle_50`/`throttle_100`, `frame_shift_drive`, `supercruise`, `hyperspace`, `flight_assist`, `select_target_ahead`, `cycle_next_target`/`cycle_previous_target`, `target_next_route_system`, `nav_lock` — see [Keybind automation](automation/keybinds.md#tier-1-flight-navigation-actions-30) |
 | `keybinds.allowlist` | `["landing_gear"]` | The only macros the companion may run. Opt in to more by name — Tier-1 benign UI actions (#32): `focus_left_panel`, `focus_right_panel`, `focus_comms_panel`, `focus_role_panel`, `quick_comms`, `open_galaxy_map`, `open_system_map`, `cycle_fire_group_next`, `cycle_fire_group_previous`, `ui_back`, `ui_focus`, `toggle_headlook`. See [keybind automation](automation/keybinds.md#more-actions-tier-1-panels-maps-fire-groups). |
 
+## Custom macros (`[macros]`)
+
+See [Custom macros](automation/custom-macros.md). **Off by default.** Lets you author your own
+named, triggerable macros; a macro may only use actions in `keybinds.allowlist`, so it can't do
+anything you haven't already enabled.
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `macros.enabled` | `false` | Master switch |
+| `macros.require_confirmation` | `true` | Consequential macros need a separate spoken confirm (leave on) |
+| `macros.combat_guard` | `true` | Refuse during danger/interdiction or unknown status (leave on) |
+| `macros.mode_guard` | `true` | Only run a macro in its own game mode (leave on) |
+| `macros.confirm_window` | `60` | Seconds an armed macro stays confirmable |
+| `macros.file` | `"custom_macros.jsonl"` | Where saved macros live (git-ignored — it's your content) |
+
 ## Combat reflexes (`[reflex]`)
 
 See [Combat reflexes](automation/reflexes.md). **Off by default**, allowlist ships **empty** — a

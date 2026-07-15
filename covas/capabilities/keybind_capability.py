@@ -170,6 +170,7 @@ class KeybindCapability:
         config: KeybindConfig,
         macros: dict[str, Macro] | None = None,
         status_snapshot: Callable[[], dict | None] | None = None,
+        abort_event: threading.Event | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
         log: Callable[[str], None] | None = None,
@@ -188,7 +189,9 @@ class KeybindCapability:
         # Set by the hard abort to stop a running sequence between steps; cleared at the start of
         # each sequence run. The executor's release_all() is the key-level guarantee; this is the
         # loop-level one so an abort ends the sequence rather than firing its remaining steps.
-        self._abort_flag = threading.Event()
+        # INJECTED (defaulting to a fresh Event) so it can be SHARED with the custom-macro
+        # capability (#50) — then one hard abort stops a running sequence from either.
+        self._abort_flag = abort_event or threading.Event()
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:

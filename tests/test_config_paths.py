@@ -66,6 +66,7 @@ def test_all_path_fields_resolved():
         "checklist": {"file": "ultimate_checklist.md"},
         "crew": {"file": "crew.json"},
         "memory": {"dir": "memory"},
+        "macros": {"file": "custom_macros.jsonl"},
         "logging": {"dir": "logs"},
         "piper": {"model": "voices/en.onnx"},
         "whisper": {"download_root": "models"},

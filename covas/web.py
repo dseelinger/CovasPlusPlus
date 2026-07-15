@@ -33,6 +33,7 @@ from . import updates
 from .__version__ import __version__
 from .checklist import ITEM_RE
 from .memory.store import MemoryRecord, MemoryStore, store_from_config
+from .macros.store import store_from_config as macros_store_from_config
 
 # Config sections whose `api_key_file` the masked "API keys" Settings card manages (issue #23),
 # in display order. The card is write-only: keys are stored ENCRYPTED per section and never read
@@ -581,6 +582,92 @@ def create_app(core) -> Flask:
                           "text": f"Crew roster updated from the web editor "
                                   f"({len(members)} character(s))."})
         return jsonify({"ok": True, **_crew_snapshot()})
+
+    # ---- Custom macros browser (issue #50) -------------------------------------
+    # View / author / delete the Commander's own named macros, mirroring the checklist/memory
+    # editors. Authoring here runs the SAME registry validator (`compile_macro`) as voice
+    # authoring, so a web-created macro is anti-hallucination-checked identically: an action not
+    # in [keybinds].allowlist, or an unknown status/trigger, is a templated 400 and nothing is
+    # saved. When macros are ON we reach the app's live store; otherwise we build one from config
+    # pointing at the same file, so the panel works before the feature is enabled.
+    def _macro_store():
+        mac = getattr(core, "macros", None)
+        if mac is not None:
+            return mac._store
+        try:
+            return macros_store_from_config(core.cfg)
+        except Exception:  # noqa: BLE001 — no resolvable file: browser simply unavailable
+            return None
+
+    def _macro_actions_and_allow():
+        """The action registry + current [keybinds].allowlist the validator (and the form's
+        option lists) use — read live from config so a changed allowlist is reflected."""
+        from .capabilities.keybind_capability import KeybindConfig
+        from .keybinds import actions as _kb_actions  # noqa: F401 — populates the registry
+        from .keybinds.registry import registered_macros
+        allow = frozenset(KeybindConfig.from_cfg(core.cfg).allowlist)
+        return registered_macros(), allow
+
+    def _macro_vocab():
+        """The closed vocabularies the authoring form offers (allowlisted actions, status keys,
+        triggers) — same sets the validator enforces, so the form can't suggest an invalid one."""
+        from .macros.registry import STATUS_CONDITIONS, TRIGGERS
+        actions, allow = _macro_actions_and_allow()
+        return {
+            "actions": sorted(allow & set(actions)),
+            "statuses": [{"key": k, "label": c.label} for k, c in STATUS_CONDITIONS.items()],
+            "triggers": [{"id": t.id, "when": t.when} for t in TRIGGERS.values()],
+        }
+
+    @flask_app.route("/macros")
+    def macros_page():
+        return render_template("macros.html")
+
+    @flask_app.route("/api/macros")
+    def macros_state():
+        store = _macro_store()
+        if store is None:
+            return jsonify({"ok": False, "error": "no macros file configured"}), 400
+        specs = store.load()
+        return jsonify({"ok": True, "macros": [s.to_dict() for s in specs],
+                        "vocab": _macro_vocab(), "name": store.path.name})
+
+    @flask_app.route("/api/macros/create", methods=["POST"])
+    def macros_create():
+        """Validate a macro against the registry and persist it. Reuses the exact voice-authoring
+        path (`_spec_from_input` -> `compile_macro`) so web and voice share one validator."""
+        store = _macro_store()
+        if store is None:
+            return jsonify({"ok": False, "error": "no macros file configured"}), 400
+        from .capabilities.macro_capability import _spec_from_input
+        from .macros.compile import MacroValidationError, compile_macro
+        b = request.get_json(force=True) or {}
+        try:
+            spec = _spec_from_input(b)
+        except ValueError as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+        actions, allow = _macro_actions_and_allow()
+        try:
+            compile_macro(spec, actions=actions, allowlist=allow)   # anti-hallucination gate
+        except MacroValidationError as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+        store.add(spec)
+        core.bus.publish({"type": "log", "who": "system",
+                          "text": f"Custom macro '{spec.name}' saved from the web editor."})
+        return jsonify({"ok": True, "macros": [s.to_dict() for s in store.all()]})
+
+    @flask_app.route("/api/macros/delete", methods=["POST"])
+    def macros_delete():
+        store = _macro_store()
+        if store is None:
+            return jsonify({"ok": False, "error": "no macros file configured"}), 400
+        b = request.get_json(force=True) or {}
+        name = str(b.get("name") or "")
+        if not store.delete(name):
+            return jsonify({"ok": False, "error": f"no macro called {name!r}"}), 404
+        core.bus.publish({"type": "log", "who": "system",
+                          "text": f"Custom macro '{name}' deleted from the web editor."})
+        return jsonify({"ok": True, "macros": [s.to_dict() for s in store.all()]})
 
     @flask_app.route("/api/cancel", methods=["POST"])
     def cancel():
