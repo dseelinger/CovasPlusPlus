@@ -371,6 +371,18 @@ SCHEMA: list[Setting] = [
             "Default number of hops when planning a trade loop (if you don't say).",
             default=4, min=1, max=20, unit="hops",
             phrasings=("trade route hops",)),
+    Setting("neutron_plan.enabled", ("neutron_plan", "enabled"), "bool",
+            "Neutron-route planner", "Navigation & search",
+            "Voice: 'plot a neutron route to Colonia'. Plots a long-range neutron-highway route to "
+            "a distant system and copies the first waypoint to your clipboard for the galaxy map.",
+            default=False, phrasings=("neutron route planner", "long range route planner",
+                                      "galaxy route planner")),
+    Setting("neutron_plan.default_efficiency", ("neutron_plan", "default_efficiency"), "int",
+            "Neutron route efficiency", "Navigation & search",
+            "Default Spansh efficiency (1-100) when you don't say — higher trades longer neutron "
+            "detours for fewer total jumps.",
+            default=60, min=1, max=100, unit="%",
+            phrasings=("neutron route efficiency",)),
 
     # --- Providers ---------------------------------------------------------
     Setting("llm.provider", ("llm", "provider"), "enum",

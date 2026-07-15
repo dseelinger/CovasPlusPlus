@@ -298,6 +298,19 @@ See [Trade-route planner](search/trade-routes.md). **Off by default.**
 Needs [`[elite].enabled`](elite/monitoring.md) for the live docked-station start. The next stop is
 copied to your clipboard for the galaxy map (in-game course-set arrives with the keybind actions).
 
+## Neutron / long-range route planner (`[neutron_plan]`)
+
+See [Neutron / long-range route planner](search/neutron-route.md). **Off by default.**
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `neutron_plan.enabled` | `false` | Master switch — voice-plot a long-range neutron route to a distant system |
+| `neutron_plan.default_efficiency` | `60` | Spansh efficiency 1–100 when you don't say (higher = fewer jumps) |
+
+Needs [`[elite].enabled`](elite/monitoring.md) for the current-system default start. The first
+waypoint is copied to your clipboard for the galaxy map (in-game course-set arrives with the keybind
+actions).
+
 ## Community goals (`[cg]`)
 
 See [Community goals](elite/community-goals.md).

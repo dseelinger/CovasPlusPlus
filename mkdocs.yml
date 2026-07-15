@@ -98,6 +98,7 @@ nav:
       - Faction states: search/faction-states.md
       - Signals & structures: search/signals.md
       - Trade-route planner: search/trade-routes.md
+      - Neutron / long-range route: search/neutron-route.md
   - Ship automation:
       - Keybind automation: automation/keybinds.md
       - Auto-honk: automation/auto-honk.md

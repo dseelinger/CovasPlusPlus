@@ -232,6 +232,8 @@ class App:
             self._start_searches()
         if self.cfg.get("route_plan", {}).get("enabled"):
             self._start_route_plan()
+        if self.cfg.get("neutron_plan", {}).get("enabled"):
+            self._start_neutron_plan()
         # C9: compose the audio layer once the mixer, providers, and ED context all exist.
         if self.mixer is not None:
             self._start_audio_layer()
@@ -978,6 +980,29 @@ class App:
             self.route_plan = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Trade-route planner failed to start: {e}"})
+
+    def _start_neutron_plan(self) -> None:
+        """Build + register the neutron / long-range galaxy planner (#43), the second capability on
+        the #41 route foundation. Fail soft — a startup problem just leaves it off. Shares the
+        current-system seam for the default start; the plot handoff copies the first waypoint to the
+        clipboard until the galaxy-map keybind automation (#32) lands."""
+        try:
+            from .search import RequestsHttp
+            from .capabilities.neutron_plan_capability import (NeutronPlanCapability,
+                                                               NeutronPlanConfig)
+
+            ncfg = NeutronPlanConfig.from_cfg(self.cfg)
+            self.neutron_plan = NeutronPlanCapability(
+                ncfg, http=RequestsHttp(),
+                get_current_system=self._current_system,
+                log=lambda msg: self._log("neutron", msg))
+            self.registry.register(self.neutron_plan)
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": "Neutron-route planner ON (plot handoff via clipboard)."})
+        except Exception as e:  # noqa: BLE001 — optional; never block startup
+            self.neutron_plan = None
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Neutron-route planner failed to start: {e}"})
 
     def _current_station(self) -> str | None:
         """The station the Commander is currently DOCKED at, from live ED context — or None when

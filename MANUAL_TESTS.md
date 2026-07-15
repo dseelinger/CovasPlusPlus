@@ -344,6 +344,18 @@ Notes:
 
 Notes:
 
+## 8b. Neutron / long-range route planner (#43)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
+> `[neutron_plan].enabled = true` + `[elite].enabled = true`. Plots a Spansh **neutron-highway** route to a distant system (start defaults to your current system) and copies the **first waypoint** to the clipboard for the galaxy map. Needs a real route.
+- [ ] **Plot to a distant system (happy path):** somewhere with a real position, *"Plot a neutron route to Colonia — my laden jump range is 55 light-years."* → speaks a **total jump count**, the **number of waypoints**, and the **first waypoint system**, and says it was copied. Cross-check the jump count against [spansh.co.uk/plotter](https://spansh.co.uk/plotter) with the same range/efficiency.
+- [ ] **Plot handoff:** after a plan, **paste** (Ctrl-V) into the galaxy-map search box → it's the **first waypoint system**; it sets course. (In-game auto course-set is the later keybind action #32.)
+- [ ] **Asks for the destination:** *"Plot a neutron route."* with no target → it asks **where to**, rather than guessing.
+- [ ] **Asks for jump range:** *"Plot a neutron route to Colonia."* with no range → it asks for your **laden jump range** rather than inventing one.
+- [ ] **Explicit start:** *"Plot a neutron route from Sol to Colonia, 55 light-year jump range."* → uses **Sol** as the start even if you're elsewhere.
+- [ ] **Efficiency nudge:** ask for a **more efficient** (or *more direct*) route → the jump count changes accordingly (higher efficiency = fewer jumps).
+- [ ] **Fail-soft:** with the internet briefly off, ask for a route → a spoken "couldn't reach the neutron plotter" note, and the voice loop keeps working (no crash).
+
+Notes:
+
 ## 9. Location & carriers (N3)  🎮 ED 🔊 HW 📋 clipboard
 > `[elite].enabled = true`. The owned fleet carrier is tracked from the journal (pinned to its `CarrierID`).
 - [ ] **Copy current system:** *"Copy my current system."* → copies your **current** system to the clipboard (paste to confirm).
