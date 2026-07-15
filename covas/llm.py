@@ -172,7 +172,12 @@ def stream_reply(
     model: str | None = None,
     max_tokens: int | None = None,
 ) -> Iterator[tuple[str, str]]:
-    working = list(messages)
+    # Belt-and-braces: never send a message with empty content — the API rejects it
+    # ("messages.N: … must have non-empty content") and 400s the whole turn. App now builds
+    # history transactionally so an orphaned/empty turn shouldn't reach here, but a stray one
+    # must degrade to a dropped message, not a hard failure. Content is a str (text) or a list of
+    # blocks (tool results); both are falsy when empty.
+    working = [m for m in messages if m.get("content")]
     # Loop to handle server-tool continuations (pause_turn) and client-tool calls
     # (tool_use). Each keeps re-sending until Claude produces a final answer.
     for _round in range(8):

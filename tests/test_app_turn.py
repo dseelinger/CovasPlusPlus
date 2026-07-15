@@ -525,3 +525,82 @@ def test_vad_utterance_dispatches_wake_gated(tmp_path):
     app.ptt_held = False
     app._on_vad_utterance(object())
     assert seen == {"wake_gated": True}
+
+
+# --- history integrity (feature-01 remediation) ---------------------------------------
+# A turn that CANCELS, ERRORS, or comes back EMPTY must leave NO orphaned user turn in
+# self.history. An orphan (a user message with no assistant reply) poisons the next call:
+# Anthropic 400s ("messages … must have non-empty content") and the model answers the STALE
+# question. We commit the user+assistant PAIR only after a successful reply.
+
+class _RaisingLLM:
+    """stream_reply raises mid-stream — stands in for the Anthropic 400 we saw in testing."""
+
+    def stream_reply(self, messages, cancel, on_event,
+                     tool_handler=None, tools=None, model=None, max_tokens=None):
+        raise RuntimeError("400 - user messages must have non-empty content")
+        yield ("text", "")  # unreachable — keeps this a generator, like the real provider
+
+
+class _CancelMidStreamLLM:
+    """Sets the cancel event as the reply begins — a barge-in / tap-cancel mid-turn."""
+
+    def stream_reply(self, messages, cancel, on_event,
+                     tool_handler=None, tools=None, model=None, max_tokens=None):
+        cancel.set()
+        yield ("text", "half a sen")
+
+
+def test_error_midturn_leaves_history_clean(tmp_path):
+    app = _make_app(tmp_path, stt=FakeSTT(text="what's the latest ED update?"),
+                    llm=_RaisingLLM(), tts=FakeTTS())
+    app._process(object(), threading.Event())
+    assert app.history == []            # no orphaned user turn survives the error
+    assert app.tts.spoken == []
+    assert app.state == "Idle"
+
+
+def test_cancel_midturn_leaves_history_clean(tmp_path):
+    app = _make_app(tmp_path, stt=FakeSTT(text="tell me a long story"),
+                    llm=_CancelMidStreamLLM(), tts=FakeTTS())
+    app._process(object(), threading.Event())
+    assert app.history == []            # barge-in/cancel drops the turn cleanly
+    assert app.tts.spoken == []
+
+
+def test_empty_reply_leaves_history_clean(tmp_path):
+    app = _make_app(tmp_path, stt=FakeSTT(text="hello?"),
+                    llm=FakeLLM(text="   "), tts=FakeTTS())
+    app._process(object(), threading.Event())
+    assert app.history == []
+    assert app.tts.spoken == []
+
+
+def test_whitespace_transcription_drops_turn_without_calling_llm(tmp_path):
+    """A near-silence / whitespace-only capture (e.g. a barge-in that caught almost nothing)
+    must NOT reach the LLM or history — sending an empty/whitespace user turn 400s the API
+    ("messages must have non-empty content") and poisons later turns."""
+    llm = FakeLLM(text="ok")
+    app = _make_app(tmp_path, stt=FakeSTT(text="   \n  "), llm=llm, tts=FakeTTS())
+    app._process(object(), threading.Event())
+    assert llm.model_seen is None       # LLM never called on an empty capture
+    assert app.history == []            # nothing stored
+    assert app.tts.spoken == []
+    assert app.state == "Idle"
+
+
+def test_history_not_poisoned_across_error_then_success(tmp_path):
+    """The stale-question BLEED regression: after a turn errors, the next turn answers ITS OWN
+    question — the errored turn left no orphan for the model to respond to."""
+    app = _make_app(tmp_path, stt=FakeSTT(text="what's the latest ED update?"),
+                    llm=_RaisingLLM(), tts=FakeTTS())
+    app._process(object(), threading.Event())              # turn 1 errors
+    assert app.history == []
+
+    app.llm = FakeLLM(text="On foot? Different department, Commander.")
+    app.stt = FakeSTT(text="give me the on-foot engineering breakdown")
+    app._process(object(), threading.Event())              # turn 2 succeeds
+    assert app.history == [
+        {"role": "user", "content": "give me the on-foot engineering breakdown"},
+        {"role": "assistant", "content": "On foot? Different department, Commander."},
+    ]

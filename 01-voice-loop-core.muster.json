@@ -140,11 +140,11 @@
         "FILE"
       ],
       "requires": "App running.",
-      "expected": "Emoji/symbol input streams without crashing; the newest `logs\\session_*.log` holds timestamped prompts/replies + router/usage; a brief network kill degrades gracefully back to IDLE (dead TTS falls back to text); Ctrl+Alt+Q shuts down cleanly.",
+      "expected": "A reply with odd Unicode (accented words, →, em dash) streams/speaks without crashing; the newest `logs\\session_*.log` holds timestamped prompts/replies + router/usage; a brief network kill degrades gracefully back to IDLE (dead TTS falls back to text); Ctrl+Alt+Q shuts down cleanly.",
       "steps": [
         {
           "id": "s1",
-          "text": "Ask for something with odd symbols/emoji (\"Draw me an ASCII arrow and explain it.\") → speaks/streams without the console crashing."
+          "text": "Ask for a reply that MUST contain odd Unicode (\"Say these words back to me — café, naïve, jalapeño — then tell me what the → (rightwards arrow) and — (em dash) symbols are called.\") → COVAS streams/speaks the accented words + symbol names without the console crashing on the non-cp1252 glyphs. (Avoid ASCII-ART requests — the audio persona declines those.)"
         },
         {
           "id": "s2",
@@ -161,5 +161,78 @@
       ]
     }
   ],
-  "runs": []
+  "runs": [
+    {
+      "runId": "run-20260715T172420Z-e52b",
+      "session": "01 voice-loop-core: PTT->STT->LLM->TTS, barge-in, cost router, web search, robustness",
+      "commit": "21f70c1",
+      "branch": "main",
+      "submittedAt": "2026-07-15T18:06:00Z",
+      "results": [
+        {
+          "testId": "core-voice-loop",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": true,
+            "s5": true
+          }
+        },
+        {
+          "testId": "cancel-barge-in",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": true
+          }
+        },
+        {
+          "testId": "cost-router-tiers",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": true,
+            "s5": true,
+            "s6": true
+          }
+        },
+        {
+          "testId": "web-search-automatic",
+          "status": "fail",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false
+          },
+          "failure": {
+            "notes": "What's the latest Elite Dangerous update right now - failed.",
+            "console": "14:02:50 Commander: What's the latest Elite Dangerous update right now?\r\n14:02:50 router: [standard] claude-sonnet-5 max_tokens=1024 — escalate -> standard tier: current/web data 'latest'\r\n14:02:50 » Thinking\r\n14:02:54 usage: in=1824 out=57 cache_write=0 cache_read=17904 ~$0.0117 [claude-sonnet-5]\r\n14:02:54 » Idle · error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'messages.28: user messages must have non-empty content'}, 'request_id': 'req_011Cd4HNFE9vr79xcmtbjZBN'}",
+            "screenshots": []
+          }
+        },
+        {
+          "testId": "robustness-and-quit",
+          "status": "fail",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false
+          },
+          "failure": {
+            "notes": "Draw me an ASCII arrow and explain it - failed",
+            "console": "14:04:26 Commander: Draw me an ASCII arrow and explain it.\r\n14:04:26 router: [cheap] claude-haiku-4-5 max_tokens=1024 — default -> cheap tier\r\n14:04:26 » Thinking\r\n14:04:28 usage: in=1648 out=108 cache_write=0 cache_read=13270 ~$0.0035 [claude-haiku-4-5]\r\n14:04:28 COVAS: I don't have real-time update information, Commander — that's out of my reach. You'd need to check the launcher or the official forums for what's current as of today.\r\n\r\nAs for the ASCII arrow: can't do it. I'm speaking to you via audio, so there's no visual — no ASCII art, no diagrams, no text formatting. Just words. If you need to see something drawn out, you'll want a screen for that.\r\n\r\nAnything else I can help with?\r\n14:04:29 » Speaking",
+            "screenshots": []
+          }
+        }
+      ]
+    }
+  ]
 }
