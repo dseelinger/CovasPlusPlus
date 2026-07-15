@@ -164,11 +164,11 @@
         "FILE"
       ],
       "requires": "App running.",
-      "expected": "A reply with odd Unicode (accented words, →, em dash) streams/speaks without crashing; the newest `logs\\session_*.log` holds timestamped prompts/replies + router/usage; a brief network kill degrades gracefully back to IDLE (dead TTS falls back to text); Ctrl+Alt+Q shuts down cleanly.",
+      "expected": "A long/complex reply streams + speaks and the loop SURVIVES without the console crashing (genuine non-cp1252 glyph safety is covered by an offline unit test); the newest `logs\\session_*.log` holds timestamped prompts/replies + router/usage; a brief network kill degrades gracefully back to IDLE (dead TTS falls back to text); Ctrl+Alt+Q shuts down cleanly.",
       "steps": [
         {
           "id": "s1",
-          "text": "Ask for a reply that MUST contain odd Unicode (\"Say these words back to me — café, naïve, jalapeño — then tell me what the → (rightwards arrow) and — (em dash) symbols are called.\") → COVAS streams/speaks the accented words + symbol names without the console crashing on the non-cp1252 glyphs. (Avoid ASCII-ART requests — the audio persona declines those.)"
+          "text": "Odd/long reply does not crash the loop: ask for a punctuation- and symbol-heavy answer (e.g. \"Explain em dashes, en dashes, hyphens, and arrows, with examples.\"). COVAS streams + speaks the whole reply and returns to IDLE with no console crash. NOTE: it is a voice app — the model describes symbols in words and STT cannot feed it glyphs, so you are confirming the loop SURVIVES any reply, not that specific glyphs print. Real non-cp1252 console safety is covered by the offline unit test (tests/test_console_hardening.py)."
         },
         {
           "id": "s2",
@@ -253,6 +253,82 @@
           "failure": {
             "notes": "Draw me an ASCII arrow and explain it - failed",
             "console": "14:04:26 Commander: Draw me an ASCII arrow and explain it.\r\n14:04:26 router: [cheap] claude-haiku-4-5 max_tokens=1024 — default -> cheap tier\r\n14:04:26 » Thinking\r\n14:04:28 usage: in=1648 out=108 cache_write=0 cache_read=13270 ~$0.0035 [claude-haiku-4-5]\r\n14:04:28 COVAS: I don't have real-time update information, Commander — that's out of my reach. You'd need to check the launcher or the official forums for what's current as of today.\r\n\r\nAs for the ASCII arrow: can't do it. I'm speaking to you via audio, so there's no visual — no ASCII art, no diagrams, no text formatting. Just words. If you need to see something drawn out, you'll want a screen for that.\r\n\r\nAnything else I can help with?\r\n14:04:29 » Speaking",
+            "screenshots": []
+          }
+        }
+      ]
+    },
+    {
+      "runId": "run-20260715T201500Z-1002",
+      "session": "01 voice-loop-core re-test on v0.10.1 (history-integrity fix): build-check, web-search FIRST real run, robustness s1-s4",
+      "commit": "85b4820",
+      "branch": "main",
+      "submittedAt": "2026-07-15T20:40:28Z",
+      "results": [
+        {
+          "testId": "build-version-check",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "core-voice-loop",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": true,
+            "s5": true
+          }
+        },
+        {
+          "testId": "cancel-barge-in",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": true
+          }
+        },
+        {
+          "testId": "cost-router-tiers",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": true,
+            "s5": true,
+            "s6": true
+          }
+        },
+        {
+          "testId": "web-search-automatic",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": true
+          }
+        },
+        {
+          "testId": "robustness-and-quit",
+          "status": "fail",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false
+          },
+          "failure": {
+            "notes": "\"Ask for a reply that MUST contain odd Unicode (\"Say these words back to me — café, naïve, jalapeño\". No unicode characters were printed. I assume they were supposed to be? It wasn't totally clear.",
+            "console": "16:37:42 Commander: Say these words back to me. Cafe, naive, jalapeno. Then tell me what the right words arrow and m-dash symbols are called.\r\n16:37:42 router: [cheap] claude-haiku-4-5 max_tokens=1024 — default -> cheap tier\r\n16:37:42 » Thinking\r\n16:37:45 usage: in=2608 out=131 cache_write=0 cache_read=13270 ~$0.0046 [claude-haiku-4-5]\r\n16:37:45 COVAS: Cafe, naive, jalapeno. Easy enough.\r\n\r\nThe right-pointing arrow symbol is called a right arrow, or if you want the formal name, a rightwards arrow. The m-dash — that's the long horizontal line used in prose — is called an em dash. It's called that because it's roughly the width of the letter M in the typeface you're using. There's also an en dash, which is shorter, about the width of an N, and a hyphen, which is shorter still — but the m-dash is the one for setting off clauses or adding emphasis in writing.",
             "screenshots": []
           }
         }

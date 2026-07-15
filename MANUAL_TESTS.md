@@ -820,7 +820,7 @@ Notes:
 Notes:
 
 ## 17. Robustness & quit  🔊 HW 📋 FILE
-- [ ] Ask for a reply that MUST contain odd Unicode (*"Say these words back to me — café, naïve, jalapeño — then tell me what the → (rightwards arrow) and — (em dash) symbols are called."*) → COVAS streams/speaks the accented words + symbol names without the console crashing on the non-cp1252 glyphs. (Avoid ASCII-ART requests — the audio persona declines those.)
+- [ ] Odd/long reply doesn't crash the loop: ask for a punctuation- and symbol-heavy answer (*"Explain em dashes, en dashes, hyphens, and arrows, with examples."*) → COVAS streams + speaks the whole reply and returns to IDLE with no console crash. (It's a voice app — the model describes symbols in words and STT can't feed it glyphs, so you're confirming the loop **survives any reply**, not that specific glyphs print. Real non-cp1252 console safety is covered by the offline unit test `tests/test_console_hardening.py`.)
 - [ ] 📋 After a session, open the newest **`logs\session_*.log`** → prompts + replies with timestamps, plus router/usage lines.
 - [ ] A provider hiccup (briefly kill network) degrades gracefully — the loop survives and returns to IDLE; a dead TTS falls back to text.
 - [ ] **Ctrl+Alt+Q** (or closing the console window) shuts it down cleanly.

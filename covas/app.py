@@ -32,14 +32,20 @@ from .ed import ContextDetector
 from .memory import MemoryDetector
 from . import crew as crew_mod
 
-# Claude replies can contain Unicode (arrows, em-dashes, emoji) the default Windows
-# console can't encode. Make console output lossy-safe so a stray glyph never crashes
-# the worker mid-reply.
-for _stream in (sys.stdout, sys.stderr):
-    try:
-        _stream.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:  # noqa: BLE001 — older/odd streams may lack reconfigure
-        pass
+def _harden_streams(streams) -> None:
+    """Make console output lossy-safe. Claude replies can contain Unicode (arrows, em-dashes,
+    emoji) the default Windows console (cp1252) can't encode — a stray glyph would raise
+    UnicodeEncodeError and crash the worker mid-reply. Reconfigure each stream to utf-8 with
+    errors="replace" so an unencodable glyph degrades to a placeholder instead of crashing.
+    Best-effort per stream (older/odd streams may lack reconfigure)."""
+    for _stream in streams:
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001 — older/odd streams may lack reconfigure
+            pass
+
+
+_harden_streams((sys.stdout, sys.stderr))
 
 STATES = ("Idle", "Listening", "Transcribing", "Thinking", "Searching", "Speaking")
 # States where COVAS is heads-down WORKING on a spoken turn — the window the soft "thinking" bed
