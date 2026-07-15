@@ -58,6 +58,16 @@ Local speech recognition (faster-whisper) — nothing leaves your machine.
 | `anthropic.cache_ttl` | `1h` | Prompt-cache lifetime: `1h` survives long gaps between turns; `5m` is cheaper when chatting steadily |
 | `anthropic.thinking.default` | `Off` | Extended-thinking depth: `Off`, `Low`, `Medium`, `High`, `Extra`, `Max` |
 
+The Anthropic key isn't set here — enter it in the **first-run wizard** or the Settings **API keys**
+card, and it's stored in `anthropic.api_key_file` (`AnthropicAPIKey.txt`).
+
+> **How your keys are stored.** Every provider key (Anthropic, ElevenLabs, OpenAI, Gemini, Azure,
+> Cartesia, Inara) is encrypted at rest with **Windows DPAPI** (`CurrentUser` scope) — never
+> plaintext, and **environment variables are no longer read for keys** (#22). A plaintext key you
+> paste into a `*APIKey.txt` file is migrated to a `DPAPI:<blob>` on first read. A blob won't
+> decrypt on a different machine/account, so re-enter keys after a move. As defense-in-depth, use
+> **spend-capped or restricted keys** where your provider offers them.
+
 ## Cost router (`[router]`)
 
 Routes each turn to the cheapest capable model, escalating only when a turn earns it. See
@@ -122,10 +132,10 @@ See [Personas & voice](using/personas-voice.md).
 | `cartesia.model` | `sonic-2` | Cartesia Sonic model for `tts.provider = "cartesia"` (low-latency premium **persona** voice) |
 | `cartesia.voice` | *(blank)* | Cartesia voice id (**required** for `cartesia` — get one from play.cartesia.ai or `GET /voices`) |
 | `cartesia.language` | `en` | Synthesis language (BCP-47 primary subtag) for the Cartesia voice |
-| `elevenlabs.api_key_file` | `ElevenLabsAPIKey.txt` | Where the ElevenLabs key is read from (git-ignored) |
-| `azure.api_key_file` | `AzureSpeechKey.txt` | Where the Azure Speech key is read from — or set `AZURE_SPEECH_KEY` (git-ignored) |
-| `openai_tts.api_key_file` | `OpenAIAPIKey.txt` | Where the OpenAI key is read from — or set `OPENAI_API_KEY` (git-ignored) |
-| `cartesia.api_key_file` | `CartesiaAPIKey.txt` | Where the Cartesia key is read from — or set `CARTESIA_API_KEY` (git-ignored) |
+| `elevenlabs.api_key_file` | `ElevenLabsAPIKey.txt` | Where the ElevenLabs key is read from — DPAPI-encrypted at rest, git-ignored; enter it on the Settings **API keys** card |
+| `azure.api_key_file` | `AzureSpeechKey.txt` | Where the Azure Speech key is read from — DPAPI-encrypted at rest, git-ignored; enter it on the Settings **API keys** card |
+| `openai_tts.api_key_file` | `OpenAIAPIKey.txt` | Where the OpenAI key is read from — DPAPI-encrypted at rest, git-ignored; enter it on the Settings **API keys** card |
+| `cartesia.api_key_file` | `CartesiaAPIKey.txt` | Where the Cartesia key is read from — DPAPI-encrypted at rest, git-ignored; enter it on the Settings **API keys** card |
 
 > **Edge (`edge-tts`) is optional and not load-bearing.** It uses an undocumented, no-SLA Microsoft
 > endpoint that periodically breaks; when it's down the persona voice falls back to Piper (or degrades
@@ -133,18 +143,18 @@ See [Personas & voice](using/personas-voice.md).
 >
 > **Azure Neural TTS is Edge's reliable sibling** — the *same* voices over the official Speech
 > service, with an API, an SLA, and a **free tier (~0.5M chars/month)**. Needs a Speech resource key
-> (`AZURE_SPEECH_KEY` env var or `AzureSpeechKey.txt`) + its `region`. No ToS/reliability asterisk —
+> (enter it on the Settings **API keys** card, stored in `AzureSpeechKey.txt`) + its `region`. No ToS/reliability asterisk —
 > the shippable low/zero-cost way to give the cast big voice variety.
 >
 > **OpenAI-compatible TTS (`openai`)** is a **cheap cloud** voice — a small fixed voice set, so it's
 > best as a persona or a supplemental cast voice. `base_url` is configurable, so any OpenAI-compatible
-> endpoint works. Needs `OPENAI_API_KEY` (env var or `OpenAIAPIKey.txt`) — the env var is shared with a
-> future OpenAI LLM provider.
+> endpoint works. Needs an OpenAI key (enter it on the Settings **API keys** card, stored in
+> `OpenAIAPIKey.txt`) — the same key is shared with a future OpenAI LLM provider.
 >
 > **Cartesia (`cartesia`)** is a **low-latency premium persona** voice (Cartesia Sonic) — a snappier
 > alternative to ElevenLabs for COVAS's own voice; it **streams** so the first audio starts fast. It's
-> **persona-only** — not offered for the NPC/comms/chatter cast. Needs `CARTESIA_API_KEY` (env var or
-> `CartesiaAPIKey.txt`) and a `voice` id.
+> **persona-only** — not offered for the NPC/comms/chatter cast. Needs a Cartesia key (enter it on the
+> Settings **API keys** card, stored in `CartesiaAPIKey.txt`) and a `voice` id.
 
 ## Conversation (`[conversation]`)
 
@@ -317,14 +327,14 @@ voice-cast pool live in the same sections — see the comments in `config.toml`.
 > DeepSeek, and OpenRouter** — only `[openai].base_url` and the model ids differ (see the presets in
 > `config.toml`). It's a **cloud** provider, so it's fine in-game and the [cost router](#cost-router-router)
 > tiers it via `[openai.tiers].{cheap,standard,premium}`. Tool calling (the checklist voice commands)
-> works; there is **no web-search** on this path (Anthropic-only). Needs `OPENAI_API_KEY` (env var or
-> `OpenAIAPIKey.txt` — shared with the OpenAI TTS provider). A request error degrades the turn to text,
-> never crashing the loop.
+> works; there is **no web-search** on this path (Anthropic-only). Needs an OpenAI key (enter it on the
+> Settings **API keys** card, stored in `OpenAIAPIKey.txt` — shared with the OpenAI TTS provider). A
+> request error degrades the turn to text, never crashing the loop.
 >
 > **Gemini LLM (`llm.provider = "gemini"`).** Google Gemini on the **native** API — strong **tool
 > calling** plus Google-Search **grounding** (surfaced like web search when `web_search.enabled` is on),
 > and a cheap/fast **Flash** default tier (Pro for depth) via `[gemini.tiers]`. Cloud, so in-game is
-> fine. Needs `GEMINI_API_KEY` (or `GOOGLE_API_KEY`, env var or `GeminiAPIKey.txt`) — a free key comes
-> from [Google AI Studio](https://aistudio.google.com). Fail soft: a request error degrades the turn to
+> fine. Needs a Gemini key (enter it on the Settings **API keys** card, stored in `GeminiAPIKey.txt`) —
+> a free key comes from [Google AI Studio](https://aistudio.google.com). Fail soft: a request error degrades the turn to
 > text. (Combining function calling + grounding needs a Gemini 2.x model; older models may reject the
 > combo — turn `web_search.enabled` off for those.)

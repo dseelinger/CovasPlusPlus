@@ -103,19 +103,19 @@ first launch may download the local speech model, which can take a minute.
 
 ### 3. Set up your keys and personal files
 
-A source run reads its state from the **project root** (not `%APPDATA%`), so:
+A source run reads its state from the **project root** (not `%APPDATA%`). The easiest path is to
+launch the app once (step 5) and enter your keys in the **first-run wizard** or the Settings
+**API keys** card — each key is stored **DPAPI-encrypted** (see the note below). To set them up by
+hand first, drop each key into its git-ignored file in the project root:
 
-**Anthropic** — set a **Windows User environment variable** named `ANTHROPIC_API_KEY`:
+**Anthropic** *(required)* — paste your key (it starts with `sk-ant-`) into `AnthropicAPIKey.txt`:
 
-1. Press <kbd>Win</kbd> and type **"environment variables"**, then open
-   **"Edit environment variables for your account."**
-2. Under **User variables**, click **New…**
-3. Name: `ANTHROPIC_API_KEY` — Value: your key (it starts with `sk-ant-`).
-4. Click OK, then **restart PowerShell** so it picks up the new variable.
+```powershell
+Set-Content AnthropicAPIKey.txt 'sk-ant-...'   # your key
+```
 
-!!! warning "Never paste your key into a file in the project"
-    The Anthropic key lives only in that environment variable — never in a file that could be
-    committed. COVAS++ reads it from the environment.
+The file is git-ignored, and the plaintext you paste is **migrated to a DPAPI-encrypted blob on
+first read** — the app never keeps your key in plaintext on disk.
 
 **ElevenLabs** *(optional)* — copy the template and paste your key in:
 
@@ -124,8 +124,17 @@ Copy-Item ElevenLabsAPIKey.txt.example ElevenLabsAPIKey.txt
 # then open ElevenLabsAPIKey.txt and paste your key
 ```
 
-`ElevenLabsAPIKey.txt` is git-ignored. Prefer not to use ElevenLabs? Switch the voice to the
-free local **Piper** (see below) and skip this.
+`ElevenLabsAPIKey.txt` is git-ignored (and encrypted at rest on first read, same as above). Prefer
+not to use ElevenLabs? Switch the voice to the free local **Piper** (see below) and skip this.
+
+!!! info "How your keys are stored"
+    COVAS++ **never stores plaintext keys**. Every provider key (Anthropic, ElevenLabs, OpenAI,
+    Gemini, Azure, Cartesia, Inara) is encrypted at rest with **Windows DPAPI** (`CurrentUser`
+    scope) — Windows owns the encryption key, the app stores none, and the encrypted blob is
+    useless on any other machine or account. **Environment variables are no longer read for keys.**
+    If you move your data folder to a new PC or Windows account, the blobs won't decrypt there —
+    just re-enter each key. As defense-in-depth, create **spend-capped or restricted keys** at each
+    provider where you can.
 
 **Your character** — start from the shipped default:
 

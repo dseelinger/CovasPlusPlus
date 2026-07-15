@@ -95,15 +95,17 @@ credits — ideal for the NPC/comms/chatter cast. Pin explicit voices by adding 
 **`azure` — the reliable sibling of Edge (free tier + SLA).** The `azure` provider uses **official
 Azure Neural TTS**: the *same* voices as Edge, but over the Speech service with a real API, an SLA,
 and a **free monthly tier (~0.5M characters)** — the shippable way to give the cast big voice variety
-at low/zero cost, with no ToS/reliability asterisk. Needs a Speech resource **key** (`AZURE_SPEECH_KEY`
-env var or `AzureSpeechKey.txt`) and **region** (`[azure].region`). Set `cast_provider = "azure"` or a
+at low/zero cost, with no ToS/reliability asterisk. Needs a Speech resource **key** (enter it on the
+Settings **API keys** card, stored DPAPI-encrypted in `AzureSpeechKey.txt`) and **region**
+(`[azure].region`). Set `cast_provider = "azure"` or a
 per-role override, and pin explicit voices with pool entries `provider = "azure"`, `ref = "<ShortName>"`.
 A key/region/service problem makes those cast voices **fall silent** (never crashes the loop).
 
 **`openai` — a cheap cloud voice.** The `openai` provider speaks through an OpenAI-compatible
 `audio/speech` endpoint. Its voice set is small and fixed (alloy, nova, shimmer, …), so it's better as
-a persona or a *supplemental* cast voice than a large diverse cast. Needs `OPENAI_API_KEY`
-(env var or `OpenAIAPIKey.txt`); `[openai_tts].base_url` is configurable for compatible endpoints. Pin
+a persona or a *supplemental* cast voice than a large diverse cast. Needs an OpenAI key (enter it on
+the Settings **API keys** card, stored DPAPI-encrypted in `OpenAIAPIKey.txt`); `[openai_tts].base_url`
+is configurable for compatible endpoints. Pin
 voices with pool entries `provider = "openai"`, `ref = "<voice>"`. A key/service problem makes those
 cast voices **fall silent** (never crashes the loop).
 

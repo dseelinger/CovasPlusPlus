@@ -508,8 +508,8 @@ Notes:
 ### 18.9 Azure Neural TTS — reliable free-tier sibling of Edge (issue #17)  🎮 ED 🔊 HW 🌍 NET 📋 FILE
 > **Official Azure Neural TTS** — the *same* voices as Edge, but with a real API, an **SLA**, and a
 > **free monthly tier (~0.5M chars)**. No ToS/reliability asterisk. Needs a Speech resource: create one
-> in the Azure portal, then set `AZURE_SPEECH_KEY` (or paste the key into `AzureSpeechKey.txt`) and
-> `[azure].region` to match it.
+> in the Azure portal, then add its key on the Settings **API keys** card (stored DPAPI-encrypted in
+> `AzureSpeechKey.txt`; env vars are no longer read, #22) and set `[azure].region` to match it.
 - [ ] **Persona voice:** set `[tts].provider = "azure"` (and `[azure].voice`, e.g. `en-US-GuyNeural`),
   restart, speak a turn → COVAS replies in the chosen Azure voice.
 - [ ] **Speaking style:** set `[azure].style = "cheerful"` (on a voice that supports it), restart, speak
@@ -524,35 +524,38 @@ Notes:
 
 ### 18.10 OpenAI-compatible TTS — cheap cloud voice (issue #16)  🎮 ED 🔊 HW 🌍 NET 📋 FILE
 > A **cheap cloud** voice over an OpenAI-compatible `audio/speech` endpoint (small fixed voice set —
-> best as a persona or supplemental cast voice). Needs `OPENAI_API_KEY` (env var or `OpenAIAPIKey.txt`);
+> best as a persona or supplemental cast voice). Needs an OpenAI key (add it on the Settings **API keys**
+> card — stored DPAPI-encrypted in `OpenAIAPIKey.txt`; env vars are no longer read, #22);
 > `[openai_tts].base_url` is configurable for compatible endpoints.
-- [ ] **Persona voice:** set `[tts].provider = "openai"` (and `[openai_tts].voice`, e.g. `nova`), export
-  `OPENAI_API_KEY`, restart, speak a turn → COVAS replies in the chosen OpenAI voice.
+- [ ] **Persona voice:** set `[tts].provider = "openai"` (and `[openai_tts].voice`, e.g. `nova`), add the
+  OpenAI key on the Settings **API keys** card, restart, speak a turn → COVAS replies in the chosen OpenAI voice.
 - [ ] **Model + tone:** try `[openai_tts].model = "tts-1"` (works) and `gpt-4o-mini-tts` with
   `[openai_tts].instructions = "Calm, professional ship-computer tone"` → the newer model reflects the
   instruction; `tts-1` ignores it (still speaks).
 - [ ] **Cast-eligible:** set `[audio.voices].cast_provider = "openai"` (or a per-role override), restart,
   fly/dock in a populated system → ambient chatter/comms use OpenAI voices (a small set, so speakers
   repeat sooner than Edge/Azure).
-- [ ] **Fail-soft:** clear `OPENAI_API_KEY` (or set a bad `base_url`) and speak → the reply degrades to
-  **text** and the loop returns to IDLE (cast OpenAI voices fall silent); restore → voices return.
+- [ ] **Fail-soft:** clear the OpenAI key on the Settings **API keys** card (or set a bad `base_url`) and
+  speak → the reply degrades to **text** and the loop returns to IDLE (cast OpenAI voices fall silent);
+  restore the key → voices return.
 
 Notes:
 
 ### 18.11 Cartesia (Sonic) low-latency persona voice (issue #18)  🎮 ED 🔊 HW 🌍 NET 📋 FILE
 > A **low-latency premium PERSONA** voice (Cartesia Sonic) — a snappier alternative to ElevenLabs for
 > COVAS's own voice; it **streams** so the first audio starts fast. **Persona-only** (not a cast
-> provider). Needs `CARTESIA_API_KEY` (env var or `CartesiaAPIKey.txt`) and a voice id.
+> provider). Needs a Cartesia key (add it on the Settings **API keys** card — stored DPAPI-encrypted in
+> `CartesiaAPIKey.txt`; env vars are no longer read, #22) and a voice id.
 - [ ] **Persona voice:** set `[tts].provider = "cartesia"`, a valid `[cartesia].voice` id (from
-  play.cartesia.ai), export `CARTESIA_API_KEY`, restart, speak a turn → COVAS replies in the Cartesia
-  voice, and audio starts **noticeably fast** (low time-to-first-audio).
+  play.cartesia.ai), add the Cartesia key on the Settings **API keys** card, restart, speak a turn →
+  COVAS replies in the Cartesia voice, and audio starts **noticeably fast** (low time-to-first-audio).
 - [ ] **Barge-in:** while COVAS is speaking a long Cartesia reply, tap push-to-talk → speech stops
   promptly (streaming cancel), loop returns to LISTENING/IDLE.
 - [ ] **Persona-only:** set `[audio.voices].cast_provider = "cartesia"` → it has **no effect** on the
   cast (Cartesia isn't a cast backend); the cast keeps using its own provider. COVAS's own voice is
   unaffected.
-- [ ] **Fail-soft:** clear `CARTESIA_API_KEY` (or blank `[cartesia].voice`) and speak → the reply
-  degrades to **text** and the loop returns to IDLE; restore → the voice returns. No crash.
+- [ ] **Fail-soft:** clear the Cartesia key on the Settings **API keys** card (or blank `[cartesia].voice`)
+  and speak → the reply degrades to **text** and the loop returns to IDLE; restore → the voice returns. No crash.
 
 Notes:
 
