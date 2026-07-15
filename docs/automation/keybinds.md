@@ -218,6 +218,43 @@ joystick, COVAS will say so. On-foot and SRV variants of the panels and maps com
 tiers (they use different ED controls). `open_galaxy_map` is also the first building block of the
 future "set course" voice-plot handoff (it opens the map the destination gets typed into).
 
+## Multi-step sequences (#33)
+
+Everything above presses **one** key. Real ship tasks are *sequences* — throttle up, lift off
+the pad, boost clear, retract the gear — and firing those keys blind is fragile. COVAS++ can run
+small **scripted macros** that mix key presses with **holds**, short waits, and — the important
+part — **Status.json checks between steps**, so a sequence *verifies* your game state instead of
+guessing. COVAS only ever *selects* a whole named sequence; it never makes up the key list.
+
+The first shipped sequence is **`launch`** — *"lift off the pad."* Run it right after you press
+**undock** (while ED still hovers you over the pad):
+
+| Step | What it does | Check |
+|------|--------------|-------|
+| 1 | **Verify** the landing gear is **down** | precondition — refuses if you're not on the pad |
+| 2 | Throttle to 50% | press |
+| 3 | **Hold** vertical thrust ~1.2 s to clear the pad | hold |
+| 4 | Short settle, then **boost** away | wait + press |
+| 5 | Retract the gear, then **wait until Status.json says it actually came up** | press + verify |
+
+Because it moves the ship, `launch` **arms-and-confirms** like landing gear (ask, then confirm on
+a *separate* command), and it's still behind the allowlist, the combat/interdiction guard, and
+mode gating (main-ship only). If any check fails — gear not down, or the gear never confirms
+retracted — the sequence stops and tells you, and **"abort"** halts a running sequence and
+releases every held key immediately.
+
+It's **off by default.** Opt in by name and bind each control it uses to a **key** in ED
+(*Flight Throttle*, *Flight Rotation/Thrusters* → Thrust Up, *Flight Miscellaneous* → Engine
+Boost, *Landing Gear*):
+
+```toml
+[keybinds]
+enabled = true
+allowlist = ["landing_gear", "launch"]
+```
+
+If any of those controls is only on a joystick, COVAS will tell you which one to bind to a key.
+
 ## It reads *your* bindings
 
 COVAS++ reads your **actual** Elite Dangerous key bindings (it resolves your active preset and pulls

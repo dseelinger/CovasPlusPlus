@@ -20,14 +20,24 @@ from dataclasses import dataclass, field
 @dataclass(frozen=True)
 class Macro:
     """A named, deterministic ship action the LLM may select. `action` is the ED binding
-    token the executor presses; `kind` is press (a tap) or hold (press for `hold_seconds`)."""
+    token the executor presses; `kind` is press (a tap) or hold (press for `hold_seconds`).
+
+    A macro is EITHER a single key (`action` + `kind`) or a status-checked SEQUENCE (`steps`
+    non-empty — a tuple of `keybinds.sequence.Step`). When `steps` is set the capability runs
+    the sequence runner instead of a single press/hold, and `action`/`kind`/`hold_seconds` are
+    ignored (pass `action=""`). Either way the LLM only SELECTS the named macro — it never
+    assembles the keys/steps itself (issue #33)."""
     name: str            # allowlist key + identity (e.g. "landing_gear")
     tool: str            # the tool name advertised to the LLM (e.g. "toggle_landing_gear")
     action: str          # ED action token in the .binds file (e.g. "LandingGearToggle")
     arm_phrase: str      # what we're about to do, for the confirmation prompt
     done_phrase: str     # spoken result once executed
-    kind: str = "press"  # "press" | "hold"
+    kind: str = "press"  # "press" | "hold" (single-key macros only)
     hold_seconds: float = 0.0
+    # A status-checked timed sequence (issue #33). Empty = a single-key macro (above). Typed as
+    # a string annotation (`from __future__ import annotations`) so registry stays decoupled
+    # from the sequence module — no runtime import needed for the default empty tuple.
+    steps: "tuple[Step, ...]" = ()
     # Game modes this action is valid in (ed/modes vocabulary). EMPTY = valid in any mode
     # (e.g. a global control). Mode-gating hides an action when the Commander isn't in one of
     # these modes — so on-foot actions aren't offered while flying, and vice-versa.

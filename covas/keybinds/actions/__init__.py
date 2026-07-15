@@ -12,5 +12,6 @@ from . import flight         # noqa: F401 — Tier-1 flight/nav batch (#30)
 from . import panels         # noqa: F401 — Tier-1 panels/UI/fire-groups batch (#32)
 from . import on_foot        # noqa: F401 — Odyssey on-foot batch (#34)
 from . import srv            # noqa: F401 — SRV / buggy batch (#35)
+from . import macros         # noqa: F401 — status-checked timed sequences (#33)
 
-__all__ = ["ship", "ship_systems", "flight", "panels", "on_foot", "srv"]
+__all__ = ["ship", "ship_systems", "flight", "panels", "on_foot", "srv", "macros"]
