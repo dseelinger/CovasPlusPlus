@@ -29,6 +29,23 @@ itself carries a comment on every line.
 
 You can bind a joystick/HOTAS button to the talk key with a tool like JoyToKey.
 
+## Activation mode (`[listen]`)
+
+How a turn starts — push-to-talk or [hands-free](getting-started/hands-free.md). The energy
+thresholds only apply in continuous mode. Switching the mode applies **live** (no restart).
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `listen.mode` | `ptt` | `ptt` (push-to-talk, default) or `continuous` (hands-free voice activation) |
+| `listen.energy_threshold` | `0.02` | Loudness (RMS ~0-1) a mic frame must reach to count as speech |
+| `listen.start_ms` | `120.0` | Voiced time (ms) that confirms speech has started (debounce) |
+| `listen.min_speech_ms` | `250.0` | Shortest capture (ms) that counts as a real utterance; briefer = noise |
+| `listen.hangover_ms` | `700.0` | Trailing silence (ms) that ends an utterance |
+| `listen.frame_ms` | `30.0` | VAD analysis frame length (ms) — rarely needs changing |
+
+Continuous mode is **local-only** (same faster-whisper, no extra cloud cost) and keeps barge-in.
+With open speakers, raise `energy_threshold` or use a headset so COVAS doesn't hear its own voice.
+
 ## Microphone & audio device (`[audio]`)
 
 | Setting | Default | What it does |

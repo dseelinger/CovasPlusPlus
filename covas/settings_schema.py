@@ -86,6 +86,53 @@ SCHEMA: list[Setting] = [
             default="", phrasings=("cancel key",),
             example="set the cancel key to escape"),
 
+    # --- Activation mode (issue #63) --------------------------------------
+    # Hands-free continuous listening vs push-to-talk. Switching this applies LIVE
+    # (the app starts/stops the VAD mic listener via _after_settings_change).
+    Setting("listen.mode", ("listen", "mode"), "enum",
+            "Activation mode", "Voice input",
+            "How a turn starts: 'ptt' (push-to-talk, the default — hold the talk key) or "
+            "'continuous' (hands-free — a voice-activity gate captures you when you start "
+            "talking and stops after a short silence). Continuous is local-only (same local "
+            "Whisper, no extra cloud cost) and keeps barge-in; PTT still works in either mode.",
+            default="ptt", options=["ptt", "continuous"],
+            phrasings=("listening mode", "activation mode", "hands free", "hands-free",
+                       "continuous listening"),
+            example="switch to continuous listening"),
+    Setting("listen.energy_threshold", ("listen", "energy_threshold"), "float",
+            "Voice-detect sensitivity", "Voice input",
+            "Hands-free only: loudness (RMS, ~0-1) a mic frame must reach to count as speech. "
+            "Raise it if background noise keeps opening a capture; lower it if quiet speech is "
+            "missed.",
+            default=0.02, min=0.0, max=1.0,
+            phrasings=("voice detection sensitivity", "vad threshold", "mic sensitivity"),
+            example="set the voice detect sensitivity to 0.03"),
+    Setting("listen.start_ms", ("listen", "start_ms"), "float",
+            "Speech-onset debounce", "Voice input",
+            "Hands-free only: voiced time needed to confirm you've started talking, so a click "
+            "can't open a capture. Milliseconds.",
+            default=120.0, min=0.0, max=2000.0, unit="ms",
+            phrasings=("onset debounce", "speech start debounce")),
+    Setting("listen.min_speech_ms", ("listen", "min_speech_ms"), "float",
+            "Minimum utterance", "Voice input",
+            "Hands-free only: shortest voiced capture that counts as a real utterance; briefer "
+            "blips are dropped as noise. Milliseconds.",
+            default=250.0, min=0.0, max=5000.0, unit="ms",
+            phrasings=("minimum utterance", "min speech length")),
+    Setting("listen.hangover_ms", ("listen", "hangover_ms"), "float",
+            "End-of-speech silence", "Voice input",
+            "Hands-free only: trailing silence that ends an utterance. Longer tolerates "
+            "mid-sentence pauses but reacts slower; shorter is snappier but may cut you off. "
+            "Milliseconds.",
+            default=700.0, min=100.0, max=5000.0, unit="ms",
+            phrasings=("end of speech silence", "hangover time", "trailing silence")),
+    Setting("listen.frame_ms", ("listen", "frame_ms"), "float",
+            "VAD frame size", "Voice input",
+            "Hands-free only: length of each analysis frame the voice-activity gate scores. "
+            "Rarely needs changing. Milliseconds.",
+            default=30.0, min=10.0, max=100.0, unit="ms",
+            phrasings=("vad frame size", "listen frame size")),
+
     # --- Speech-to-text ----------------------------------------------------
     Setting("whisper.model", ("whisper", "model"), "enum",
             "Whisper model", "Speech-to-text",

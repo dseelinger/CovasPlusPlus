@@ -74,6 +74,7 @@ nav:
       - Running COVAS++: getting-started/running.md
       - Updating COVAS++: getting-started/updating.md
       - The voice loop: getting-started/voice-loop.md
+      - Hands-free listening: getting-started/hands-free.md
   - Talking to COVAS:
       - Personas & voice: using/personas-voice.md
       - The checklist: using/checklist.md

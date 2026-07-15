@@ -123,6 +123,31 @@ Notes:
 
 Notes:
 
+## 3a. Hands-free / continuous listening (issue #63 — `[listen].mode = "continuous"`)  🔊 HW 🎧 headset
+> Off by default. Switch to continuous by voice (*"switch to continuous listening"*), on the Settings
+> page (**Activation mode** under *Voice input*), or in `config.toml` (`[listen].mode`). Best tested
+> with a **headset** so COVAS doesn't hear its own voice. PTT must keep working the whole time.
+- [ ] **Switch on live by voice:** in PTT mode, hold `[` and say *"switch to continuous listening."*
+      The log shows **Hands-free continuous listening ON**; no restart needed.
+- [ ] **Hands-free turn:** with your hands off the keyboard, just say *"COVAS, what time is it? Keep it
+      short."* → you hear the **listen** cue at your speech onset, then the normal
+      **LISTENING → TRANSCRIBING → THINKING → SPEAKING → IDLE** turn runs and the reply plays.
+- [ ] **Trailing silence ends the turn:** the capture closes only after you **stop** talking for a
+      moment (not on a short mid-sentence pause) — a brief breath doesn't cut you off.
+- [ ] **Noise rejection:** a single cough / key clack / short "uh" does **not** start a turn.
+- [ ] **Barge-in preserved:** while COVAS is speaking a reply, **start talking** → the speech cuts off
+      and a fresh capture begins (same as a PTT barge-in).
+- [ ] **PTT still works in continuous mode:** hold `[` and speak → that PTT turn runs normally, and a
+      simultaneous VAD capture does **not** double-fire (PTT wins while held).
+- [ ] **Sensitivity tuning:** if background noise keeps opening captures, raise **Voice-detect
+      sensitivity** (`listen.energy_threshold`) on the Settings page and confirm it settles down.
+- [ ] **Switch back:** say *"switch to push-to-talk"* (or set mode to `ptt`) → log shows **Hands-free
+      continuous listening OFF (push-to-talk)**; the mic listener stops and only PTT starts turns.
+- [ ] **Fail-soft:** with a bad/absent mic in continuous mode, startup logs a fall-back to PTT and the
+      app still runs (it does not crash).
+
+Notes:
+
 ## 4. Cost router — cheap by default, escalates on demand  🔊 HW 🌐 PANEL
 > Verify each turn via the session log's two lines: a **`[router] [<tier>] <model> max_tokens=N — <reason>`** line (the `[cheap]`/`[standard]`/`[premium]` tier prefix is from issue #11) and a **`[usage] in=… out=… ~$0.00XX [<model>]`** line. (Requires `[router].enabled = true`.)
 - [ ] **Banter uses the cheap tier:** *"Morning, COVAS — how's it going?"* → router line shows **`[cheap] claude-haiku-4-5`**; cost a fraction of a cent.

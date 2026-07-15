@@ -22,6 +22,36 @@ tap_cancel_ms = 400
 cancel       = ""
 
 
+[listen]
+# ACTIVATION MODE (issue #63). How COVAS++ starts a turn:
+#   "ptt"        — push-to-talk (DEFAULT): hold the [keys].push_to_talk key to speak.
+#   "continuous" — hands-free: a voice-activity gate watches the mic, opens a capture
+#                  window when you start talking, and closes it after a short silence.
+# Continuous mode is LOCAL-ONLY — the same local Whisper transcribes it, so it adds no
+# cloud cost just to listen. PTT still works in either mode, and a spoken command or the
+# Settings page can switch modes live ("switch to continuous listening"). Barge-in is
+# preserved: start talking while COVAS is speaking and it stops and captures you.
+# NOTE: hands-free with speakers can hear COVAS's own voice — use a headset, or nudge
+# the thresholds below, to avoid self-triggering.
+mode = "ptt"
+# --- Energy voice-activity tunables (only used in continuous mode) ---
+# The gate slices the mic into frames of this many milliseconds and compares each frame's
+# RMS loudness to energy_threshold. Bigger threshold = less sensitive (needs louder speech).
+frame_ms = 30.0
+# RMS amplitude (float audio ~[-1,1]) at/above which a frame counts as speech. Raise it if
+# background noise keeps opening a capture; lower it if quiet speech gets missed.
+energy_threshold = 0.02
+# Voiced time needed to CONFIRM speech has started (debounce), so a click/clack can't open
+# a capture window. Milliseconds.
+start_ms = 120.0
+# Minimum voiced duration for a capture to count as a real utterance; shorter blips are
+# discarded as noise. Milliseconds.
+min_speech_ms = 250.0
+# Trailing silence that ENDS an utterance. Longer = more tolerant of mid-sentence pauses
+# but slower to react; shorter = snappier but may cut you off. Milliseconds.
+hangover_ms = 700.0
+
+
 [audio]
 # Microphone input. Leave input_device blank to use the Windows default mic.
 # Run check_setup.py to see the list of device names/indexes if you want to pin one.
