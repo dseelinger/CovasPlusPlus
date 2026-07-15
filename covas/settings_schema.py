@@ -133,6 +133,24 @@ SCHEMA: list[Setting] = [
             default=30.0, min=10.0, max=100.0, unit="ms",
             phrasings=("vad frame size", "listen frame size")),
 
+    # --- Wake word (issue #64) --------------------------------------------
+    # Optional arming phrase for hands-free mode. OFF by default (blank). PTT is never gated.
+    Setting("listen.wake_word", ("listen", "wake_word"), "string",
+            "Wake word", "Voice input",
+            "Hands-free only: an optional arming phrase (e.g. 'COVAS'). Blank (default) = off — "
+            "continuous mode runs a turn on any capture. Set it and a hands-free capture only "
+            "becomes a turn if you say the phrase; it's stripped before your words reach the "
+            "model. Push-to-talk is never gated.",
+            default="", phrasings=("wake word", "wake phrase", "activation word", "trigger word"),
+            example="set the wake word to COVAS"),
+    Setting("listen.wake_word_fuzzy", ("listen", "wake_word_fuzzy"), "bool",
+            "Wake-word fuzzy match", "Voice input",
+            "Hands-free only: tolerate small speech-to-text slips of the wake word (e.g. "
+            "'Kovas'/'Covis' for 'COVAS'), so a one-letter mistranscription doesn't swallow "
+            "your command. Off = require an exact (still case-insensitive) match.",
+            default=True, phrasings=("wake word fuzzy match", "fuzzy wake word"),
+            example="turn off wake word fuzzy match"),
+
     # --- Speech-to-text ----------------------------------------------------
     Setting("whisper.model", ("whisper", "model"), "enum",
             "Whisper model", "Speech-to-text",

@@ -42,9 +42,13 @@ thresholds only apply in continuous mode. Switching the mode applies **live** (n
 | `listen.min_speech_ms` | `250.0` | Shortest capture (ms) that counts as a real utterance; briefer = noise |
 | `listen.hangover_ms` | `700.0` | Trailing silence (ms) that ends an utterance |
 | `listen.frame_ms` | `30.0` | VAD analysis frame length (ms) — rarely needs changing |
+| `listen.wake_word` | `""` | Optional [wake word](getting-started/hands-free.md#wake-word-optional) for continuous mode; blank = off. A hands-free capture must contain it (it's stripped before the model sees it). PTT is never gated |
+| `listen.wake_word_fuzzy` | `true` | Tolerate STT slips of the wake word (e.g. "Kovas"/"Covis"); off = exact (still case-insensitive) match |
 
 Continuous mode is **local-only** (same faster-whisper, no extra cloud cost) and keeps barge-in.
 With open speakers, raise `energy_threshold` or use a headset so COVAS doesn't hear its own voice.
+The optional **wake word** gates continuous mode so it isn't triggered by every stray utterance;
+matching runs on the local transcript, so a false trigger costs nothing.
 
 ## Microphone & audio device (`[audio]`)
 

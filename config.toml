@@ -50,6 +50,18 @@ min_speech_ms = 250.0
 # Trailing silence that ENDS an utterance. Longer = more tolerant of mid-sentence pauses
 # but slower to react; shorter = snappier but may cut you off. Milliseconds.
 hangover_ms = 700.0
+# --- Wake word (issue #64) — hands-free gating, OFF by default ---
+# An optional arming phrase for CONTINUOUS mode. When blank (the default), continuous mode
+# runs a turn on anything the voice-activity gate captures. Set it (e.g. "COVAS") and a
+# hands-free capture only becomes a turn if its transcript CONTAINS the phrase — so the LLM
+# isn't triggered by every stray utterance in the room. The phrase is stripped before your
+# words go to the model, and push-to-talk is NEVER gated (a deliberate press always runs).
+# Only affects continuous mode; ignored in ptt mode.
+wake_word = ""
+# Tolerate small speech-to-text slips of the wake word (e.g. "Kovas"/"Covis" for "COVAS"),
+# so a one-letter mistranscription of a short call sign doesn't swallow your command. Set
+# false to require an exact (still case-insensitive) match.
+wake_word_fuzzy = true
 
 
 [audio]
