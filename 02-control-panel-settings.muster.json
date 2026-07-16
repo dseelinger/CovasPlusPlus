@@ -10,7 +10,7 @@
         "GUI"
       ],
       "requires": "You installed the release intended for this test pass.",
-      "expected": "The control panel version banner shows the build under test (0.10.3), so every result maps to the right code. A stale install must never masquerade as a bug.",
+      "expected": "The control panel version banner shows the build under test (0.10.4), so every result maps to the right code. A stale install must never masquerade as a bug.",
       "steps": [
         {
           "id": "s1",
@@ -18,7 +18,7 @@
         },
         {
           "id": "s2",
-          "text": "Confirm the version banner reads 0.10.3 - it must match the installer you just ran."
+          "text": "Confirm the version banner reads 0.10.4 - it must match the installer you just ran."
         },
         {
           "id": "s3",
@@ -29,7 +29,7 @@
     {
       "id": "env-health",
       "title": "Environment health check reports all-OK",
-      "section": "0. Prerequisites",
+      "section": "0. Preflight",
       "tags": [
         "HW",
         "FILE"
@@ -54,7 +54,7 @@
     {
       "id": "launch-headless-and-panel",
       "title": "Both entry points launch with the expected banner",
-      "section": "0. Prerequisites",
+      "section": "0. Preflight",
       "tags": [
         "HW",
         "GUI"
@@ -64,11 +64,11 @@
       "steps": [
         {
           "id": "s1",
-          "text": "Run `run_covas.py` (headless) → banner shows model, voice, Whisper size, and capability on/off lines (Router, ED monitor, Proactive, Keybinds, Auto-honk, Find, Personality). No browser opens."
+          "text": "Run `run_covas.py` (headless) \u2192 banner shows model, voice, Whisper size, and capability on/off lines (Router, ED monitor, Proactive, Keybinds, Auto-honk, Find, Personality). No browser opens."
         },
         {
           "id": "s2",
-          "text": "Run `run_covas_ui.py` → same banner PLUS the browser opens http://127.0.0.1:8765 and the status light reads IDLE."
+          "text": "Run `run_covas_ui.py` \u2192 same banner PLUS the browser opens http://127.0.0.1:8765 and the status light reads IDLE."
         },
         {
           "id": "s3",
@@ -78,15 +78,15 @@
     },
     {
       "id": "openai-compatible-llm-provider",
-      "title": "OpenAI-compatible LLM provider — OpenAI/Groq/DeepSeek/OpenRouter (issue #12)",
-      "section": "4. Cost router",
+      "title": "OpenAI-compatible LLM provider \u2014 OpenAI/Groq/DeepSeek/OpenRouter (issue #12)",
+      "section": "13. LLM providers",
       "tags": [
         "HW",
         "NET",
         "FILE"
       ],
-      "requires": "An OpenAI (or compatible) API key: enter it on the Settings **API keys** card (OpenAI field), or paste it into `OpenAIAPIKey.txt` in the data dir (migrated to DPAPI-encrypted on first read). Env vars are NOT read for keys (#22). Internet access. Set **LLM provider = openai** on the Settings **Providers** card and restart. For the alt-endpoint step, a Groq or OpenRouter key + the **OpenAI LLM base URL** field (Settings **Providers**). All config here is done from the Settings page — only the per-tier model maps (`[openai.tiers]`) stay in `config.toml`.",
-      "expected": "COVAS answers via the OpenAI-compatible endpoint; the router tiers it (OpenAI model ids in the `[router]` line); tool calling (checklist) works over delta-assembled tool_calls; switching base_url to Groq/OpenRouter still works; a missing key/bad base_url degrades the turn to text without crashing.",
+      "requires": "An OpenAI (or compatible) API key: enter it on the Settings **API keys** card (OpenAI field), or paste it into `OpenAIAPIKey.txt` in the data dir (migrated to DPAPI-encrypted on first read). Env vars are NOT read for keys (#22). Internet access. Set **LLM provider = openai** on the Settings **Providers** card and restart. For the alt-endpoint step, a Groq or OpenRouter key + the **OpenAI LLM base URL** field (Settings **Providers**). All config here is done from the Settings page \u2014 only the per-tier model maps (`[openai.tiers]`) stay in `config.toml`.",
+      "expected": "COVAS answers via the OpenAI-compatible endpoint; `[openai.tiers]` ships UNSET so every router tier reuses your `[openai].model` (a base_url+model swap to another endpoint just works \u2014 the router line shows YOUR model, never a stale gpt-4o-mini); tool calling (checklist) works over delta-assembled tool_calls; a missing key/bad base_url degrades the turn to text without crashing. NOTE: COVAS sends a large tool set (~10K tokens) every turn, so the endpoint needs adequate limits \u2014 Groq's FREE tier (12K TPM / 100K tokens-per-day \u2248 ~9 turns/day) is too small and 413/429-throttles; use paid Groq, DeepSeek, OpenRouter (with credits), OpenAI, or the Gemini provider's free tier instead.",
       "steps": [
         {
           "id": "s1",
@@ -98,11 +98,11 @@
         },
         {
           "id": "s3",
-          "text": "Escalation: \"Think hard about ...\" -> router line shows `[standard]` with the `[openai.tiers].standard` model; a premium wake phrase -> `[premium]`."
+          "text": "Escalation (only if you set distinct tiers): `[openai.tiers]` ships UNSET, so by default every tier reuses `[openai].model` and the router line shows the same model on every turn. To exercise tiers, first set `[openai.tiers].{cheap,standard,premium}` in config.toml to valid ids for THIS endpoint; then \"Think hard about ...\" -> `[standard]` model; a premium wake phrase -> `[premium]`."
         },
         {
           "id": "s4",
-          "text": "Alt endpoint: on the Settings **Providers** card set **OpenAI LLM base URL** to Groq (`https://api.groq.com/openai/v1`) and **OpenAI LLM model** to `llama-3.3-70b-versatile` (or OpenRouter), enter that service's key on the **API keys** card, restart -> conversation still works through the same provider."
+          "text": "Alt endpoint (non-OpenAI company, same provider): on the Settings **Providers** card set **OpenAI LLM base URL** + **OpenAI LLM model** to a viable OpenAI-compatible service \u2014 e.g. DeepSeek (`https://api.deepseek.com/v1`, `deepseek-chat`), OpenRouter, or PAID Groq \u2014 enter that service's key on the **API keys** card, restart -> conversation works through the same provider; with the router on, the `[router]` line shows YOUR model (e.g. `[cheap] deepseek-chat`), never `gpt-4o-mini`. Do NOT use Groq's FREE tier: 12K TPM / 100K tokens-per-day can't fit COVAS's per-turn tool payload -> HTTP 413/429."
         },
         {
           "id": "s5",
@@ -112,15 +112,15 @@
     },
     {
       "id": "gemini-llm-provider",
-      "title": "Gemini LLM provider — native API, tool calling + Search grounding (issue #13)",
-      "section": "4. Cost router",
+      "title": "Gemini LLM provider \u2014 native API, tool calling + Search grounding (issue #13)",
+      "section": "13. LLM providers",
       "tags": [
         "HW",
         "NET",
         "FILE"
       ],
-      "requires": "A Gemini API key (free from aistudio.google.com): enter it on the Settings **API keys** card (Gemini field), or paste it into `GeminiAPIKey.txt` in the data dir (DPAPI-encrypted on first read). Env vars are NOT read for keys (#22). Internet access. Set **LLM provider = gemini** on the Settings **Providers** card and restart. For grounding, turn on **Web search** on the Settings page. All config here is done from the Settings page — only the per-tier model maps (`[gemini.tiers]`) stay in `config.toml`.",
-      "expected": "COVAS answers via Gemini; the router tiers it (Flash cheap / Pro depth in the `[router]` line); checklist tool calling works; with web search on, Google-Search grounding surfaces a Searching side-channel line; a missing key degrades the turn to text without crashing.",
+      "requires": "A Gemini API key (free from aistudio.google.com): enter it on the Settings **API keys** card (Gemini field), or paste it into `GeminiAPIKey.txt` in the data dir (DPAPI-encrypted on first read). Env vars are NOT read for keys (#22). Internet access. Set **LLM provider = gemini** on the Settings **Providers** card and restart. For grounding, turn on **Web search** on the Settings page. All config here is done from the Settings page \u2014 only the per-tier model maps (`[gemini.tiers]`) stay in `config.toml`.",
+      "expected": "COVAS answers via Gemini; the router tiers it (Flash cheap / Pro depth in the `[router]` line); checklist tool calling works; with web search on, Google-Search grounding surfaces a Searching side-channel line; a missing key degrades the turn to text without crashing. NOTE: Gemini's Flash FREE tier (~250K TPM / 1,500 requests-per-day) comfortably fits COVAS's per-turn load, so it is the recommended zero-cost provider (unlike Groq's free tier). Google trims free quotas without notice, so treat the exact limits as best-effort.",
       "steps": [
         {
           "id": "s1",
@@ -151,20 +151,20 @@
       "tags": [
         "HW"
       ],
-      "requires": "App running; the capabilities you want to spot-check are enabled (see §0.3 in MANUAL_TESTS.md).",
-      "expected": "\"What can you do?\" names CATEGORIES (not every capability); drilling into a category lists ≤3 capabilities with examples; drilling into a capability describes its refinements; every enabled capability is reachable; misspellings get a suggestion, never an invented correction; an unbuilt capability is declined without echoing it as real.",
+      "requires": "App running; the capabilities you want to spot-check are enabled (see \u00a70.3 in MANUAL_TESTS.md).",
+      "expected": "\"What can you do?\" names CATEGORIES (not every capability); drilling into a category lists \u22643 capabilities with examples; drilling into a capability describes its refinements; every enabled capability is reachable; misspellings get a suggestion, never an invented correction; an unbuilt capability is declined without echoing it as real.",
       "steps": [
         {
           "id": "s1",
-          "text": "Overview names CATEGORIES: \"What can you do?\" → names the groups (navigation and search, your ship, your checklist, community goals, settings) and invites drilling in — does NOT read every capability."
+          "text": "Overview names CATEGORIES: \"What can you do?\" \u2192 names the groups (navigation and search, your ship, your checklist, community goals, settings) and invites drilling in \u2014 does NOT read every capability."
         },
         {
           "id": "s2",
-          "text": "Drill into a category: \"Tell me about navigation and search.\" → lists its capabilities (≤3, then \"there are others — ask about …\"), each with an example."
+          "text": "Drill into a category: \"Tell me about navigation and search.\" \u2192 lists its capabilities (\u22643, then \"there are others \u2014 ask about \u2026\"), each with an example."
         },
         {
           "id": "s3",
-          "text": "Drill into a capability: \"How do I find a module?\" → describes outfitting and its refinements (size, mount, pad)."
+          "text": "Drill into a capability: \"How do I find a module?\" \u2192 describes outfitting and its refinements (size, mount, pad)."
         },
         {
           "id": "s4",
@@ -172,11 +172,11 @@
         },
         {
           "id": "s5",
-          "text": "Failure recovery: \"Find the closest power distributer.\" (misspelled) → \"did you mean Power Distributor?\" — never inventing a correction."
+          "text": "Failure recovery: \"Find the closest power distributer.\" (misspelled) \u2192 \"did you mean Power Distributor?\" \u2014 never inventing a correction."
         },
         {
           "id": "s6",
-          "text": "Unknown capability: \"Can you plot me a route?\" (not built) → says it can't and offers to list what it can, WITHOUT echoing the fake capability as real."
+          "text": "Unknown capability: \"Can you plot me a route?\" (not built) \u2192 says it can't and offers to list what it can, WITHOUT echoing the fake capability as real."
         }
       ]
     },
@@ -187,8 +187,8 @@
       "tags": [
         "HW"
       ],
-      "requires": "App running (native window, browser UI, or headless). Know the expected version from `covas/__version__.py` (currently 0.10.3).",
-      "expected": "COVAS speaks the running version, e.g. \"I'm running COVAS++ version 0.10.3.\", matching covas/__version__.py exactly.",
+      "requires": "App running (native window, browser UI, or headless). Know the expected version from `covas/__version__.py` (currently 0.10.4).",
+      "expected": "COVAS speaks the running version, e.g. \"I'm running COVAS++ version 0.10.4.\", matching covas/__version__.py exactly.",
       "steps": [
         {
           "id": "s1",
@@ -200,19 +200,19 @@
         },
         {
           "id": "s3",
-          "text": "Try a variant (\"which build is this?\") → still reports the same version."
+          "text": "Try a variant (\"which build is this?\") \u2192 still reports the same version."
         }
       ]
     },
     {
       "id": "check-updates-by-voice-is-ui-only",
-      "title": "\"Check for updates\" by voice does NOT update — points to the panel",
+      "title": "\"Check for updates\" by voice does NOT update \u2014 points to the panel",
       "section": "11. Help & version",
       "tags": [
         "HW"
       ],
       "requires": "App running.",
-      "expected": "Asking to check for / install an update by VOICE does not trigger any download or relaunch; COVAS says updates are done from the control panel's update banner. (Updating stays a UI action — INSTALLER_DESIGN decision #5.)",
+      "expected": "Asking to check for / install an update by VOICE does not trigger any download or relaunch; COVAS says updates are done from the control panel's update banner. (Updating stays a UI action \u2014 INSTALLER_DESIGN decision #5.)",
       "steps": [
         {
           "id": "s1",
@@ -237,27 +237,27 @@
       "steps": [
         {
           "id": "s1",
-          "text": "Set an enum: \"Set the Whisper model to small.\" → confirms; the change appears in `overrides.json`."
+          "text": "Set an enum: \"Set the Whisper model to small.\" \u2192 confirms; the change appears in `overrides.json`."
         },
         {
           "id": "s2",
-          "text": "Set a bool: \"Turn personality off.\" → confirms; a follow-up no longer says \"Commander\". Turn it back on."
+          "text": "Set a bool: \"Turn personality off.\" \u2192 confirms; a follow-up no longer says \"Commander\". Turn it back on."
         },
         {
           "id": "s3",
-          "text": "Natural value: \"Set thinking to high.\" / \"Set the voice speed to 1.1.\" → applied."
+          "text": "Natural value: \"Set thinking to high.\" / \"Set the voice speed to 1.1.\" \u2192 applied."
         },
         {
           "id": "s4",
-          "text": "Invalid value refused with options: \"Set the Whisper model to gigantic.\" → refuses and lists the valid options."
+          "text": "Invalid value refused with options: \"Set the Whisper model to gigantic.\" \u2192 refuses and lists the valid options."
         },
         {
           "id": "s5",
-          "text": "Unknown setting → help: \"Set the warp factor to 9.\" → routes to help / says it isn't a setting."
+          "text": "Unknown setting \u2192 help: \"Set the warp factor to 9.\" \u2192 routes to help / says it isn't a setting."
         },
         {
           "id": "s6",
-          "text": "Get a setting: \"What's my Whisper model set to?\" → reads the current value."
+          "text": "Get a setting: \"What's my Whisper model set to?\" \u2192 reads the current value."
         }
       ]
     },
@@ -285,7 +285,7 @@
     {
       "id": "panel-voice-list-filter",
       "title": "ElevenLabs voice pickers type-to-filter on both main panel and Settings (issue #26)",
-      "section": "14. Web panel — voice list",
+      "section": "14. Web panel",
       "tags": [
         "PANEL",
         "NET"
@@ -324,23 +324,23 @@
         },
         {
           "id": "s2",
-          "text": "Filter box: type in the search box → the list narrows to matching settings."
+          "text": "Filter box: type in the search box \u2192 the list narrows to matching settings."
         },
         {
           "id": "s3",
-          "text": "Change + save: change a value → the save bar appears with a count; SAVE CHANGES → written to `overrides.json` (config.toml stays pristine) AND a visible \"Settings saved.\" acknowledgement (toast, top-right) appears confirming success."
+          "text": "Change + save: change a value \u2192 the save bar appears with a count; SAVE CHANGES \u2192 written to `overrides.json` (config.toml stays pristine) AND a visible \"Settings saved.\" acknowledgement (toast, top-right) appears confirming success."
         },
         {
           "id": "s4",
-          "text": "Per-setting reset: a changed setting shows RESET → click → reverts to default and drops from `overrides.json`."
+          "text": "Per-setting reset: a changed setting shows RESET \u2192 click \u2192 reverts to default and drops from `overrides.json`."
         },
         {
           "id": "s5",
-          "text": "Validation: try an out-of-range number (voice speed 2.0) → rejected, not written."
+          "text": "Validation: try an out-of-range number (voice speed 2.0) \u2192 rejected, not written."
         },
         {
           "id": "s6",
-          "text": "Live where supported: change the Whisper model → the log notes the model reloaded (no restart)."
+          "text": "Live where supported: change the Whisper model \u2192 the log notes the model reloaded (no restart)."
         }
       ]
     },
@@ -357,7 +357,7 @@
       "steps": [
         {
           "id": "s1",
-          "text": "Persona picker: the tab lists personas; selecting one shows a preview. Pick a different persona → the next reply's voice/register changes."
+          "text": "Persona picker: the tab lists personas; selecting one shows a preview. Pick a different persona \u2192 the next reply's voice/register changes."
         },
         {
           "id": "s2",
@@ -365,11 +365,11 @@
         },
         {
           "id": "s3",
-          "text": "Save as custom: edit the persona box → SAVE AS CUSTOM → a new custom persona appears (written under `personalities/custom/`)."
+          "text": "Save as custom: edit the persona box \u2192 SAVE AS CUSTOM \u2192 a new custom persona appears (written under `personalities/custom/`)."
         },
         {
           "id": "s4",
-          "text": "Campaign editor: edit the Campaign box → SAVE CAMPAIGN → a subsequent reply reflects the updated facts."
+          "text": "Campaign editor: edit the Campaign box \u2192 SAVE CAMPAIGN \u2192 a subsequent reply reflects the updated facts."
         }
       ]
     },
@@ -382,11 +382,11 @@
         "HW"
       ],
       "requires": "Panel open.",
-      "expected": "Nudging the Voice speed slider (1.0–1.2×) makes the next reply faster; the value cannot exceed 1.2.",
+      "expected": "Nudging the Voice speed slider (1.0\u20131.2\u00d7) makes the next reply faster; the value cannot exceed 1.2.",
       "steps": [
         {
           "id": "s1",
-          "text": "Nudge the Voice speed slider and ask something → the reply is spoken faster."
+          "text": "Nudge the Voice speed slider and ask something \u2192 the reply is spoken faster."
         },
         {
           "id": "s2",
@@ -410,7 +410,7 @@
         },
         {
           "id": "s2",
-          "text": "Switch to Conversation → status/thinking/usage lines hide; the choice persists across a reload."
+          "text": "Switch to Conversation \u2192 status/thinking/usage lines hide; the choice persists across a reload."
         }
       ]
     },
@@ -435,11 +435,11 @@
         },
         {
           "id": "s3",
-          "text": "Hover a line -> a small ⎘ button appears; click it -> just that line is on the clipboard (shows ✓)."
+          "text": "Hover a line -> a small \u2398 button appears; click it -> just that line is on the clipboard (shows \u2713)."
         },
         {
           "id": "s4",
-          "text": "Repeat s1–s3 in the PACKAGED native window (not just the browser): selection highlights and both copy paths work there too."
+          "text": "Repeat s1\u2013s3 in the PACKAGED native window (not just the browser): selection highlights and both copy paths work there too."
         }
       ]
     },
@@ -460,11 +460,11 @@
         },
         {
           "id": "s2",
-          "text": "Open `overrides.json` → your changes are there."
+          "text": "Open `overrides.json` \u2192 your changes are there."
         },
         {
           "id": "s3",
-          "text": "Quit (Ctrl+Alt+Q) and relaunch → the panel comes back with the same settings."
+          "text": "Quit (Ctrl+Alt+Q) and relaunch \u2192 the panel comes back with the same settings."
         }
       ]
     }
@@ -511,6 +511,358 @@
             "s1": false,
             "s2": false,
             "s3": false,
+            "s4": false,
+            "s5": false
+          }
+        },
+        {
+          "testId": "gemini-llm-provider",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false
+          }
+        },
+        {
+          "testId": "help-hierarchy",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false,
+            "s6": false
+          }
+        },
+        {
+          "testId": "version-by-voice",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "check-updates-by-voice-is-ui-only",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "voice-settable-settings",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false,
+            "s6": false
+          }
+        },
+        {
+          "testId": "panel-live-status-log",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "panel-voice-list-filter",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "panel-settings-page",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false,
+            "s6": false
+          }
+        },
+        {
+          "testId": "panel-personality-tab",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false
+          }
+        },
+        {
+          "testId": "panel-voice-speed",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "panel-log-filter",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "panel-log-select-copy",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false
+          }
+        },
+        {
+          "testId": "settings-persistence",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        }
+      ]
+    },
+    {
+      "runId": "run-20260715T230734Z-r0102",
+      "session": "02 control-panel-settings on v0.10.2 (config-migration fix): resumed - env-health + launch carried; re-verify build 0.10.2; OpenAI key now settable",
+      "commit": "9de24e2",
+      "branch": "main",
+      "submittedAt": "2026-07-16T00:28:50Z",
+      "results": [
+        {
+          "testId": "env-health",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "launch-headless-and-panel",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "build-version-check",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "openai-compatible-llm-provider",
+          "status": "fail",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
+            "s4": false,
+            "s5": false
+          },
+          "failure": {
+            "notes": "This was after I restarted with those settings.",
+            "console": "20:26:42 Commander: What's the name of my ship?\r\n20:26:42 router: [cheap] gpt-4o-mini max_tokens=1024 \u2014 default -> cheap tier\r\n20:26:42 ed-context: status reference 'my ship'\r\n20:26:42 \u00bb Thinking\r\n20:26:42 \u00bb Idle \u00b7 error: OpenAI LLM 404: {\"error\":{\"message\":\"The model `gpt-4o-mini` does not exist or you do not have access to it.\",\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}",
+            "screenshots": [
+              ".muster/shots/run-20260715t230734z-r0102-openai-compatible-llm-provider-b9a46666719946b2bac09c.png"
+            ]
+          }
+        },
+        {
+          "testId": "gemini-llm-provider",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false
+          }
+        },
+        {
+          "testId": "help-hierarchy",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false,
+            "s6": false
+          }
+        },
+        {
+          "testId": "version-by-voice",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "check-updates-by-voice-is-ui-only",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "voice-settable-settings",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false,
+            "s6": false
+          }
+        },
+        {
+          "testId": "panel-live-status-log",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "panel-voice-list-filter",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        },
+        {
+          "testId": "panel-settings-page",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false,
+            "s5": false,
+            "s6": false
+          }
+        },
+        {
+          "testId": "panel-personality-tab",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false
+          }
+        },
+        {
+          "testId": "panel-voice-speed",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "panel-log-filter",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false
+          }
+        },
+        {
+          "testId": "panel-log-select-copy",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false,
+            "s4": false
+          }
+        },
+        {
+          "testId": "settings-persistence",
+          "status": "pending",
+          "stepChecks": {
+            "s1": false,
+            "s2": false,
+            "s3": false
+          }
+        }
+      ]
+    },
+    {
+      "runId": "run-20260716T124503Z-248a",
+      "commit": "e74cc26",
+      "branch": "main",
+      "submittedAt": "2026-07-16T13:31:26Z",
+      "results": [
+        {
+          "testId": "build-version-check",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "env-health",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "launch-headless-and-panel",
+          "status": "pass",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true
+          }
+        },
+        {
+          "testId": "openai-compatible-llm-provider",
+          "status": "pending",
+          "stepChecks": {
+            "s1": true,
+            "s2": true,
+            "s3": true,
             "s4": false,
             "s5": false
           }

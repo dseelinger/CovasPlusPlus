@@ -259,6 +259,19 @@ Log every decision with its reason, so you can tune the rules from real transcri
 - **Trim history** — lower `conversation.max_turns` or summarize older turns.
 - **Usage logging** — log the token counts the API returns per call (including cache reads/writes) plus a rough cost estimate; pair with a dev-mode mock for zero-cost iteration.
 
+### Provider suitability — a floor the tiering can't move
+COVAS is a *tool-heavy, session-length* workload: the tool schemas alone are **~10K tokens per turn**
+(sent every turn; prompt caching cuts their *cost* but not the raw token count a rate limiter sees),
+and a session is many turns. So a usable LLM endpoint needs real headroom — roughly **≥100K TPM and
+≥1,000 requests/day**. This is a hard floor the router can't engineer around: **Groq's *free* tier
+(12K TPM / 100K tokens-per-day ≈ ~9 turns/day) cannot run COVAS** and returns HTTP 413/429 — even
+halving the tool payload only reaches ~18 turns/day, so the daily-token ceiling, not request size, is
+the wall. Documented stance: Groq-free is **unsupported** (Groq *paid* is excellent); the recommended
+**free** provider is **Gemini Flash** (~250K TPM / 1,500 req/day); cheap-paid options (OpenAI
+`gpt-4o-mini`, DeepSeek, paid Groq) all clear the floor. The standing lever to lower the floor is
+**context-aware tool gating** (advertise only tools relevant to the turn/mode instead of all ~47) —
+a real cost/latency win on every provider, tracked as a backlog item; it does *not* rescue Groq-free.
+
 ### TTS: the one worthwhile local move
 TTS is a light CPU burst, not a GPU hog, so **Piper runs fine alongside the game**. Defaulting TTS to Piper takes ElevenLabs cost to zero; keep ElevenLabs as a "premium voice" toggle for relaxed sessions. Because both emit the same PCM, this is a config/router choice, not a code change. Whisper STT is already local for the same reason. Note the voice character differs — Piper is good but not ElevenLabs-smooth; worth an A/B once wired.
 

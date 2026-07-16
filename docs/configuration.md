@@ -501,7 +501,7 @@ See [Companion HUD](using/hud.md). **Off by default.**
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `llm.provider` | `anthropic` | `anthropic` (cloud, Claude), `openai` (any OpenAI-compatible cloud — OpenAI/Groq/DeepSeek/OpenRouter), `gemini` (Google Gemini native — function calling + Search grounding), or `ollama` (local, out-of-game only) |
-| `openai.base_url` / `.model` | OpenAI / `gpt-4o-mini` | OpenAI-compatible `chat/completions` endpoint + router-off model when `llm.provider = "openai"`; per-tier models live in `[openai.tiers]` |
+| `openai.base_url` / `.model` | OpenAI / `gpt-4o-mini` | OpenAI-compatible `chat/completions` endpoint + the model used when `llm.provider = "openai"`; `[openai.tiers]` ships **unset**, so every router tier reuses `.model` (a bare model swap to Groq/DeepSeek/OpenRouter just works) unless you set distinct per-tier ids there |
 | `gemini.model` | `gemini-2.5-flash` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash/Pro) live in `[gemini.tiers]` |
 | `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
@@ -513,7 +513,9 @@ See [Companion HUD](using/hud.md). **Off by default.**
 > **OpenAI-compatible LLM (`llm.provider = "openai"`).** One implementation covers **OpenAI, Groq,
 > DeepSeek, and OpenRouter** — only `[openai].base_url` and the model ids differ (see the presets in
 > `config.toml`). It's a **cloud** provider, so it's fine in-game and the [cost router](#cost-router-router)
-> tiers it via `[openai.tiers].{cheap,standard,premium}`. Tool calling (the checklist voice commands)
+> tiers it via `[openai.tiers].{cheap,standard,premium}` — which ship **unset**, so by default every
+> tier uses `[openai].model` and swapping to another endpoint only means changing `base_url` + `model`.
+> Set the per-tier keys only if you want distinct models on that endpoint. Tool calling (the checklist voice commands)
 > works; there is **no web-search** on this path (Anthropic-only). Needs an OpenAI key (enter it on the
 > Settings **API keys** card, stored in `OpenAIAPIKey.txt` — shared with the OpenAI TTS provider). A
 > request error degrades the turn to text, never crashing the loop.
@@ -525,3 +527,21 @@ See [Companion HUD](using/hud.md). **Off by default.**
 > a free key comes from [Google AI Studio](https://aistudio.google.com). Fail soft: a request error degrades the turn to
 > text. (Combining function calling + grounding needs a Gemini 2.x model; older models may reject the
 > combo — turn `web_search.enabled` off for those.)
+
+> **Provider suitability — what limits COVAS actually needs.** COVAS is a *tool-heavy, session-length*
+> workload: it sends a large tool set (**~10K tokens per turn**, growing with history) and runs many
+> turns per play session. The binding constraints on a provider are **tokens-per-minute (TPM)** for
+> burst and **tokens/requests-per-day (TPD/RPD)** for a whole session — not single-request size. A
+> comfortable provider offers roughly **≥100K TPM and ≥1,000 requests/day**.
+>
+> | Free tier | TPM | Per-day | Verdict for COVAS |
+> |---|---|---|---|
+> | **Groq** (free) | 12K | 100K tokens/day | ✗ **Not supported** — ~1 turn/min, ~9 turns/day; returns HTTP 413/429. No app-side tuning fixes the daily-token wall. |
+> | **Gemini Flash** (free, `provider = "gemini"`) | ~250K | 1,500 req/day | ✓ **Recommended free option** — fits a full session. |
+> | **OpenRouter** `:free` | loose | 50/day (1,000 after a one-time $10) | ~ Light/testing use; bump the daily cap with credits. |
+>
+> **Groq is excellent on a *paid* tier** (fast, high limits); it's only the *free* tier that can't
+> serve COVAS. For a paid path, OpenAI `gpt-4o-mini`, DeepSeek, or paid Groq all have ample limits and
+> low cost. Prompt caching (Anthropic/Gemini) cuts *cost* but **not** these rate-limit counts, so a
+> low-TPM free tier throttles regardless. Google revises Gemini free quotas without notice — treat the
+> numbers above as best-effort, not a guarantee.

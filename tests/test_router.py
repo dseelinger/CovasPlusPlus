@@ -256,6 +256,31 @@ def test_generic_provider_without_tiers_uses_single_model_for_all():
     assert r.decide("use opus").model == "qwen3"      # every tier -> the one local model
 
 
+def test_shipped_config_openai_tiers_do_not_shadow_a_model_swap():
+    """Regression: the "one provider" claim (Groq/DeepSeek/OpenRouter via a bare model swap) must
+    survive the router being ON. The shipped [openai.tiers] must be UNSET so a Settings-page model
+    change to a non-OpenAI id reaches every tier — otherwise a hardcoded `cheap = "gpt-4o-mini"`
+    shadows it and 404s on Groq (which has no gpt-4o-mini). See router._provider_tiers."""
+    import tomllib
+    from pathlib import Path
+
+    shipped = Path(__file__).resolve().parent.parent / "config.toml"
+    with open(shipped, "rb") as f:
+        cfg = tomllib.load(f)
+    # Simulate the documented alt-endpoint swap (base_url + model), router ON, as Settings writes it.
+    cfg["llm"]["provider"] = "openai"
+    cfg["router"]["enabled"] = True
+    cfg["openai"]["base_url"] = "https://api.groq.com/openai/v1"
+    cfg["openai"]["model"] = "llama-3.3-70b-versatile"
+
+    r = Router.from_cfg(cfg)
+    assert r.cfg.tiers == {"cheap": "llama-3.3-70b-versatile",
+                           "standard": "llama-3.3-70b-versatile",
+                           "premium": "llama-3.3-70b-versatile"}
+    # The failing turn from the bug report — default (cheap) tier must be the swapped model.
+    assert r.decide("can you hear me?").model == "llama-3.3-70b-versatile"
+
+
 # ---- strip_control: keep the control phrase out of the model's input --------
 def test_strip_control_removes_premium_phrase_and_filler():
     r = _router()

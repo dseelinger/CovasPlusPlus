@@ -1152,11 +1152,15 @@ model        = "gpt-4o-mini"
 
 [openai.tiers]
 # The cost router's tier -> model map for the OpenAI provider (issue #11). The router picks a tier
-# (cheap/standard/premium) and these name the model. Omit a key to reuse [openai].model. Set these
-# to the model ids of whatever endpoint base_url points at (Groq/DeepSeek/OpenRouter names differ).
-cheap    = "gpt-4o-mini"
-standard = "gpt-4o"
-premium  = "gpt-4o"
+# (cheap/standard/premium) and these name the model. Every key is UNSET by default, so all tiers
+# reuse [openai].model above — that way a bare model swap (change base_url + model to Groq/DeepSeek/
+# OpenRouter, e.g. via the Settings page) "just works" through the router, instead of a shipped
+# OpenAI-only default (gpt-4o-mini) shadowing your model and 404ing on another endpoint. Only set a
+# key here if you actually want DISTINCT per-tier models on THIS endpoint (they must be valid ids for
+# whatever base_url points at); an unset key falls back to [openai].model.
+# cheap    = "gpt-4o-mini"
+# standard = "gpt-4o"
+# premium  = "gpt-4o"
 
 [gemini]
 # Google Gemini on the NATIVE API (issue #13) — function calling (checklist voice commands) plus

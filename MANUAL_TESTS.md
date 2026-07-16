@@ -190,20 +190,33 @@ Notes:
 
 ### 4.1 OpenAI-compatible LLM provider (issue #12)  🔊 HW 🌍 NET 📋 FILE
 > One provider covers **OpenAI, Groq, DeepSeek, OpenRouter** — only `[openai].base_url` + model ids
-> differ. A *cloud* LLM, so it's fine in-game and the router tiers it via `[openai.tiers]`. Needs a
-> key in `OpenAIAPIKey.txt` (DPAPI-encrypted; add it in Settings — env vars are no longer read, #22).
-> Restart after switching `[llm].provider`.
+> differ. A *cloud* LLM, so it's fine in-game and the router tiers it via `[openai.tiers]`, which ship
+> **unset** so every tier reuses `[openai].model` (that's why a bare model swap to another endpoint
+> works even with the router ON). Needs a key in `OpenAIAPIKey.txt` (DPAPI-encrypted; add it in
+> Settings — env vars are no longer read, #22). Restart after switching `[llm].provider`.
+>
+> **Provider limits matter.** COVAS sends a large tool set (~10K tokens) every turn and runs many
+> turns per session, so the endpoint needs headroom — roughly **≥100K TPM and ≥1,000 requests/day**.
+> **Groq's FREE tier (12K TPM / 100K tokens-per-day ≈ ~9 turns/day) cannot run COVAS and is not
+> supported** — it returns HTTP 413/429; no app-side tuning changes that (the daily-token ceiling is
+> the wall). For a paid/high-limit endpoint (paid Groq, DeepSeek, OpenRouter-with-credits, OpenAI) it
+> works fine. For a **free** option that actually fits the load, use the **Gemini** provider (§4.2).
 - [ ] **Conversation:** set `[llm].provider = "openai"` (default `base_url`/`model` = OpenAI
   `gpt-4o-mini`), restart, speak a turn → COVAS answers via OpenAI; the `[router]` line shows the
   OpenAI model (e.g. `[cheap] gpt-4o-mini`) and `[usage]` shows token counts (+ a cost if priced).
 - [ ] **Tool calling works:** *"What's my next objective?"* / *"Mark fuel scooping complete."* → the
   checklist tool fires (log shows the tool call) and COVAS confirms — proving delta-assembled
   `tool_calls` are handled.
-- [ ] **Escalation tiers:** *"Think hard…"* → the router line shows `[standard]` with the
-  `[openai.tiers].standard` model; *"use opus/the big model"* wake phrase → `[premium]`.
-- [ ] **Alt endpoint (the "one provider" claim):** point `[openai].base_url` at **Groq**
-  (`https://api.groq.com/openai/v1`, model `llama-3.3-70b-versatile`) **or** OpenRouter, with that
-  service's key, restart → conversation still works through the same provider.
+- [ ] **Escalation tiers:** first set distinct `[openai.tiers]` ids (they're unset by default, so every
+  tier reuses `[openai].model` — the router line would otherwise show the same model for all tiers).
+  Then *"Think hard…"* → the router line shows `[standard]` with the `[openai.tiers].standard` model;
+  *"use opus/the big model"* wake phrase → `[premium]`.
+- [ ] **Alt endpoint (the "one provider" claim):** point `[openai].base_url` + `model` at a viable
+  OpenAI-compatible service — **DeepSeek** (`https://api.deepseek.com/v1`, `deepseek-chat`),
+  **OpenRouter**, or **paid Groq** — with that service's key, restart → conversation still works
+  through the same provider. Leave `[openai.tiers]` unset (the default) so the router uses your
+  `[openai].model`; with the router ON the log line reads e.g. `[cheap] deepseek-chat`, **not**
+  `gpt-4o-mini`. (Do **not** use Groq's *free* tier here — see the limits note above: it 413/429s.)
 - [ ] **Fail-soft:** clear the key (or set a bad `base_url`) → the turn degrades to text and the loop
   returns to IDLE; restore → it works again. No crash.
 
@@ -214,6 +227,11 @@ Notes:
 > default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash/Pro). Needs a key in
 > `GeminiAPIKey.txt` (DPAPI-encrypted; add it in Settings — env vars are no longer read, #22).
 > Restart after switching `[llm].provider`.
+>
+> **Recommended free provider.** Gemini's Flash **free** tier (~250K TPM / 1,500 requests-per-day)
+> comfortably fits COVAS's per-turn tool load — unlike Groq's free tier (§4.1) — so it's the
+> zero-cost path that actually works. Google trims free quotas without notice, so treat exact
+> numbers as best-effort.
 - [ ] **Conversation:** set `[llm].provider = "gemini"`, add your Gemini key in Settings, restart, speak a turn
   → COVAS answers via Gemini; `[router]` line shows the Gemini model (e.g. `[cheap] gemini-2.5-flash`)
   and `[usage]` shows token counts.
