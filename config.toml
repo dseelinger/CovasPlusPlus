@@ -67,7 +67,7 @@ wake_word_fuzzy = true
 [audio]
 # Microphone input. Leave input_device blank to use the Windows default mic.
 # Run check_setup.py to see the list of device names/indexes if you want to pin one.
-input_device   = "Microphone (Logi 4K Stream Edition)"  # your chosen mic (matched by name)
+input_device   = ""  # blank = the Windows default mic; or pick one on the Settings page (issue #89)
 sample_rate    = 16000   # 16 kHz is what Whisper expects — leave as-is
 tts_output_device = ""   # blank = default speakers/headset
 # Output sample rate of the multi-bus audio mixer (C1). All bus sources (comms/SFX/music)

@@ -51,6 +51,27 @@ def _voices(voices) -> list[dict]:
     return out
 
 
+def _dedup_input_devices(devices: list[dict]) -> list[dict]:
+    """Collapse the OS's per-host-API duplicates of one physical mic into a single option (#89).
+
+    Windows enumerates the same mic under MME, DirectSound, and WASAPI; the MME copy TRUNCATES the
+    name to ~31 chars (e.g. "Microphone (Logi 4K Stream Edit"), and because `Recorder._resolve` does
+    a first-hit substring match, that silent truncated copy used to win. list_input_devices() gives
+    only {index, name}, so we prefer by NAME: drop any device whose name is a strict PREFIX of a
+    longer one (the truncation) and de-duplicate exact repeats, keeping first-seen order. The result
+    is the full-name (typically WASAPI/DirectSound) entry the Recorder resolves to the audible device."""
+    names = [str(d.get("name", "")).strip() for d in devices if str(d.get("name", "")).strip()]
+    kept: list[str] = []
+    for n in names:
+        if n in kept:
+            continue  # exact duplicate
+        # Skip a name that is a strict prefix of any OTHER device name (a truncated MME clone).
+        if any(other != n and other.startswith(n) for other in names):
+            continue
+        kept.append(n)
+    return [{"value": n, "label": n, "meta": ""} for n in kept]
+
+
 def _cfg(cfg: dict, *keys, default=""):
     node = cfg
     for k in keys:
@@ -71,6 +92,10 @@ def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
         # --- static / no-network sources (always available) ---
         if source == schema.OPT_OPENAI_BASE_URLS:
             return list(OPENAI_BASE_URL_PRESETS), None
+
+        # --- local capture devices (mic picker, #89) — no network, no key ---
+        if source == schema.OPT_INPUT_DEVICES:
+            return _dedup_input_devices(firstrun.list_input_devices()), None
 
         # --- LLM model catalogs ---
         if source == schema.OPT_OPENAI_MODELS:
