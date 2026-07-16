@@ -117,10 +117,11 @@ SCHEMA: list[Setting] = [
             phrasings=("openai llm model", "openai model")),
     Setting("gemini.model", ("gemini", "model"), "enum",
             "Gemini model", "Providers",
-            "Model when LLM provider = gemini and the router is off/unset, e.g. gemini-2.5-flash-lite. "
-            "Pick from Google's live catalog or type a custom id. Per-tier models (Flash-Lite/Flash/"
-            "Pro) live in [gemini.tiers] in config.toml.",
-            default="gemini-2.5-flash-lite", options_source=OPT_GEMINI_MODELS,
+            "Model when LLM provider = gemini and the router is off/unset. Defaults to the "
+            "deprecation-proof alias gemini-flash-lite-latest (always resolves to Google's current GA "
+            "Flash-Lite). Pick from Google's live catalog or type a custom id/alias. Per-tier models "
+            "(Flash-Lite/Flash/Pro aliases) live in [gemini.tiers] in config.toml.",
+            default="gemini-flash-lite-latest", options_source=OPT_GEMINI_MODELS,
             phrasings=("gemini model",)),
     Setting("ollama.model", ("ollama", "model"), "enum",
             "Ollama model", "Providers",

@@ -22,10 +22,10 @@ def _llm(monkeypatch=None, *, key="test-key", web_search=False, **cfg):
     if monkeypatch is not None and key is not None:
         monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: key)
     return gem.GeminiLLM({
-        "gemini": {"model": "gemini-2.5-flash-lite", **cfg},
+        "gemini": {"model": "gemini-flash-lite-latest", **cfg},
         "web_search": {"enabled": web_search},
         "personality": {"enabled": False},
-        "pricing": {"gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40}},
+        "pricing": {"gemini-flash-lite-latest": {"input": 0.10, "output": 0.40}},
     })
 
 
@@ -227,7 +227,7 @@ def test_stream_generate_parses_sse_and_uses_header(monkeypatch):
         return _Resp()
 
     monkeypatch.setattr(gem.requests, "post", fake_post)
-    chunks = list(gem._stream_generate("http://x/v1beta", "gemini-2.5-flash-lite", "SECRET", {},
+    chunks = list(gem._stream_generate("http://x/v1beta", "gemini-flash-lite-latest", "SECRET", {},
                                        threading.Event()))
     assert len(chunks) == 2
     assert ":streamGenerateContent?alt=sse" in captured["url"]
@@ -325,7 +325,7 @@ def test_live_gemini_replies():
     otherwise so the paid suite stays deliberate. Uses the cheap Flash model."""
     if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
         pytest.skip("set GEMINI_API_KEY to run the live Gemini test")
-    cfg = {"gemini": {"model": os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")},
+    cfg = {"gemini": {"model": os.environ.get("GEMINI_MODEL", "gemini-flash-lite-latest")},
            "web_search": {"enabled": False}, "personality": {"enabled": False}, "pricing": {}}
     p = gem.GeminiLLM(cfg)
     text = "".join(piece for kind, piece in p.stream_reply(
@@ -336,20 +336,25 @@ def test_live_gemini_replies():
 
 @pytest.mark.integration
 @pytest.mark.paid
-def test_live_gemini_tier_ids_are_real():
-    """Guard against the #91 class of bug: assert every shipped [gemini.tiers] id (and the default
-    model) is a member of the LIVE model list. A free GET /models call (needs a key). If this fails,
-    a shipped id is stale — fix config.toml before it 404s a user's first turn."""
+def test_live_gemini_tier_ids_resolve():
+    """Guard against the #91 class of bug for ALIAS ids: the shipped [gemini.tiers] are `-latest`
+    aliases (gemini-flash-lite-latest / …) that resolve server-side and do NOT appear verbatim in the
+    concrete `GET /models` list — so a strict membership check would false-fail. Instead assert a real
+    turn SUCCEEDS on each configured tier id (+ the default model): that's the true "this id is
+    accepted / not a 404" check. Needs a key; paid (one short turn per unique id)."""
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
-        pytest.skip("set GEMINI_API_KEY to run the live Gemini model-list guard")
+        pytest.skip("set GEMINI_API_KEY to run the live Gemini tier-alias guard")
     from covas.config import load_config
     cfg = load_config()
     g = cfg.get("gemini", {}) or {}
-    base_url = str(g.get("base_url", "")).strip().rstrip("/") or gem._DEFAULT_BASE_URL
-    live = set(gem.list_gemini_models(base_url, key))
-    assert live, "live model list came back empty"
-    configured = {str(g.get("model", "")).strip()}
-    configured |= {str(v).strip() for v in (g.get("tiers", {}) or {}).values()}
-    missing = sorted(m for m in configured if m and m not in live)
-    assert not missing, f"configured Gemini ids not in live list: {missing}"
+    ids = {str(g.get("model", "")).strip()}
+    ids |= {str(v).strip() for v in (g.get("tiers", {}) or {}).values()}
+    ids = {i for i in ids if i}
+    for mid in sorted(ids):
+        p = gem.GeminiLLM({"gemini": {"model": mid}, "web_search": {"enabled": False},
+                           "personality": {"enabled": False}, "pricing": {}})
+        text = "".join(piece for kind, piece in p.stream_reply(
+            [{"role": "user", "content": "Reply with the single word: ok."}],
+            threading.Event(), lambda *a: None) if kind == "text")
+        assert text.strip(), f"configured Gemini id {mid!r} produced no reply (stale/invalid?)"

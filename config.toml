@@ -356,18 +356,20 @@ input = 2.50
 output = 10.0
 # Gemini provider (#13) rough rates (TUNE — add rows for the model you use; an unlisted model
 # estimates $0.00). Flash-Lite is the cheap/default tier; Flash is standard; Pro is premium/depth.
-# Ids GROUNDED against Google's live catalog (issue #91): the previously-shipped guessed 3.x ids
-# (gemini-3.1-flash-lite / gemini-3.5-flash) 404'd — no reliable source confirmed those exact
-# strings — so we use the confirmed-current, stable 2.5 family (dedicated docs pages + published
-# pricing). Sources: https://ai.google.dev/gemini-api/docs/models and
-# https://ai.google.dev/gemini-api/docs/pricing (verified 2026-07-16). Rates USD per 1M tokens.
-[pricing."gemini-2.5-flash-lite"]
+# Ids are DEPRECATION-PROOF `-latest` ALIASES (issue #91): pinning a concrete id keeps breaking —
+# the guessed gemini-3.1-flash-lite 404'd, and the GA gemini-2.5-* family is now "superseded" and
+# heading for deprecation. The `-latest` aliases always resolve to Google's current GA model in each
+# class (e.g. gemini-flash-latest → gemini-3.5-flash), so they survive the churn. Alias PRICING
+# tracks whatever underlying GA model the alias resolves to — these are best-effort per-class rates;
+# retune if Google shifts a class's price. Sources: https://ai.google.dev/gemini-api/docs/models and
+# https://ai.google.dev/gemini-api/docs/changelog (verified 2026-07-16). Rates USD per 1M tokens.
+[pricing."gemini-flash-lite-latest"]
 input = 0.10
 output = 0.40
-[pricing."gemini-2.5-flash"]
+[pricing."gemini-flash-latest"]
 input = 0.30
 output = 2.50
-[pricing."gemini-2.5-pro"]
+[pricing."gemini-pro-latest"]
 input = 1.25
 output = 10.0
 cache_read = 0.31
@@ -1200,21 +1202,22 @@ model        = "gpt-4o-mini"
 # NEVER commit the key. `base_url` rarely changes.
 base_url     = "https://generativelanguage.googleapis.com/v1beta"
 api_key_file = "GeminiAPIKey.txt"
-# GROUNDED model id (issue #91): the earlier guessed "gemini-3.1-flash-lite" 404'd. Use the
-# confirmed-current stable Flash-Lite. Verify/refresh from the live list: GET
-# {base_url}/models?key=… or https://ai.google.dev/gemini-api/docs/models
-model        = "gemini-2.5-flash-lite"
+# DEPRECATION-PROOF alias (issue #91): pinning a concrete id kept breaking (the guessed
+# gemini-3.1-flash-lite 404'd; the GA gemini-2.5-* family is now "superseded"). The `-latest` alias
+# always resolves to Google's current GA Flash-Lite, so it survives model churn. Refresh guidance:
+# GET {base_url}/models?key=… or https://ai.google.dev/gemini-api/docs/models
+model        = "gemini-flash-lite-latest"
 
 [gemini.tiers]
 # The router's tier -> model map for Gemini (issue #11): Flash-Lite for cheap/default banter, Flash
-# for standard, Pro for depth. Omit a key to reuse [gemini].model. Ids GROUNDED against Google's live
-# catalog (issue #91) — the previously-shipped 3.x guesses 404'd and no reliable source confirmed the
-# exact 3.x strings, so we ship the confirmed-stable 2.5 family (each has a dedicated docs page).
-# Source: https://ai.google.dev/gemini-api/docs/models (verified 2026-07-16). When a verified newer
-# id exists, swap it in and update the [pricing] rows to match.
-cheap    = "gemini-2.5-flash-lite"
-standard = "gemini-2.5-flash"
-premium  = "gemini-2.5-pro"
+# for standard, Pro for depth. Omit a key to reuse [gemini].model. Ids are DEPRECATION-PROOF `-latest`
+# ALIASES (issue #91) — they always resolve to Google's current GA model per class (e.g.
+# gemini-flash-latest → gemini-3.5-flash per the changelog), instead of a concrete id that gets
+# retired out from under us. Sources: https://ai.google.dev/gemini-api/docs/models and
+# https://ai.google.dev/gemini-api/docs/changelog (verified 2026-07-16).
+cheap    = "gemini-flash-lite-latest"
+standard = "gemini-flash-latest"
+premium  = "gemini-pro-latest"
 
 [ollama]
 # Local LLM via Ollama. Start it with `ollama serve`; pull a model first.

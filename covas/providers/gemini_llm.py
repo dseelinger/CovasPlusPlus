@@ -37,10 +37,12 @@ from ._retry import (RetryPolicy, TransientError, is_retryable_status,
 from .base import OnEvent, ToolHandler
 
 _DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-# GROUNDED default (issue #91): the earlier guessed "gemini-3.1-flash-lite" 404'd. This is the
-# confirmed-current stable Flash-Lite id from Google's live catalog / docs
-# (https://ai.google.dev/gemini-api/docs/models, verified 2026-07-16). Refresh via list_models().
-_DEFAULT_MODEL = "gemini-2.5-flash-lite"
+# DEPRECATION-PROOF default (issue #91): pinning a concrete id kept breaking (the guessed
+# gemini-3.1-flash-lite 404'd; GA gemini-2.5-* is now "superseded"). The `-latest` alias always
+# resolves to Google's current GA Flash-Lite (https://ai.google.dev/gemini-api/docs/models +
+# /changelog, verified 2026-07-16). Note: aliases won't appear verbatim in list_models() (which lists
+# concrete ids) — the check_setup guard is alias-aware so it doesn't false-warn on `-latest`.
+_DEFAULT_MODEL = "gemini-flash-lite-latest"
 _USER_AGENT = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
 _MAX_ROUNDS = 8
 

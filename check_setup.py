@@ -150,13 +150,19 @@ def check_gemini(cfg: dict) -> None:
         live_set = set(live)
         configured = {str(g.get("model", "")).strip()}
         configured |= {str(v).strip() for v in (g.get("tiers", {}) or {}).values()}
-        missing = sorted(m for m in configured if m and m not in live_set)
+        # `-latest` ALIASES (issue #91) resolve server-side to a current GA model and do NOT appear
+        # verbatim in the concrete-id list — so don't false-warn on them; only flag concrete ids that
+        # are genuinely absent.
+        missing = sorted(m for m in configured
+                         if m and not m.endswith("-latest") and m not in live_set)
         if missing:
             print(WARN + "configured Gemini model id(s) not in the live list: "
                   + ", ".join(missing))
-            print("        (Fix [gemini].model / [gemini.tiers] — a bad id 404s every turn.)")
+            print("        (Fix [gemini].model / [gemini.tiers] — a bad id 404s every turn. Tip: the "
+                  "gemini-flash-lite-latest / gemini-flash-latest / gemini-pro-latest aliases are "
+                  "deprecation-proof.)")
         else:
-            print(OK + "configured [gemini].model / tiers are all in the live list")
+            print(OK + "configured [gemini].model / tiers are all valid (live ids or `-latest` aliases)")
     except Exception as e:  # noqa: BLE001 — this guard must never crash setup
         print(WARN + f"Gemini model-list check skipped: {e}")
 
