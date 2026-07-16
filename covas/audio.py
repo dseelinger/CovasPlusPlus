@@ -228,6 +228,7 @@ class Recorder:
         self._frames: list[np.ndarray] = []
         self._stream: sd.InputStream | None = None
         self._lock = threading.Lock()
+        self._drop_samples = 0  # leading samples to discard on stop() — the barge-in mute window
 
     @staticmethod
     def _resolve(name) -> int | None:
@@ -240,9 +241,15 @@ class Recorder:
                 return i
         return None
 
-    def start(self) -> None:
+    def start(self, mute_ms: float = 0.0) -> None:
+        """Open the mic. On a barge-in (``mute_ms`` > 0) the leading ``mute_ms`` of the capture is
+        discarded on stop(): a belt-and-braces backstop for the residual TTS tail still draining
+        from the output device's own buffer after the mixer is silenced (issue #71). It also covers
+        the direct-device TTS path (no shared mixer) that the app can't synchronously stop. Kept
+        small so a normal (mute_ms=0) press never clips the Commander's first word."""
         with self._lock:
             self._frames = []
+            self._drop_samples = max(0, int(self.sr * mute_ms / 1000.0))
 
             def cb(indata, frames, time_info, status):  # noqa: ANN001
                 self._frames.append(indata.copy())
@@ -261,4 +268,9 @@ class Recorder:
                 self._stream = None
             if not self._frames:
                 return np.zeros(0, dtype=np.float32)
-            return np.concatenate(self._frames, axis=0).flatten().astype(np.float32)
+            audio = np.concatenate(self._frames, axis=0).flatten().astype(np.float32)
+            if self._drop_samples:
+                # Drop the barge-in mute window (any residual TTS tail leaking into the mic).
+                audio = audio[self._drop_samples:]
+                self._drop_samples = 0
+            return audio
