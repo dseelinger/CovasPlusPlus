@@ -1136,6 +1136,25 @@ port = 8765
 # OUT-OF-GAME only; a local model competes with ED for the GPU). Cloud providers are fine in-game
 # and are tiered by the cost router (see [router]).
 provider = "anthropic"
+# Latency watchdog (issue #97): if a turn goes this many seconds WITHOUT a spoken reply — a slow
+# first token, a provider retry/backoff, or a hung connection — COVAS speaks a short, plain-language
+# "the AI service is being slow, I'm still trying" line in the CURRENT voice so you're not left in
+# silence. It's a heads-up, not a failure: if the reply then lands, it follows normally. 0 disables.
+slow_warning_seconds = 30
+
+# Transient-error retry (issue #97). A cloud LLM has bad minutes (Anthropic 529 "Overloaded",
+# OpenAI/Groq 429s, Gemini 503s, connection blips). Instead of dying on one, COVAS retries the
+# request with exponential backoff + jitter, honoring the server's Retry-After, staying cancel-aware
+# (a barge-in aborts the wait), and capping the TOTAL wait so a turn never feels hung. Non-transient
+# errors (bad key, 404 model, 400 validation) fail fast — retrying them just wastes time. Shared by
+# every LLM provider; the Anthropic SDK is driven from the same knobs (its own internal retries).
+[llm.retry]
+enabled = true          # false -> a single try, no retry
+attempts = 4            # total tries (1 initial + up to 3 retries)
+base_delay = 0.5        # first backoff in seconds; grows x2 each retry (0.5, 1, 2, 4…)
+max_delay = 4.0         # per-sleep ceiling
+max_total_wait = 20.0   # HARD cap on cumulative backoff for one turn — keeps it interactive
+jitter = 0.25           # add up to this fraction of the delay at random, to avoid herd retries
 
 [openai]
 # OpenAI-compatible LLM (issue #12) — ONE implementation for OpenAI, Groq, DeepSeek, and OpenRouter:

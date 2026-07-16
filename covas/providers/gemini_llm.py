@@ -32,6 +32,8 @@ from typing import Iterator, Optional
 import requests
 
 from ..llm import build_system, estimate_cost
+from ._retry import (RetryPolicy, TransientError, is_retryable_status,
+                     parse_retry_after, run_with_retry)
 from .base import OnEvent, ToolHandler
 
 _DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
@@ -93,6 +95,7 @@ class GeminiLLM:
         mdl = str(model or self.model)
         cap = int(max_tokens if max_tokens is not None else self._max_tokens)
         gem_tools = _build_tools(tools, self._grounding)
+        policy = RetryPolicy.from_cfg(self._cfg)  # transient-error retry (issue #97)
 
         for _round in range(_MAX_ROUNDS):
             body: dict = {"contents": contents,
@@ -106,7 +109,7 @@ class GeminiLLM:
             fn_calls: list[dict] = []
             usage: Optional[dict] = None
 
-            for chunk in _stream_generate(self.base_url, mdl, key, body, cancel):
+            for chunk in _stream_generate(self.base_url, mdl, key, body, cancel, policy=policy):
                 if cancel.is_set():
                     return
                 if chunk.get("usageMetadata"):
@@ -150,6 +153,14 @@ class GeminiLLM:
 
 
 # ---- module helpers -------------------------------------------------------
+def _close(r) -> None:  # noqa: ANN001 — a requests.Response (or a test double without .close)
+    """Best-effort release of a non-200 response before we raise — test doubles may lack close()."""
+    try:
+        r.close()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _build_tools(tools: Optional[list[dict]], grounding: bool) -> list[dict]:
     """Translate shared tool schemas ({name, description, input_schema}) into a Gemini
     `functionDeclarations` tool, and (when grounding is on) add the `googleSearch` tool so the model
@@ -185,16 +196,33 @@ def _usage_event(cfg: dict, model: str, usage: dict) -> dict:
     return ev
 
 
-def _stream_generate(base_url: str, model: str, key: str, body: dict,
-                     cancel: threading.Event, *, timeout=(10, 600)) -> Iterator[dict]:  # noqa: ANN001
+def _stream_generate(base_url: str, model: str, key: str, body: dict, cancel: threading.Event,
+                     *, policy: Optional[RetryPolicy] = None,
+                     timeout=(10, 600)) -> Iterator[dict]:  # noqa: ANN001
     """POST `models/{model}:streamGenerateContent?alt=sse` and yield each parsed SSE `data:` chunk.
-    The key rides the `x-goog-api-key` header (never the URL). Raises RuntimeError on a non-200."""
+    The key rides the `x-goog-api-key` header (never the URL).
+
+    Retry (issue #97) wraps the CONNECT only: a 429/5xx/503 or a connection/timeout backs off
+    (honoring Retry-After) and re-tries per `policy`; a 4xx (bad key, 404 model) fails fast. A
+    mid-stream drop is NOT retried — it propagates and the turn falls soft. A non-retryable non-200
+    raises the same RuntimeError the app already guards."""
     url = f"{base_url}/models/{model}:streamGenerateContent?alt=sse"
     headers = {"x-goog-api-key": key, "Content-Type": "application/json", "User-Agent": _USER_AGENT}
-    with requests.post(url, data=json.dumps(body), headers=headers,
-                       stream=True, timeout=timeout) as r:
+    policy = policy or RetryPolicy()
+
+    def _connect() -> "requests.Response":
+        r = requests.post(url, data=json.dumps(body), headers=headers, stream=True, timeout=timeout)
         if r.status_code != 200:
-            raise RuntimeError(f"Gemini LLM {r.status_code}: {r.text[:200]}")
+            detail = f"Gemini LLM {r.status_code}: {r.text[:200]}"
+            retryable = is_retryable_status(r.status_code)
+            ra = parse_retry_after(r.headers.get("Retry-After")) if retryable else None
+            _close(r)
+            if retryable:
+                raise TransientError(detail, status=r.status_code, retry_after=ra, provider="Gemini")
+            raise RuntimeError(detail)
+        return r
+
+    with run_with_retry(_connect, cancel, policy, provider="Gemini") as r:
         for line in r.iter_lines():
             if cancel.is_set():
                 return

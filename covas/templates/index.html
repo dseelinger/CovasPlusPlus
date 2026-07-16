@@ -67,6 +67,15 @@
         border-radius:6px;font-family:inherit;font-size:12px;letter-spacing:1px;cursor:pointer}
   .prow button:hover{background:#162836}
   .pmsg{color:var(--ok,#39d353);font-size:12px}
+  /* Typed-prompt row (issue #76): a text box + a paper-airplane send, above the live log. */
+  .promptrow{display:flex;gap:8px;margin-bottom:10px}
+  .promptrow input{flex:1;background:#0c1119;color:var(--text);border:1px solid var(--edge);
+        border-radius:6px;padding:9px 10px;font-family:inherit;font-size:13px}
+  .promptrow input:focus{outline:none;border-color:var(--accent)}
+  .promptrow button{padding:9px 14px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+        border-radius:6px;font-family:inherit;font-size:15px;cursor:pointer;line-height:1}
+  .promptrow button:hover{background:#162836}
+  .promptrow button:disabled{opacity:.5;cursor:default}
   .logfilter{float:right;font-size:11px;letter-spacing:1px;font-weight:normal}
   .logfilter a{color:var(--muted);cursor:pointer;text-transform:none}
   .logfilter a.active{color:var(--accent)}
@@ -157,6 +166,11 @@
 
   <div class="card">
     <h2>Live Log <span class="logfilter"><a id="copyLog" title="Copy the whole log to the clipboard (respects the Conversation/All filter)">Copy log</a> · <a id="fConv">Conversation</a> · <a id="fAll">All</a></span></h2>
+    <!-- #76: type a prompt to the AI (no mic). Enter or ✈ sends a full normal turn. -->
+    <div class="promptrow">
+      <input type="text" id="promptInput" placeholder="Type a message to COVAS…" autocomplete="off" spellcheck="false">
+      <button id="promptSend" title="Send (Enter)" aria-label="Send prompt">&#9992;</button>
+    </div>
     <div class="logwrap">
       <div class="log" id="log"></div>
       <button type="button" class="jumpLatest" id="jumpLatest" title="Jump to the latest log line">↓ Jump to latest</button>
@@ -355,6 +369,21 @@ async function init(){
 
   $("personality").onclick = () => { const v=!getToggle("personality"); setToggle("personality",v); post({personality:v}); };
   $("cancelBtn").onclick = () => fetch("/api/cancel",{method:"POST"});
+
+  // Typed prompt (#76): Enter or ✈ sends a FULL normal turn (skips STT). Clears on send; the
+  // reply arrives over the same live log/status the voice loop uses, so no extra plumbing here.
+  const sendPrompt = async () => {
+    const inp = $("promptInput"), btn = $("promptSend");
+    const text = (inp.value || "").trim();
+    if (!text) return;                       // empty/whitespace ignored (server rejects it too)
+    inp.value = ""; btn.disabled = true;
+    try { await fetch("/api/prompt",{method:"POST",headers:{"content-type":"application/json"},
+                                     body:JSON.stringify({text})}); }
+    catch(e){ /* the turn failing shows in the live log; keep the panel responsive */ }
+    finally { btn.disabled = false; inp.focus(); }
+  };
+  $("promptSend").onclick = sendPrompt;
+  $("promptInput").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); sendPrompt(); } });
   $("openCues").onclick = async () => {
     const msg = $("cuesMsg");
     try {

@@ -130,6 +130,21 @@ Notes:
 
 Notes:
 
+## 3c. Type a prompt in the control panel (issue #76 — feature 02)  🌐 PANEL 🔊 HW
+> The main panel has a **text box + ✈ send button** above the live log. A typed prompt runs a
+> **full normal turn** (routing, context, tools, history, spoken reply) — just no microphone.
+- [ ] 🌐 Type *"what time is it? keep it short"* in the box and press **Enter** → it appears in the log as
+      `Commander: …`, the status light runs **THINKING → SPEAKING → IDLE**, and you **hear** the reply.
+- [ ] 🌐 Type another prompt and click the **✈** button → same result (both Enter and click send).
+- [ ] 🌐 The box **clears** on send.
+- [ ] 🌐 An **empty / whitespace-only** box does nothing when sent (no turn, no log line).
+- [ ] 🌐 **Precise glyphs:** type a system with an odd glyph (e.g. *"how far is Col 285 Sector →"* or a
+      name with `café`) → it goes through **verbatim** (something STT would mangle by voice).
+- [ ] 🌐 **Barge-in parity:** while a spoken reply is playing, send a typed prompt → it interrupts and
+      starts the new turn (like a push-to-talk press).
+
+Notes:
+
 ## 3a. Hands-free / continuous listening (issue #63 — `[listen].mode = "continuous"`)  🔊 HW 🎧 headset
 > Off by default. Switch to continuous by voice (*"switch to continuous listening"*), on the Settings
 > page (**Activation mode** under *Voice input*), or in `config.toml` (`[listen].mode`). Best tested
@@ -245,6 +260,35 @@ Notes:
   `[gemini.tiers].standard` (`gemini-3.5-flash`) model.
 - [ ] **Fail-soft:** clear the key → the turn degrades to text and the loop returns to IDLE; restore →
   it works again. No crash.
+
+Notes:
+
+### 4.3 Transient provider outage — retry, slow heads-up, degraded line (issue #97)  🔊 HW 🌐 PANEL
+> Cloud LLMs have bad minutes (Anthropic **529 Overloaded**, 429s, 503s). COVAS should **retry** with
+> backoff, speak a **"still slow"** heads-up if a turn drags, and — if it can't recover — say the
+> provider is **overloaded** (named) instead of dying. Simulate an outage without waiting for a real
+> one by pointing a provider at a URL that returns errors, or by using a throwaway/over-quota key.
+> **How to force a 529/5xx or timeout (pick one):**
+> - Set `[llm].provider = "openai"` and `[openai].base_url` to an endpoint that returns 5xx/429 (e.g.
+>   a local stub, or `https://httpstat.us/529` style mock), restart, and speak/type a turn.
+> - Or set `[openai].base_url` to an unroutable host/port to force a **connection timeout**.
+> - Or temporarily lower `[llm.retry].max_total_wait` / raise `attempts` to watch the backoff.
+- [ ] **Retry then recover:** with an endpoint that fails a couple of times then succeeds, one turn
+      **still answers** — the log shows retry attempts (backoff) before the reply. No user-visible error.
+- [ ] **Slow heads-up (watchdog):** set `[llm].slow_warning_seconds` low (e.g. `5`) against a slow/hung
+      endpoint → after ~5 s COVAS **speaks** *"the AI service is being slow… I'm still trying"* in the
+      **current voice**, and still delivers the real reply (or the degraded line) afterward.
+- [ ] **Exhausted → degraded line:** with an endpoint that always returns 529/5xx, a turn ends with a
+      short spoken, **provider-named** *"…is overloaded right now, Commander…"* line — not a raw error —
+      and 🌐 the log shows a precise reason (e.g. `provider degraded: … 529 … — retried 4×, giving up`).
+- [ ] **Fail-fast (no pointless retry):** point at a **404** model or a **bad key (401)** → the turn
+      fails **immediately** (no long backoff), degrading to text/IDLE.
+- [ ] **Cancel during backoff:** while a turn is retrying/slow, **tap `[`** (or panel **CANCEL**) →
+      it aborts **instantly**, no waiting out the backoff, back to IDLE.
+- [ ] **Text-only fail-soft:** in text-only mode (no TTS key), the slow/degraded messages appear as
+      **log lines** (not spoken) and the loop never crashes.
+- [ ] **History intact:** after a degraded/failed turn, the **next** turn answers its own question
+      (the failed turn left no orphaned prompt behind).
 
 Notes:
 

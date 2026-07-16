@@ -27,6 +27,7 @@ from .capabilities import CapabilityRegistry
 from .capabilities.checklist_capability import ChecklistCapability
 from .providers.base import LLMProvider, STTProvider, TTSProvider
 from .providers.factory import make_llm, make_stt, make_tts
+from .providers import _retry
 from .router import Router
 from .ed import ContextDetector
 from .memory import MemoryDetector
@@ -84,6 +85,50 @@ def _prune_empty(d: dict) -> None:
         _prune_empty(d[k])
         if not d[k]:
             del d[k]
+
+
+class _LatencyWatchdog:
+    """Background timer for the >Ns latency heads-up (issue #97). If a turn goes `seconds` without
+    a reply in hand, it fires ONCE and calls `speak` (the normal voice path, or a logged line in
+    text-only) so the Commander isn't left in dead silence during a slow/retrying provider call.
+    Disarmed the moment the reply arrives or the turn is cancelled.
+
+    Thread-safe and fail-soft: `_fire` (Timer thread) and `disarm` (worker thread) coordinate under
+    a lock so the interim line speaks at most once and never after disarm; a speak failure degrades
+    to nothing (the reason is already logged). Never blocks or crashes the turn."""
+
+    def __init__(self, seconds: float, *, speak, cancel: threading.Event, log) -> None:  # noqa: ANN001
+        self._seconds = seconds
+        self._speak = speak
+        self._cancel = cancel
+        self._log = log
+        self._timer: threading.Timer | None = None
+        self._lock = threading.Lock()
+        self._spent = False  # True once the line has fired OR the watchdog was disarmed
+
+    def arm(self) -> "_LatencyWatchdog":
+        if self._seconds and self._seconds > 0:
+            self._timer = threading.Timer(self._seconds, self._fire)
+            self._timer.daemon = True
+            self._timer.start()
+        return self
+
+    def _fire(self) -> None:
+        with self._lock:
+            if self._spent or self._cancel.is_set():
+                return
+            self._spent = True  # claim the single interim slot before releasing the lock
+        try:
+            self._log(f"provider slow: no reply after {self._seconds:.0f}s — speaking interim status")
+            self._speak()
+        except Exception:  # noqa: BLE001 — interim reassurance is best-effort, never crash the turn
+            pass
+
+    def disarm(self) -> None:
+        with self._lock:
+            self._spent = True
+        if self._timer is not None:
+            self._timer.cancel()
 
 
 class App:
@@ -1637,6 +1682,33 @@ class App:
         )
         self.worker.start()
 
+    # ---- typed prompt (control panel, issue #76) --------------------------
+    def dispatch_text(self, text: str) -> None:
+        """Public entry for a TYPED prompt from the control panel (issue #76). Runs a FULL normal
+        turn — router tiering, ED + memory injection, capability tools, conversation history, and a
+        spoken TTS reply — identical to a spoken turn, just skipping STT. Empty/whitespace is
+        rejected (mirrors the transcription guard). Like a PTT press it barges in on anything in
+        flight, then runs on the worker thread."""
+        if not text or not text.strip():
+            return  # nothing to answer — never send an empty user turn (the API 400s on it)
+        # Barge-in exactly like on_ptt_down: interrupt any current thinking/speaking (incl. a
+        # proactive callout) and claim the turn under the proactive lock so a callout can't slip in.
+        with self._proactive_lock:
+            self._interrupt()
+        self._dispatch_text(text.strip())
+
+    def _dispatch_text(self, text: str) -> None:
+        """Run ONE typed turn on the worker thread — mirrors :meth:`_dispatch_utterance` minus STT
+        (no capture cue, no transcription): same soft-bed arming, cancel/barge-in wiring, and
+        transactional history path, straight into the shared :meth:`_run_turn`."""
+        self.cues.play("processing")
+        self._bed_armed = True
+        cancel = threading.Event()
+        self.active_cancel = cancel
+        self.worker = threading.Thread(
+            target=self._run_turn, args=(text, cancel), daemon=True)
+        self.worker.start()
+
     # ---- Tier-2 reflex FAST PATH (second PTT, issue #38) ------------------
     def on_reflex_ptt_down(self) -> None:
         """The reflex second-PTT was pressed. Same barge-in as the main PTT (interrupt anything in
@@ -2003,7 +2075,30 @@ class App:
                         self.set_state("Idle", "(no wake word)")
                         return
                     text = res.text  # run the turn on the stripped command
+        except Exception as e:  # noqa: BLE001 — a transcription/gate failure must not crash the loop
+            self.cues.play("failed")
+            self.set_state("Idle", f"error: {e}")
+            return
+        # Post-transcription: hand off to the shared turn logic (issue #76). _run_turn owns its own
+        # fail-soft guard plus the #97 retry/watchdog, so this STT try only has to cover transcription.
+        self._run_turn(text, cancel)
 
+    def _run_turn(self, text: str, cancel: threading.Event) -> None:
+        """Run ONE full conversation turn from ALREADY-RESOLVED text — the shared spine of a
+        spoken turn (:meth:`_process`, post-STT + wake gate) and a TYPED prompt from the control
+        panel (:meth:`dispatch_text`, issue #76). Router tiering, ED-context + memory injection,
+        capability tools, conversation history, and a spoken TTS reply are identical for both; the
+        typed path simply skips STT and logs the same ``Commander: …`` line.
+
+        Reliability (issue #97): transient provider errors are retried with backoff INSIDE the
+        provider; a turn that goes silent past the latency threshold speaks an interim "still
+        trying" line via the watchdog; exhausted retries speak an in-character, provider-named
+        degraded line. Fail soft: any error returns to Idle leaving NO orphaned history turn — the
+        user+assistant pair commits atomically only on a successful reply."""
+        watchdog = None
+        try:
+            if cancel.is_set():
+                return
             print(f"\nCommander: {text}")
             self._log("Commander", text)
 
@@ -2128,18 +2223,26 @@ class App:
 
             reply = ""
             print("COVAS: ", end="", flush=True)
-            stream = self.llm.stream_reply(
-                messages, cancel, on_event,
-                tool_handler=self.registry.run_tool, tools=self.registry.tools(),
-                model=route.model, max_tokens=route.max_tokens)
-            for kind, chunk in stream:
-                if cancel.is_set():
-                    break
-                if kind == "text":
-                    flush_thinking()  # thinking precedes the spoken text
-                    reply += chunk
-                    sys.stdout.write(chunk)
-                    sys.stdout.flush()
+            # Latency watchdog (issue #97): armed for the LLM call only — a slow first token, a
+            # retry/backoff, or a hung connection all live here. It speaks a plain-language "still
+            # trying" line once past the threshold; disarmed the instant the reply is in hand (the
+            # finally), which is just before any reply audio plays.
+            watchdog = self._arm_latency_watchdog(cancel)
+            try:
+                stream = self.llm.stream_reply(
+                    messages, cancel, on_event,
+                    tool_handler=self.registry.run_tool, tools=self.registry.tools(),
+                    model=route.model, max_tokens=route.max_tokens)
+                for kind, chunk in stream:
+                    if cancel.is_set():
+                        break
+                    if kind == "text":
+                        flush_thinking()  # thinking precedes the spoken text
+                        reply += chunk
+                        sys.stdout.write(chunk)
+                        sys.stdout.flush()
+            finally:
+                watchdog.disarm()
             print()
 
             if cancel.is_set():
@@ -2173,8 +2276,61 @@ class App:
             self._speak(reply, cancel)
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — keep the loop alive on any failure
+            if watchdog is not None:
+                watchdog.disarm()  # idempotent — the stream's finally already ran on most paths
             self.cues.play("failed")
+            # Issue #97: a transient/overloaded provider (exhausted retries, connection drop, 529)
+            # earns an in-character, provider-named spoken heads-up instead of a bare error; any
+            # other failure just degrades soft as before. Never another LLM call — the LLM is what's
+            # down. History is untouched here (the commit is after a successful reply), so a failed
+            # turn leaves NO orphan.
+            if _retry.is_degraded_error(e):
+                self._speak_degraded(e, cancel)
             self.set_state("Idle", f"error: {e}")
+
+    # ---- provider reliability (issue #97) ---------------------------------
+    def _arm_latency_watchdog(self, cancel: threading.Event) -> "_LatencyWatchdog":
+        """Arm the >Ns latency watchdog for a turn (issue #97). Threshold from
+        ``[llm].slow_warning_seconds`` (default 30; <=0 disables). When it fires it speaks a canned,
+        plain-language "the AI service is being slow, still trying" line in the CURRENT voice via
+        the normal `_speak` path (degrading to a logged line in text-only mode) — never another LLM
+        call. Always returns a watchdog object (disabled ones no-op) so callers can disarm blindly."""
+        seconds = float((self.cfg.get("llm", {}) or {}).get("slow_warning_seconds", 30) or 0)
+        line = "Sorry, Commander — the AI service is being slow to respond. I'm still trying."
+
+        def _interim() -> None:
+            if self.text_only:
+                self._log("COVAS", line)  # no voice — surface it as text so it's never silent
+            else:
+                self._speak(line, cancel)
+
+        return _LatencyWatchdog(
+            seconds, speak=_interim, cancel=cancel,
+            log=lambda m: self._log("system", m)).arm()
+
+    def _provider_display_name(self) -> str:
+        """Friendly, in-character name for the ACTIVE LLM provider, for the degraded line. Kept
+        provider-agnostic — the OpenAI-compatible seam fronts many services (Groq/DeepSeek/…), so
+        it gets a generic label rather than a wrong brand."""
+        name = str((self.cfg.get("llm", {}) or {}).get("provider", "anthropic")).lower()
+        return {"anthropic": "Claude", "gemini": "Gemini",
+                "openai": "The AI service", "ollama": "The local model"}.get(name, "The AI service")
+
+    def _speak_degraded(self, err: Exception, cancel: threading.Event) -> None:
+        """Tell the Commander, in character, that the provider is overloaded (issue #97) and log
+        the precise reason. Canned/verbatim — the LLM is the thing that's down, so we NEVER call it
+        to narrate its own outage. Fail soft: degrade to a logged line when TTS is unavailable and
+        never raise."""
+        name = self._provider_display_name()
+        line = f"{name} is overloaded right now, Commander — give it a moment and try again."
+        self._log("system", f"provider degraded: {_retry.degraded_reason(err)}")
+        if self.text_only:
+            self._log("COVAS", line)
+            return
+        try:
+            self._speak(line, cancel)
+        except Exception:  # noqa: BLE001 — _speak already logged loudly; degrade to text
+            self._log("COVAS", line)
 
     # ---- run --------------------------------------------------------------
     def start(self) -> None:

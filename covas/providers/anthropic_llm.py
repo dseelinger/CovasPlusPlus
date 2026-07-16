@@ -8,12 +8,24 @@ from typing import Iterator, Optional
 import anthropic
 
 from .. import llm
+from ._retry import RetryPolicy
 from .base import OnEvent, ToolHandler
 
 
 class AnthropicLLM:
     def __init__(self, cfg: dict) -> None:
         self.cfg = cfg
+        # Transient-error handling (issue #97): the Anthropic SDK already retries 429/5xx/overloaded
+        # (incl. 529) internally with its own backoff + Retry-After honoring. For parity with the
+        # raw-`requests` providers we DRIVE that from the SAME `[llm.retry]` policy instead of
+        # wrapping the stream in the shared helper — wrapping would DOUBLE-retry the request. The
+        # SDK's max_retries counts retries (not total tries), so it's attempts-1.
+        # STREAMING BOUNDARY: the SDK's retries cover the initial connect / before the first token
+        # only. Once tokens stream, a mid-stream drop cannot be transparently retried without
+        # double-speaking, so it falls soft (the turn fails and app.py's degraded path speaks the
+        # outcome) — this matches the raw providers' behavior.
+        policy = RetryPolicy.from_cfg(cfg)
+        max_retries = max(0, policy.attempts - 1)
         # Key resolution: the DPAPI-encrypted key file the first-run wizard writes under data_dir
         # (file-only since #22 — no env-var read). Pass it explicitly when found; otherwise fall
         # through to the bare SDK client. The SDK will read its own ANTHROPIC_API_KEY as a last
@@ -21,7 +33,8 @@ class AnthropicLLM:
         # env-only setup never gets this far — the wizard runs first.
         from ..firstrun import anthropic_key
         key = anthropic_key(cfg)
-        self.client = anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic()
+        self.client = (anthropic.Anthropic(api_key=key, max_retries=max_retries) if key
+                       else anthropic.Anthropic(max_retries=max_retries))
 
     def stream_reply(
         self,

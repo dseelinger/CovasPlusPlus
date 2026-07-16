@@ -16,6 +16,19 @@ A small, muted **version tag** (`vX.Y.Z`) sits in the corner of every page — e
 glance which build you're on when comparing notes or filing a bug, without competing for attention
 with anything else on screen. The packaged app's window title carries the same version.
 
+## Type a prompt (no mic)
+
+Above the live log is a **text box with a ✈ send button**. Type a message and press **Enter** or
+click **✈** to send it — it runs a **full normal turn** (model routing, game-state and memory
+context, tools, conversation history, and a spoken reply), exactly like talking, just **without the
+microphone**. The box clears on send and your prompt shows in the log as `Commander: …` like any
+turn.
+
+It's handy when a hot mic is awkward (streaming, a voice call, a sleeping house, no free hand
+mid-combat), for **accessibility**, and for **exact** input speech-to-text tends to mangle — precise
+system/station/Commander names, numbers, URLs, and odd glyphs (`café`, `→`, `🚀`) go through
+verbatim. Like a push-to-talk press, sending **barges in** on anything already in flight.
+
 ## Live status & log
 
 The main page shows a **status light** that tracks each turn (LISTENING → TRANSCRIBING → THINKING →
