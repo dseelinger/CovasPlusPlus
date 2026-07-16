@@ -53,6 +53,8 @@ inline help:
   beside it. Type 3+ characters to narrow the dropdown to voices whose name or category contains the
   text (case-insensitive); shorter or empty restores the full list. The same box appears next to the
   **ElevenLabs voice** dropdown on the main control panel.
+- **Alphabetical order** — the ElevenLabs voice and model dropdowns are sorted A→Z by display name
+  (case-insensitive), not raw API order, so long voice libraries are easy to scan.
 - **Change & save** — edit values, then **Save changes** writes them to `overrides.json`
   (`config.toml` stays pristine).
 - **Per-setting reset** — a changed setting shows a **Reset** button that reverts it to the default

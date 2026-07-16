@@ -776,6 +776,17 @@ Notes:
 - [ ] **Settings page:** same behavior in the filter box **next to** the schema `@elevenlabs_voices`
       picker — 3+ chars filters by substring, <3 clears. Picking a filtered voice still saves normally.
 
+### 14.1b Voice/model dropdowns sorted alphabetically (issue #93)  🌐 PANEL 🌍 NET
+> Both the **ElevenLabs voice** and **ElevenLabs model** dropdowns should list entries A→Z by
+> display name, case-insensitive, regardless of the order the ElevenLabs API returns them in.
+- [ ] **Main panel:** open the **ElevenLabs voice** dropdown → names read alphabetically
+      (case-insensitive — e.g. a lowercase name like *"bella"* sorts with the *B*s, not after *Z*).
+- [ ] **Settings page:** the schema-driven **ElevenLabs voice** (`@elevenlabs_voices`) and
+      **ElevenLabs model** (`@elevenlabs_models`) pickers are both alphabetical too.
+- [ ] **Selection preserved:** with a voice/model selected that happens to sort near the bottom
+      (e.g. starts with *"Z"* or *"™"*), reload the Settings page → it's still the selected value
+      (sorting is presentational only, never drops or changes the current selection).
+
 ### 14.2 Settings page (N1) — http://127.0.0.1:8765/settings
 - [ ] The page renders **grouped sections** with the **right control per type** (toggles, dropdowns, number/sliders, text/path) and inline help.
 - [ ] **Filter box (issue #7):** type 3+ chars → the list narrows to settings whose **section, title, or description** contains the text (case-insensitive); sections with no matches hide entirely. Typing **1–2 chars** filters nothing (everything stays shown); **clearing** the box restores the full list. Verify a **section-name-only** match (e.g. type a group name that isn't in any title/help) still surfaces that section's settings.
