@@ -28,6 +28,7 @@ import time
 
 from covas import firstrun
 from covas import setup_web
+from covas.__version__ import __version__
 from covas.app import App
 from covas.config import load_config
 from covas.single_instance import ensure_single_instance
@@ -176,7 +177,7 @@ def main() -> None:
     # The one and only window and start() for the session. A fresh install opens on the wizard
     # (`/setup`); the handoff below navigates the SAME window to the panel (`/`). A configured
     # install opens straight on the panel.
-    window = webview.create_window("COVAS++", url=(panel_url if configured else wizard_url),
+    window = webview.create_window(f"COVAS++ v{__version__}", url=(panel_url if configured else wizard_url),
                                    width=1200, height=820, min_size=(900, 640))
 
     if configured:
