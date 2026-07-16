@@ -509,12 +509,26 @@ See [Companion HUD](using/hud.md). **Off by default.**
 | `llm.retry.jitter` | `0.25` | Add up to this fraction of the delay at random, so retries don't stampede a recovering server |
 | `openai.base_url` / `.model` | OpenAI / `gpt-4o-mini` | OpenAI-compatible `chat/completions` endpoint + the model used when `llm.provider = "openai"`; `[openai.tiers]` ships **unset**, so every router tier reuses `.model` (a bare model swap to Groq/DeepSeek/OpenRouter just works) unless you set distinct per-tier ids there |
 | `gemini.model` | `gemini-2.5-flash-lite` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash-Lite cheap, Flash standard, Pro for depth) live in `[gemini.tiers]`. Ids are grounded against Google's [live model list](https://ai.google.dev/gemini-api/docs/models) — verify a new id there (or `GET {base_url}/models`) before setting it, and `check_setup.py` warns if a configured id isn't in the live list |
+| `ollama.model` | `qwen3` | Local model when `llm.provider = "ollama"` (out-of-game only); pick from your locally-pulled models (`GET /api/tags`) or type a tag to `ollama pull` |
 | `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `azure.region` / `azure.voice` / `azure.style` | `eastus` / `en-US-AriaNeural` / *(blank)* | Azure Neural region, voice ShortName, and optional SSML style when `tts.provider = "azure"` |
 | `openai_tts.base_url` / `.model` / `.voice` / `.instructions` | OpenAI / `gpt-4o-mini-tts` / `alloy` / *(blank)* | OpenAI-compatible endpoint, model, voice, and optional tone steer when `tts.provider = "openai"` |
 | `cartesia.model` / `.voice` / `.language` | `sonic-2` / *(blank)* / `en` | Cartesia Sonic model, voice id, and language when `tts.provider = "cartesia"` (persona-only) |
 | `dev.mock` | `false` | Swap LLM/TTS/STT for fakes — exercise the loop with zero API calls (restart to apply) |
+
+> **Pick, don't type — fetched dropdowns (issue #92 / #88).** On the Settings page most model-id and
+> endpoint fields are **editable comboboxes**: a dropdown populated from the provider's *live* catalog
+> plus free-text for anything custom. `openai.model` / `openai_tts` follow `GET {base_url}/models` for
+> the active endpoint (OpenAI/Groq/DeepSeek/OpenRouter — the model list refetches when you change the
+> base URL); `gemini.model` uses Google's `GET /v1beta/models`; `ollama.model` uses `GET /api/tags`;
+> `edge.voice` / `azure.voice` / `cartesia.voice` fetch each provider's voice catalog (Edge needs no
+> key; Azure needs the key + region; Cartesia needs the key). The base-URL fields offer the four known
+> presets + a custom entry. A value **outside** the fetched list is still accepted — flagged *"custom
+> (unsupported)"*, never blocked — and the **current value is always kept**: offline, no key, or an
+> unreachable endpoint simply degrades the control to free-text with your existing value intact (never
+> an empty/blocking dropdown). `openai_tts.voice` / `openai_tts.model` / `cartesia.model` are small
+> fixed sets shown as strict dropdowns.
 
 > **OpenAI-compatible LLM (`llm.provider = "openai"`).** One implementation covers **OpenAI, Groq,
 > DeepSeek, and OpenRouter** — only `[openai].base_url` and the model ids differ (see the presets in

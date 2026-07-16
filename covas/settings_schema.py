@@ -44,6 +44,32 @@ CAST_PROVIDERS = ["piper", "elevenlabs", "edge", "azure", "openai"]
 OPT_MODELS = "@anthropic_models"        # cfg[anthropic][available_models]
 OPT_EL_MODELS = "@elevenlabs_models"    # live ElevenLabs model ids
 OPT_EL_VOICES = "@elevenlabs_voices"    # live ElevenLabs voice ids
+# Fetched-catalog sources added by issue #92 (+#88). Each is resolved by `covas/catalog.py`
+# from the provider's live list (fail-soft) and rendered as an EDITABLE COMBOBOX (combobox=True
+# below) so a value outside the fetched set — the "custom, at your own risk" escape hatch — stays
+# valid, and the current value is never lost when the fetch fails/offline/no-key.
+OPT_OPENAI_MODELS = "@openai_models"        # GET {openai.base_url}/models (OpenAI/Groq/DeepSeek/OpenRouter)
+OPT_GEMINI_MODELS = "@gemini_models"        # GET {gemini.base_url}/models (#91 reuse)
+OPT_OLLAMA_MODELS = "@ollama_models"        # GET {ollama.host}/api/tags (locally-pulled)
+OPT_ANTHROPIC_MODELS_LIVE = "@anthropic_models_live"  # GET /v1/models, static available_models fallback
+OPT_OPENAI_BASE_URLS = "@openai_base_urls"  # preset OpenAI/Groq/DeepSeek/OpenRouter + Custom…
+OPT_EDGE_VOICES = "@edge_voices"            # list_edge_voices() — no key (#88)
+OPT_AZURE_VOICES = "@azure_voices"          # list_azure_voices(key, region) — key+region gated (#88)
+OPT_CARTESIA_VOICES = "@cartesia_voices"    # GET {cartesia.base_url}/voices — key gated
+
+# Small static option vocabularies for TTS model/voice fields (issue #92).
+OPENAI_TTS_VOICES = ["alloy", "ash", "ballad", "coral", "echo", "fable",
+                     "nova", "onyx", "sage", "shimmer", "verse"]
+OPENAI_TTS_MODELS = ["gpt-4o-mini-tts", "tts-1", "tts-1-hd"]
+CARTESIA_MODELS = ["sonic-2", "sonic", "sonic-turbo"]
+
+# Sentinels whose value is NOT in the fetched list is still ACCEPTED (editable combobox / custom
+# escape hatch). Used by validate_value so a custom base_url or an unlisted-but-valid model/voice id
+# is never rejected — the UI flags it as unsupported instead of blocking the save.
+_COMBOBOX_SOURCES = frozenset({
+    OPT_OPENAI_MODELS, OPT_GEMINI_MODELS, OPT_OLLAMA_MODELS, OPT_ANTHROPIC_MODELS_LIVE,
+    OPT_OPENAI_BASE_URLS, OPT_EDGE_VOICES, OPT_AZURE_VOICES, OPT_CARTESIA_VOICES,
+})
 
 
 @dataclass(frozen=True)
@@ -77,21 +103,31 @@ SCHEMA: list[Setting] = [
             "Search grounding), or ollama (local, out-of-game only).",
             default="anthropic", options=LLM_PROVIDERS,
             phrasings=("llm provider",)),
-    Setting("openai.base_url", ("openai", "base_url"), "string",
+    Setting("openai.base_url", ("openai", "base_url"), "enum",
             "OpenAI LLM base URL", "Providers",
-            "OpenAI-compatible chat/completions endpoint when LLM provider = openai. Default is "
-            "OpenAI; point it at Groq/DeepSeek/OpenRouter. Key comes from the key file.",
-            default="https://api.openai.com/v1", phrasings=("openai llm base url",)),
-    Setting("openai.model", ("openai", "model"), "string",
+            "OpenAI-compatible chat/completions endpoint when LLM provider = openai. Pick a preset "
+            "(OpenAI/Groq/DeepSeek/OpenRouter) or type a custom URL. Key comes from the key file.",
+            default="https://api.openai.com/v1", options_source=OPT_OPENAI_BASE_URLS,
+            phrasings=("openai llm base url",)),
+    Setting("openai.model", ("openai", "model"), "enum",
             "OpenAI LLM model", "Providers",
-            "Model when LLM provider = openai and the router is off/unset, e.g. gpt-4o-mini. Per-tier "
-            "models live in [openai.tiers] in config.toml.",
-            default="gpt-4o-mini", phrasings=("openai llm model", "openai model")),
-    Setting("gemini.model", ("gemini", "model"), "string",
+            "Model when LLM provider = openai and the router is off/unset, e.g. gpt-4o-mini. Pick from "
+            "the endpoint's live catalog or type a custom id. Per-tier models live in [openai.tiers].",
+            default="gpt-4o-mini", options_source=OPT_OPENAI_MODELS,
+            phrasings=("openai llm model", "openai model")),
+    Setting("gemini.model", ("gemini", "model"), "enum",
             "Gemini model", "Providers",
             "Model when LLM provider = gemini and the router is off/unset, e.g. gemini-2.5-flash-lite. "
-            "Per-tier models (Flash-Lite/Flash/Pro) live in [gemini.tiers] in config.toml.",
-            default="gemini-2.5-flash-lite", phrasings=("gemini model",)),
+            "Pick from Google's live catalog or type a custom id. Per-tier models (Flash-Lite/Flash/"
+            "Pro) live in [gemini.tiers] in config.toml.",
+            default="gemini-2.5-flash-lite", options_source=OPT_GEMINI_MODELS,
+            phrasings=("gemini model",)),
+    Setting("ollama.model", ("ollama", "model"), "enum",
+            "Ollama model", "Providers",
+            "Local model when LLM provider = ollama (out-of-game only). Pick from your locally-pulled "
+            "models or type a tag you'll `ollama pull`, e.g. qwen3 or qwen3:32b.",
+            default="qwen3", options_source=OPT_OLLAMA_MODELS,
+            phrasings=("ollama model", "local model")),
     Setting("tts.provider", ("tts", "provider"), "enum",
             "TTS provider", "Providers",
             "Which voice speaks. edge (free edge-tts neural voices — the default; no SLA, falls "
@@ -100,55 +136,63 @@ SCHEMA: list[Setting] = [
             "premium), or piper (local, offline, free).",
             default="edge", options=TTS_PROVIDERS,
             phrasings=("tts provider", "voice provider")),
-    Setting("edge.voice", ("edge", "voice"), "string",
+    Setting("edge.voice", ("edge", "voice"), "enum",
             "Edge voice", "Providers",
             "Edge (edge-tts) persona voice ShortName when TTS provider = edge, e.g. "
-            "en-US-AriaNeural. List them with: python -m edge_tts --list-voices.",
-            default="en-US-AriaNeural", phrasings=("edge voice", "edge tts voice")),
+            "en-US-AriaNeural. Pick from the live voice catalog (no key needed) or type a ShortName.",
+            default="en-US-AriaNeural", options_source=OPT_EDGE_VOICES,
+            phrasings=("edge voice", "edge tts voice")),
     Setting("azure.region", ("azure", "region"), "string",
             "Azure region", "Providers",
             "Azure Speech resource region when TTS provider = azure, e.g. eastus, westus2, uksouth. "
             "Must match your resource. Key comes from [azure].api_key_file.",
             default="eastus", phrasings=("azure region", "azure speech region")),
-    Setting("azure.voice", ("azure", "voice"), "string",
+    Setting("azure.voice", ("azure", "voice"), "enum",
             "Azure voice", "Providers",
             "Azure Neural persona voice ShortName when TTS provider = azure (same names as Edge), "
-            "e.g. en-US-AriaNeural.",
-            default="en-US-AriaNeural", phrasings=("azure voice", "azure tts voice")),
+            "e.g. en-US-AriaNeural. Pick from the live catalog (needs the Azure key + region) or "
+            "type a ShortName.",
+            default="en-US-AriaNeural", options_source=OPT_AZURE_VOICES,
+            phrasings=("azure voice", "azure tts voice")),
     Setting("azure.style", ("azure", "style"), "string",
             "Azure speaking style", "Providers",
             "Optional SSML speaking style/emotion for the Azure voice (voice-dependent), e.g. "
             "cheerful, newscast, chat. Blank = the voice's neutral default.",
             default="", phrasings=("azure style", "azure speaking style", "voice style")),
-    Setting("openai_tts.base_url", ("openai_tts", "base_url"), "string",
+    Setting("openai_tts.base_url", ("openai_tts", "base_url"), "enum",
             "OpenAI TTS base URL", "Providers",
-            "OpenAI-compatible audio/speech endpoint when TTS provider = openai. Default is OpenAI; "
-            "point it at any compatible endpoint. Key comes from the key file.",
-            default="https://api.openai.com/v1", phrasings=("openai base url", "openai tts url")),
-    Setting("openai_tts.model", ("openai_tts", "model"), "string",
+            "OpenAI-compatible audio/speech endpoint when TTS provider = openai. Pick a preset or "
+            "type a custom URL. Key comes from the key file.",
+            default="https://api.openai.com/v1", options_source=OPT_OPENAI_BASE_URLS,
+            phrasings=("openai base url", "openai tts url")),
+    Setting("openai_tts.model", ("openai_tts", "model"), "enum",
             "OpenAI TTS model", "Providers",
-            "TTS model when TTS provider = openai. gpt-4o-mini-tts (cheap, default) or tts-1.",
-            default="gpt-4o-mini-tts", phrasings=("openai tts model", "openai voice model")),
-    Setting("openai_tts.voice", ("openai_tts", "voice"), "string",
+            "TTS model when TTS provider = openai. gpt-4o-mini-tts (cheap, default), tts-1, or tts-1-hd.",
+            default="gpt-4o-mini-tts", options=OPENAI_TTS_MODELS,
+            phrasings=("openai tts model", "openai voice model")),
+    Setting("openai_tts.voice", ("openai_tts", "voice"), "enum",
             "OpenAI TTS voice", "Providers",
             "Voice name when TTS provider = openai: alloy, ash, ballad, coral, echo, fable, nova, "
             "onyx, sage, shimmer, verse.",
-            default="alloy", phrasings=("openai voice", "openai tts voice")),
+            default="alloy", options=OPENAI_TTS_VOICES,
+            phrasings=("openai voice", "openai tts voice")),
     Setting("openai_tts.instructions", ("openai_tts", "instructions"), "string",
             "OpenAI TTS instructions", "Providers",
             "Optional free-text tone/delivery steer, honored by newer models (gpt-4o-mini-tts), "
             "ignored by older (tts-1). Blank = the voice's default.",
             default="", phrasings=("openai instructions", "openai tone")),
-    Setting("cartesia.model", ("cartesia", "model"), "string",
+    Setting("cartesia.model", ("cartesia", "model"), "enum",
             "Cartesia model", "Providers",
             "Cartesia Sonic model when TTS provider = cartesia (a low-latency premium PERSONA "
             "voice), e.g. sonic-2. Key comes from the key file.",
-            default="sonic-2", phrasings=("cartesia model", "sonic model")),
-    Setting("cartesia.voice", ("cartesia", "voice"), "string",
+            default="sonic-2", options=CARTESIA_MODELS,
+            phrasings=("cartesia model", "sonic model")),
+    Setting("cartesia.voice", ("cartesia", "voice"), "enum",
             "Cartesia voice id", "Providers",
-            "Cartesia voice id when TTS provider = cartesia (required — get one from the Cartesia "
-            "voice library at play.cartesia.ai or GET /voices).",
-            default="", phrasings=("cartesia voice", "sonic voice")),
+            "Cartesia voice id when TTS provider = cartesia (required). Pick from your Cartesia voice "
+            "library (needs the key) or type a voice id from play.cartesia.ai.",
+            default="", options_source=OPT_CARTESIA_VOICES,
+            phrasings=("cartesia voice", "sonic voice")),
     Setting("cartesia.language", ("cartesia", "language"), "string",
             "Cartesia language", "Providers",
             "Synthesis language (BCP-47 primary subtag) for the Cartesia voice, e.g. en.",
@@ -840,6 +884,13 @@ def is_overridden(overrides: dict, setting: Setting) -> bool:
     return isinstance(node, dict) and setting.path[-1] in node
 
 
+def is_combobox(setting: Setting) -> bool:
+    """Whether an enum is an EDITABLE combobox (issue #92): its dropdown is a discovery aid, but a
+    value OUTSIDE the fetched list stays valid (the custom / at-your-own-risk escape hatch). Only the
+    fetched-catalog sources are open; static enums and the strict ElevenLabs/anthropic lists are not."""
+    return setting.options_source in _COMBOBOX_SOURCES
+
+
 def resolve_options(setting: Setting, dynamic: Optional[dict] = None) -> Optional[list]:
     """The concrete option list for an enum: static options, or a dynamic list
     supplied by the caller for an `options_source`. None when a dynamic source
@@ -896,6 +947,11 @@ def validate_value(setting: Setting, value: Any,
     if t == "enum":
         opts = options if options is not None else resolve_options(setting)
         sval = value if isinstance(value, str) else str(value)
+        if is_combobox(setting):
+            # Editable combobox (issue #92): the dropdown is a discovery aid, but a value outside it
+            # (a custom base_url, an unlisted-but-valid model/voice id) MUST stay valid — the UI
+            # flags it as unsupported instead of blocking. Just type-check it as a non-empty string.
+            return sval, None
         if opts is None:
             # Dynamic options unavailable (e.g. offline ElevenLabs) — accept as a
             # string rather than reject a value we simply can't check right now.
@@ -939,6 +995,7 @@ def public_schema(cfg: dict, overrides: dict,
             "help": s.help,
             "options": resolve_options(s, dynamic),
             "options_source": s.options_source,
+            "combobox": is_combobox(s),
             "min": s.min,
             "max": s.max,
             "unit": s.unit,

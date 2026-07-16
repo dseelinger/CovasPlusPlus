@@ -1946,6 +1946,12 @@ class App:
                 return pairs
             except Exception:  # noqa: BLE001 — offline/API failure: caller handles None
                 return None
+        # Fetched-catalog combobox sources (issue #92 / #88) — model ids, base URLs, Edge/Azure/
+        # Cartesia voices. `catalog.option_pairs` is fail-soft (None on offline/no-key), so a voice
+        # "set the edge voice to …" degrades gracefully like the ElevenLabs pickers.
+        if src is not None:
+            from . import catalog
+            return catalog.option_pairs(src, self.cfg)
         return None
 
     def public_settings(self) -> dict:

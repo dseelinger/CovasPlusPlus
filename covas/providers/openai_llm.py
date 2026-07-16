@@ -169,6 +169,36 @@ def _close(r) -> None:  # noqa: ANN001 — a requests.Response (or a test double
         pass
 
 
+def parse_openai_models(payload: dict) -> list[str]:
+    """Extract model ids from an OpenAI-compatible `GET /models` payload (issue #92).
+
+    The response shape is ``{"data": [{"id": "gpt-4o-mini", ...}, ...]}`` (OpenAI/Groq/DeepSeek/
+    OpenRouter all follow it). Ids are de-duplicated, order preserved. PURE — no I/O — so the parsing
+    is unit-tested offline with a fake payload."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in (payload or {}).get("data") or []:
+        mid = str((m or {}).get("id", "")).strip() if isinstance(m, dict) else ""
+        if mid and mid not in seen:
+            seen.add(mid)
+            out.append(mid)
+    return out
+
+
+def list_openai_models(base_url: str, key: str, *, timeout=(5, 15)) -> list[str]:  # noqa: ANN001
+    """`GET {base_url}/models` → the model-id list for the ACTIVE endpoint (base_url selects
+    OpenAI/Groq/DeepSeek/OpenRouter). Raises on a non-200 or transport error; callers that want
+    fail-soft wrap this (see `covas/catalog.py`)."""
+    url = f"{base_url.rstrip('/')}/models"
+    headers = {"Authorization": f"Bearer {key}", "User-Agent": _USER_AGENT}
+    r = requests.get(url, headers=headers, timeout=timeout)
+    if r.status_code != 200:
+        detail = f"OpenAI model list {r.status_code}: {r.text[:200]}"
+        _close(r)
+        raise RuntimeError(detail)
+    return parse_openai_models(r.json())
+
+
 def _translate_tools(tools: Optional[list[dict]]) -> list[dict]:
     """Translate the shared Anthropic-style tool schemas ({name, description, input_schema}) into
     OpenAI function tools ({type:'function', function:{name, description, parameters}})."""

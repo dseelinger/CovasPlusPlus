@@ -869,6 +869,29 @@ Notes:
       (e.g. starts with *"Z"* or *"™"*), reload the Settings page → it's still the selected value
       (sorting is presentational only, never drops or changes the current selection).
 
+### 14.1c Fetched-catalog dropdowns — editable comboboxes (issues #92 + #88)  🌐 PANEL 🌍 NET 📋 FILE
+> On the **Settings** page the model-id and endpoint fields are editable comboboxes: a dropdown fed
+> from the provider's LIVE catalog plus free-text for anything custom. `requires:` the relevant
+> provider key/endpoint for the list to actually populate (OpenAI/Groq key for `openai.model`, Gemini
+> key for `gemini.model`, a running Ollama for `ollama.model`, Azure key+region for `azure.voice`,
+> Cartesia key for `cartesia.voice`; Edge needs no key). Verify in BOTH the browser (`run_covas_ui.py`)
+> and the packaged native window.
+- [ ] **Base-URL presets:** the **OpenAI LLM base URL** field offers the four presets
+      (OpenAI/Groq/DeepSeek/OpenRouter) in its dropdown; picking one fills the box. Typing a custom URL
+      shows a **"custom (unsupported)"** flag but is accepted.
+- [ ] **Model list populates:** with an OpenAI (or Groq/OpenRouter) key set, open **OpenAI LLM model**
+      → the datalist lists that endpoint's models; the row footer shows a count. Change the **base URL**
+      to another preset → the model list **refetches** for the new endpoint.
+- [ ] **Gemini / Ollama:** with a Gemini key, **Gemini model** lists Google's live models; with Ollama
+      running, **Ollama model** lists your locally-pulled tags.
+- [ ] **Edge/Azure/Cartesia voices:** **Edge voice** populates with no key; **Azure voice** populates
+      once the Azure key + region are set; **Cartesia voice** once the Cartesia key is set.
+- [ ] **Custom value accepted + flagged:** type a model/voice id NOT in the list → it's kept (flagged
+      "custom (unsupported)"), saves to `overrides.json`, and is still the value on reload.
+- [ ] **Fail-soft (no key / offline):** with the relevant key cleared or offline, the field still shows
+      the **current value** and lets you type — the footer reads *"catalog unavailable (…) — type a
+      value"*; never an empty or blocking dropdown, and the existing value is never lost.
+
 ### 14.2 Settings page (N1) — http://127.0.0.1:8765/settings
 - [ ] The page renders **grouped sections** with the **right control per type** (toggles, dropdowns, number/sliders, text/path) and inline help.
 - [ ] **Filter box (issue #7):** type 3+ chars → the list narrows to settings whose **section, title, or description** contains the text (case-insensitive); sections with no matches hide entirely. Typing **1–2 chars** filters nothing (everything stays shown); **clearing** the box restores the full list. Verify a **section-name-only** match (e.g. type a group name that isn't in any title/help) still surfaces that section's settings.

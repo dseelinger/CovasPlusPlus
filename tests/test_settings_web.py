@@ -73,6 +73,58 @@ def test_api_schema_lists_grouped_settings_with_values(client):
     assert flat["web_search.enabled"]["overridden"] is False
 
 
+# --- catalog endpoint (issue #92) ------------------------------------------
+
+def test_catalog_base_urls_static(client):
+    c, _, _ = client
+    r = c.get("/api/catalog?source=@openai_base_urls")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["error"] is None
+    assert any(o["label"] == "Groq" for o in data["options"])
+
+
+def test_catalog_unknown_source_400(client):
+    c, _, _ = client
+    r = c.get("/api/catalog?source=@bogus")
+    assert r.status_code == 400
+    assert r.get_json()["options"] == []
+
+
+def test_catalog_failsoft_returns_200_with_error(client, monkeypatch):
+    # No OpenAI key in the test config -> resolve returns (None, reason); the endpoint still 200s
+    # with options:[] + a reason, so the page degrades to free-text (never a blocking 5xx).
+    c, _, _ = client
+    r = c.get("/api/catalog?source=@openai_models")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["options"] == [] and data["error"]
+
+
+def test_catalog_is_cached(client, monkeypatch):
+    c, core, _ = client
+    from covas import catalog as cat
+    calls = {"n": 0}
+
+    def fake_resolve(source, cfg, **k):
+        calls["n"] += 1
+        return [{"value": "m", "label": "m", "meta": ""}], None
+
+    monkeypatch.setattr(cat, "resolve", fake_resolve)
+    c.get("/api/catalog?source=@gemini_models")
+    c.get("/api/catalog?source=@gemini_models")
+    assert calls["n"] == 1   # second identical request served from the throttle cache
+
+
+# --- combobox accepts a custom value (issue #92) ---------------------------
+
+def test_combobox_custom_model_id_accepted(client):
+    c, core, ov = client
+    r = c.post("/api/settings/update", json={"updates": {"gemini.model": "some-future-model-x"}})
+    assert r.status_code == 200   # unlisted/custom id is NOT rejected (escape hatch)
+    assert core.cfg["gemini"]["model"] == "some-future-model-x"
+
+
 # --- valid write round-trips ----------------------------------------------
 
 def test_valid_update_persists_to_overrides_and_config(client):

@@ -47,6 +47,17 @@
   /* Compact type-to-filter box that sits beside a voice <select> (issue #26). */
   input.voicefilter{min-width:120px;max-width:150px;font-size:12px}
   input.invalid,select.invalid{border-color:var(--err)}
+  /* Editable combobox (issue #92): a fetched dropdown you can also type into. A value outside the
+     fetched catalog is the "custom / at your own risk" escape hatch — flagged, never blocked. */
+  .combo{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:1}
+  .combo .pickrow{display:flex;align-items:center;gap:8px;width:100%;justify-content:flex-end}
+  .combo input[type=text]{min-width:220px}
+  .combo .custom{color:var(--accent);font-size:11px;letter-spacing:.3px}
+  .combo .custom.hidden{display:none}
+  .combo .catmsg{color:var(--muted);font-size:11px}
+  .pickbtn{background:transparent;color:var(--muted);border:1px solid var(--edge);border-radius:5px;
+    padding:6px 10px;font-family:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+  .pickbtn:hover{color:var(--text);border-color:var(--accent2)}
   .unit{color:var(--muted);font-size:12px;min-width:52px}
   .toggle{position:relative;width:50px;height:26px;background:#222c38;border-radius:20px;cursor:pointer;
     border:1px solid var(--edge);transition:.15s;flex:0 0 auto}
@@ -201,6 +212,9 @@ function buildControl(control, s){
     control.appendChild(t); return;
   }
   if(s.type==="enum"){
+    // Editable combobox for fetched-catalog sources (issue #92): pick from the live list OR type a
+    // custom value. Everything else stays a strict <select>.
+    if(s.combobox){ control.appendChild(buildCombo(s)); return; }
     const sel = document.createElement("select");
     for(const o of optionsFor(s)) sel.appendChild(new Option(o.label,o.value));
     sel.value = s.value; if(sel.value!==String(s.value)) sel.appendChild(new Option(s.value,s.value)), sel.value=s.value;
@@ -242,6 +256,88 @@ function voiceFilter(sel){
   return f;
 }
 
+// ---- editable combobox + catalog fetch (issue #92) --------------------------------
+// Client-side throttle cache so reopening a picker or re-rendering doesn't re-hit the server (which
+// itself caches). key = source|base_url -> {options:[{value,label,meta}], error}.
+const CATALOG = {};
+async function fetchCatalog(source, baseUrl){
+  const ck = source+"|"+(baseUrl||"");
+  if(CATALOG[ck]) return CATALOG[ck];
+  try{
+    let url = "/api/catalog?source="+encodeURIComponent(source);
+    if(baseUrl) url += "&base_url="+encodeURIComponent(baseUrl);
+    const r = await (await fetch(url)).json();
+    CATALOG[ck] = {options:r.options||[], error:r.error||null};
+  }catch(e){ CATALOG[ck] = {options:[], error:"fetch failed"}; }
+  return CATALOG[ck];
+}
+
+// The current pending/base value of another setting (for base_url-dependent model lists, #92).
+function currentValueOf(key){
+  const s = findSetting(key);
+  return (key in EDITS) ? EDITS[key] : (s ? s.value : "");
+}
+
+// Build one editable combobox. Fail-soft (issue #92 + #26): the input shows the CURRENT value
+// immediately (never lost), the catalog loads in the background to fill the datalist, and a typed
+// value outside the fetched set is accepted but flagged "custom (unsupported)". Static-option enums
+// marked combobox (none today) would pass s.options straight through.
+function buildCombo(s){
+  const wrap=document.createElement("div"); wrap.className="combo"; wrap.dataset.combo=s.key;
+  const row=document.createElement("div"); row.className="pickrow";
+  const inp=document.createElement("input"); inp.type="text"; inp.value=(s.value==null?"":s.value);
+  inp.autocomplete="off"; inp.spellcheck=false;
+  const list=document.createElement("datalist"); list.id="dl-"+s.key.replace(/[^a-z0-9]/gi,"-");
+  inp.setAttribute("list", list.id);
+  const btn=document.createElement("button"); btn.className="pickbtn"; btn.type="button"; btn.textContent="⟳";
+  btn.title="Refresh list";
+  row.appendChild(inp); row.appendChild(list); row.appendChild(btn);
+  const custom=document.createElement("div"); custom.className="custom hidden"; custom.textContent="custom (unsupported)";
+  const msg=document.createElement("div"); msg.className="catmsg";
+  wrap.appendChild(row); wrap.appendChild(custom); wrap.appendChild(msg);
+
+  let known=new Set();
+  function reflectCustom(){
+    const v=inp.value.trim();
+    custom.classList.toggle("hidden", v==="" || known.has(v));
+  }
+  inp.oninput=()=>{ edit(s.key, inp.value); reflectCustom(); };
+
+  async function fill(force){
+    // openai.model / openai_tts.model follow their sibling base_url (refetch on change, #92).
+    let baseUrl=null;
+    if(s.key==="openai.model") baseUrl=currentValueOf("openai.base_url");
+    if(s.key==="openai_tts.model") baseUrl=currentValueOf("openai_tts.base_url");
+    const ck=s.options_source+"|"+(baseUrl||"");
+    if(force) delete CATALOG[ck];
+    msg.textContent="loading…";
+    const {options,error}=await fetchCatalog(s.options_source, baseUrl);
+    list.innerHTML="";
+    known=new Set();
+    for(const o of options){
+      const opt=document.createElement("option"); opt.value=o.value;
+      opt.label=o.meta ? (o.label+" — "+o.meta) : o.label;
+      list.appendChild(opt); known.add(o.value);
+    }
+    // Fail-soft: on offline/no-key/error keep the current value valid + typeable, just say why.
+    msg.textContent = error ? ("catalog unavailable ("+error+") — type a value")
+                            : (options.length+" available");
+    reflectCustom();
+  }
+  btn.onclick=()=>fill(true);
+  fill(false);
+  wrap._refill=fill;   // so a base_url change can trigger a dependent refetch
+  return wrap;
+}
+
+// When a base_url combobox changes, refetch its dependent model combobox (issue #92).
+function refetchDependents(changedKey){
+  const dep = {"openai.base_url":"openai.model", "openai_tts.base_url":"openai_tts.model"}[changedKey];
+  if(!dep) return;
+  const el=document.querySelector('.combo[data-combo="'+CSS.escape(dep)+'"]');
+  if(el && el._refill) el._refill(true);
+}
+
 function findSetting(key){
   for(const g of GROUPS) for(const s of g.settings) if(s.key===key) return s;
   return null;
@@ -255,6 +351,7 @@ function edit(key, raw){
   if(same){ delete EDITS[key]; el.classList.remove("dirty"); }
   else { EDITS[key]=val; el.classList.add("dirty"); }
   clientValidate(s, val, el);
+  refetchDependents(key);   // a base_url change refreshes its dependent model list (issue #92)
   syncSaveBar();
 }
 
