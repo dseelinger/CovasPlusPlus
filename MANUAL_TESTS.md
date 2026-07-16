@@ -240,24 +240,33 @@ Notes:
 
 ### 4.2 Gemini LLM provider (issue #13)  🔊 HW 🌍 NET 📋 FILE
 > Google Gemini on the **native** API — tool calling + Google-Search **grounding** + a cheap Flash
-> default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash-Lite/3.5 Flash). Needs a key in
+> default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash-Lite/Flash/Pro). Needs a key in
 > `GeminiAPIKey.txt` (DPAPI-encrypted; add it in Settings — env vars are no longer read, #22).
 > Restart after switching `[llm].provider`.
+>
+> **Model ids are grounded (issue #91).** The shipped ids (`gemini-2.5-flash-lite` default,
+> `gemini-2.5-flash` standard, `gemini-2.5-pro` premium) are verified against Google's live catalog —
+> the earlier guessed `gemini-3.x-*` ids 404'd on the first word. If Google deprecates one, look up the
+> replacement at <https://ai.google.dev/gemini-api/docs/models> (or `GET {base_url}/models`), never
+> guess. `check_setup.py` warns if a configured id isn't in the live list.
 >
 > **Recommended free provider.** Gemini's Flash **free** tier (~250K TPM / 1,500 requests-per-day)
 > comfortably fits COVAS's per-turn tool load — unlike Groq's free tier (§4.1) — so it's the
 > zero-cost path that actually works. Google trims free quotas without notice, so treat exact
 > numbers as best-effort.
+- [ ] **Model-id guard:** run `.venv\Scripts\python.exe check_setup.py` with `[llm].provider = "gemini"` and a
+  key set → the **Gemini API** section reports the live model count and confirms `[gemini].model` / tiers are
+  all in the live list (or WARNs which id is stale). No crash without a key.
 - [ ] **Conversation:** set `[llm].provider = "gemini"`, add your Gemini key in Settings, restart, speak a turn
-  → COVAS answers via Gemini; `[router]` line shows the Gemini model (e.g. `[cheap] gemini-3.1-flash-lite`)
-  and `[usage]` shows token counts.
+  → COVAS answers via Gemini (no 404 on the first word); `[router]` line shows the Gemini model
+  (e.g. `[cheap] gemini-2.5-flash-lite`) and `[usage]` shows token counts.
 - [ ] **Tool calling works:** *"What's my next objective?"* / *"Mark fuel scooping complete."* → the
   checklist tool fires (log shows the tool call) and COVAS confirms.
 - [ ] **Search grounding:** with `[web_search].enabled = true`, ask something current
   (*"What's the latest on the Thargoid war?"*) → the log shows a **`Searching…`** side-channel line
   (grounding queries) and the answer reflects live info.
 - [ ] **Escalation tiers:** *"Think hard…"* → the router line shows `[standard]` with the
-  `[gemini.tiers].standard` (`gemini-3.5-flash`) model.
+  `[gemini.tiers].standard` (`gemini-2.5-flash`) model.
 - [ ] **Fail-soft:** clear the key → the turn degrades to text and the loop returns to IDLE; restore →
   it works again. No crash.
 

@@ -127,6 +127,40 @@ def check_elevenlabs(el_key: str | None) -> None:
         problems.append("ElevenLabs API call")
 
 
+def check_gemini(cfg: dict) -> None:
+    """Fail-soft Gemini model-id guard (issue #91).
+
+    Only runs when [llm].provider == "gemini". Fetches the live model list and WARNS (never a
+    FAIL, never a crash) if the configured [gemini].model or any [gemini.tiers] id isn't in it —
+    catching a stale/guessed id before the user hits a first-word 404 instead of after."""
+    if (cfg.get("llm", {}) or {}).get("provider") != "gemini":
+        return
+    section("Gemini API (free model-list call)")
+    try:
+        from covas.firstrun import gemini_key
+        from covas.providers.gemini_llm import list_gemini_models, _DEFAULT_BASE_URL
+        key = gemini_key(cfg)
+        if not key:
+            print(WARN + "skipped (no Gemini key)")
+            return
+        g = cfg.get("gemini", {}) or {}
+        base_url = str(g.get("base_url", "")).strip().rstrip("/") or _DEFAULT_BASE_URL
+        live = list_gemini_models(base_url, key)
+        print(OK + f"reachable — {len(live)} models")
+        live_set = set(live)
+        configured = {str(g.get("model", "")).strip()}
+        configured |= {str(v).strip() for v in (g.get("tiers", {}) or {}).values()}
+        missing = sorted(m for m in configured if m and m not in live_set)
+        if missing:
+            print(WARN + "configured Gemini model id(s) not in the live list: "
+                  + ", ".join(missing))
+            print("        (Fix [gemini].model / [gemini.tiers] — a bad id 404s every turn.)")
+        else:
+            print(OK + "configured [gemini].model / tiers are all in the live list")
+    except Exception as e:  # noqa: BLE001 — this guard must never crash setup
+        print(WARN + f"Gemini model-list check skipped: {e}")
+
+
 def check_audio(cfg: dict) -> None:
     section("Audio devices")
     try:
@@ -150,6 +184,7 @@ def main() -> None:
     anth_key, el_key = check_files(cfg)
     check_anthropic(anth_key)
     check_elevenlabs(el_key)
+    check_gemini(cfg)
     check_audio(cfg)
 
     section("Result")

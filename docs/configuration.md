@@ -508,7 +508,7 @@ See [Companion HUD](using/hud.md). **Off by default.**
 | `llm.retry.max_total_wait` | `20.0` | **Hard cap** on cumulative backoff for one turn — keeps a struggling provider from ever making the app feel hung |
 | `llm.retry.jitter` | `0.25` | Add up to this fraction of the delay at random, so retries don't stampede a recovering server |
 | `openai.base_url` / `.model` | OpenAI / `gpt-4o-mini` | OpenAI-compatible `chat/completions` endpoint + the model used when `llm.provider = "openai"`; `[openai.tiers]` ships **unset**, so every router tier reuses `.model` (a bare model swap to Groq/DeepSeek/OpenRouter just works) unless you set distinct per-tier ids there |
-| `gemini.model` | `gemini-3.1-flash-lite` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash-Lite cheap, 3.5 Flash for depth) live in `[gemini.tiers]` |
+| `gemini.model` | `gemini-2.5-flash-lite` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash-Lite cheap, Flash standard, Pro for depth) live in `[gemini.tiers]`. Ids are grounded against Google's [live model list](https://ai.google.dev/gemini-api/docs/models) — verify a new id there (or `GET {base_url}/models`) before setting it, and `check_setup.py` warns if a configured id isn't in the live list |
 | `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `azure.region` / `azure.voice` / `azure.style` | `eastus` / `en-US-AriaNeural` / *(blank)* | Azure Neural region, voice ShortName, and optional SSML style when `tts.provider = "azure"` |
@@ -528,7 +528,7 @@ See [Companion HUD](using/hud.md). **Off by default.**
 >
 > **Gemini LLM (`llm.provider = "gemini"`).** Google Gemini on the **native** API — strong **tool
 > calling** plus Google-Search **grounding** (surfaced like web search when `web_search.enabled` is on),
-> and a cheap/fast **Flash-Lite** default tier (**3.5 Flash** for depth) via `[gemini.tiers]`. Cloud,
+> and a cheap/fast **Flash-Lite** default tier (**Flash** standard, **Pro** for depth) via `[gemini.tiers]`. Cloud,
 > so in-game is fine. Needs a Gemini key (enter it on the Settings **API keys** card, stored in
 > `GeminiAPIKey.txt`) — a free key comes from [Google AI Studio](https://aistudio.google.com). Fail soft: a request error degrades the turn to
 > text. (Combining function calling + grounding needs a Gemini 2.x-or-newer model; older models may

@@ -89,9 +89,9 @@ SCHEMA: list[Setting] = [
             default="gpt-4o-mini", phrasings=("openai llm model", "openai model")),
     Setting("gemini.model", ("gemini", "model"), "string",
             "Gemini model", "Providers",
-            "Model when LLM provider = gemini and the router is off/unset, e.g. gemini-3.1-flash-lite. "
-            "Per-tier models (Flash-Lite/3.5 Flash) live in [gemini.tiers] in config.toml.",
-            default="gemini-3.1-flash-lite", phrasings=("gemini model",)),
+            "Model when LLM provider = gemini and the router is off/unset, e.g. gemini-2.5-flash-lite. "
+            "Per-tier models (Flash-Lite/Flash/Pro) live in [gemini.tiers] in config.toml.",
+            default="gemini-2.5-flash-lite", phrasings=("gemini model",)),
     Setting("tts.provider", ("tts", "provider"), "enum",
             "TTS provider", "Providers",
             "Which voice speaks. edge (free edge-tts neural voices — the default; no SLA, falls "
