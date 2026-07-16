@@ -82,6 +82,24 @@
   .banner button:hover{background:#162836}
   .banner button:disabled{opacity:.5;cursor:default}
   .banner .dismiss{background:none;border:none;color:var(--muted);margin-left:8px;padding:7px 4px}
+  /* #78: small, muted, always-on version tag — fixed corner so it never intrudes on layout. */
+  .verlabel{position:fixed;right:10px;bottom:6px;color:var(--muted);font-size:11px;opacity:.55;
+      letter-spacing:1px;pointer-events:none;user-select:none}
+  /* #77: floating "jump to latest" pill, absolutely positioned over the log so it doesn't
+     scroll with its content; .logwrap (not .log, which scrolls) is the positioning parent. */
+  .logwrap{position:relative}
+  .jumpLatest{display:none;position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+      padding:6px 14px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+      border-radius:20px;font-family:inherit;font-size:12px;letter-spacing:1px;cursor:pointer;
+      box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .jumpLatest:hover{background:#162836}
+  .jumpLatest.show{display:block}
+  /* #75: portable selection context menu (packaged PyWebView/WebView2 suppresses the native one). */
+  .selmenu{display:none;position:fixed;z-index:1000;background:var(--panel);border:1px solid var(--edge);
+      border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.5);padding:4px;min-width:100px}
+  .selmenu button{display:block;width:100%;padding:6px 14px;background:none;border:none;
+      color:var(--text);font-family:inherit;font-size:13px;text-align:left;cursor:pointer;border-radius:4px}
+  .selmenu button:hover{background:#1c2733}
 </style>
 </head>
 <body>
@@ -98,6 +116,7 @@
     <span class="state-name" id="stateName">CONNECTING…</span>
   </div>
 </header>
+<span class="verlabel" id="verLabel" title="COVAS++ version"></span>
 
 <div class="banner" id="updateBanner">
   <span id="updateText"></span>
@@ -137,10 +156,16 @@
   </div>
 
   <div class="card">
-    <h2>Live Log <span class="logfilter"><a id="copyLog" title="Copy the log to the clipboard (respects the filter)">Copy</a> · <a id="fConv">Conversation</a> · <a id="fAll">All</a></span></h2>
-    <div class="log" id="log"></div>
+    <h2>Live Log <span class="logfilter"><a id="copyLog" title="Copy the whole log to the clipboard (respects the Conversation/All filter)">Copy log</a> · <a id="fConv">Conversation</a> · <a id="fAll">All</a></span></h2>
+    <div class="logwrap">
+      <div class="log" id="log"></div>
+      <button type="button" class="jumpLatest" id="jumpLatest" title="Jump to the latest log line">↓ Jump to latest</button>
+    </div>
   </div>
 </div>
+
+<!-- #75: fallback right-click menu for a text selection, since the packaged webview eats the native one -->
+<div class="selmenu" id="selMenu"><button type="button" id="selMenuCopy">Copy</button></div>
 
 <script>
 const STATE_COLORS = {
@@ -199,7 +224,35 @@ function addLog(ev){
   addLineCopy(div, plain);
   LOG.push({conv, plain});
   log.appendChild(div);
-  if(stick) log.scrollTop = log.scrollHeight;
+  if(stick){
+    log.scrollTop = log.scrollHeight;
+  } else {
+    // #77: detached from the bottom — surface the jump button and count what arrived while away.
+    detachedNewCount++;
+    updateJumpBtn();
+  }
+}
+
+// ---- #77: floating "jump to latest" — visible only while scrolled away from the bottom,
+// badged with how many lines arrived since detaching. ----
+let detachedNewCount = 0;
+function updateJumpBtn(){
+  const log = $("log"), btn = $("jumpLatest");
+  if(atBottom(log)){
+    detachedNewCount = 0;
+    btn.classList.remove("show");
+  } else {
+    btn.textContent = detachedNewCount > 0
+      ? ("↓ " + detachedNewCount + " new message" + (detachedNewCount===1?"":"s"))
+      : "↓ Jump to latest";
+    btn.classList.add("show");
+  }
+}
+function jumpToLatest(){
+  const log = $("log");
+  log.scrollTop = log.scrollHeight;   // resumes auto-follow: addLog's stick check reads atBottom()
+  detachedNewCount = 0;
+  updateJumpBtn();
 }
 function escapeHtml(s){return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 
@@ -222,10 +275,12 @@ async function copyText(text){
   }catch(e){ return false; }
 }
 function currentLogMode(){ return $("log").classList.contains("conv-only") ? "conversation" : "all"; }
-function copyLog(){
+// #74: reports how many lines were copied so the button can affirm it, not just "done".
+async function copyLog(){
   const all = currentLogMode() === "all";
-  const text = LOG.filter(e => all || e.conv).map(e => e.plain).join("\n");
-  return copyText(text);
+  const lines = LOG.filter(e => all || e.conv).map(e => e.plain);
+  const ok = await copyText(lines.join("\n"));
+  return {ok, count: lines.length};
 }
 // A small per-line copy button, revealed on hover (see .linecopy). Copies just that line's text.
 function addLineCopy(div, plain){
@@ -261,6 +316,7 @@ let SETTINGS = {};
 async function init(){
   const st = await (await fetch("/api/state")).json();
   SETTINGS = st.settings;
+  $("verLabel").textContent = st.version ? ("v" + st.version) : "";   // #78
 
   st.options.models.forEach(m=>$("model").appendChild(opt(m)));
   st.options.thinking.forEach(t=>$("thinking").appendChild(opt(t)));
@@ -316,7 +372,30 @@ async function init(){
   initPersonality();
   initLogFilter();
   initUpdateCheck();
+  initSelectionMenu();
   connectWS();
+}
+
+// ---- #75: custom right-click menu for a text selection. The packaged PyWebView/WebView2
+// window suppresses the native context menu entirely (no Copy there otherwise); this portable
+// JS menu stands in for it and works the same way in a plain browser tab. ----
+function initSelectionMenu(){
+  const menu = $("selMenu");
+  const hide = () => { menu.style.display = "none"; };
+  document.addEventListener("contextmenu", e => {
+    if(e.target.closest(".linecopy")) return;    // leave the per-line copy button's own affordance alone
+    const sel = window.getSelection();
+    const text = sel ? sel.toString() : "";
+    if(!text){ hide(); return; }                 // no selection: nothing for this menu to do
+    e.preventDefault();
+    menu.style.left = e.clientX + "px";
+    menu.style.top = e.clientY + "px";
+    menu.style.display = "block";
+    $("selMenuCopy").onclick = async () => { await copyText(text); hide(); };
+  });
+  document.addEventListener("click", e => { if(!e.target.closest("#selMenu")) hide(); });
+  document.addEventListener("scroll", hide, true);
+  window.addEventListener("blur", hide);
 }
 
 // ---- Update banner (Tier-2 self-update) ----
@@ -406,14 +485,17 @@ function initLogFilter(){
     $("fConv").classList.toggle("active", mode !== "all");
     $("fAll").classList.toggle("active", mode === "all");
     try{ localStorage.setItem("logFilter", mode); }catch(e){}
+    updateJumpBtn();   // hidden lines change scrollHeight, so bottom-ness can flip on filter switch
   };
   $("fConv").onclick = () => apply("conversation");
   $("fAll").onclick = () => apply("all");
+  $("log").addEventListener("scroll", updateJumpBtn);
+  $("jumpLatest").onclick = jumpToLatest;
   $("copyLog").onclick = async () => {
     const el = $("copyLog");
-    const ok = await copyLog();
-    el.textContent = ok ? "Copied ✓" : "Copy failed";
-    clearTimeout(el._t); el._t = setTimeout(() => el.textContent = "Copy", 1500);
+    const {ok, count} = await copyLog();
+    el.textContent = ok ? ("Copied " + count + " line" + (count===1?"":"s")) : "Copy failed";
+    clearTimeout(el._t); el._t = setTimeout(() => el.textContent = "Copy log", 1500);
   };
   let saved = "conversation";
   try{ saved = localStorage.getItem("logFilter") || "conversation"; }catch(e){}

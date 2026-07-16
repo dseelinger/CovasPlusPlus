@@ -759,6 +759,9 @@ Notes:
 
 ## 14. Web control panel  🌐 PANEL 🔊 HW 📋 FILE
 
+### 14.0 Version label (issue #78)
+- [ ] A small, muted **`vX.Y.Z`** tag sits in the bottom-right corner of the panel (matches `__version__` / `check_setup.py`'s reported version) — visible but out of the way of every control. 🖥️ **Native window:** its title bar also reads **"COVAS++ vX.Y.Z"** in the packaged app (not the plain browser build).
+
 ### 14.1 Live status & log
 - [ ] The status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, status/search lines (timestamped).
 
@@ -794,11 +797,22 @@ Notes:
 - [ ] The Live Log has a **Conversation / All** toggle. **Conversation** (default) shows only your utterances and COVAS replies; **All** shows status/thinking/search/usage/system lines too.
 - [ ] Switch to Conversation → status/thinking/usage lines **hide**; the choice **persists** across a reload.
 
-### 14.5a Live Log — select & copy (issue #6)
+### 14.5a Live Log — select & copy (issue #6, relabelled #74)
 - [ ] **Selection survives new lines:** during an active session (lines still arriving), **scroll up** and drag-select an older line → the selection is **not** lost and the view does **not** jump to the bottom while you're scrolled up / selecting. Scroll back to the bottom → auto-scroll **resumes**.
-- [ ] **Copy button honours the filter:** in **Conversation** mode click **Copy** (log header) → clipboard holds **only** the timestamped Commander/COVAS lines (paste to check). Switch to **All**, Copy again → status/thinking/search/`[router]`/`[usage]`/system lines are included too. Text is clean `HH:MM:SS  who: text` — no HTML.
-- [ ] **Per-line copy:** hover a line → a small **⎘** button appears; click it → just that line is on the clipboard (shows ✓ briefly).
+- [ ] **"Copy log" affirms the count (issue #74):** the log-header link reads **"Copy log"** (its tooltip still notes it respects the filter). In **Conversation** mode click it → button briefly reads **"Copied N lines"** (N = the Commander/COVAS lines currently in the log) and the clipboard holds only those, timestamped `HH:MM:SS  who: text` — no HTML. Switch to **All**, click again → N is bigger and status/thinking/search/`[router]`/`[usage]`/system lines are included too.
+- [ ] **Per-line copy:** hover a line → a small **⎘** button appears; click it → just that line is on the clipboard (shows ✓ briefly), distinct from the header's whole-log "Copy log".
 - [ ] 🖥️ **Native window:** repeat the selection + Copy checks in the **packaged app's** window (not just the browser build) — selection highlights and both copy paths work there too.
+
+### 14.5b Jump to latest (issue #77)
+- [ ] Let the log fill past one screen, **scroll up** → a floating **"↓ Jump to latest"** pill appears centered at the bottom of the log box; it stays hidden while you're already at the bottom.
+- [ ] While scrolled up, trigger a few more lines (talk to COVAS, or wait for status/search lines under **All**) → the pill's label switches to **"↓ N new messages"**, counting up.
+- [ ] Click the pill → the log jumps to the bottom, the pill hides, and auto-follow **resumes** (new lines after that keep the view pinned to the bottom without re-showing the pill).
+- [ ] Toggle **Conversation ⇄ All** while scrolled up → the pill's visibility stays correct for the filtered content (hidden lines don't count toward "at the bottom").
+
+### 14.5c Right-click Copy on a selection (issue #75)
+- [ ] **Browser:** select some log text, right-click it → a small dark **Copy** menu appears at the cursor (not the browser's native menu); click it → the selection is on the clipboard. Right-clicking with **no selection** leaves the browser's normal menu alone.
+- [ ] 🖥️ **Native window (the real point of #75):** in the **packaged app** (`run_covas_app.py` / installed `COVAS++.exe`, not `run_covas_ui.py`'s browser tab) the native right-click menu is suppressed entirely — select log text and right-click → the same custom **Copy** menu appears there and copies correctly. Right-clicking a **per-line ⎘ button** does not bring up this menu.
+- [ ] Click elsewhere (or scroll, or Alt-Tab away) while the menu is open → it dismisses without side effects.
 
 ### 14.6 Checklist editor (N10) — http://127.0.0.1:8765/checklist 🌍 NET (CDN)
 > Edits the SAME `ultimate_checklist.md` the voice loop uses. Use a **throwaway** line.

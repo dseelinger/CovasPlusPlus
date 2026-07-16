@@ -12,6 +12,10 @@ for settings, personality, your checklist, your memory, and your crew.
 The panel is **local-only** (`127.0.0.1`) and isn't exposed to your network. Change the host/port
 under `[ui]` in [`config.toml`](configuration.md) if you need to.
 
+A small, muted **version tag** (`vX.Y.Z`) sits in the corner of every page — enough to tell at a
+glance which build you're on when comparing notes or filing a bug, without competing for attention
+with anything else on screen. The packaged app's window title carries the same version.
+
 ## Live status & log
 
 The main page shows a **status light** that tracks each turn (LISTENING → TRANSCRIBING → THINKING →
@@ -24,9 +28,17 @@ behind-the-scenes lines (routing decisions, usage/cost, status, searches) — al
   choice persists across reloads.
 - **Selecting & copying** — the log is fully selectable. Scroll up (or start a selection) and
   auto-scroll **pauses** so a new line can't yank the view or drop your selection; it resumes once
-  you're back at the bottom. The **Copy** link in the log header copies the whole log to the
+  you're back at the bottom. The **"Copy log"** link in the log header copies the whole log to the
   clipboard, **respecting the current filter** (so *Conversation* copies only utterances and
-  replies as clean, timestamped plain text). Hover any line for a per-line **⎘ copy** button.
+  replies as clean, timestamped plain text), and briefly confirms with **"Copied N lines"**. Hover
+  any line for a per-line **⎘ copy** button that copies just that line.
+- **Jump to latest** — scrolling up to read or copy older lines reveals a floating **"↓ Jump to
+  latest"** pill over the bottom of the log (badged with a running count once new lines arrive
+  while you're away). Click it, or scroll back to the bottom yourself, to resume auto-follow.
+- **Right-click Copy on a selection** — select some log text and right-click for a small **Copy**
+  menu. This exists because the packaged native window (PyWebView/WebView2) suppresses the OS's own
+  context menu entirely, so without it a selection there would have no Copy at all; the same menu
+  also appears in the plain browser build for consistency.
 
 ## Settings page — `/settings`
 
