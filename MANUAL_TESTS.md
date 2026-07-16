@@ -806,8 +806,12 @@ Notes:
 - [ ] **Toggle:** click a checkbox → **SAVE** → 📋 that line flips `- [ ]`/`- [x]` in the file; ask *"what's next?"* by voice → the change is heard (same file, read live).
 - [ ] **Edit + nest:** edit an item's text inline; **Tab** nests it under the item above → SAVE → 📋 text and indentation land in the file; task lines stay `- [ ]` style (never `* [ ]`).
 - [ ] **Voice → web:** mark an item by voice, then click **RELOAD FROM DISK** (or refocus the tab) → the voice edit appears.
-- [ ] **Stale-write guard:** load the tab, make a voice edit, then click SAVE in the tab → an **amber warning** appears (file changed on disk) instead of clobbering; **RELOAD THEIR VERSION** shows the voice edit, or **OVERWRITE ANYWAY** forces yours.
+- [ ] **Live in-place sync (#82) — the headline test:** with the tab open and **no unsaved edits**, mark an item done **by voice** → within a moment the matching checkbox **flips to checked in place** (no reload click), a green *"Updated — N/M complete"* flashes, and the item renders **identically to a fresh reload**. Repeat with *"add …"*, *"change … to …"*, and *"delete …"* → the added/edited/removed line updates live too.
+- [ ] **Bulk coalesce (#82):** with several pending items, say *"mark the next three done"* → the checkboxes update in **one** smooth batch, not a flickering series of re-renders.
+- [ ] **Dirty-guard (#82) — never clobbers:** start editing a line (leave it **unsaved**), then make a voice change to a *different* line → your in-progress edit is **kept** and the **amber "changed on disk" warning** appears instead of a live overwrite; **RELOAD THEIR VERSION** discards your edit and loads the voice change, **OVERWRITE ANYWAY** keeps yours.
+- [ ] **Stale-write guard:** load the tab, make a voice edit while you have unsaved changes, then click SAVE in the tab → an **amber warning** appears (file changed on disk) instead of clobbering; **RELOAD THEIR VERSION** shows the voice edit, or **OVERWRITE ANYWAY** forces yours.
 - [ ] **Save feedback:** a successful save flashes "Saved — N/M complete" and the Live Log (All filter) shows "Checklist updated from the web editor".
+- [ ] **Two tabs (#82):** open `/checklist` in **two** browser tabs; **SAVE** an edit in one → the *other* clean tab reflects it live in place.
 
 ### 14.7 Memory browser (issue #62) — http://127.0.0.1:8765/memory  🌐 PANEL 📋 FILE
 > Reads/writes the SAME `memory/memory.jsonl` the voice loop uses. Needs `[memory].enabled = true`

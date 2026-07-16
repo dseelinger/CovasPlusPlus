@@ -32,8 +32,12 @@ personal). Voice edits and web edits both read and write that one file:
 - Voice reads are always **fresh** — hand-edit the file, save, and the next "what's next?" reflects
   your change.
 - The [web checklist editor](../control-panel.md) renders it as proper markdown with real
-  checkboxes. If a voice edit lands while you have the editor open, it warns you before
-  overwriting rather than clobbering your change.
+  checkboxes. A voice or tool change (marking an item done, adding, editing, or deleting a line)
+  shows up **live in the open editor** — the checkbox flips in place, no manual reload. Rapid
+  changes (marking several done in one breath) are batched so the page doesn't flicker.
+- Your **unsaved edits are never clobbered.** If you're mid-edit when a voice change lands, the
+  editor keeps your work and shows the "changed on disk" warning instead of silently overwriting —
+  you choose whether to reload their version or keep yours.
 
 Task lines use the standard `- [ ]` (to-do) and `- [x]` (done) markdown, and nesting is preserved,
 so the file stays readable and portable.

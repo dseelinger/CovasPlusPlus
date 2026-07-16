@@ -138,7 +138,10 @@ class App:
                                    log=lambda m: self._log("help", m))
         self.registry.register(self.help)
         if self.cfg.get("checklist", {}).get("file"):
-            self.registry.register(ChecklistCapability(self.checklist))
+            # on_change publishes a `checklist` event on every voice/tool CRUD so a live
+            # Checklist page reflects it in place instead of going stale until reload (#82).
+            self.registry.register(
+                ChecklistCapability(self.checklist, on_change=self.bus.publish))
 
         # Settings-by-voice (Prompt N2): change any setting spoken aloud, projected from the
         # SAME schema the web page uses so the two can't drift. Always on, like help — it

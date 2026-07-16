@@ -158,6 +158,12 @@ def test_save_clamps_the_cursor_and_publishes_a_sync_event(client):
     except queue.Empty:
         pass
     assert any("Checklist updated from the web editor" in e.get("text", "") for e in events)
+    # #82: the web save is a writer too, so it fires the SAME `checklist` event the voice/tool
+    # path does — carrying the new markdown + version + progress for other tabs to live-sync.
+    synced = [e for e in events if e.get("type") == "checklist"]
+    assert synced and synced[-1]["total"] == 1 and synced[-1]["done"] == 0
+    assert "the only item left" in synced[-1]["markdown"]
+    assert synced[-1]["version"] == r.get_json()["version"]   # matches the save's stale-write token
 
 
 # --- the stale-write guard ---------------------------------------------------------------------
