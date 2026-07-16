@@ -221,8 +221,8 @@ function buildControl(control, s){
     sel.value = s.value; if(sel.value!==String(s.value)) sel.appendChild(new Option(s.value,s.value)), sel.value=s.value;
     sel.onchange=()=>edit(s.key, sel.value);
     // Long fetched lists (ElevenLabs voices/models) get the command palette (#94) — a searchable,
-    // keyboard-driven, highlighted picker that supersedes the #26 inline filter for the long case.
-    // The <select> stays as the current-value display; the palette drives selection.
+    // keyboard-driven, highlighted picker for the long case. The #26 inline type-to-filter box stays
+    // too (for voices), so both paths work; the <select> is the current-value display.
     if(s.options_source){
       const search=document.createElement("button"); search.type="button"; search.className="pickbtn";
       search.textContent="🔍"; search.title="Search "+s.label;
@@ -235,6 +235,9 @@ function buildControl(control, s){
       });
       control.appendChild(search);
     }
+    // Voice lists can be long — keep the #26 type-to-filter box beside any *_voices picker (the
+    // currently-selected voice always stays visible so the current pick can't vanish behind it).
+    if(s.options_source && s.options_source.indexOf("voices")>=0) control.appendChild(voiceFilter(sel));
     control.appendChild(sel); return;
   }
   if(s.type==="int"||s.type==="float"){

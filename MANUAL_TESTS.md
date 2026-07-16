@@ -847,14 +847,20 @@ Notes:
 ### 14.1 Live status & log
 - [ ] The status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, status/search lines (timestamped).
 
-### 14.1a Voice-list filter (issue #26)  🌐 PANEL 🌍 NET
+### 14.1a Voice-list filter (issue #26 / #100)  🌐 PANEL 🌍 NET
 > `requires:` **both voice dropdowns must be POPULATED via a valid ElevenLabs key** (set it on the
 > Settings *API keys* card and restart; `tts.provider` doesn't need to be elevenlabs, but the list only
-> loads with a key) — an empty list has nothing to filter and the test reads as "not implemented" (this
-> is the #100 mis-mark; annotate accordingly). Verify in BOTH the browser (`run_covas_ui.py`) AND the
-> packaged native window. The inline filter is superseded by the command palette (§14.1d) for the long
-> list, but the box still works: the **ElevenLabs voice** picker on the **main panel** (below the
-> dropdown) and the schema-driven picker on the **Settings** page (beside the dropdown).
+> loads with a key) — an empty list has nothing to filter and the test reads as "not implemented".
+> Verify in BOTH the browser (`run_covas_ui.py`) AND the packaged native window.
+>
+> **#100 resolution (do NOT re-mark NYI on an empty list):** the filter code IS wired on both surfaces —
+> `index.html` `#el_voice_filter` → `filterOptions(#el_voice)` and `settings.html` `voiceFilter(sel)` on
+> the `@elevenlabs_voices` picker. The earlier `panel-voice-list-filter` NYI failure was a **populate
+> artifact** (the voice dropdowns never loaded — no valid key / non-EL TTS active — so there was nothing
+> to filter), not a code regression. If it fails again, first confirm the list actually populated. The
+> inline box coexists with the richer command palette (§14.1d).
+- [ ] The **ElevenLabs voice** picker on the **main panel** (below the dropdown) and the schema-driven
+      picker on the **Settings** page (beside the dropdown) both show a filter box once the list loads.
 - [ ] **Main panel:** type **3+ characters** in the filter box under **ElevenLabs voice** → the dropdown
       narrows to voices whose **name or category** contains the text (case-insensitive; try a category
       word like *"cloned"* or *"premium"*). Typing **1–2 chars** filters nothing; **clearing** the box
