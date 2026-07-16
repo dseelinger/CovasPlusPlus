@@ -258,6 +258,49 @@ Two changes to the worker turn, both keeping the fail-soft discipline of princip
   line while the log records the precise reason. Retries happen **before** the atomic user+assistant
   history commit, so a degraded turn leaves no orphan.
 
+### 3.10 Live-apply component lifecycle — hot-swap on a settings change (issue #90)
+
+Providers were built once at the composition root (`App.__init__` → `make_llm`/`make_tts`/
+`make_stt`) and cached for the process, so changing an LLM/TTS provider, model, voice, or key on
+the Settings page needed a **relaunch**. #90 generalizes the live-apply already done for the HUD,
+listener, Whisper, and audio volumes to the **whole** settings surface, so almost every change
+takes effect **without a restart**. The model:
+
+- **Rebuild-and-rebind, cloning `_reload_whisper`.** The LLM/TTS impls read their config at
+  construction, so a change means a **fresh instance**, not an in-place mutation. `_after_settings_change`
+  builds the new provider on a **daemon thread** (a build may touch the network/GPU) and then
+  rebinds the attribute (`self.llm = make_llm(cfg)` / `self.tts = make_tts(cfg, mixer=self.mixer)`).
+  The rebind is GIL-atomic; old instances drop to GC (there is **no** `close()` protocol). The TTS
+  rebuild **reuses the existing mixer** — the `BusMixer` is never rebuilt, which is what keeps a
+  voice swap safe against the shared output device.
+- **Section-granularity diff drives the rebuild.** `update_settings`/`reset_setting` snapshot the
+  relevant config sub-trees **before** the merge; afterward, any change under `[llm]`/`[anthropic]`/
+  `[openai]`/`[gemini]`/`[ollama]` rebuilds the LLM, and any change under `[tts]` or a voice section
+  (`[elevenlabs]`/`[edge]`/`[azure]`/`[openai_tts]`/`[cartesia]`/`[piper]`) rebuilds the TTS. An
+  unrelated key rebuilds neither. The Router is already `Router.from_cfg(self.cfg)` **per turn**, so
+  tiers are always live with no work.
+- **Next-turn semantics + turn-local binding.** An in-flight turn finishes on the instances it
+  started with — `_process`/`_run_turn`/`_proactive_worker` bind `llm`/`tts`/`stt` locals at the top,
+  so a mid-turn hot-swap can't split one turn across two provider sets. The swap lands on the next
+  turn; there is no cancellation-to-apply (v1).
+- **Fail-soft (principle #6).** The rebuild runs inside try/except on the background thread; on
+  failure it does **not** rebind — it keeps the working provider and publishes a "couldn't switch …;
+  keeping the previous one" bus event (a UI toast). On success it publishes "LLM now: …" / "Voice
+  now: …". The loop never sees a half-swapped state.
+- **Hotkeys + mic go live too.** `start()` resolves the PTT/cancel/reflex scan-code sets into
+  `self._ptt_codes`/`_cancel_codes`/`_reflex_codes`; `on_key` reads them in place, and
+  `_reconcile_hotkeys()` re-resolves on a `[keys].*`/`[reflex].ptt` change with **no re-hook** (the
+  hook stays installed, only the sets change). A `[audio].input_device` change rebuilds the
+  `Recorder` and bounces the VAD listener via `_reconcile_recorder()`, riding the same reconcile path
+  as the listen-mode switch (issue #89).
+- **`RESTART_REQUIRED` — the true minimum.** Encoded next to the apply logic as a `frozenset` of
+  schema keys: `audio.enabled` and `audio.mix_sample_rate` (the bus-mixer graph is cross-wired and
+  the shared device opened at init/start), `ui.host`/`ui.port` (Flask binds at launch), and
+  `dev.mock` (swaps the whole provider set for fakes at the composition root). A paired
+  `LIVE_SECTIONS` prefix list is the single source of truth for everything else, and a **drift-guard
+  unit test** asserts every `settings_schema` key falls under `LIVE_SECTIONS ∪ RESTART_REQUIRED`, so
+  a new unclassified setting fails the test until it's placed.
+
 ---
 
 ## 4. Cloud model tiering strategy

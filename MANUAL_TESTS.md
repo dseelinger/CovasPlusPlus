@@ -53,8 +53,10 @@ Notes:
 
 ### 0.3 Capability toggles — enable what you want to test FIRST
 Capabilities are gated in **`config.toml`** (edit freely) or **`overrides.json`** (what the panel
-writes). The Settings page (§14.2) can also flip these, but **capability enable/disable applies on
-the next restart** (only Whisper reloads live). Confirm each before running its section (as shipped,
+writes). The Settings page (§14.2) can also flip these; **most settings now apply live** (issue #90
+— providers, keys, mic, Whisper, volumes, toggles) with only a tiny `RESTART_REQUIRED` set needing a
+relaunch (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`, `dev.mock` — see §14.3).
+Confirm each before running its section (as shipped,
 **everything defaults ON** so the app shows full functionality out of the box):
 - [ ] `[elite].enabled = true` — ED journal/Status monitoring. **Required by** proactive/route callouts, the keybind + honk combat guard, carriers, community goals, and the live "current system" used by every search. (§5, §6, §7, §8, §9, §10)
 - [ ] `[proactive].enabled = true` — proactive callouts. (§5.2)
@@ -209,7 +211,8 @@ Notes:
 > differ. A *cloud* LLM, so it's fine in-game and the router tiers it via `[openai.tiers]`, which ship
 > **unset** so every tier reuses `[openai].model` (that's why a bare model swap to another endpoint
 > works even with the router ON). Needs a key in `OpenAIAPIKey.txt` (DPAPI-encrypted; add it in
-> Settings — env vars are no longer read, #22). Restart after switching `[llm].provider`.
+> Settings — env vars are no longer read, #22). Switching `[llm].provider` applies **live** (issue
+> #90) — the **next turn** uses it, no restart (an in-flight turn finishes on the old one).
 >
 > **Provider limits matter.** COVAS sends a large tool set (~10K tokens) every turn and runs many
 > turns per session, so the endpoint needs headroom — roughly **≥100K TPM and ≥1,000 requests/day**.
@@ -242,7 +245,7 @@ Notes:
 > Google Gemini on the **native** API — tool calling + Google-Search **grounding** + a cheap Flash
 > default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash-Lite/Flash/Pro). Needs a key in
 > `GeminiAPIKey.txt` (DPAPI-encrypted; add it in Settings — env vars are no longer read, #22).
-> Restart after switching `[llm].provider`.
+> Switching `[llm].provider` applies **live** (issue #90) — the next turn uses it, no restart.
 >
 > **Model ids are deprecation-proof aliases (issue #91).** The shipped ids are the `-latest` aliases
 > (`gemini-flash-lite-latest` default, `gemini-flash-latest` standard, `gemini-pro-latest` premium),
@@ -926,7 +929,14 @@ Notes:
 - [ ] **Change + save:** change a value → the **save bar** appears with a count; **SAVE CHANGES** → 📋 written to `overrides.json` (config.toml stays pristine).
 - [ ] **Per-setting reset:** a changed (overridden) setting shows **RESET** → click it → reverts to default and drops from `overrides.json`.
 - [ ] **Validation:** try an out-of-range number (e.g. voice speed 2.0) → rejected client-side / server-side, not written.
-- [ ] **Live where supported:** change the **Whisper model** → the log notes the model reloaded (no restart). (Capability enables apply on restart.)
+- [ ] **Live where supported:** change the **Whisper model** → the log notes the model reloaded (no restart). Most settings now apply live — see §14.2a; only the `RESTART_REQUIRED` set (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`, `dev.mock`) needs a relaunch.
+
+### 14.2a Settings apply LIVE — hot-swap providers & keys (issue #90)  🔊 HW 🌐 PANEL 🌍 NET
+> #90 makes almost every Settings change take effect **without a restart**.
+- [ ] **Switch the LLM provider live:** on the Settings page change **LLM provider** (e.g. anthropic → gemini, with that provider's key set) and **SAVE CHANGES**. The log shows `LLM now: <provider> / <model>`. Speak a turn → the **next** turn is answered by the new provider (check the router/usage line), **no restart**. A turn already in flight when you saved finishes on the old provider.
+- [ ] **Switch the TTS provider/voice live:** change **TTS provider** (e.g. edge → elevenlabs, or just a different voice) and SAVE → the log shows `Voice now: <provider>` and the next spoken reply uses the new voice. Confirm ambient audio (if the bus mixer is on) keeps working — the mixer is **not** rebuilt.
+- [ ] **Failed switch is fail-soft:** switch to a provider whose key is missing/bad and SAVE → the log shows `Couldn't switch … keeping the previous one`, and the next turn **still works** on the previous provider (no dead loop).
+- [ ] **Hotkeys live:** change the **push-to-talk key** (and/or cancel/reflex key) and SAVE → the log notes the hotkeys updated; the **new** key holds-to-talk immediately and the **old** key no longer does — **no restart, no re-hook**.
 
 ### 14.3 Personality tab (N7)
 - [ ] **Persona picker:** the Personality tab lists personas; selecting one shows a **preview**. Pick a different persona → the next reply's **voice/register changes**.

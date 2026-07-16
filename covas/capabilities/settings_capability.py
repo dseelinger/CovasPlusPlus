@@ -115,7 +115,9 @@ class SettingsCapability:
             example="turn personality off",
             help_when_active=("Name a setting and a value — like 'set thinking to high', 'use "
                               "the George voice', or 'turn web search off'. Ask 'what can I "
-                              "change' and I'll run through the options."),
+                              "change' and I'll run through the options. Changes apply live — "
+                              "even switching my language model or voice takes effect on the "
+                              "next thing you ask, no restart."),
         )
 
     def run_tool(self, name: str, inp: dict) -> str:

@@ -73,8 +73,13 @@ inline help:
 - **Per-setting reset** — a changed setting shows a **Reset** button that reverts it to the default
   and drops it from the overrides.
 - **Validation** — out-of-range or unknown values are rejected rather than saved.
-- **Live where supported** — some settings (like the Whisper model) reload immediately; enabling or
-  disabling a whole capability applies on the next restart.
+- **Applies live** — a saved change takes effect immediately, no relaunch. Switching your **LLM or
+  TTS provider** (or its model/voice/base URL) hot-swaps it for the **next turn** — an in-flight
+  turn finishes on the previous one, and a failed switch keeps the working provider and tells you.
+  Changing the **talk/cancel/reflex keys** or the **microphone** rebinds them in place; the Whisper
+  model, activation mode, bus volumes, and toggles all reload immediately. The only exceptions that
+  still need a restart are `audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`, and
+  `dev.mock` (see the Configuration reference).
 
 Everything here is the **same schema** the [voice settings](using/settings.md) use, so the two never
 disagree.
