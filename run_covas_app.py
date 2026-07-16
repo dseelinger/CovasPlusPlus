@@ -230,15 +230,28 @@ def main() -> None:
     os._exit(0)
 
 
-if __name__ == "__main__":
-    # A windowed (console=False) frozen build has no console, so PyInstaller leaves sys.stdout/
-    # sys.stderr as None — any print() in the app (banner, App startup lines) would then crash.
-    # Redirect them to a null sink so every write is safe; real diagnostics go to the log file
-    # under %APPDATA%\COVAS++\logs. A source run keeps its normal console.
+def _null_sink():
+    """A process-lifetime discard stream that never raises on odd Unicode. A windowed
+    (console=False) frozen build has no console, so PyInstaller leaves sys.stdout/stderr as
+    None and the app writes model output — which can contain emoji or non-Latin glyphs — here.
+    Open it utf-8 with errors='replace' so an unencodable glyph is dropped, not raised: a
+    cp1252-default sink would UnicodeEncodeError and crash the turn mid-reply (e.g. a model
+    that emits Arabic or an emoji)."""
+    return open(os.devnull, "w", encoding="utf-8", errors="replace")  # noqa: SIM115 — process-lifetime sink
+
+
+def _ensure_writable_std_streams() -> None:
+    """Give a windowed frozen build (no console) safe stdout/stderr so no print()/write can
+    crash the app; real diagnostics go to the log file under %APPDATA%\\COVAS++\\logs. A source
+    run keeps its normal console (already utf-8-hardened in covas.app)."""
     if sys.stdout is None:
-        sys.stdout = open(os.devnull, "w")  # noqa: SIM115 — process-lifetime sink, never closed
+        sys.stdout = _null_sink()
     if sys.stderr is None:
-        sys.stderr = open(os.devnull, "w")  # noqa: SIM115
+        sys.stderr = _null_sink()
+
+
+if __name__ == "__main__":
+    _ensure_writable_std_streams()
     if "--selftest" in sys.argv:
         raise SystemExit(_selftest())
     main()
