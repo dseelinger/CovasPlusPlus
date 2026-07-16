@@ -96,8 +96,12 @@ A **WYSIWYG markdown editor** for your [checklist](using/checklist.md) — rende
 clickable checkboxes, not a plain text box. It edits the **same file** the voice loop uses:
 
 - **Toggle** a checkbox, **edit** an item inline, **nest** items with Tab, then **Save**.
-- **Reload from disk** pulls in edits you made by voice.
-- **Stale-write guard** — if a voice edit landed while you had the tab open, it warns you (with a
+- **Live updates** — a voice or tool change (marking an item done, adding, editing, or deleting a
+  line) appears in the open editor **in place**, with no manual reload. It only does this when you
+  have **no unsaved edits**; if you're mid-edit it keeps your work and shows the stale-write warning
+  instead.
+- **Reload from disk** pulls in edits you made by voice (still there for the mid-edit case).
+- **Stale-write guard** — if a voice edit landed while you had unsaved changes, it warns you (with a
   choice to reload their version or overwrite) instead of clobbering.
 
 The checklist editor uses a rich-text library loaded from a CDN, so it needs internet; if the CDN

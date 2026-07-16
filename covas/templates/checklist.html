@@ -165,7 +165,41 @@ window.addEventListener("focus", async () => {
   } catch (e) { /* offline blip — the save-time guard still protects the file */ }
 });
 
+// Live sync (#82): every voice/tool CRUD (and every web save) publishes a `checklist`
+// event on the bus, bridged to us over the WS. Apply it IN PLACE when the editor is clean
+// — setMd re-renders from the fresh markdown, so the result is byte-identical to a fresh
+// load (rendered-state parity). When there are unsaved edits, NEVER clobber them: fall back
+// to the existing conflict banner. Rapid bulk changes (e.g. "mark the next three done")
+// are coalesced so the editor doesn't thrash.
+let _pending = null, _syncTimer = null;
+function applySync(){
+  const ev = _pending; _pending = null;
+  if (!ev) return;
+  if (ev.version === VERSION) return;      // our own save (or a no-op) echoed back — nothing to do
+  if (dirty) {                             // unsaved edits present: warn, don't discard them
+    $("conflict").classList.add("show");
+    $("conflict")._theirs = ev;            // ev carries markdown + version, like the 409 body
+    return;
+  }
+  VERSION = ev.version;
+  setMd(ev.markdown || "");                // setMd() resets dirty=false; identical to a fresh load
+  $("conflict").classList.remove("show");
+  flash("Updated" + (ev.total != null ? " — " + ev.done + "/" + ev.total + " complete." : "."));
+}
+function connectWS(){
+  const proto = location.protocol === "https:" ? "wss://" : "ws://";
+  const ws = new WebSocket(proto + location.host + "/ws");
+  ws.onmessage = e => {
+    let ev; try { ev = JSON.parse(e.data); } catch (_) { return; }
+    if (!ev || ev.type !== "checklist") return;     // only checklist changes concern this page
+    _pending = ev;                                   // keep just the latest — coalesce a burst
+    clearTimeout(_syncTimer); _syncTimer = setTimeout(applySync, 200);
+  };
+  ws.onclose = () => setTimeout(connectWS, 1500);    // auto-reconnect, mirroring index.html
+}
+
 load();
+connectWS();
 </script>
 </body>
 </html>

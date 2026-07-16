@@ -8,6 +8,7 @@ order; that number is a stable handle for marking a specific item. The file is r
 fresh on every call, so hand-edits are picked up live.
 """
 from __future__ import annotations
+import hashlib
 import re
 from pathlib import Path
 
@@ -157,3 +158,31 @@ class Checklist:
         remaining = len(self._task_lines(lines))
         self.current = min(num, remaining)  # 0 if list now empty
         return text
+
+
+def checklist_event(checklist: Checklist) -> dict:
+    """Build the payload for a `checklist` bus event (#82).
+
+    Carries the full item list + progress (for any listener) AND the raw file markdown
+    with its content-hash `version`, so a live Checklist-page client can re-render IN
+    PLACE and keep its stale-write token in sync with GET /api/checklist. It hashes the
+    SAME raw bytes web._file_version does and decodes utf-8-sig (BOM-safe), so the
+    version and markdown here are byte-identical to a fresh page load. Read-only /
+    fail-soft: an unreadable file yields an empty, still-publishable snapshot."""
+    try:
+        data = checklist.path.read_bytes()
+    except OSError:
+        data = b""
+    version = hashlib.sha256(data).hexdigest()[:16]
+    try:
+        markdown = data.decode("utf-8-sig") if data else ""
+    except UnicodeDecodeError:  # a mangled file must not break the sync path
+        markdown = ""
+    items = checklist.items()
+    done = sum(1 for _n, d, _t in items if d)
+    return {
+        "type": "checklist",
+        "items": [{"n": n, "done": d, "text": t} for n, d, t in items],
+        "done": done, "total": len(items),
+        "markdown": markdown, "version": version,
+    }

@@ -6,7 +6,9 @@ capability behind the registry (DESIGN §3.3). Behavior is unchanged.
 """
 from __future__ import annotations
 
-from ..checklist import Checklist
+from typing import Callable
+
+from ..checklist import Checklist, checklist_event
 from .base import HelpMeta
 
 # Client-side tools that let Claude read/update the Commander's checklist.
@@ -129,8 +131,23 @@ CHECKLIST_TOOLS = [
 class ChecklistCapability:
     """Wraps a Checklist model and serves the checklist tools to the LLM."""
 
-    def __init__(self, checklist: Checklist) -> None:
+    def __init__(self, checklist: Checklist,
+                 on_change: Callable[[dict], None] | None = None) -> None:
         self.checklist = checklist
+        # Called with a `checklist` bus event after EVERY successful mutation so a live
+        # Checklist page reflects voice/tool CRUD without a manual reload (#82). The app
+        # wires this to bus.publish; tests that don't care leave it None.
+        self._on_change = on_change
+
+    def _notify(self) -> None:
+        """Publish a checklist snapshot after a mutation. Fail-soft — a UI-sync hiccup must
+        never turn a successful checklist edit into a tool error."""
+        if self._on_change is None:
+            return
+        try:
+            self._on_change(checklist_event(self.checklist))
+        except Exception:  # noqa: BLE001 — sync is best-effort; the edit already succeeded
+            pass
 
     def tools(self) -> list[dict]:
         return CHECKLIST_TOOLS
@@ -185,6 +202,7 @@ class ChecklistCapability:
                 n = number or cl.current
                 if not text:
                     return "I don't know which objective you mean."
+                self._notify()  # completion toggle landed — reflect it live
                 result = f"Done. #{n} '{text}' is now {verb}."
                 # On a COMPLETION, hand the model the REAL next objective so it never has to
                 # (and must never) invent one. Skip on reopen — 'next' doesn't apply there.
@@ -202,6 +220,7 @@ class ChecklistCapability:
                 new_num, text = cl.add(inp.get("text", ""),
                                        inp.get("position", "after"),
                                        inp.get("anchor_number"))
+                self._notify()  # new line added — reflect it live
                 return f"Added #{new_num}: '{text}' (now the current line)."
 
             if name == "modify_objective":
@@ -209,12 +228,14 @@ class ChecklistCapability:
                 if res is None:
                     return "I don't know which line to modify — find it first."
                 n, text = res
+                self._notify()  # line text changed — reflect it live
                 return f"Updated #{n} to: '{text}'."
 
             if name == "delete_objective":
                 text = cl.delete(inp.get("number"))
                 if text is None:
                     return "I don't know which line to delete — find it first."
+                self._notify()  # line removed — reflect it live
                 return f"Deleted: '{text}'."
 
             return f"Unknown tool: {name}"

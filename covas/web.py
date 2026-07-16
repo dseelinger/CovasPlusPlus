@@ -31,7 +31,7 @@ from . import personality as persona
 from . import settings_schema as schema
 from . import updates
 from .__version__ import __version__
-from .checklist import ITEM_RE
+from .checklist import ITEM_RE, checklist_event
 from .memory.store import MemoryRecord, MemoryStore, store_from_config
 from .macros.store import store_from_config as macros_store_from_config
 
@@ -385,6 +385,9 @@ def create_app(core) -> Flask:
         core.bus.publish({"type": "log", "who": "system",
                           "text": f"Checklist updated from the web editor "
                                   f"({done}/{len(items)} complete)."})
+        # Same `checklist` event the voice/tool path fires, so OTHER open Checklist tabs
+        # re-render in place too (this tab ignores its own version echo) — one writer path (#82).
+        core.bus.publish(checklist_event(core.checklist))
         return jsonify({"ok": True, "version": _file_version(path),
                         "items": len(items), "done": done})
 

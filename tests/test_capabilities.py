@@ -143,3 +143,61 @@ def test_reopening_item_does_not_append_a_next(tmp_path):
     out = cap.run_tool("set_objective", {"number": 2, "completed": False})
     assert "reopened" in out
     assert "next pending" not in out.lower()
+
+
+# --- issue #82: every mutation publishes a `checklist` event for live UI sync -------------
+
+def _cap_events(tmp_path):
+    """A capability whose on_change sink collects the events it would publish (bus faked as a
+    list append). Offline: just file IO on a temp checklist, no network."""
+    f = tmp_path / "checklist.md"
+    f.write_text("- [ ] Scoop fuel\n- [ ] Jump to Sol\n", encoding="utf-8")
+    events: list[dict] = []
+    cap = ChecklistCapability(Checklist(str(f)), on_change=events.append)
+    return cap, events
+
+
+def test_set_objective_publishes_checklist_event(tmp_path):
+    cap, events = _cap_events(tmp_path)
+    cap.run_tool("set_objective", {"number": 1, "completed": True})
+    assert events and events[-1]["type"] == "checklist"
+    # Payload reflects the NEW state: #1 done, progress + raw markdown + version for re-render.
+    assert events[-1]["done"] == 1 and events[-1]["total"] == 2
+    assert events[-1]["items"][0] == {"n": 1, "done": True, "text": "Scoop fuel"}
+    assert "version" in events[-1] and "Scoop fuel" in events[-1]["markdown"]
+
+
+def test_add_objective_publishes_checklist_event(tmp_path):
+    cap, events = _cap_events(tmp_path)
+    cap.run_tool("add_objective", {"text": "Buy limpets"})
+    assert events[-1]["type"] == "checklist" and events[-1]["total"] == 3
+    assert "Buy limpets" in events[-1]["markdown"]
+
+
+def test_modify_objective_publishes_checklist_event(tmp_path):
+    cap, events = _cap_events(tmp_path)
+    cap.run_tool("modify_objective", {"number": 2, "new_text": "Jump to Colonia"})
+    assert events[-1]["type"] == "checklist"
+    assert "Jump to Colonia" in events[-1]["markdown"]
+
+
+def test_delete_objective_publishes_checklist_event(tmp_path):
+    cap, events = _cap_events(tmp_path)
+    cap.run_tool("delete_objective", {"number": 1})
+    assert events[-1]["type"] == "checklist" and events[-1]["total"] == 1
+
+
+def test_noop_mutation_publishes_nothing(tmp_path):
+    """A disambiguation / no-match set_objective changes nothing on disk, so it must NOT
+    publish — a live client should never re-render for a non-change."""
+    cap, events = _cap_events(tmp_path)
+    cap.run_tool("set_objective", {"query": "nonexistent", "completed": True})
+    assert events == []
+
+
+def test_read_only_tools_publish_nothing(tmp_path):
+    """get_next_objectives / find_objectives don't mutate the file — no sync event."""
+    cap, events = _cap_events(tmp_path)
+    cap.run_tool("get_next_objectives", {})
+    cap.run_tool("find_objectives", {"query": "fuel"})
+    assert events == []
