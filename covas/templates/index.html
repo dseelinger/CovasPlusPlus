@@ -23,6 +23,10 @@
   /* Voice list + its type-to-filter box, stacked so the filter spans the row (issue #26). */
   .voicerow{flex-direction:column;align-items:stretch;gap:6px}
   .voicerow .voicehead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .voicerow .voicehead select{flex:1;min-width:0}
+  .voicesearch{background:transparent;color:var(--muted);border:1px solid var(--edge);border-radius:5px;
+       padding:5px 9px;font-family:inherit;font-size:13px;cursor:pointer;flex:0 0 auto}
+  .voicesearch:hover{color:var(--text);border-color:var(--accent2)}
   input.voicefilter{background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:5px;
        padding:6px 8px;font-family:inherit;font-size:12px;width:100%}
   .status{display:flex;align-items:center;gap:14px;margin-left:auto}
@@ -142,7 +146,8 @@
       <div class="row"><label>Whisper model</label><select id="whisper"></select></div>
       <div class="row"><label>ElevenLabs model</label><select id="el_model"></select></div>
       <div class="row voicerow">
-        <div class="voicehead"><label>ElevenLabs voice</label><select id="el_voice"></select></div>
+        <div class="voicehead"><label>ElevenLabs voice</label><select id="el_voice"></select>
+          <button type="button" id="el_voice_search" class="voicesearch" title="Search voices">🔍</button></div>
         <input type="text" id="el_voice_filter" class="voicefilter" placeholder="Filter voices (3+ chars)…" autocomplete="off">
       </div>
       <div class="row"><label>Voice speed</label><input type="range" id="speed" min="1.0" max="1.2" step="0.05"><span class="speedval" id="speedVal">1.0×</span></div>
@@ -326,6 +331,7 @@ function post(body){
 }
 
 let SETTINGS = {};
+let EL_VOICES = [];   // fetched ElevenLabs voices, fed to the command palette (#94)
 
 async function init(){
   const st = await (await fetch("/api/state")).json();
@@ -351,19 +357,39 @@ async function init(){
   try{
     const el = await (await fetch("/api/elevenlabs")).json();
     if(el.error) throw new Error(el.error);
+    EL_VOICES = el.voices || [];
     el.models.forEach(m=>$("el_model").appendChild(opt(m.model_id, m.name)));
     el.voices.forEach(v=>$("el_voice").appendChild(opt(v.voice_id, v.name+" ["+v.category+"]")));
     $("el_model").value = st.settings.el_model;
     $("el_voice").value = st.settings.el_voice;
     $("el_model").onchange = e => post({el_model:e.target.value});
+    const setVoice = (id, name) => {
+      const sel=$("el_voice");
+      if(sel.value!==id){ if(![...sel.options].some(o=>o.value===id)) sel.appendChild(opt(id,name||id)); sel.value=id; }
+      post({el_voice:id, el_voice_name:(name||"").split(" [")[0]});
+    };
     $("el_voice").onchange = e => {
       const name = e.target.selectedOptions[0].textContent.split(" [")[0];
       post({el_voice:e.target.value, el_voice_name:name});
     };
     $("el_voice_filter").oninput = e => filterOptions($("el_voice"), e.target.value);
+    // Command palette (#94): the 100+ voice list gets a searchable, keyboard-driven picker with
+    // per-row category metadata; the current pick is always reachable (fail-soft, #26/#100).
+    $("el_voice_search").onclick = () => openPalette({
+      title: "Search ElevenLabs voices",
+      items: EL_VOICES.map(v=>({value:v.voice_id, label:v.name, meta:v.category||""})),
+      current: $("el_voice").value,
+      allowCustom: false,
+      onPick: (id, label) => setVoice(id, label),
+    });
   }catch(err){
     $("el_model").appendChild(opt("", "(fetch failed)"));
     $("el_voice").appendChild(opt("", "(fetch failed)"));
+    // Fail-soft (#26/#100): the palette still opens showing the current value; never blocks.
+    $("el_voice_search").onclick = () => openPalette({
+      title:"Search ElevenLabs voices", items:[], current:$("el_voice").value, allowCustom:false,
+      onPick:(id)=>post({el_voice:id}),
+    });
     addLog({type:"log",who:"system",text:"ElevenLabs list fetch failed: "+err.message});
   }
 
@@ -555,5 +581,6 @@ function syncSettings(s){
 }
 init();
 </script>
+{% include "_command_palette.html" %}
 </body>
 </html>

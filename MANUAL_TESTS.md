@@ -848,15 +848,35 @@ Notes:
 - [ ] The status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, status/search lines (timestamped).
 
 ### 14.1a Voice-list filter (issue #26)  🌐 PANEL 🌍 NET
-> Both voice dropdowns get a type-to-filter box: the **ElevenLabs voice** picker on the **main panel**
-> (below the dropdown) and the schema-driven **ElevenLabs voice** picker on the **Settings** page
-> (beside the dropdown). Needs an ElevenLabs key so the list actually populates.
+> `requires:` **both voice dropdowns must be POPULATED via a valid ElevenLabs key** (set it on the
+> Settings *API keys* card and restart; `tts.provider` doesn't need to be elevenlabs, but the list only
+> loads with a key) — an empty list has nothing to filter and the test reads as "not implemented" (this
+> is the #100 mis-mark; annotate accordingly). Verify in BOTH the browser (`run_covas_ui.py`) AND the
+> packaged native window. The inline filter is superseded by the command palette (§14.1d) for the long
+> list, but the box still works: the **ElevenLabs voice** picker on the **main panel** (below the
+> dropdown) and the schema-driven picker on the **Settings** page (beside the dropdown).
 - [ ] **Main panel:** type **3+ characters** in the filter box under **ElevenLabs voice** → the dropdown
       narrows to voices whose **name or category** contains the text (case-insensitive; try a category
       word like *"cloned"* or *"premium"*). Typing **1–2 chars** filters nothing; **clearing** the box
       restores the full list. The **currently-selected** voice stays visible even when it doesn't match.
 - [ ] **Settings page:** same behavior in the filter box **next to** the schema `@elevenlabs_voices`
       picker — 3+ chars filters by substring, <3 clears. Picking a filtered voice still saves normally.
+
+### 14.1d Command-palette voice/model search (issue #94)  🌐 PANEL 🌍 NET
+> A reusable searchable palette (magnifier 🔍 button) beside the long voice/model pickers on BOTH the
+> **main panel** (ElevenLabs voice) and the **Settings** page (ElevenLabs voice/model + the #92 model/
+> voice comboboxes). `requires:` a populated list (valid ElevenLabs key for the voice palettes; the
+> relevant provider key for a model palette). Verify in the browser AND the packaged native window.
+- [ ] **Open + search:** click 🔍 beside **ElevenLabs voice** → a palette opens with a search box and the
+      full list below. Type a few letters → results **filter live** and the matched substring is **bold**;
+      each row shows the voice **category** as secondary text. Empty query lists **alphabetically**.
+- [ ] **Keyboard-first:** **↑/↓** move the highlighted row, **Enter** selects it (applies + saves), **Esc**
+      closes without changing. A mouse **click** also selects. The list **scrolls** for the long tail.
+- [ ] **Current pick reachable (fail-soft, #26/#100):** the currently-selected voice is marked (✓). With
+      the ElevenLabs key cleared/offline, 🔍 still opens the palette showing *"list unavailable — type a
+      value and press Enter"* so the current pick is kept and a value can still be entered — never blocks.
+- [ ] **Reused for model lists:** on the Settings page, the 🔍 beside a fetched **model** combobox
+      (e.g. OpenAI/OpenRouter with a key) opens the same palette over the hundreds of model ids.
 
 ### 14.1b Voice/model dropdowns sorted alphabetically (issue #93)  🌐 PANEL 🌍 NET
 > Both the **ElevenLabs voice** and **ElevenLabs model** dropdowns should list entries A→Z by

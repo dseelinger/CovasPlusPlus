@@ -116,6 +116,17 @@ def test_catalog_is_cached(client, monkeypatch):
     assert calls["n"] == 1   # second identical request served from the throttle cache
 
 
+# --- command palette include renders on both surfaces (issue #94) ----------
+
+def test_command_palette_included_on_both_pages(client):
+    c, _, _ = client
+    settings = c.get("/settings").get_data(as_text=True)
+    index = c.get("/").get_data(as_text=True)
+    # The reusable palette partial is {% include %}'d into both — proves the include resolves.
+    assert "openPalette" in settings and "cmdpOverlay" in settings
+    assert "openPalette" in index and "cmdpOverlay" in index
+
+
 # --- combobox accepts a custom value (issue #92) ---------------------------
 
 def test_combobox_custom_model_id_accepted(client):

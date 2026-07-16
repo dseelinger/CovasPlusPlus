@@ -216,11 +216,25 @@ function buildControl(control, s){
     // custom value. Everything else stays a strict <select>.
     if(s.combobox){ control.appendChild(buildCombo(s)); return; }
     const sel = document.createElement("select");
-    for(const o of optionsFor(s)) sel.appendChild(new Option(o.label,o.value));
+    const selOpts = optionsFor(s);
+    for(const o of selOpts) sel.appendChild(new Option(o.label,o.value));
     sel.value = s.value; if(sel.value!==String(s.value)) sel.appendChild(new Option(s.value,s.value)), sel.value=s.value;
     sel.onchange=()=>edit(s.key, sel.value);
-    // Voice lists can be long — give any *_voices picker a type-to-filter box (issue #26).
-    if(s.options_source && s.options_source.indexOf("voices")>=0) control.appendChild(voiceFilter(sel));
+    // Long fetched lists (ElevenLabs voices/models) get the command palette (#94) — a searchable,
+    // keyboard-driven, highlighted picker that supersedes the #26 inline filter for the long case.
+    // The <select> stays as the current-value display; the palette drives selection.
+    if(s.options_source){
+      const search=document.createElement("button"); search.type="button"; search.className="pickbtn";
+      search.textContent="🔍"; search.title="Search "+s.label;
+      search.onclick=()=> openPalette({
+        title:"Search "+s.label,
+        items: selOpts.map(o=>({value:o.value, label:o.label, meta:""})),
+        current: sel.value,
+        allowCustom:false,   // ElevenLabs voice/model must be a real account id — no free-text
+        onPick:(val)=>{ sel.value=val; if(sel.value!==val){ sel.appendChild(new Option(val,val)); sel.value=val; } edit(s.key, val); },
+      });
+      control.appendChild(search);
+    }
     control.appendChild(sel); return;
   }
   if(s.type==="int"||s.type==="float"){
@@ -291,12 +305,15 @@ function buildCombo(s){
   inp.setAttribute("list", list.id);
   const btn=document.createElement("button"); btn.className="pickbtn"; btn.type="button"; btn.textContent="⟳";
   btn.title="Refresh list";
-  row.appendChild(inp); row.appendChild(list); row.appendChild(btn);
+  const search=document.createElement("button"); search.className="pickbtn"; search.type="button";
+  search.textContent="🔍"; search.title="Search (command palette)";
+  row.appendChild(inp); row.appendChild(list); row.appendChild(search); row.appendChild(btn);
   const custom=document.createElement("div"); custom.className="custom hidden"; custom.textContent="custom (unsupported)";
   const msg=document.createElement("div"); msg.className="catmsg";
   wrap.appendChild(row); wrap.appendChild(custom); wrap.appendChild(msg);
 
   let known=new Set();
+  let opts=[];   // last-fetched catalog options, fed to the command palette (#94)
   function reflectCustom(){
     const v=inp.value.trim();
     custom.classList.toggle("hidden", v==="" || known.has(v));
@@ -312,19 +329,28 @@ function buildCombo(s){
     if(force) delete CATALOG[ck];
     msg.textContent="loading…";
     const {options,error}=await fetchCatalog(s.options_source, baseUrl);
+    opts=options||[];
     list.innerHTML="";
     known=new Set();
-    for(const o of options){
+    for(const o of opts){
       const opt=document.createElement("option"); opt.value=o.value;
       opt.label=o.meta ? (o.label+" — "+o.meta) : o.label;
       list.appendChild(opt); known.add(o.value);
     }
     // Fail-soft: on offline/no-key/error keep the current value valid + typeable, just say why.
     msg.textContent = error ? ("catalog unavailable ("+error+") — type a value")
-                            : (options.length+" available");
+                            : (opts.length+" available");
     reflectCustom();
   }
   btn.onclick=()=>fill(true);
+  // Command palette (#94): search the (possibly long) catalog with keyboard nav + highlight; a
+  // custom/unlisted value is still selectable so the current pick is never lost (fail-soft).
+  search.onclick=()=> openPalette({
+    title: "Search "+s.label,
+    items: opts,
+    current: (inp.value||"").trim(),
+    onPick: (val)=>{ inp.value=val; edit(s.key, val); reflectCustom(); },
+  });
   fill(false);
   wrap._refill=fill;   // so a base_url change can trigger a dependent refetch
   return wrap;
@@ -576,5 +602,6 @@ $("revertBtn").onclick=()=>{ for(const k of Object.keys(EDITS)) delete EDITS[k];
 $("search").oninput=filter;
 load();
 </script>
+{% include "_command_palette.html" %}
 </body>
 </html>

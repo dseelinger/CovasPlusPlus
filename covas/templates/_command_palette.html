@@ -1,0 +1,188 @@
+{# Reusable command-palette picker (issue #94). ONE implementation, {% include %}'d into both the
+   control panel (index.html) and the Settings page (settings.html), so the voice/model picker is a
+   single component, not two. A search input + live, ranked, highlighted results list with keyboard
+   nav (↑/↓/Enter/Esc) and click-to-select, scrollable, per-row secondary metadata.
+
+   Fail-soft (issue #26 / #100): the current pick is ALWAYS reachable — passed in as `current`, shown
+   selected, and even with an EMPTY items list (offline/fetch-failed) the palette lets you keep the
+   current value or free-type a custom one and Enter to accept it. Never blocks selection.
+
+   API (global): openPalette({title, items, current, allowCustom=true, onPick})
+     items:   [{value, label, meta}]   (meta = secondary text, optional)
+     current: the currently-selected value (kept reachable)
+     onPick:  (value, label) => void   (fired on Enter/click; not fired on Esc/cancel) #}
+<style>
+  .cmdp-overlay{position:fixed;inset:0;background:rgba(3,6,10,.62);display:none;z-index:50;
+    align-items:flex-start;justify-content:center}
+  .cmdp-overlay.show{display:flex}
+  .cmdp{margin-top:9vh;width:min(560px,92vw);max-height:76vh;display:flex;flex-direction:column;
+    background:var(--panel,#121821);border:1px solid var(--accent2,#00b4ff);border-radius:12px;
+    box-shadow:0 18px 60px rgba(0,0,0,.55);overflow:hidden}
+  .cmdp-searchrow{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--edge,#26313f)}
+  .cmdp-mag{color:var(--muted,#7d8ea3);font-size:15px;flex:0 0 auto}
+  .cmdp-input{flex:1;background:transparent;border:none;outline:none;color:var(--text,#d6e2f0);
+    font-family:inherit;font-size:15px}
+  .cmdp-clear{background:none;border:none;color:var(--muted,#7d8ea3);font-size:15px;cursor:pointer;
+    flex:0 0 auto;padding:2px 6px;border-radius:6px}
+  .cmdp-clear:hover{color:var(--text,#d6e2f0);background:rgba(255,255,255,.06)}
+  .cmdp-list{overflow-y:auto;padding:6px;min-height:44px}
+  .cmdp-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer}
+  .cmdp-row .cmdp-primary{flex:1;font-size:14px;color:var(--text,#d6e2f0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cmdp-row .cmdp-meta{color:var(--muted,#7d8ea3);font-size:12px;flex:0 0 auto;max-width:45%;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cmdp-row.active{background:rgba(0,180,255,.16);outline:1px solid var(--accent2,#00b4ff)}
+  .cmdp-row.current .cmdp-primary::after{content:" ✓";color:var(--ok,#39d353)}
+  .cmdp-row b{color:var(--accent,#ff7a1a);font-weight:700}
+  .cmdp-row .cmdp-tag{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--accent,#ff7a1a);
+    border:1px solid var(--edge,#26313f);border-radius:8px;padding:1px 6px;flex:0 0 auto}
+  .cmdp-empty{color:var(--muted,#7d8ea3);font-size:13px;padding:14px 16px}
+  .cmdp-foot{padding:7px 14px;border-top:1px solid var(--edge,#26313f);color:var(--muted,#7d8ea3);
+    font-size:11px;display:flex;gap:14px}
+  .cmdp-btn{background:transparent;color:var(--muted,#7d8ea3);border:1px solid var(--edge,#26313f);
+    border-radius:6px;padding:6px 10px;font-family:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+  .cmdp-btn:hover{color:var(--text,#d6e2f0);border-color:var(--accent2,#00b4ff)}
+</style>
+<div class="cmdp-overlay" id="cmdpOverlay" role="dialog" aria-modal="true">
+  <div class="cmdp">
+    <div class="cmdp-searchrow">
+      <span class="cmdp-mag">🔍</span>
+      <input class="cmdp-input" id="cmdpInput" type="text" placeholder="Search…" autocomplete="off" spellcheck="false">
+      <button class="cmdp-clear" id="cmdpClear" title="Clear">✕</button>
+    </div>
+    <div class="cmdp-list" id="cmdpList"></div>
+    <div class="cmdp-foot"><span>↑↓ navigate</span><span>⏎ select</span><span>esc close</span></div>
+  </div>
+</div>
+<script>
+(function(){
+  const overlay = document.getElementById("cmdpOverlay");
+  const input = document.getElementById("cmdpInput");
+  const list = document.getElementById("cmdpList");
+  const clear = document.getElementById("cmdpClear");
+  let STATE = null;   // {items, current, allowCustom, onPick, results, active}
+
+  function escHtml(s){return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+  function escRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}
+
+  // Bold every case-insensitive occurrence of q in text, HTML-escaped (no injection).
+  function highlight(text, q){
+    if(!q) return escHtml(text);
+    const re = new RegExp(escRe(q), "ig");
+    let out="", last=0, m;
+    while((m = re.exec(text))){
+      out += escHtml(text.slice(last, m.index)) + "<b>" + escHtml(m[0]) + "</b>";
+      last = m.index + m[0].length;
+      if(re.lastIndex === m.index) re.lastIndex++;   // guard against zero-width
+    }
+    return out + escHtml(text.slice(last));
+  }
+
+  // Match score: lower is better; null = no match. Substring first, then subsequence (fuzzy).
+  function score(item, q){
+    const hay = (item.label + " " + (item.value||"") + " " + (item.meta||"")).toLowerCase();
+    const label = (item.label||"").toLowerCase();
+    if(!q) return 0;
+    const i = label.indexOf(q);
+    if(i === 0) return 1;                 // prefix on the display label — best
+    if(i > 0 && /\W/.test(label[i-1])) return 2;   // word-boundary match
+    if(i > 0) return 3;                   // substring in label
+    if(hay.indexOf(q) >= 0) return 4;     // substring somewhere (value/meta)
+    // subsequence (fuzzy): all chars of q appear in order
+    let k=0; for(const ch of hay){ if(ch===q[k]) k++; if(k===q.length) break; }
+    return k===q.length ? 5 : null;
+  }
+
+  function compute(){
+    const q = input.value.trim().toLowerCase();
+    const scored = [];
+    for(const it of STATE.items){
+      const s = score(it, q);
+      if(s !== null) scored.push({it, s});
+    }
+    // Empty query → alpha by label (respects #93). Non-empty → by score, then alpha.
+    scored.sort((a,b)=> a.s!==b.s ? a.s-b.s
+                        : (a.it.label||"").toLowerCase().localeCompare((b.it.label||"").toLowerCase()));
+    let results = scored.map(x=>x.it);
+    // Fail-soft custom escape hatch (#92/#100): if the typed value isn't an exact known value,
+    // offer "Use ‘…’" at the top so a custom / unlisted id is always selectable, even offline.
+    if(STATE.allowCustom && q){
+      const exact = STATE.items.some(it => (it.value||"").toLowerCase()===q || (it.label||"").toLowerCase()===q);
+      if(!exact) results = [{value: input.value.trim(), label: input.value.trim(), meta:"", _custom:true}, ...results];
+    }
+    STATE.results = results;
+    STATE.active = results.length ? 0 : -1;
+    renderList();
+  }
+
+  function renderList(){
+    list.innerHTML = "";
+    const q = input.value.trim();
+    if(!STATE.results.length){
+      const e = document.createElement("div"); e.className="cmdp-empty";
+      e.textContent = STATE.items.length ? "No matches." :
+        "List unavailable — type a value and press Enter to use it.";
+      list.appendChild(e);
+      return;
+    }
+    STATE.results.forEach((it, idx)=>{
+      const row = document.createElement("div");
+      row.className = "cmdp-row" + (idx===STATE.active?" active":"") +
+                      (it.value===STATE.current && !it._custom?" current":"");
+      const prim = document.createElement("span"); prim.className="cmdp-primary";
+      prim.innerHTML = highlight(it.label||it.value, q.toLowerCase());
+      row.appendChild(prim);
+      if(it._custom){ const t=document.createElement("span"); t.className="cmdp-tag"; t.textContent="custom"; row.appendChild(t); }
+      else if(it.meta){ const mt=document.createElement("span"); mt.className="cmdp-meta"; mt.textContent=it.meta; row.appendChild(mt); }
+      row.onmouseenter = ()=>{ STATE.active=idx; paintActive(); };
+      row.onclick = ()=> pick(idx);
+      list.appendChild(row);
+    });
+  }
+
+  function paintActive(){
+    [...list.children].forEach((r,i)=> r.classList && r.classList.toggle("active", i===STATE.active));
+  }
+
+  function move(delta){
+    if(!STATE.results.length) return;
+    STATE.active = (STATE.active + delta + STATE.results.length) % STATE.results.length;
+    paintActive();
+    const el = list.children[STATE.active];
+    if(el && el.scrollIntoView) el.scrollIntoView({block:"nearest"});
+  }
+
+  function pick(idx){
+    const it = STATE.results[idx];
+    if(!it) return;
+    const cb = STATE.onPick;
+    close();
+    if(cb) cb(it.value, it.label);
+  }
+
+  function close(){ overlay.classList.remove("show"); STATE=null; document.removeEventListener("keydown", onKey, true); }
+
+  function onKey(e){
+    if(!STATE) return;
+    if(e.key==="ArrowDown"){ e.preventDefault(); move(1); }
+    else if(e.key==="ArrowUp"){ e.preventDefault(); move(-1); }
+    else if(e.key==="Enter"){ e.preventDefault(); if(STATE.active>=0) pick(STATE.active); }
+    else if(e.key==="Escape"){ e.preventDefault(); close(); }
+  }
+
+  input.oninput = ()=> { if(STATE) compute(); };
+  clear.onclick = ()=> { input.value=""; input.focus(); if(STATE) compute(); };
+  overlay.onclick = (e)=> { if(e.target===overlay) close(); };
+
+  // Global entry point.
+  window.openPalette = function(opts){
+    STATE = {items: opts.items||[], current: opts.current, onPick: opts.onPick,
+             allowCustom: opts.allowCustom!==false, results:[], active:-1};
+    input.placeholder = opts.title || "Search…";
+    input.value = "";
+    overlay.classList.add("show");
+    document.addEventListener("keydown", onKey, true);
+    compute();
+    setTimeout(()=> input.focus(), 0);
+  };
+})();
+</script>

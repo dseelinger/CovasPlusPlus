@@ -529,6 +529,13 @@ See [Companion HUD](using/hud.md). **Off by default.**
 > unreachable endpoint simply degrades the control to free-text with your existing value intact (never
 > an empty/blocking dropdown). `openai_tts.voice` / `openai_tts.model` / `cartesia.model` are small
 > fixed sets shown as strict dropdowns.
+>
+> **Command-palette search (issue #94).** For the long lists — 100+ ElevenLabs voices, hundreds of
+> OpenRouter model ids — a 🔍 button beside the picker opens a **search palette**: type to filter with
+> the match bolded, **↑/↓** to move, **Enter** to select, **Esc** to close (mouse click works too), with
+> each row's category/locale as secondary text. It's one shared component on both the control panel and
+> the Settings page, and it keeps the same fail-soft guarantee — your current pick is always shown and
+> reachable, and offline you can still type a value and press Enter.
 
 > **OpenAI-compatible LLM (`llm.provider = "openai"`).** One implementation covers **OpenAI, Groq,
 > DeepSeek, and OpenRouter** — only `[openai].base_url` and the model ids differ (see the presets in
