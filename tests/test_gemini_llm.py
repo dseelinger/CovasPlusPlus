@@ -22,10 +22,10 @@ def _llm(monkeypatch=None, *, key="test-key", web_search=False, **cfg):
     if monkeypatch is not None and key is not None:
         monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: key)
     return gem.GeminiLLM({
-        "gemini": {"model": "gemini-2.5-flash", **cfg},
+        "gemini": {"model": "gemini-3.1-flash-lite", **cfg},
         "web_search": {"enabled": web_search},
         "personality": {"enabled": False},
-        "pricing": {"gemini-2.5-flash": {"input": 0.30, "output": 2.50}},
+        "pricing": {"gemini-3.1-flash-lite": {"input": 0.25, "output": 1.50}},
     })
 
 
@@ -227,7 +227,7 @@ def test_stream_generate_parses_sse_and_uses_header(monkeypatch):
         return _Resp()
 
     monkeypatch.setattr(gem.requests, "post", fake_post)
-    chunks = list(gem._stream_generate("http://x/v1beta", "gemini-2.5-flash", "SECRET", {},
+    chunks = list(gem._stream_generate("http://x/v1beta", "gemini-3.1-flash-lite", "SECRET", {},
                                        threading.Event()))
     assert len(chunks) == 2
     assert ":streamGenerateContent?alt=sse" in captured["url"]
@@ -256,7 +256,7 @@ def test_live_gemini_replies():
     otherwise so the paid suite stays deliberate. Uses the cheap Flash model."""
     if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
         pytest.skip("set GEMINI_API_KEY to run the live Gemini test")
-    cfg = {"gemini": {"model": os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")},
+    cfg = {"gemini": {"model": os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")},
            "web_search": {"enabled": False}, "personality": {"enabled": False}, "pricing": {}}
     p = gem.GeminiLLM(cfg)
     text = "".join(piece for kind, piece in p.stream_reply(

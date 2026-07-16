@@ -33,7 +33,7 @@ def make_llm(cfg: dict) -> LLMProvider:
         return OpenAILLM(cfg)
     if name == "gemini":
         # Gemini native API — function calling + Google Search grounding; tiered via [gemini].tiers
-        # (Flash/Pro). Issue #13; cloud path is fine in-game.
+        # (Flash-Lite/3.5 Flash). Issue #13; cloud path is fine in-game.
         from .gemini_llm import GeminiLLM
         return GeminiLLM(cfg)
     raise ValueError(

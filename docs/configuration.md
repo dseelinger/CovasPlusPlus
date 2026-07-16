@@ -502,7 +502,7 @@ See [Companion HUD](using/hud.md). **Off by default.**
 |---------|---------|--------------|
 | `llm.provider` | `anthropic` | `anthropic` (cloud, Claude), `openai` (any OpenAI-compatible cloud — OpenAI/Groq/DeepSeek/OpenRouter), `gemini` (Google Gemini native — function calling + Search grounding), or `ollama` (local, out-of-game only) |
 | `openai.base_url` / `.model` | OpenAI / `gpt-4o-mini` | OpenAI-compatible `chat/completions` endpoint + the model used when `llm.provider = "openai"`; `[openai.tiers]` ships **unset**, so every router tier reuses `.model` (a bare model swap to Groq/DeepSeek/OpenRouter just works) unless you set distinct per-tier ids there |
-| `gemini.model` | `gemini-2.5-flash` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash/Pro) live in `[gemini.tiers]` |
+| `gemini.model` | `gemini-3.1-flash-lite` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash-Lite cheap, 3.5 Flash for depth) live in `[gemini.tiers]` |
 | `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `azure.region` / `azure.voice` / `azure.style` | `eastus` / `en-US-AriaNeural` / *(blank)* | Azure Neural region, voice ShortName, and optional SSML style when `tts.provider = "azure"` |
@@ -522,11 +522,11 @@ See [Companion HUD](using/hud.md). **Off by default.**
 >
 > **Gemini LLM (`llm.provider = "gemini"`).** Google Gemini on the **native** API — strong **tool
 > calling** plus Google-Search **grounding** (surfaced like web search when `web_search.enabled` is on),
-> and a cheap/fast **Flash** default tier (Pro for depth) via `[gemini.tiers]`. Cloud, so in-game is
-> fine. Needs a Gemini key (enter it on the Settings **API keys** card, stored in `GeminiAPIKey.txt`) —
-> a free key comes from [Google AI Studio](https://aistudio.google.com). Fail soft: a request error degrades the turn to
-> text. (Combining function calling + grounding needs a Gemini 2.x model; older models may reject the
-> combo — turn `web_search.enabled` off for those.)
+> and a cheap/fast **Flash-Lite** default tier (**3.5 Flash** for depth) via `[gemini.tiers]`. Cloud,
+> so in-game is fine. Needs a Gemini key (enter it on the Settings **API keys** card, stored in
+> `GeminiAPIKey.txt`) — a free key comes from [Google AI Studio](https://aistudio.google.com). Fail soft: a request error degrades the turn to
+> text. (Combining function calling + grounding needs a Gemini 2.x-or-newer model; older models may
+> reject the combo — turn `web_search.enabled` off for those.)
 
 > **Provider suitability — what limits COVAS actually needs.** COVAS is a *tool-heavy, session-length*
 > workload: it sends a large tool set (**~10K tokens per turn**, growing with history) and runs many
