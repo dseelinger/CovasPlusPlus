@@ -19,7 +19,7 @@ Differences from the OpenAI path this provider handles:
     `on_event("thinking", …)`, kept OUT of the spoken text.
 
 Tiering comes from the router foundation (#11): the per-turn model is `[gemini].tiers.{cheap,standard,
-premium}` (Flash cheap/default, Pro for depth). Usage is costed via the shared `[pricing]` table.
+premium}` (Flash-Lite cheap/default, 3.5 Flash for depth). Usage is costed via the shared `[pricing]` table.
 Key: `[gemini].api_key_file` (DPAPI-encrypted, file-only). Cloud, so in-game is fine.
 Fail soft: a request error raises a clear RuntimeError the app guards, degrading the turn to text.
 """
@@ -35,7 +35,7 @@ from ..llm import build_system, estimate_cost
 from .base import OnEvent, ToolHandler
 
 _DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-_DEFAULT_MODEL = "gemini-2.5-flash"
+_DEFAULT_MODEL = "gemini-3.1-flash-lite"
 _USER_AGENT = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
 _MAX_ROUNDS = 8
 

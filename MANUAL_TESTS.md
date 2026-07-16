@@ -224,7 +224,7 @@ Notes:
 
 ### 4.2 Gemini LLM provider (issue #13)  🔊 HW 🌍 NET 📋 FILE
 > Google Gemini on the **native** API — tool calling + Google-Search **grounding** + a cheap Flash
-> default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash/Pro). Needs a key in
+> default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash-Lite/3.5 Flash). Needs a key in
 > `GeminiAPIKey.txt` (DPAPI-encrypted; add it in Settings — env vars are no longer read, #22).
 > Restart after switching `[llm].provider`.
 >
@@ -233,7 +233,7 @@ Notes:
 > zero-cost path that actually works. Google trims free quotas without notice, so treat exact
 > numbers as best-effort.
 - [ ] **Conversation:** set `[llm].provider = "gemini"`, add your Gemini key in Settings, restart, speak a turn
-  → COVAS answers via Gemini; `[router]` line shows the Gemini model (e.g. `[cheap] gemini-2.5-flash`)
+  → COVAS answers via Gemini; `[router]` line shows the Gemini model (e.g. `[cheap] gemini-3.1-flash-lite`)
   and `[usage]` shows token counts.
 - [ ] **Tool calling works:** *"What's my next objective?"* / *"Mark fuel scooping complete."* → the
   checklist tool fires (log shows the tool call) and COVAS confirms.
@@ -241,7 +241,7 @@ Notes:
   (*"What's the latest on the Thargoid war?"*) → the log shows a **`Searching…`** side-channel line
   (grounding queries) and the answer reflects live info.
 - [ ] **Escalation tiers:** *"Think hard…"* → the router line shows `[standard]` with the
-  `[gemini.tiers].standard` (Pro) model.
+  `[gemini.tiers].standard` (`gemini-3.5-flash`) model.
 - [ ] **Fail-soft:** clear the key → the turn degrades to text and the loop returns to IDLE; restore →
   it works again. No crash.
 

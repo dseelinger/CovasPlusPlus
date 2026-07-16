@@ -355,13 +355,15 @@ output = 0.60
 input = 2.50
 output = 10.0
 # Gemini provider (#13) rough rates (TUNE — add rows for the model you use; an unlisted model
-# estimates $0.00). Flash is the cheap/default tier; Pro is for depth.
-[pricing."gemini-2.5-flash"]
-input = 0.30
-output = 2.50
-[pricing."gemini-2.5-pro"]
-input = 1.25
-output = 10.0
+# estimates $0.00). Flash-Lite is the cheap/default tier; 3.5 Flash (now frontier-class) is standard/
+# premium. The old gemini-2.5-* rows are gone (Google shut those down Oct 2026).
+[pricing."gemini-3.1-flash-lite"]
+input = 0.25
+output = 1.50
+[pricing."gemini-3.5-flash"]
+input = 1.50
+output = 9.0
+cache_read = 0.15
 
 
 [router]
@@ -1172,14 +1174,16 @@ model        = "gpt-4o-mini"
 # NEVER commit the key. `base_url` rarely changes.
 base_url     = "https://generativelanguage.googleapis.com/v1beta"
 api_key_file = "GeminiAPIKey.txt"
-model        = "gemini-2.5-flash"
+model        = "gemini-3.1-flash-lite"
 
 [gemini.tiers]
-# The router's tier -> model map for Gemini (issue #11): Flash for cheap/default banter, Pro for
-# depth. Omit a key to reuse [gemini].model.
-cheap    = "gemini-2.5-flash"
-standard = "gemini-2.5-pro"
-premium  = "gemini-2.5-pro"
+# The router's tier -> model map for Gemini (issue #11): Flash-Lite for cheap/default banter, 3.5
+# Flash (now frontier-class, "most intelligent") for depth. Omit a key to reuse [gemini].model.
+# NOTE: Pro is preview-only right now (gemini-3.1-pro-preview) — kept OFF the map to avoid depending
+# on a -preview model that can be shut down abruptly (which is exactly what killed gemini-2.5-*).
+cheap    = "gemini-3.1-flash-lite"
+standard = "gemini-3.5-flash"
+premium  = "gemini-3.5-flash"
 
 [ollama]
 # Local LLM via Ollama. Start it with `ollama serve`; pull a model first.
