@@ -1289,16 +1289,30 @@ Notes:
 
 Notes:
 
-### 19.2 First-run wizard  📦 🖥️ 🔊 HW 🌍 NET
-> On a machine with none of the dev state — that absence *is* the test.
+### 19.2 First-run wizard — pick any LLM/TTS combo (issue #87)  📦 🖥️ 🔊 HW 🌍 NET
+> On a machine with none of the dev state — that absence *is* the test. The wizard must let you
+> finish with ANY supported LLM + TTS, **not** only Anthropic + ElevenLabs.
 - [ ] First launch (empty `%APPDATA%\COVAS++`) opens the **setup wizard**, not the panel.
-- [ ] **Anthropic key** entry → accepted; **ElevenLabs key** entry → accepted (or skipped).
+- [ ] **LLM provider picker** offers **Anthropic / OpenAI-compatible / Gemini / Ollama**; selecting one
+      reveals just its fields (Anthropic → key; OpenAI → endpoint preset + model + key; Gemini → key
+      (+ model); Ollama → host + model, no key). The **"AI ready"** badge names the chosen provider.
+- [ ] **TTS provider picker** offers **Edge (free, no key) / ElevenLabs / Azure / OpenAI / Cartesia /
+      Piper**; selecting one reveals just its fields. Edge/Piper show **no key field**.
+- [ ] **Non-Anthropic + non-ElevenLabs onboarding (the key case): pick Gemini (or OpenRouter) + Edge**,
+      paste ONLY the Gemini/OpenRouter key, download the STT model → the **Launch** button enables with
+      **no Anthropic key and no ElevenLabs key**. Finish → the app starts and speaks a turn in the
+      **Edge** voice (not text-only).
 - [ ] **Mic** picker lists your input devices; pick one.
 - [ ] **STT model** downloads (`small.en`, ~250 MB) with a **progress** indicator (needs internet); it's fetched **once**.
 - [ ] Wizard **hands off to the control panel in the same window** — no second window, no browser. The finish message says it's **switching to the control panel** (NOT "close this tab"); the panel appears **without you closing anything** (closing the single native window quits the app).
-- [ ] **No-ElevenLabs path:** finish the wizard with **no** EL key → the app runs **text-only** and says so; add a key later in Settings → spoken replies start working.
-- [ ] **Default voice:** with an EL key, the voice defaults to **George** (or the first valid voice if George isn't in your catalog).
-- [ ] 📋 After the wizard, `%APPDATA%\COVAS++` holds `config.toml`/keys/etc. and the model is under `%LOCALAPPDATA%`; **nothing** was written into the install tree (`%LOCALAPPDATA%\Programs\COVAS++`).
+- [ ] **Keyless-cloud-voice → text-only:** pick a cloud voice (e.g. ElevenLabs) but leave its key blank
+      → the voice badge shows **text-only** and the app still finishes (on the LLM + STT); add the key
+      later in Settings → spoken replies start working. (Edge/Piper never hit this — they're free.)
+- [ ] **ElevenLabs default voice:** with an EL key + TTS = ElevenLabs, "Save voice" resolves **George**
+      (or the first valid voice if George isn't in your catalog).
+- [ ] 📋 After the wizard, `%APPDATA%\COVAS++` holds `overrides.json` with your `[llm].provider` /
+      `[tts].provider` choices + keys, and the model is under `%LOCALAPPDATA%`; **nothing** was written
+      into the install tree (`%LOCALAPPDATA%\Programs\COVAS++`).
 
 Notes:
 

@@ -39,6 +39,9 @@
   @keyframes s{to{transform:rotate(360deg)}}
   .finish{border-color:var(--accent)}
   .finish .msg{font-size:13px}
+  .free{color:var(--ok);font-size:11px;letter-spacing:1px}
+  /* Per-provider field groups toggled by the provider <select>. */
+  .pfields{display:none} .pfields.show{display:block}
 </style>
 </head>
 <body>
@@ -48,28 +51,148 @@
 </header>
 
 <div class="wrap">
-  <p class="intro">Welcome, Commander. A few one-time steps and you're flying. Your keys and
-  settings are stored locally on this machine only — nothing is ever uploaded.</p>
+  <p class="intro">Welcome, Commander. A few one-time steps and you're flying. Pick any AI + voice
+  combination you like — a <span class="free">free voice (Edge) needs no key at all</span>. Your keys
+  and settings are stored locally on this machine only — nothing is ever uploaded.</p>
 
-  <!-- 1. Keys -->
+  <!-- 1. LLM provider -->
   <div class="card">
-    <h2>API keys <span class="req">Anthropic required · ElevenLabs optional</span>
-      <span class="badge off" id="bKeys">not set</span></h2>
-    <div class="hint">
-      <b>Anthropic</b> powers the conversation (required).
-      <a href="https://console.anthropic.com/settings/keys" target="_blank">Get a key →</a><br>
-      <b>ElevenLabs</b> gives COVAS a voice. Leave it blank to run <b>text-only</b> — you can add
-      it later in Settings. <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">Get a key →</a>
+    <h2>AI brain (LLM) <span class="req">required</span>
+      <span class="badge off" id="bLlm">not ready</span></h2>
+    <div class="hint">Which model powers the conversation. Pick a cloud provider and paste its key,
+      or run a local model with Ollama.</div>
+    <label class="f">LLM provider</label>
+    <select id="llmProvider">
+      <option value="anthropic">Anthropic — Claude</option>
+      <option value="openai">OpenAI-compatible — OpenAI / Groq / DeepSeek / OpenRouter</option>
+      <option value="gemini">Google Gemini</option>
+      <option value="ollama">Ollama — local model (advanced)</option>
+    </select>
+
+    <div class="pfields" id="llm_anthropic">
+      <div class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank">Get an Anthropic key →</a></div>
+      <label class="f">Anthropic API key</label>
+      <input type="password" id="k_anthropic" placeholder="sk-ant-…" autocomplete="off">
     </div>
-    <label class="f">Anthropic API key</label>
-    <input type="password" id="anthKey" placeholder="sk-ant-…" autocomplete="off">
-    <label class="f">ElevenLabs API key (optional)</label>
-    <input type="password" id="elKey" placeholder="leave blank for text-only" autocomplete="off">
-    <button id="saveKeys">Save keys</button>
-    <div class="msg" id="keysMsg"></div>
+
+    <div class="pfields" id="llm_openai">
+      <div class="hint">Works with any OpenAI-compatible endpoint. Presets:
+        <a href="https://console.groq.com/keys" target="_blank">Groq</a> ·
+        <a href="https://platform.deepseek.com/api_keys" target="_blank">DeepSeek</a> ·
+        <a href="https://openrouter.ai/keys" target="_blank">OpenRouter</a> ·
+        <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI</a></div>
+      <label class="f">Endpoint (base URL)</label>
+      <select id="openai_preset">
+        <option value="https://api.openai.com/v1">OpenAI — https://api.openai.com/v1</option>
+        <option value="https://api.groq.com/openai/v1">Groq — https://api.groq.com/openai/v1</option>
+        <option value="https://api.deepseek.com/v1">DeepSeek — https://api.deepseek.com/v1</option>
+        <option value="https://openrouter.ai/api/v1">OpenRouter — https://openrouter.ai/api/v1</option>
+        <option value="__custom">Custom…</option>
+      </select>
+      <input type="text" id="openai_base_url" placeholder="https://…/v1" autocomplete="off" style="margin-top:8px;display:none">
+      <label class="f">Model</label>
+      <input type="text" id="openai_model" placeholder="e.g. llama-3.3-70b-versatile" autocomplete="off">
+      <label class="f">API key</label>
+      <input type="password" id="k_openai" placeholder="key for the endpoint above" autocomplete="off">
+    </div>
+
+    <div class="pfields" id="llm_gemini">
+      <div class="hint"><a href="https://aistudio.google.com/apikey" target="_blank">Get a Gemini key →</a>
+        (Google's free tier is generous.)</div>
+      <label class="f">Gemini API key</label>
+      <input type="password" id="k_gemini" placeholder="AIza…" autocomplete="off">
+      <label class="f">Model (optional)</label>
+      <input type="text" id="gemini_model" placeholder="gemini-flash-lite-latest" autocomplete="off">
+    </div>
+
+    <div class="pfields" id="llm_ollama">
+      <div class="hint"><b>Advanced / local.</b> Runs a model on THIS PC with no key — but a good model
+        competes with Elite for your GPU, so it's best out-of-game. Install <a href="https://ollama.com" target="_blank">Ollama</a>,
+        then <code>ollama pull</code> a model. Needs the Ollama server running.</div>
+      <label class="f">Ollama host</label>
+      <input type="text" id="ollama_host" placeholder="http://localhost:11434" autocomplete="off">
+      <label class="f">Model (must be pulled)</label>
+      <input type="text" id="ollama_model" placeholder="e.g. qwen3" autocomplete="off">
+    </div>
+
+    <button id="saveLlm">Save AI provider</button>
+    <div class="msg" id="llmMsg"></div>
   </div>
 
-  <!-- 2. Speech model -->
+  <!-- 2. TTS provider / voice -->
+  <div class="card">
+    <h2>Voice (TTS) <span class="req">optional — Edge is free</span>
+      <span class="badge off" id="bVoice">not set</span></h2>
+    <div class="hint">Which voice COVAS speaks in. <b>Edge</b> is free and needs no key, so you always
+      get a voice. The cloud voices sound better but need their own key; leave a keyless cloud voice
+      unset and COVAS runs <b>text-only</b> until you add one.</div>
+    <label class="f">Voice provider</label>
+    <select id="ttsProvider">
+      <option value="edge">Edge — free neural voices, no key ★</option>
+      <option value="elevenlabs">ElevenLabs — premium</option>
+      <option value="azure">Azure Neural — free tier + SLA</option>
+      <option value="openai">OpenAI — cheap cloud</option>
+      <option value="cartesia">Cartesia — low-latency persona</option>
+      <option value="piper">Piper — local, offline (advanced)</option>
+    </select>
+
+    <div class="pfields" id="tts_edge">
+      <div class="hint"><span class="free">Free — no key needed.</span> Uses Microsoft Edge's neural
+        voices. Optional: a specific voice ShortName.</div>
+      <label class="f">Edge voice (optional)</label>
+      <input type="text" id="edge_voice" placeholder="en-US-AriaNeural" autocomplete="off">
+    </div>
+
+    <div class="pfields" id="tts_elevenlabs">
+      <div class="hint"><a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">Get an ElevenLabs key →</a>
+        Leave blank to run text-only for now.</div>
+      <label class="f">ElevenLabs API key</label>
+      <input type="password" id="k_elevenlabs" placeholder="leave blank for text-only" autocomplete="off">
+      <div class="hint">Then pick the default voice “George” (or the first in your library).</div>
+    </div>
+
+    <div class="pfields" id="tts_azure">
+      <div class="hint"><a href="https://portal.azure.com" target="_blank">Azure Speech resource →</a>
+        (a free tier exists). Needs the key + your resource region.</div>
+      <label class="f">Azure Speech key</label>
+      <input type="password" id="k_azure" placeholder="Azure Speech key" autocomplete="off">
+      <label class="f">Region</label>
+      <input type="text" id="azure_region" placeholder="eastus" autocomplete="off">
+      <label class="f">Voice (optional)</label>
+      <input type="text" id="azure_voice" placeholder="en-US-AriaNeural" autocomplete="off">
+    </div>
+
+    <div class="pfields" id="tts_openai">
+      <div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank">OpenAI key →</a>
+        (shared with the OpenAI LLM key). Cheap cloud voices.</div>
+      <label class="f">OpenAI API key</label>
+      <input type="password" id="k_openai_tts" placeholder="sk-…" autocomplete="off">
+      <label class="f">Voice (optional)</label>
+      <input type="text" id="openai_tts_voice" placeholder="alloy" autocomplete="off">
+    </div>
+
+    <div class="pfields" id="tts_cartesia">
+      <div class="hint"><a href="https://play.cartesia.ai" target="_blank">Cartesia →</a> — low-latency
+        persona voice. Needs the key and a voice id from your library.</div>
+      <label class="f">Cartesia API key</label>
+      <input type="password" id="k_cartesia" placeholder="Cartesia key" autocomplete="off">
+      <label class="f">Voice id</label>
+      <input type="text" id="cartesia_voice" placeholder="a voice id from play.cartesia.ai" autocomplete="off">
+    </div>
+
+    <div class="pfields" id="tts_piper">
+      <div class="hint"><span class="free">Free — no key.</span> Fully offline local TTS. Download a
+        voice: <code>python -m piper.download_voices en_US-lessac-medium</code>, then point to the
+        resulting <code>.onnx</code>.</div>
+      <label class="f">Piper voice (.onnx path)</label>
+      <input type="text" id="piper_model" placeholder="voices/en_US-lessac-medium.onnx" autocomplete="off">
+    </div>
+
+    <button id="saveVoice">Save voice</button>
+    <div class="msg" id="voiceMsg"></div>
+  </div>
+
+  <!-- 3. Speech model -->
   <div class="card">
     <h2>Speech-to-text model <span class="req">required</span>
       <span class="badge off" id="bStt">not installed</span></h2>
@@ -77,16 +200,6 @@
       hear you. Runs entirely on your CPU afterward — no internet needed to talk.</div>
     <button id="dlModel">Download speech model</button>
     <div class="msg" id="modelMsg"></div>
-  </div>
-
-  <!-- 3. Voice -->
-  <div class="card">
-    <h2>COVAS voice <span class="req">needs ElevenLabs key</span>
-      <span class="badge off" id="bVoice">not set</span></h2>
-    <div class="hint">Picks the default voice <b>“George”</b> (or the first available voice) from
-      your ElevenLabs library. Change it any time in Settings.</div>
-    <button id="pickVoice">Choose default voice</button>
-    <div class="msg" id="voiceMsg"></div>
   </div>
 
   <!-- 4. Mic -->
@@ -102,7 +215,8 @@
   <!-- Finish -->
   <div class="card finish">
     <h2>Finish</h2>
-    <div class="hint">Enabled once the Anthropic key and speech model are ready.</div>
+    <div class="hint">Enabled once your chosen AI provider is ready and the speech model is installed.
+      A voice is optional — Edge gives you one for free.</div>
     <button class="primary" id="finishBtn" disabled>Launch COVAS++ →</button>
     <div class="msg" id="finishMsg"></div>
   </div>
@@ -119,17 +233,39 @@ async function jpost(url, body){
   return {ok:r.ok, data: await r.json()};
 }
 
+// Show only the selected provider's field group.
+function showGroup(prefix, provider, providers){
+  providers.forEach(p => $(prefix+"_"+p).classList.toggle("show", p===provider));
+}
+const LLM_PROVIDERS = ["anthropic","openai","gemini","ollama"];
+const TTS_PROVIDERS = ["edge","elevenlabs","azure","openai","cartesia","piper"];
+
+$("llmProvider").onchange = e => showGroup("llm", e.target.value, LLM_PROVIDERS);
+$("ttsProvider").onchange = e => showGroup("tts", e.target.value, TTS_PROVIDERS);
+
+// OpenAI endpoint preset ↔ custom text box.
+$("openai_preset").onchange = e => {
+  const custom = e.target.value === "__custom";
+  $("openai_base_url").style.display = custom ? "block" : "none";
+  if(!custom) $("openai_base_url").value = e.target.value;
+};
+
 let downloading = false;
 
 async function refresh(){
   let s;
   try{ s = await (await fetch("/api/setup/status")).json(); }catch(e){ return; }
-  badge("bKeys", s.anthropic, s.elevenlabs?"anthropic + voice":"anthropic set", "not set");
+  // LLM readiness badge names the active provider.
+  badge("bLlm", s.llm, (s.llm_provider||"llm")+" ready", (s.llm_provider||"llm")+" not ready");
+  // Voice badge: Edge/Piper are always "free voice"; cloud shows set/text-only.
+  if(s.tts_provider === "edge" || s.tts_provider === "piper")
+    badge("bVoice", true, s.tts_provider+" (free)", "");
+  else
+    badge("bVoice", s.voice, s.tts_provider+" set", "text-only");
   badge("bStt", s.stt, "installed", "not installed");
   $("finishBtn").disabled = !s.configured;
   if(s.configured) msg("finishMsg","Ready to launch.", true);
 
-  // Reflect an in-flight / finished model download.
   const d = s.download || {};
   if(d.state === "downloading"){ downloading = true; $("dlModel").disabled = true;
     $("modelMsg").innerHTML = '<span class="spin"></span>Downloading… (~250 MB, one time)'; }
@@ -139,13 +275,51 @@ async function refresh(){
     msg("modelMsg","Download failed: "+(d.error||"unknown"), false); }
 }
 
-$("saveKeys").onclick = async () => {
-  msg("keysMsg","Saving…");
-  const {ok,data} = await jpost("/api/setup/keys",
-    {anthropic:$("anthKey").value, elevenlabs:$("elKey").value});
-  if(!ok || !data.ok){ msg("keysMsg", (data&&data.error)||"save failed", false); return; }
-  const hasAnth = data.status && data.status.anthropic;
-  msg("keysMsg", hasAnth ? "Saved." : "Enter your Anthropic key to continue.", hasAnth);
+$("saveLlm").onclick = async () => {
+  msg("llmMsg","Saving…");
+  const provider = $("llmProvider").value;
+  const body = { llm_provider: provider, keys: {} };
+  if(provider === "anthropic") body.keys.anthropic = $("k_anthropic").value;
+  if(provider === "openai"){
+    body.keys.openai = $("k_openai").value;
+    body.openai_base_url = ($("openai_preset").value === "__custom")
+      ? $("openai_base_url").value : $("openai_preset").value;
+    body.openai_model = $("openai_model").value;
+  }
+  if(provider === "gemini"){ body.keys.gemini = $("k_gemini").value; body.gemini_model = $("gemini_model").value; }
+  if(provider === "ollama"){ body.ollama_host = $("ollama_host").value; body.ollama_model = $("ollama_model").value; }
+  const {ok,data} = await jpost("/api/setup/keys", body);
+  if(!ok || !data.ok){ msg("llmMsg",(data&&data.error)||"save failed", false); return; }
+  const ready = data.status && data.status.llm;
+  msg("llmMsg", ready ? "Saved — provider ready." :
+      (provider==="ollama" ? "Saved. Pull/start the model so Ollama can reach it." :
+       "Saved. Enter a valid key to continue."), ready);
+  refresh();
+};
+
+$("saveVoice").onclick = async () => {
+  msg("voiceMsg","Saving…");
+  const provider = $("ttsProvider").value;
+  // 1) persist the provider selection + its key (if any) via the keys endpoint.
+  const keys = {};
+  if(provider === "elevenlabs") keys.elevenlabs = $("k_elevenlabs").value;
+  if(provider === "azure") keys.azure = $("k_azure").value;
+  if(provider === "openai") keys.openai = $("k_openai_tts").value;
+  if(provider === "cartesia") keys.cartesia = $("k_cartesia").value;
+  await jpost("/api/setup/keys", { tts_provider: provider, keys });
+  // 2) set/resolve the voice for that provider.
+  const vbody = {};
+  if(provider === "edge") vbody.voice = $("edge_voice").value;
+  if(provider === "piper") vbody.model = $("piper_model").value;
+  if(provider === "azure"){ vbody.voice = $("azure_voice").value; vbody.region = $("azure_region").value; }
+  if(provider === "openai") vbody.voice = $("openai_tts_voice").value;
+  if(provider === "cartesia") vbody.voice = $("cartesia_voice").value;
+  const {ok,data} = await jpost("/api/setup/voice", vbody);
+  if(!ok || !data.ok){ msg("voiceMsg",(data&&data.error)||"failed", false); return; }
+  if(data.skipped){ msg("voiceMsg","Text-only for now — add an ElevenLabs key to give COVAS a voice.", null);
+    badge("bVoice", false, "", "text-only"); refresh(); return; }
+  const name = data.voice ? data.voice.name : "";
+  msg("voiceMsg","Voice set"+(name?(" — "+name):"")+".", true);
   refresh();
 };
 
@@ -154,16 +328,6 @@ $("dlModel").onclick = async () => {
   const {ok,data} = await jpost("/api/setup/model");
   if(!ok){ $("dlModel").disabled=false; msg("modelMsg",(data&&data.error)||"failed",false); return; }
   refresh();
-};
-
-$("pickVoice").onclick = async () => {
-  msg("voiceMsg","Fetching voices…");
-  const {ok,data} = await jpost("/api/setup/voice");
-  if(!ok || !data.ok){ msg("voiceMsg",(data&&data.error)||"failed",false); return; }
-  if(data.skipped){ msg("voiceMsg","Skipped — text-only (no ElevenLabs key).", null);
-    badge("bVoice", false, "", "text-only"); return; }
-  msg("voiceMsg","Voice set to "+data.voice.name+".", true);
-  badge("bVoice", true, data.voice.name, "not set");
 };
 
 $("saveMic").onclick = async () => {
@@ -190,6 +354,19 @@ async function loadMics(){
   }catch(e){ /* no devices listed; system default stays selected */ }
 }
 
+// Initialize the provider dropdowns from the current config (so a re-run reflects prior choices),
+// then reveal the matching field groups.
+async function initProviders(){
+  try{
+    const s = await (await fetch("/api/setup/status")).json();
+    if(s.llm_provider && LLM_PROVIDERS.includes(s.llm_provider)) $("llmProvider").value = s.llm_provider;
+    if(s.tts_provider && TTS_PROVIDERS.includes(s.tts_provider)) $("ttsProvider").value = s.tts_provider;
+  }catch(e){ /* offline: keep defaults */ }
+  showGroup("llm", $("llmProvider").value, LLM_PROVIDERS);
+  showGroup("tts", $("ttsProvider").value, TTS_PROVIDERS);
+}
+
+initProviders();
 loadMics();
 refresh();
 setInterval(refresh, 1500);   // keep badges + download state live

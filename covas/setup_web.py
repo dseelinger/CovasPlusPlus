@@ -19,6 +19,7 @@ from flask import Flask, jsonify, render_template, request
 
 from . import elevenlabs as el
 from . import firstrun
+from . import settings_schema as schema
 
 # The finish-step copy differs by HOW the wizard is being shown, because the safe next action
 # differs. In the NATIVE single window (run_covas_app.py) the handoff swaps this SAME window over
@@ -56,19 +57,48 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
             st["download"] = dict(dl)
         return jsonify(st)
 
+    # Sections whose key the wizard may save, plus the optional non-key provider fields it persists
+    # to overrides (endpoint/model/host). Any TTS voice fields are handled by /api/setup/voice.
+    _KEY_SECTIONS = ("anthropic", "openai", "gemini", "elevenlabs", "azure", "cartesia")
+
     @app.route("/api/setup/keys", methods=["POST"])
     def save_keys():
-        """Save whichever keys were supplied. Anthropic is required to finish; ElevenLabs is
-        optional (absent ⇒ text-only). Empty strings are ignored, not written, so a blank
-        ElevenLabs box doesn't clobber an existing key."""
+        """Persist the wizard's provider choices and whichever keys/fields were supplied (issue #87).
+        The user picks ANY supported LLM + TTS combo — not Anthropic-only — so this writes:
+          * `llm_provider` / `tts_provider` selection to overrides,
+          * each supplied per-section key (blank strings ignored, so a blank box never clobbers), and
+          * the optional non-key provider fields the chosen LLM needs (OpenAI base_url + model,
+            Gemini model, Ollama host + model).
+        Whether that's ENOUGH to finish is decided provider-aware by `is_configured`, not here."""
         b = request.get_json(force=True) or {}
-        anth = str(b.get("anthropic") or "").strip()
-        elk = str(b.get("elevenlabs") or "").strip()
+
+        # 1) provider selection (validated against the schema vocabularies).
+        llm = str(b.get("llm_provider") or "").strip().lower()
+        tts = str(b.get("tts_provider") or "").strip().lower()
         try:
-            if anth:
-                firstrun.save_anthropic_key(cfg, anth)
-            if elk:
-                firstrun.save_elevenlabs_key(cfg, elk)
+            if llm and llm in schema.LLM_PROVIDERS:
+                firstrun.apply_override(cfg, {"llm": {"provider": llm}})
+            if tts and tts in schema.TTS_PROVIDERS:
+                firstrun.apply_override(cfg, {"tts": {"provider": tts}})
+
+            # 2) keys — only non-blank values, keyed by config section.
+            keys = b.get("keys") or {}
+            for section in _KEY_SECTIONS:
+                val = str(keys.get(section) or "").strip()
+                if val:
+                    firstrun.save_key(cfg, section, val)
+
+            # 3) optional non-key provider fields (persist only what's supplied).
+            for field, path in (
+                ("openai_base_url", ("openai", "base_url")),
+                ("openai_model", ("openai", "model")),
+                ("gemini_model", ("gemini", "model")),
+                ("ollama_host", ("ollama", "host")),
+                ("ollama_model", ("ollama", "model")),
+            ):
+                v = str(b.get(field) or "").strip()
+                if v:
+                    firstrun.apply_override(cfg, {path[0]: {path[1]: v}})
         except Exception as e:  # noqa: BLE001 — surface a write failure to the wizard
             return jsonify({"ok": False, "error": str(e)}), 500
         return jsonify({"ok": True, "status": firstrun.configured_status(cfg)})
@@ -120,21 +150,54 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
 
     @app.route("/api/setup/voice", methods=["POST"])
     def voice():
-        """Resolve and store the default TTS voice. Needs the ElevenLabs key already saved;
-        with no key this step is simply skipped (text-only) and reports so. Picks "George" by
-        name, else the first valid voice."""
-        if not firstrun.elevenlabs_key_available(cfg):
-            return jsonify({"ok": True, "skipped": True, "reason": "no ElevenLabs key (text-only)"})
-        try:
-            voices = el.list_voices(cfg)
-        except Exception as e:  # noqa: BLE001 — bad key / offline: let the wizard show it
-            return jsonify({"ok": False, "error": str(e)}), 502
-        chosen = firstrun.resolve_default_voice(voices)
-        if chosen is None:
-            return jsonify({"ok": False, "error": "your ElevenLabs account has no voices"}), 502
-        firstrun.apply_override(cfg, {"elevenlabs": {
-            "voice_id": chosen["voice_id"], "voice_name": chosen["name"]}})
-        return jsonify({"ok": True, "voice": chosen})
+        """Set the default voice for the CHOSEN TTS provider (issue #87 — no longer ElevenLabs-only):
+          * edge / piper  — FREE, no key, no fetch: persist the supplied voice/model field (or keep
+            the config default) and report the active voice — a keyless install still gets a voice.
+          * elevenlabs    — the original flow: needs the key, resolves "George" (else the first
+            voice); with no key it's skipped (text-only), reported so.
+          * azure / openai / cartesia — persist the supplied voice field (+ region/model); the key
+            these need to actually speak is collected on the keys step.
+        Every branch is fail-soft and reports what it did so the wizard can badge it."""
+        b = request.get_json(force=True, silent=True) or {}   # empty body is fine (voice is optional)
+        provider = str(cfg.get("tts", {}).get("provider", "edge")).lower()
+
+        if provider in ("edge", "piper"):
+            field = "voice" if provider == "edge" else "model"
+            supplied = str(b.get(field) or "").strip()
+            if supplied:
+                firstrun.apply_override(cfg, {provider: {field: supplied}})
+            current = str((cfg.get(provider, {}) or {}).get(field) or "")
+            return jsonify({"ok": True, "provider": provider,
+                            "voice": {"name": current or "(default)"}})
+
+        if provider == "elevenlabs":
+            if not firstrun.elevenlabs_key_available(cfg):
+                return jsonify({"ok": True, "skipped": True,
+                                "reason": "no ElevenLabs key (text-only)"})
+            try:
+                voices = el.list_voices(cfg)
+            except Exception as e:  # noqa: BLE001 — bad key / offline: let the wizard show it
+                return jsonify({"ok": False, "error": str(e)}), 502
+            chosen = firstrun.resolve_default_voice(voices)
+            if chosen is None:
+                return jsonify({"ok": False, "error": "your ElevenLabs account has no voices"}), 502
+            firstrun.apply_override(cfg, {"elevenlabs": {
+                "voice_id": chosen["voice_id"], "voice_name": chosen["name"]}})
+            return jsonify({"ok": True, "provider": provider, "voice": chosen})
+
+        # azure / openai (TTS) / cartesia: persist the voice field the user typed/picked. The config
+        # section for OpenAI TTS is [openai_tts]; the others match the provider name.
+        section = "openai_tts" if provider == "openai" else provider
+        supplied = str(b.get("voice") or "").strip()
+        if supplied:
+            firstrun.apply_override(cfg, {section: {"voice": supplied}})
+        if provider == "azure":
+            region = str(b.get("region") or "").strip()
+            if region:
+                firstrun.apply_override(cfg, {"azure": {"region": region}})
+        current = str((cfg.get(section, {}) or {}).get("voice") or "")
+        return jsonify({"ok": True, "provider": provider,
+                        "voice": {"name": current or "(default)"}})
 
     @app.route("/api/setup/finish", methods=["POST"])
     def finish():
@@ -142,8 +205,16 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
         wizard can't hand a half-configured app to the panel. Sets the done event the server
         loop waits on."""
         if not firstrun.is_configured(cfg):
-            return jsonify({"ok": False, "status": firstrun.configured_status(cfg),
-                            "error": "not finished: need the Anthropic key and the STT model"}), 400
+            st = firstrun.configured_status(cfg)
+            need = []
+            if not st["llm"]:
+                need.append(f"the {st['llm_provider']} LLM "
+                            + ("model (pull it in Ollama)" if st["llm_provider"] == "ollama"
+                               else "key"))
+            if not st["stt"]:
+                need.append("the speech-to-text model")
+            return jsonify({"ok": False, "status": st,
+                            "error": "not finished: need " + " and ".join(need or ["setup"])}), 400
         done.set()
         return jsonify({"ok": True})
 

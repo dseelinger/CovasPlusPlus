@@ -232,6 +232,61 @@ def elevenlabs_key_available(cfg: dict) -> bool:
     return key_available(cfg, "elevenlabs")
 
 
+# ---- provider-aware readiness (issue #87) --------------------------------------------
+# The wizard is no longer Anthropic-only: any supported LLM + TTS combo can finish setup. "Ready"
+# is per-provider — a cloud LLM needs its key, Ollama needs a reachable model, and a voice is free
+# on Edge/Piper (no key) but key-gated on the cloud voices. These reuse the per-provider key helpers
+# above so there's ONE source of truth for "is this provider usable".
+
+def ollama_available(cfg: dict) -> bool:
+    """Whether the configured Ollama model is actually pulled + reachable (its only "key"). Fail-soft:
+    an unreachable server / parse error is simply "not ready", never a crash (offline unit runs stub
+    the fetcher). Mirrors Ollama's real resolve rule via `_model_available`."""
+    try:
+        from .providers.ollama_llm import _model_available, list_ollama_models
+        oll = cfg.get("ollama", {}) or {}
+        host = str(oll.get("host") or "http://localhost:11434")
+        model = str(oll.get("model") or "")
+        if not model:
+            return False
+        return _model_available(model, list_ollama_models(host))
+    except Exception:  # noqa: BLE001 — offline / unreachable / bad payload => not ready
+        return False
+
+
+def llm_ready(cfg: dict) -> bool:
+    """Whether the ACTIVE [llm].provider has what it needs to answer: a usable key for a cloud
+    provider (Anthropic/OpenAI-compatible/Gemini), or a reachable pulled model for local Ollama.
+    This — not "has an Anthropic key" — is what gates the wizard now (issue #87)."""
+    provider = str(cfg.get("llm", {}).get("provider", "anthropic")).lower()
+    if provider == "openai":
+        return bool(openai_key(cfg))
+    if provider == "gemini":
+        return bool(gemini_key(cfg))
+    if provider == "ollama":
+        return ollama_available(cfg)
+    # anthropic (and any unknown value) → the Anthropic key.
+    return anthropic_key_available(cfg)
+
+
+def tts_ready(cfg: dict) -> bool:
+    """Whether the ACTIVE [tts].provider can produce a voice. Edge and Piper are FREE and need no
+    key, so a keyless install still gets a voice (not dropped to text-only); the cloud voices are
+    key-gated. This is the wizard's "has a voice" check — surfaced, not a hard gate (issue #87)."""
+    provider = str(cfg.get("tts", {}).get("provider", "edge")).lower()
+    if provider in ("edge", "piper"):
+        return True                       # local/free — no key required
+    if provider == "elevenlabs":
+        return elevenlabs_key_available(cfg)
+    if provider == "azure":
+        return bool(azure_key(cfg))
+    if provider == "openai":
+        return bool(openai_key(cfg))
+    if provider == "cartesia":
+        return bool(cartesia_key(cfg))
+    return True
+
+
 def text_only_mode(cfg: dict, *, mock: bool = False, tts_injected: bool = False) -> bool:
     """Whether the app should run TEXT-ONLY: ElevenLabs is the selected TTS but no key is
     available. This is a first-class supported mode (INSTALLER_DESIGN decision #2 — Piper isn't
@@ -318,20 +373,32 @@ def resolve_default_voice(voices: list[dict], preferred: str = "George") -> dict
 # ---- The gate ------------------------------------------------------------------------
 
 def is_configured(cfg: dict) -> bool:
-    """Can the app start its real voice loop? Needs the Anthropic key (the LLM is the core) and
-    the STT weights (voice input). ElevenLabs is OPTIONAL — without it the app runs text-only —
-    so it does NOT gate; a mic isn't gated either (the default device works)."""
-    return anthropic_key_available(cfg) and stt_model_available(cfg)
+    """Can the app start its real voice loop? Needs the ACTIVE LLM provider ready (a usable key for
+    a cloud LLM, or a reachable model for Ollama — issue #87, no longer Anthropic-specific) and the
+    STT weights (voice input). The VOICE is OPTIONAL — Edge/Piper give one for free, a keyless cloud
+    voice degrades to text-only — so it does NOT gate; a mic isn't gated either (default works)."""
+    return llm_ready(cfg) and stt_model_available(cfg)
+
+
+# The provider sections whose set/not-set key flag the wizard surfaces (so it can badge the active
+# LLM/TTS provider's key without per-provider branching in the template).
+_WIZARD_KEY_SECTIONS = ("anthropic", "openai", "gemini", "elevenlabs", "azure", "cartesia")
 
 
 def configured_status(cfg: dict) -> dict:
-    """Per-requirement view for the wizard's progress display. `configured` mirrors
-    `is_configured`; `elevenlabs` is surfaced so the wizard can show the text-only consequence
-    without blocking on it."""
-    a = anthropic_key_available(cfg)
-    e = elevenlabs_key_available(cfg)
-    s = stt_model_available(cfg)
-    return {"anthropic": a, "elevenlabs": e, "stt": s, "configured": a and s}
+    """Per-requirement view for the wizard's progress display, provider-aware (issue #87).
+    `configured` mirrors `is_configured` (active LLM ready + STT); `voice` is surfaced so the wizard
+    can show the text-only consequence without blocking on it; `keys` carries the set/not-set flag
+    per managed provider section so the UI can badge whichever provider the user picked."""
+    return {
+        "llm_provider": str(cfg.get("llm", {}).get("provider", "anthropic")).lower(),
+        "tts_provider": str(cfg.get("tts", {}).get("provider", "edge")).lower(),
+        "llm": llm_ready(cfg),
+        "voice": tts_ready(cfg),
+        "stt": stt_model_available(cfg),
+        "configured": is_configured(cfg),
+        "keys": {sec: key_available(cfg, sec) for sec in _WIZARD_KEY_SECTIONS},
+    }
 
 
 # ---- Override writes (used by the wizard) --------------------------------------------
