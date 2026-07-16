@@ -225,6 +225,22 @@ SCHEMA: list[Setting] = [
             example="set thinking to high"),
 
     # --- Text-to-speech ----------------------------------------------------
+    # ONE normalized, provider-agnostic voice speed (issue #99): 1.0 = normal, <1.0 slower, >1.0
+    # faster. Each TTS adapter maps this single value into its OWN native mechanism (ElevenLabs
+    # voice_settings.speed, Edge/Azure SSML rate, OpenAI speed, Cartesia speed, Piper length_scale)
+    # and clamps to that backend's real limits — so a stored value a provider can't reach is capped,
+    # never errored, and a provider switch can't carry an out-of-range value across. This is the
+    # quick-config "Voice speed" control (web.py maps the friendly `speed` key here).
+    Setting("tts.speed", ("tts", "speed"), "float",
+            "Voice speed", "Text-to-speech",
+            "How fast COVAS speaks, as a normalized multiplier — 1.0 = the voice's normal pace, "
+            "below 1.0 slower, above 1.0 faster. Applies to whichever TTS provider is active; each "
+            "maps it into its own speed control and clamps to that voice's real range (ElevenLabs "
+            "0.7–1.2; Edge/Azure/OpenAI/Cartesia/Piper go wider), so a value a provider can't reach "
+            "is safely capped rather than erroring the request.",
+            default=1.0, min=0.5, max=2.0, unit="×",
+            phrasings=("voice speed", "speaking speed", "talk speed"),
+            example="set the voice speed to 1.5"),
     Setting("elevenlabs.model", ("elevenlabs", "model"), "enum",
             "ElevenLabs model", "Text-to-speech",
             "TTS model. flash is the low-latency default.",
@@ -240,12 +256,6 @@ SCHEMA: list[Setting] = [
             "ElevenLabs voice name", "Text-to-speech",
             "Display name paired with the selected voice id.",
             default="Sarah", hidden=True),
-    Setting("elevenlabs.speed", ("elevenlabs", "speed"), "float",
-            "Voice speed", "Text-to-speech",
-            "How fast COVAS speaks (ElevenLabs native speed). 1.0 = normal.",
-            default=1.0, min=1.0, max=1.2, unit="×",
-            phrasings=("voice speed", "speaking speed", "talk speed"),
-            example="set the voice speed to 1.1"),
     Setting("elevenlabs.output_format", ("elevenlabs", "output_format"), "enum",
             "Audio format", "Text-to-speech",
             "pcm_16000 = low-latency, cancellable. Change only if you know why.",

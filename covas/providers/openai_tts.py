@@ -92,11 +92,18 @@ class OpenAITTS:
             self._play_direct(pcm, _SAMPLE_RATE, cancel)
 
     def _body(self, text: str, voice: str) -> dict:
-        """The `audio/speech` request body. `instructions` is included only when set (older models
-        ignore it; omitting keeps the request minimal for maximum endpoint compatibility)."""
+        """The `audio/speech` request body. `instructions` and `speed` are included only when set /
+        non-default (older models ignore instructions; omitting `speed` at 1.0 keeps the request
+        minimal for maximum endpoint compatibility)."""
         body = {"model": self._model, "voice": voice, "input": text, "response_format": "pcm"}
         if self._instructions:
             body["instructions"] = self._instructions
+        from .. import tts_speed
+        n = tts_speed.normalized_speed(self._cfg)
+        if not tts_speed.is_default(n):
+            # OpenAI `speed` is a 1.0=normal multiplier (0.25–4.0); the normalized #99 value maps
+            # straight in, clamped to that native range.
+            body["speed"] = tts_speed.openai_speed(n)
         return body
 
     # ---- playback ---------------------------------------------------------

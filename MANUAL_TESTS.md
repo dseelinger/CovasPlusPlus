@@ -925,7 +925,7 @@ Notes:
 - [ ] **Filter box (issue #7):** type 3+ chars → the list narrows to settings whose **section, title, or description** contains the text (case-insensitive); sections with no matches hide entirely. Typing **1–2 chars** filters nothing (everything stays shown); **clearing** the box restores the full list. Verify a **section-name-only** match (e.g. type a group name that isn't in any title/help) still surfaces that section's settings.
 - [ ] **Change + save:** change a value → the **save bar** appears with a count; **SAVE CHANGES** → 📋 written to `overrides.json` (config.toml stays pristine).
 - [ ] **Per-setting reset:** a changed (overridden) setting shows **RESET** → click it → reverts to default and drops from `overrides.json`.
-- [ ] **Validation:** try an out-of-range number (e.g. voice speed 2.0) → rejected client-side / server-side, not written.
+- [ ] **Validation:** try an out-of-range number (e.g. voice speed 3.0, above the 2.0 max) → rejected client-side / server-side, not written.
 - [ ] **Live where supported:** change the **Whisper model** → the log notes the model reloaded (no restart). (Capability enables apply on restart.)
 
 ### 14.3 Personality tab (N7)
@@ -942,8 +942,15 @@ Notes:
 - [ ] **Accuracy guard:** confirm the added flavor never invents a station, price, or system value — numbers/names still come only from real data.
 - [ ] **Per-persona spot check:** cycle a few distinct personas (e.g. Stoic Zen = terse; Sassy Diva/Noir = a beat more room) and confirm each *reads* as its character on the same question.
 
-### 14.4 Voice speed (N7)
-- [ ] Nudge the **Voice speed** slider (1.0–1.2×) and ask something → the reply is spoken **faster**; the value can't exceed 1.2 (clamped).
+### 14.4 Voice speed — normalized, per-provider (N7 / issue #99)
+The **Voice speed** control is now ONE normalized value (`[tts].speed`, 0.5–2.0×, 1.0 = normal) that
+applies to *whichever* TTS provider is active; each provider maps + clamps it to its own real range.
+- [ ] **Faster on the default (Edge):** with `tts.provider = edge`, set the voice speed **above 1.2** (e.g. *"set the voice speed to 1.6"* or the slider) and ask something → the reply is audibly **faster than 1.2×** (proving it's no longer clipped at the old ElevenLabs cap).
+- [ ] **ElevenLabs slow-down below 1.0:** switch `tts.provider = elevenlabs`, set the voice speed to **0.8** → the reply is spoken **slower** than normal (the old 1.0 floor is gone; ElevenLabs clamps to its 0.7 floor at extreme values).
+- [ ] **Piper faster is actually faster:** with `tts.provider = piper` (a local `.onnx` voice set), set the speed to **1.5** → the reply is **faster**, not slower (guards the `length_scale` inversion — a sign error would make "faster" slow it down). Set it to **0.7** → **slower**.
+- [ ] **Voice command respects range:** say *"set the voice speed to 1.5"* → applied and confirmed. Say *"set the voice speed to 5"* → **rejected** with the valid range (0.5–2.0), not written.
+- [ ] **Provider switch carries no bad value:** set a slow speed (e.g. 0.6) on one provider, then switch providers → the new provider speaks at its own capped version of 0.6, never an API error.
+- [ ] **Live apply:** change the speed mid-session (no restart) → the **next** reply reflects the new speed.
 
 ### 14.5 Log filter (N7)
 - [ ] The Live Log has a **Conversation / All** toggle. **Conversation** (default) shows only your utterances and COVAS replies; **All** shows status/thinking/search/usage/system lines too.

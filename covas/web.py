@@ -83,7 +83,8 @@ _LEGACY_MAP = {
     "el_voice": "elevenlabs.voice_id",
     "el_voice_name": "elevenlabs.voice_name",
     "whisper": "whisper.model",
-    "speed": "elevenlabs.speed",
+    # Voice speed is the ONE normalized, provider-agnostic control now (issue #99), not per-provider.
+    "speed": "tts.speed",
 }
 
 _EL_SOURCES = (schema.OPT_EL_MODELS, schema.OPT_EL_VOICES)

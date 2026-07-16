@@ -17,6 +17,7 @@ import keyboard
 
 from .config import load_config, load_overrides, save_overrides, deep_merge, mock_enabled
 from . import settings_schema as schema
+from . import tts_speed
 from .audio import CuePlayer, Recorder
 from .listen import VadListener
 from .wake import WakeWordGate
@@ -1964,7 +1965,9 @@ class App:
             "el_model": c["elevenlabs"]["model"],
             "el_voice": c["elevenlabs"]["voice_id"],
             "el_voice_name": c["elevenlabs"].get("voice_name", ""),
-            "speed": c["elevenlabs"].get("speed", 1.0),
+            # Normalized, provider-agnostic voice speed (issue #99); legacy [elevenlabs].speed is a
+            # back-compat fallback for an older config.
+            "speed": tts_speed.normalized_speed(c),
             "whisper": c["whisper"]["model"],
         }
 

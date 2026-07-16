@@ -63,9 +63,24 @@ no key, no per-word cost. Prefer the **premium ElevenLabs** cloud voice instead?
 
 - **Which voice** speaks — pick from your ElevenLabs library (Settings → Text-to-speech, or by
   voice: *"use the George voice"*).
-- **Speaking speed** — a slider from **1.0× to 1.2×** (ElevenLabs' supported range; values are
-  clamped so you can't push it out of range). Nudge it on the Settings page or say
-  *"set the voice speed to 1.1."*
+
+**Speaking speed** is **one normalized control** (`[tts].speed`) that applies to *whichever* TTS
+provider is active — `1.0` = the voice's normal pace, below `1.0` slower, above `1.0` faster (range
+**0.5×–2.0×**). COVAS maps that single value into each provider's own speed mechanism and clamps it
+to what that voice can actually do, so you can't push any provider out of its safe range:
+
+| Provider | Real speed range | How it's applied |
+|----------|------------------|------------------|
+| ElevenLabs | **0.7×–1.2×** | native `voice_settings.speed` (quality-safe band — you can now slow *below* normal) |
+| OpenAI | **0.25×–4.0×** | native `speed` parameter |
+| Edge | wide (±%) | SSML/`rate` percentage (e.g. `+50%`, `-20%`) |
+| Azure | wide (±%) | SSML `<prosody rate="…">` |
+| Cartesia | wide | its `[-1, 1]` speed control |
+| Piper | wide | `length_scale` (inverse — larger = slower) |
+
+Nudge it on the Settings page or say *"set the voice speed to 1.5."* A value beyond a provider's
+range is safely capped, and because only the normalized value is stored, switching providers never
+carries an out-of-range speed across.
 
 Prefer a **free, fully-local voice** with no external service at all? Switch `[tts].provider` to
 **Piper**. Piper runs on your CPU alongside the game at no cost — the voice is good, if not quite as
@@ -136,7 +151,7 @@ neutral — no in-character address or campaign context. Turn it back on the sam
 |---------|--------------|
 | `personality.enabled` | Whether the in-character system prompt is used at all |
 | `elevenlabs.voice_id` | Which ElevenLabs voice speaks |
-| `elevenlabs.speed` | Speaking speed, 1.0–1.2× |
+| `tts.speed` | One normalized voice speed (0.5–2.0×, 1.0 = normal) for the active provider; each maps + clamps it to its own range (ElevenLabs 0.7–1.2, OpenAI 0.25–4.0, Edge/Azure/Cartesia/Piper wider) |
 | `tts.provider` | `edge` (free neural, default), `azure` (free-tier neural + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud), or `piper` (local, free) |
 | `edge.voice` | Edge voice ShortName when `tts.provider = edge` (e.g. `en-US-AriaNeural`) |
 | `azure.region` / `azure.voice` / `azure.style` | Azure region, voice ShortName, and optional SSML style when `tts.provider = azure` |

@@ -5,6 +5,8 @@ import threading
 import requests
 import sounddevice as sd
 
+from . import tts_speed
+
 
 def _api_key(cfg: dict) -> str:
     """The ElevenLabs key, via firstrun so it's DPAPI-aware (decrypts / migrates plaintext) rather
@@ -13,21 +15,17 @@ def _api_key(cfg: dict) -> str:
     return elevenlabs_key(cfg) or ""
 
 
-# ElevenLabs voice `speed` accepts 0.7–1.2; we expose only the faster half (a slower COVAS
-# reads oddly). Clamp hard so a bad config can never send an out-of-range value.
-_SPEED_MIN, _SPEED_MAX = 1.0, 1.2
-
-
 def _speed(cfg: dict) -> float:
-    try:
-        return max(_SPEED_MIN, min(_SPEED_MAX, float(cfg["elevenlabs"].get("speed", 1.0))))
-    except (TypeError, ValueError):
-        return 1.0
+    """The ElevenLabs native `voice_settings.speed` for this config: the ONE normalized
+    `[tts].speed` (issue #99) mapped into ElevenLabs' quality-safe 0.7–1.2 band. Widens the old
+    1.0–1.2 cap so COVAS can now slow BELOW normal; a bad/out-of-range stored value is capped, never
+    sent raw."""
+    return tts_speed.elevenlabs_speed(tts_speed.normalized_speed(cfg))
 
 
 def build_tts_body(cfg: dict, text: str) -> dict:
     """The ElevenLabs request body. `voice_settings.speed` is added ONLY when it differs from
-    the default 1.0, so the default request is byte-for-byte what it was before N7 (no risk of
+    the default 1.0, so the default request is byte-for-byte what it was before (no risk of
     resetting the voice's other settings)."""
     body: dict = {"text": text, "model_id": cfg["elevenlabs"]["model"]}
     speed = _speed(cfg)

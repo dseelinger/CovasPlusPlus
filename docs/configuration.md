@@ -155,9 +155,9 @@ See [Interactive crew](using/crew.md).
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `tts.provider` | `edge` | Which voice speaks: `edge` (free neural, no key/SLA — falls back to Piper; the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud, OpenAI-compatible), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
+| `tts.speed` | `1.0` | **One normalized voice speed** for whichever provider is active: `1.0` = normal, below `1.0` slower, above `1.0` faster (range `0.5`–`2.0`). Each provider maps it into its own native control and clamps to that voice's real range — so a value a provider can't reach is safely capped, never sent raw to error the API, and switching providers can't carry an out-of-range value across. Per-provider ranges: **ElevenLabs 0.7–1.2** (quality-safe band; you can now slow *below* normal), **OpenAI 0.25–4.0**, **Edge/Azure** ±percent rate (wide), **Cartesia** its `[-1,1]` speed axis, **Piper** `length_scale` (inverse). Only sent when ≠ `1.0`, so the default request is unchanged |
 | `elevenlabs.model` | `eleven_flash_v2_5` | ElevenLabs TTS model (flash = low latency) |
 | `elevenlabs.voice_id` | *(Sarah)* | Which ElevenLabs voice speaks |
-| `elevenlabs.speed` | `1.0` | Speaking speed, clamped to `1.0`–`1.2` |
 | `elevenlabs.output_format` | `pcm_16000` | Audio format (low-latency, cancellable — change only if you know why) |
 | `piper.model` | *(blank)* | Path to a local Piper `.onnx` voice (for `tts.provider = "piper"`) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName for `tts.provider = "edge"` (list: `python -m edge_tts --list-voices`) |

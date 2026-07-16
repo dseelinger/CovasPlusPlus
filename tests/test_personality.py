@@ -184,12 +184,19 @@ def test_speed_included_when_raised():
 
 def test_speed_clamped_to_range():
     assert build_tts_body({"elevenlabs": {"model": "m", "speed": 5.0}}, "x")["voice_settings"] == {"speed": 1.2}
-    # below 1.0 clamps to 1.0 -> omitted (default request unchanged)
-    assert "voice_settings" not in build_tts_body({"elevenlabs": {"model": "m", "speed": 0.5}}, "x")
+    # below 1.0 now SLOWS DOWN (issue #99 widened the ElevenLabs clamp to 0.7–1.2); a normalized
+    # 0.5 caps at the 0.7 floor and IS sent.
+    assert build_tts_body({"elevenlabs": {"model": "m", "speed": 0.5}}, "x")["voice_settings"] == {"speed": 0.7}
 
 
 def test_speed_bad_value_defaults():
     assert "voice_settings" not in build_tts_body({"elevenlabs": {"model": "m", "speed": "fast"}}, "x")
+
+
+def test_speed_prefers_normalized_tts_speed_over_legacy_elevenlabs():
+    # The canonical normalized [tts].speed wins; legacy [elevenlabs].speed is only a fallback.
+    b = build_tts_body({"tts": {"speed": 0.8}, "elevenlabs": {"model": "m", "speed": 1.15}}, "x")
+    assert b["voice_settings"] == {"speed": 0.8}
 
 
 # --- web endpoints ---------------------------------------------------------

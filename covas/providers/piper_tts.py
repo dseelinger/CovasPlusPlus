@@ -23,6 +23,7 @@ class PiperTTS:
         # Import lazily so the cloud stack doesn't need piper installed.
         from piper import PiperVoice
 
+        self._cfg = cfg
         self._mixer = mixer
         self._bus = bus
         p = cfg.get("piper", {})
@@ -38,12 +39,32 @@ class PiperTTS:
         # config_path defaults to '<model>.json' beside the .onnx.
         self.voice = PiperVoice.load(model)
         self.sample_rate = int(getattr(self.voice.config, "sample_rate", 22050))
+        # The voice's own default length_scale (usually 1.0) — we scale it by 1/speed (#99) so a
+        # normal speed leaves the voice exactly as configured.
+        self._base_length_scale = float(getattr(self.voice.config, "length_scale", 1.0) or 1.0)
         self._out_device = cfg.get("audio", {}).get("tts_output_device") or None
+
+    def _synth(self, text):  # noqa: ANN001, ANN202
+        """Synthesize `text`, applying the normalized voice speed (#99) via Piper's `length_scale`
+        (the INVERSE of speed — larger = slower). At normal speed we call `synthesize(text)`
+        untouched, so the default path is byte-for-byte unchanged. Read per-call so a live speed
+        change applies to the next line. Fails soft to the plain call if this Piper build lacks
+        `SynthesisConfig`."""
+        from .. import tts_speed
+        n = tts_speed.normalized_speed(self._cfg)
+        if tts_speed.is_default(n):
+            return self.voice.synthesize(text)
+        try:
+            from piper import SynthesisConfig
+            length_scale = tts_speed.piper_length_scale(n, self._base_length_scale)
+            return self.voice.synthesize(text, syn_config=SynthesisConfig(length_scale=length_scale))
+        except (ImportError, TypeError):  # older piper w/o SynthesisConfig / syn_config kwarg
+            return self.voice.synthesize(text)
 
     def synth_pcm(self, text: str, voice_id: str | None = None) -> tuple[bytes, int]:
         # Piper loads a single voice model; `voice_id` (a cloud concept) is ignored here.
         buf = bytearray()
-        for chunk in self.voice.synthesize(text):
+        for chunk in self._synth(text):
             buf += chunk.audio_int16_bytes
         return bytes(buf), self.sample_rate
 
@@ -61,7 +82,7 @@ class PiperTTS:
         stream.start()
         cancelled = False
         try:
-            for chunk in self.voice.synthesize(text):
+            for chunk in self._synth(text):
                 if cancel.is_set():
                     cancelled = True
                     break
@@ -79,7 +100,7 @@ class PiperTTS:
         sink = self._mixer.open_speech(self._bus, self.sample_rate)
         cancelled = False
         try:
-            for chunk in self.voice.synthesize(text):
+            for chunk in self._synth(text):
                 if cancel.is_set():
                     cancelled = True
                     break

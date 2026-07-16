@@ -60,10 +60,17 @@ class CartesiaTTS:
 
     def _body(self, text: str, voice_id: str | None = None) -> dict:
         voice = (voice_id or "").strip() or self._voice
+        voice_obj: dict = {"mode": "id", "id": voice}
+        from .. import tts_speed
+        n = tts_speed.normalized_speed(self._cfg)
+        if not tts_speed.is_default(n):
+            # Cartesia's speed lives on a [-1,1] axis (0=normal) under __experimental_controls; the
+            # normalized #99 value maps piecewise into it. Only sent when non-default (experimental).
+            voice_obj["__experimental_controls"] = {"speed": tts_speed.cartesia_speed(n)}
         return {
             "model_id": self._model,
             "transcript": text,
-            "voice": {"mode": "id", "id": voice},
+            "voice": voice_obj,
             "output_format": {"container": "raw", "encoding": "pcm_s16le",
                               "sample_rate": _SAMPLE_RATE},
             "language": self._language,
