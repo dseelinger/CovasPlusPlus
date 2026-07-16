@@ -22,10 +22,10 @@ def _llm(monkeypatch=None, *, key="test-key", web_search=False, **cfg):
     if monkeypatch is not None and key is not None:
         monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: key)
     return gem.GeminiLLM({
-        "gemini": {"model": "gemini-3.1-flash-lite", **cfg},
+        "gemini": {"model": "gemini-flash-lite-latest", **cfg},
         "web_search": {"enabled": web_search},
         "personality": {"enabled": False},
-        "pricing": {"gemini-3.1-flash-lite": {"input": 0.25, "output": 1.50}},
+        "pricing": {"gemini-flash-lite-latest": {"input": 0.10, "output": 0.40}},
     })
 
 
@@ -227,7 +227,7 @@ def test_stream_generate_parses_sse_and_uses_header(monkeypatch):
         return _Resp()
 
     monkeypatch.setattr(gem.requests, "post", fake_post)
-    chunks = list(gem._stream_generate("http://x/v1beta", "gemini-3.1-flash-lite", "SECRET", {},
+    chunks = list(gem._stream_generate("http://x/v1beta", "gemini-flash-lite-latest", "SECRET", {},
                                        threading.Event()))
     assert len(chunks) == 2
     assert ":streamGenerateContent?alt=sse" in captured["url"]
@@ -248,6 +248,75 @@ def test_stream_generate_raises_on_non_200(monkeypatch):
         list(gem._stream_generate("http://x/v1beta", "m", "k", {}, threading.Event()))
 
 
+def test_stream_generate_404_message_names_model_and_config(monkeypatch):
+    # A bad/stale model id (issue #91) must surface a clear, actionable message, not a raw 404.
+    class _Resp:
+        status_code = 404
+        text = '{"error":{"message":"model: gemini-3.1-flash-lite"}}'
+        headers: dict = {}
+        def close(self): pass
+
+    monkeypatch.setattr(gem.requests, "post", lambda *a, **k: _Resp())
+    with pytest.raises(RuntimeError) as ei:
+        list(gem._stream_generate("http://x/v1beta", "gemini-bogus", "k", {}, threading.Event()))
+    msg = str(ei.value)
+    assert "gemini-bogus" in msg and "[gemini].model" in msg and "/models" in msg
+
+
+# ---- model-list parsing + fail-soft guard (issue #91) ----------------------
+def test_parse_models_list_strips_prefix_and_dedupes():
+    payload = {"models": [
+        {"name": "models/gemini-2.5-flash-lite"},
+        {"name": "models/gemini-2.5-flash"},
+        {"name": "gemini-2.5-pro"},          # already bare
+        {"name": "models/gemini-2.5-flash"},  # duplicate
+        {"nope": "no name"},                  # skipped
+        "not-a-dict",                          # skipped
+    ]}
+    assert gem.parse_models_list(payload) == [
+        "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro"]
+    assert gem.parse_models_list({}) == []
+
+
+def test_list_gemini_models_uses_header_and_parses(monkeypatch):
+    captured = {}
+
+    class _Resp:
+        status_code = 200
+        def json(self): return {"models": [{"name": "models/gemini-2.5-flash"}]}
+        def close(self): pass
+
+    def fake_get(url, **k):
+        captured["url"] = url
+        captured["headers"] = k.get("headers")
+        return _Resp()
+
+    monkeypatch.setattr(gem.requests, "get", fake_get)
+    ids = gem.list_gemini_models("http://x/v1beta", "SECRET")
+    assert ids == ["gemini-2.5-flash"]
+    assert captured["url"].endswith("/models")
+    assert captured["headers"]["x-goog-api-key"] == "SECRET"   # key in header, not URL
+    assert "SECRET" not in captured["url"]
+
+
+def test_provider_list_models_is_failsoft(monkeypatch):
+    # A catalog fetch error (offline, bad key, non-200) must degrade to [] — never raise.
+    p = _llm(monkeypatch)
+
+    def boom(*a, **k):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(gem, "list_gemini_models", boom)
+    assert p.list_models() == []
+
+
+def test_provider_list_models_no_key_is_failsoft(monkeypatch):
+    monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: None)
+    p = gem.GeminiLLM({"gemini": {}, "web_search": {"enabled": False},
+                       "personality": {"enabled": False}})
+    assert p.list_models() == []   # no key -> [] not a raise
+
+
 # ---- opt-in integration (real Gemini API; needs a key) ---------------------
 @pytest.mark.integration
 @pytest.mark.paid
@@ -256,10 +325,36 @@ def test_live_gemini_replies():
     otherwise so the paid suite stays deliberate. Uses the cheap Flash model."""
     if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
         pytest.skip("set GEMINI_API_KEY to run the live Gemini test")
-    cfg = {"gemini": {"model": os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")},
+    cfg = {"gemini": {"model": os.environ.get("GEMINI_MODEL", "gemini-flash-lite-latest")},
            "web_search": {"enabled": False}, "personality": {"enabled": False}, "pricing": {}}
     p = gem.GeminiLLM(cfg)
     text = "".join(piece for kind, piece in p.stream_reply(
         [{"role": "user", "content": "Say 'docking granted' and nothing else."}],
         threading.Event(), lambda *a: None) if kind == "text")
     assert text.strip()
+
+
+@pytest.mark.integration
+@pytest.mark.paid
+def test_live_gemini_tier_ids_resolve():
+    """Guard against the #91 class of bug for ALIAS ids: the shipped [gemini.tiers] are `-latest`
+    aliases (gemini-flash-lite-latest / …) that resolve server-side and do NOT appear verbatim in the
+    concrete `GET /models` list — so a strict membership check would false-fail. Instead assert a real
+    turn SUCCEEDS on each configured tier id (+ the default model): that's the true "this id is
+    accepted / not a 404" check. Needs a key; paid (one short turn per unique id)."""
+    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not key:
+        pytest.skip("set GEMINI_API_KEY to run the live Gemini tier-alias guard")
+    from covas.config import load_config
+    cfg = load_config()
+    g = cfg.get("gemini", {}) or {}
+    ids = {str(g.get("model", "")).strip()}
+    ids |= {str(v).strip() for v in (g.get("tiers", {}) or {}).values()}
+    ids = {i for i in ids if i}
+    for mid in sorted(ids):
+        p = gem.GeminiLLM({"gemini": {"model": mid}, "web_search": {"enabled": False},
+                           "personality": {"enabled": False}, "pricing": {}})
+        text = "".join(piece for kind, piece in p.stream_reply(
+            [{"role": "user", "content": "Reply with the single word: ok."}],
+            threading.Event(), lambda *a: None) if kind == "text")
+        assert text.strip(), f"configured Gemini id {mid!r} produced no reply (stale/invalid?)"

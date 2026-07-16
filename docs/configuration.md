@@ -508,13 +508,34 @@ See [Companion HUD](using/hud.md). **Off by default.**
 | `llm.retry.max_total_wait` | `20.0` | **Hard cap** on cumulative backoff for one turn — keeps a struggling provider from ever making the app feel hung |
 | `llm.retry.jitter` | `0.25` | Add up to this fraction of the delay at random, so retries don't stampede a recovering server |
 | `openai.base_url` / `.model` | OpenAI / `gpt-4o-mini` | OpenAI-compatible `chat/completions` endpoint + the model used when `llm.provider = "openai"`; `[openai.tiers]` ships **unset**, so every router tier reuses `.model` (a bare model swap to Groq/DeepSeek/OpenRouter just works) unless you set distinct per-tier ids there |
-| `gemini.model` | `gemini-3.1-flash-lite` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash-Lite cheap, 3.5 Flash for depth) live in `[gemini.tiers]` |
+| `gemini.model` | `gemini-flash-lite-latest` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash-Lite cheap, Flash standard, Pro depth) live in `[gemini.tiers]`. Ships the **deprecation-proof `-latest` aliases** (`gemini-flash-lite-latest` / `gemini-flash-latest` / `gemini-pro-latest`) that always resolve to Google's current GA model per class — safer than a concrete id that gets retired (see the [changelog](https://ai.google.dev/gemini-api/docs/changelog)). You can still type a concrete id from the [live list](https://ai.google.dev/gemini-api/docs/models); `check_setup.py` warns if a **concrete** id isn't live (aliases are always accepted) |
+| `ollama.model` | `qwen3` | Local model when `llm.provider = "ollama"` (out-of-game only); pick from your locally-pulled models (`GET /api/tags`) or type a tag to `ollama pull` |
 | `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `azure.region` / `azure.voice` / `azure.style` | `eastus` / `en-US-AriaNeural` / *(blank)* | Azure Neural region, voice ShortName, and optional SSML style when `tts.provider = "azure"` |
 | `openai_tts.base_url` / `.model` / `.voice` / `.instructions` | OpenAI / `gpt-4o-mini-tts` / `alloy` / *(blank)* | OpenAI-compatible endpoint, model, voice, and optional tone steer when `tts.provider = "openai"` |
 | `cartesia.model` / `.voice` / `.language` | `sonic-2` / *(blank)* / `en` | Cartesia Sonic model, voice id, and language when `tts.provider = "cartesia"` (persona-only) |
 | `dev.mock` | `false` | Swap LLM/TTS/STT for fakes — exercise the loop with zero API calls (restart to apply) |
+
+> **Pick, don't type — fetched dropdowns (issue #92 / #88).** On the Settings page most model-id and
+> endpoint fields are **editable comboboxes**: a dropdown populated from the provider's *live* catalog
+> plus free-text for anything custom. `openai.model` / `openai_tts` follow `GET {base_url}/models` for
+> the active endpoint (OpenAI/Groq/DeepSeek/OpenRouter — the model list refetches when you change the
+> base URL); `gemini.model` uses Google's `GET /v1beta/models`; `ollama.model` uses `GET /api/tags`;
+> `edge.voice` / `azure.voice` / `cartesia.voice` fetch each provider's voice catalog (Edge needs no
+> key; Azure needs the key + region; Cartesia needs the key). The base-URL fields offer the four known
+> presets + a custom entry. A value **outside** the fetched list is still accepted — flagged *"custom
+> (unsupported)"*, never blocked — and the **current value is always kept**: offline, no key, or an
+> unreachable endpoint simply degrades the control to free-text with your existing value intact (never
+> an empty/blocking dropdown). `openai_tts.voice` / `openai_tts.model` / `cartesia.model` are small
+> fixed sets shown as strict dropdowns.
+>
+> **Command-palette search (issue #94).** For the long lists — 100+ ElevenLabs voices, hundreds of
+> OpenRouter model ids — a 🔍 button beside the picker opens a **search palette**: type to filter with
+> the match bolded, **↑/↓** to move, **Enter** to select, **Esc** to close (mouse click works too), with
+> each row's category/locale as secondary text. It's one shared component on both the control panel and
+> the Settings page, and it keeps the same fail-soft guarantee — your current pick is always shown and
+> reachable, and offline you can still type a value and press Enter.
 
 > **OpenAI-compatible LLM (`llm.provider = "openai"`).** One implementation covers **OpenAI, Groq,
 > DeepSeek, and OpenRouter** — only `[openai].base_url` and the model ids differ (see the presets in
@@ -528,7 +549,7 @@ See [Companion HUD](using/hud.md). **Off by default.**
 >
 > **Gemini LLM (`llm.provider = "gemini"`).** Google Gemini on the **native** API — strong **tool
 > calling** plus Google-Search **grounding** (surfaced like web search when `web_search.enabled` is on),
-> and a cheap/fast **Flash-Lite** default tier (**3.5 Flash** for depth) via `[gemini.tiers]`. Cloud,
+> and a cheap/fast **Flash-Lite** default tier (**Flash** standard, **Pro** for depth) via `[gemini.tiers]`. Cloud,
 > so in-game is fine. Needs a Gemini key (enter it on the Settings **API keys** card, stored in
 > `GeminiAPIKey.txt`) — a free key comes from [Google AI Studio](https://aistudio.google.com). Fail soft: a request error degrades the turn to
 > text. (Combining function calling + grounding needs a Gemini 2.x-or-newer model; older models may

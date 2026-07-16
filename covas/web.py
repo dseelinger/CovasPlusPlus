@@ -24,6 +24,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request
 from flask_sock import Sock
 
+from . import catalog
 from . import crew as crew_mod
 from . import elevenlabs as el
 from . import firstrun
@@ -87,10 +88,33 @@ _LEGACY_MAP = {
 
 _EL_SOURCES = (schema.OPT_EL_MODELS, schema.OPT_EL_VOICES)
 
+# Fetched-catalog sources the /api/catalog endpoint may resolve (issue #92 / #88). Only these are
+# accepted, so the endpoint can't be pointed at an arbitrary string.
+_CATALOG_SOURCES = frozenset({
+    schema.OPT_OPENAI_MODELS, schema.OPT_GEMINI_MODELS, schema.OPT_OLLAMA_MODELS,
+    schema.OPT_ANTHROPIC_MODELS_LIVE, schema.OPT_OPENAI_BASE_URLS,
+    schema.OPT_EDGE_VOICES, schema.OPT_AZURE_VOICES, schema.OPT_CARTESIA_VOICES,
+})
+# Short throttle so repeated dropdown opens don't hammer a provider (mirrors the ElevenLabs pattern).
+_CATALOG_TTL_S = 60.0
+
 
 def create_app(core) -> Flask:
     flask_app = Flask(__name__, template_folder="templates", static_folder="static")
     sock = Sock(flask_app)
+    _catalog_cache: dict = {}  # (source, base_url) -> (expires_at, options, error)
+
+    def _catalog_cached(source: str, base_url):
+        """Resolve a catalog source through `catalog.resolve`, throttled by _CATALOG_TTL_S so
+        reopening a dropdown doesn't re-hit the provider. Fail-soft: returns (options, error)."""
+        import time
+        ck = (source, base_url or "")
+        hit = _catalog_cache.get(ck)
+        if hit and hit[0] > time.monotonic():
+            return hit[1], hit[2]
+        opts, err = catalog.resolve(source, core.cfg, base_url=base_url)
+        _catalog_cache[ck] = (time.monotonic() + _CATALOG_TTL_S, opts, err)
+        return opts, err
 
     def _dynamic_options(keys) -> dict:
         """Resolve enum options that aren't statically known. Models come from
@@ -216,6 +240,20 @@ def create_app(core) -> Flask:
             })
         except Exception as e:  # noqa: BLE001
             return jsonify({"error": str(e)}), 502
+
+    @flask_app.route("/api/catalog")
+    def catalog_opts():
+        """Resolve ONE fetched-catalog options_source (issue #92 / #88) for the editable-combobox
+        dropdowns. `?source=@openai_models[&base_url=…]`. ALWAYS 200 + `{options, error}`: on failure
+        (offline / no key / unreachable) `options` is `[]` and `error` names why, so the page degrades
+        to free-text with the current value kept — never an empty blocking control. Results are cached
+        briefly (throttle) since these are network calls, some key-gated."""
+        source = (request.args.get("source") or "").strip()
+        base_url = (request.args.get("base_url") or "").strip() or None
+        if source not in _CATALOG_SOURCES:
+            return jsonify({"options": [], "error": f"unknown source {source!r}"}), 400
+        opts, err = _catalog_cached(source, base_url)
+        return jsonify({"options": opts or [], "error": err})
 
     def _key_flags() -> dict:
         """Set/not-set boolean per managed provider section — the ONLY key info the client sees."""

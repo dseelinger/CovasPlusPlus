@@ -240,24 +240,35 @@ Notes:
 
 ### 4.2 Gemini LLM provider (issue #13)  🔊 HW 🌍 NET 📋 FILE
 > Google Gemini on the **native** API — tool calling + Google-Search **grounding** + a cheap Flash
-> default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash-Lite/3.5 Flash). Needs a key in
+> default tier. A *cloud* LLM, tiered via `[gemini.tiers]` (Flash-Lite/Flash/Pro). Needs a key in
 > `GeminiAPIKey.txt` (DPAPI-encrypted; add it in Settings — env vars are no longer read, #22).
 > Restart after switching `[llm].provider`.
+>
+> **Model ids are deprecation-proof aliases (issue #91).** The shipped ids are the `-latest` aliases
+> (`gemini-flash-lite-latest` default, `gemini-flash-latest` standard, `gemini-pro-latest` premium),
+> which always resolve to Google's current GA model per class — pinning a concrete id kept breaking
+> (the guessed `gemini-3.1-flash-lite` 404'd; GA `gemini-2.5-*` is now "superseded"). You can still set
+> a concrete id from <https://ai.google.dev/gemini-api/docs/models>. `check_setup.py` warns only if a
+> **concrete** configured id isn't in the live list; `-latest` aliases are always accepted (they don't
+> appear verbatim in `GET /models`).
 >
 > **Recommended free provider.** Gemini's Flash **free** tier (~250K TPM / 1,500 requests-per-day)
 > comfortably fits COVAS's per-turn tool load — unlike Groq's free tier (§4.1) — so it's the
 > zero-cost path that actually works. Google trims free quotas without notice, so treat exact
 > numbers as best-effort.
+- [ ] **Model-id guard:** run `.venv\Scripts\python.exe check_setup.py` with `[llm].provider = "gemini"` and a
+  key set → the **Gemini API** section reports the live model count and confirms `[gemini].model` / tiers are
+  all in the live list (or WARNs which id is stale). No crash without a key.
 - [ ] **Conversation:** set `[llm].provider = "gemini"`, add your Gemini key in Settings, restart, speak a turn
-  → COVAS answers via Gemini; `[router]` line shows the Gemini model (e.g. `[cheap] gemini-3.1-flash-lite`)
-  and `[usage]` shows token counts.
+  → COVAS answers via Gemini (no 404 on the first word); `[router]` line shows the Gemini model
+  (e.g. `[cheap] gemini-flash-lite-latest`) and `[usage]` shows token counts.
 - [ ] **Tool calling works:** *"What's my next objective?"* / *"Mark fuel scooping complete."* → the
   checklist tool fires (log shows the tool call) and COVAS confirms.
 - [ ] **Search grounding:** with `[web_search].enabled = true`, ask something current
   (*"What's the latest on the Thargoid war?"*) → the log shows a **`Searching…`** side-channel line
   (grounding queries) and the answer reflects live info.
 - [ ] **Escalation tiers:** *"Think hard…"* → the router line shows `[standard]` with the
-  `[gemini.tiers].standard` (`gemini-3.5-flash`) model.
+  `[gemini.tiers].standard` (`gemini-flash-latest`) model.
 - [ ] **Fail-soft:** clear the key → the turn degrades to text and the loop returns to IDLE; restore →
   it works again. No crash.
 
@@ -838,16 +849,42 @@ Notes:
 ### 14.1 Live status & log
 - [ ] The status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, status/search lines (timestamped).
 
-### 14.1a Voice-list filter (issue #26)  🌐 PANEL 🌍 NET
-> Both voice dropdowns get a type-to-filter box: the **ElevenLabs voice** picker on the **main panel**
-> (below the dropdown) and the schema-driven **ElevenLabs voice** picker on the **Settings** page
-> (beside the dropdown). Needs an ElevenLabs key so the list actually populates.
+### 14.1a Voice-list filter (issue #26 / #100)  🌐 PANEL 🌍 NET
+> `requires:` **both voice dropdowns must be POPULATED via a valid ElevenLabs key** (set it on the
+> Settings *API keys* card and restart; `tts.provider` doesn't need to be elevenlabs, but the list only
+> loads with a key) — an empty list has nothing to filter and the test reads as "not implemented".
+> Verify in BOTH the browser (`run_covas_ui.py`) AND the packaged native window.
+>
+> **#100 resolution (do NOT re-mark NYI on an empty list):** the filter code IS wired on both surfaces —
+> `index.html` `#el_voice_filter` → `filterOptions(#el_voice)` and `settings.html` `voiceFilter(sel)` on
+> the `@elevenlabs_voices` picker. The earlier `panel-voice-list-filter` NYI failure was a **populate
+> artifact** (the voice dropdowns never loaded — no valid key / non-EL TTS active — so there was nothing
+> to filter), not a code regression. If it fails again, first confirm the list actually populated. The
+> inline box coexists with the richer command palette (§14.1d).
+- [ ] The **ElevenLabs voice** picker on the **main panel** (below the dropdown) and the schema-driven
+      picker on the **Settings** page (beside the dropdown) both show a filter box once the list loads.
 - [ ] **Main panel:** type **3+ characters** in the filter box under **ElevenLabs voice** → the dropdown
       narrows to voices whose **name or category** contains the text (case-insensitive; try a category
       word like *"cloned"* or *"premium"*). Typing **1–2 chars** filters nothing; **clearing** the box
       restores the full list. The **currently-selected** voice stays visible even when it doesn't match.
 - [ ] **Settings page:** same behavior in the filter box **next to** the schema `@elevenlabs_voices`
       picker — 3+ chars filters by substring, <3 clears. Picking a filtered voice still saves normally.
+
+### 14.1d Command-palette voice/model search (issue #94)  🌐 PANEL 🌍 NET
+> A reusable searchable palette (magnifier 🔍 button) beside the long voice/model pickers on BOTH the
+> **main panel** (ElevenLabs voice) and the **Settings** page (ElevenLabs voice/model + the #92 model/
+> voice comboboxes). `requires:` a populated list (valid ElevenLabs key for the voice palettes; the
+> relevant provider key for a model palette). Verify in the browser AND the packaged native window.
+- [ ] **Open + search:** click 🔍 beside **ElevenLabs voice** → a palette opens with a search box and the
+      full list below. Type a few letters → results **filter live** and the matched substring is **bold**;
+      each row shows the voice **category** as secondary text. Empty query lists **alphabetically**.
+- [ ] **Keyboard-first:** **↑/↓** move the highlighted row, **Enter** selects it (applies + saves), **Esc**
+      closes without changing. A mouse **click** also selects. The list **scrolls** for the long tail.
+- [ ] **Current pick reachable (fail-soft, #26/#100):** the currently-selected voice is marked (✓). With
+      the ElevenLabs key cleared/offline, 🔍 still opens the palette showing *"list unavailable — type a
+      value and press Enter"* so the current pick is kept and a value can still be entered — never blocks.
+- [ ] **Reused for model lists:** on the Settings page, the 🔍 beside a fetched **model** combobox
+      (e.g. OpenAI/OpenRouter with a key) opens the same palette over the hundreds of model ids.
 
 ### 14.1b Voice/model dropdowns sorted alphabetically (issue #93)  🌐 PANEL 🌍 NET
 > Both the **ElevenLabs voice** and **ElevenLabs model** dropdowns should list entries A→Z by
@@ -859,6 +896,29 @@ Notes:
 - [ ] **Selection preserved:** with a voice/model selected that happens to sort near the bottom
       (e.g. starts with *"Z"* or *"™"*), reload the Settings page → it's still the selected value
       (sorting is presentational only, never drops or changes the current selection).
+
+### 14.1c Fetched-catalog dropdowns — editable comboboxes (issues #92 + #88)  🌐 PANEL 🌍 NET 📋 FILE
+> On the **Settings** page the model-id and endpoint fields are editable comboboxes: a dropdown fed
+> from the provider's LIVE catalog plus free-text for anything custom. `requires:` the relevant
+> provider key/endpoint for the list to actually populate (OpenAI/Groq key for `openai.model`, Gemini
+> key for `gemini.model`, a running Ollama for `ollama.model`, Azure key+region for `azure.voice`,
+> Cartesia key for `cartesia.voice`; Edge needs no key). Verify in BOTH the browser (`run_covas_ui.py`)
+> and the packaged native window.
+- [ ] **Base-URL presets:** the **OpenAI LLM base URL** field offers the four presets
+      (OpenAI/Groq/DeepSeek/OpenRouter) in its dropdown; picking one fills the box. Typing a custom URL
+      shows a **"custom (unsupported)"** flag but is accepted.
+- [ ] **Model list populates:** with an OpenAI (or Groq/OpenRouter) key set, open **OpenAI LLM model**
+      → the datalist lists that endpoint's models; the row footer shows a count. Change the **base URL**
+      to another preset → the model list **refetches** for the new endpoint.
+- [ ] **Gemini / Ollama:** with a Gemini key, **Gemini model** lists Google's live models; with Ollama
+      running, **Ollama model** lists your locally-pulled tags.
+- [ ] **Edge/Azure/Cartesia voices:** **Edge voice** populates with no key; **Azure voice** populates
+      once the Azure key + region are set; **Cartesia voice** once the Cartesia key is set.
+- [ ] **Custom value accepted + flagged:** type a model/voice id NOT in the list → it's kept (flagged
+      "custom (unsupported)"), saves to `overrides.json`, and is still the value on reload.
+- [ ] **Fail-soft (no key / offline):** with the relevant key cleared or offline, the field still shows
+      the **current value** and lets you type — the footer reads *"catalog unavailable (…) — type a
+      value"*; never an empty or blocking dropdown, and the existing value is never lost.
 
 ### 14.2 Settings page (N1) — http://127.0.0.1:8765/settings
 - [ ] The page renders **grouped sections** with the **right control per type** (toggles, dropdowns, number/sliders, text/path) and inline help.

@@ -37,7 +37,12 @@ from ._retry import (RetryPolicy, TransientError, is_retryable_status,
 from .base import OnEvent, ToolHandler
 
 _DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-_DEFAULT_MODEL = "gemini-3.1-flash-lite"
+# DEPRECATION-PROOF default (issue #91): pinning a concrete id kept breaking (the guessed
+# gemini-3.1-flash-lite 404'd; GA gemini-2.5-* is now "superseded"). The `-latest` alias always
+# resolves to Google's current GA Flash-Lite (https://ai.google.dev/gemini-api/docs/models +
+# /changelog, verified 2026-07-16). Note: aliases won't appear verbatim in list_models() (which lists
+# concrete ids) — the check_setup guard is alias-aware so it doesn't false-warn on `-latest`.
+_DEFAULT_MODEL = "gemini-flash-lite-latest"
 _USER_AGENT = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
 _MAX_ROUNDS = 8
 
@@ -61,6 +66,18 @@ class GeminiLLM:
                 "Gemini LLM selected but no key found (add it in Settings, or to [gemini].api_key_file)."
             )
         return key
+
+    def list_models(self, *, timeout=(5, 15)) -> list[str]:  # noqa: ANN001
+        """Fetch the live Gemini model catalog (issue #91), fail-soft.
+
+        Wraps `GET {base_url}/models` and returns the bare model ids (e.g. ``gemini-2.5-flash``).
+        Returns ``[]`` on any error (no key, offline, non-200) so a caller can degrade to free-text
+        rather than crash. Powers both the startup/`check_setup` model-id guard and the fetched
+        `@gemini_models` settings dropdown (#92)."""
+        try:
+            return list_gemini_models(self.base_url, self._key(), timeout=timeout)
+        except Exception:  # noqa: BLE001 — a catalog fetch must never break the voice loop
+            return []
 
     def _contents(self, messages: list[dict]) -> list[dict]:
         """Convert the app's history to Gemini `contents` (roles user/model, text parts). Plain-
@@ -153,6 +170,39 @@ class GeminiLLM:
 
 
 # ---- module helpers -------------------------------------------------------
+def parse_models_list(payload: dict) -> list[str]:
+    """Extract bare model ids from a Gemini `GET /models` JSON payload (issue #91).
+
+    The API returns ``{"models": [{"name": "models/gemini-2.5-flash", ...}, ...]}``; we strip the
+    ``models/`` prefix and keep insertion order (de-duplicated). PURE — no I/O — so the parsing
+    logic is unit-tested offline with a fake payload."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in (payload or {}).get("models") or []:
+        name = (m or {}).get("name") if isinstance(m, dict) else None
+        if not isinstance(name, str) or not name:
+            continue
+        mid = name.split("/", 1)[1] if name.startswith("models/") else name
+        if mid and mid not in seen:
+            seen.add(mid)
+            out.append(mid)
+    return out
+
+
+def list_gemini_models(base_url: str, key: str, *, timeout=(5, 15)) -> list[str]:  # noqa: ANN001
+    """`GET {base_url}/models` → the bare model-id list. The key rides the `x-goog-api-key`
+    header (never the URL). Raises on a non-200 or transport error — callers that want fail-soft
+    behavior wrap this (see `GeminiLLM.list_models`)."""
+    url = f"{base_url.rstrip('/')}/models"
+    headers = {"x-goog-api-key": key, "User-Agent": _USER_AGENT}
+    r = requests.get(url, headers=headers, timeout=timeout)
+    if r.status_code != 200:
+        detail = f"Gemini model list {r.status_code}: {r.text[:200]}"
+        _close(r)
+        raise RuntimeError(detail)
+    return parse_models_list(r.json())
+
+
 def _close(r) -> None:  # noqa: ANN001 — a requests.Response (or a test double without .close)
     """Best-effort release of a non-200 response before we raise — test doubles may lack close()."""
     try:
@@ -214,6 +264,11 @@ def _stream_generate(base_url: str, model: str, key: str, body: dict, cancel: th
         r = requests.post(url, data=json.dumps(body), headers=headers, stream=True, timeout=timeout)
         if r.status_code != 200:
             detail = f"Gemini LLM {r.status_code}: {r.text[:200]}"
+            # A 404 almost always means a stale/invalid model id (issue #91) — say so plainly instead
+            # of surfacing a raw not_found, so the fix (check [gemini].model / [gemini.tiers]) is obvious.
+            if r.status_code == 404:
+                detail = (f"Gemini model '{model}' not available (404) — check [gemini].model / "
+                          f"[gemini.tiers] against the live list (GET {base_url}/models). {detail}")
             retryable = is_retryable_status(r.status_code)
             ra = parse_retry_after(r.headers.get("Retry-After")) if retryable else None
             _close(r)

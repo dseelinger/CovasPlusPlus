@@ -46,6 +46,21 @@ def build_system(cfg: dict) -> str | None:
     return joined or None
 
 
+def list_anthropic_models(cfg: dict, *, limit: int = 100) -> list[str]:
+    """Live Claude model ids from `GET /v1/models` (issue #92), via the Anthropic SDK.
+
+    Raises on no key / import / API error; callers that want fail-soft wrap this (see
+    `covas/catalog.py`), which falls back to the static `[anthropic].available_models` list. A free
+    lookup, so it's fine for a settings dropdown — but it stays OFF the fast `/api/schema` path."""
+    from .firstrun import anthropic_key
+    key = anthropic_key(cfg)
+    if not key:
+        raise RuntimeError("no Anthropic key")
+    import anthropic
+    client = anthropic.Anthropic(api_key=key)
+    return [m.id for m in client.models.list(limit=limit).data]
+
+
 def _cache_control(cfg: dict) -> dict:
     """cache_control breakpoint for the static prefix (system + tools). The TTL comes
     from [anthropic].cache_ttl: "1h" adds the extended-TTL flag so the cache survives

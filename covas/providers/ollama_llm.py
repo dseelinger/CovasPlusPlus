@@ -147,6 +147,29 @@ class OllamaLLM:
 _OPEN, _CLOSE = "<think>", "</think>"
 
 
+def parse_ollama_tags(payload: dict) -> list[str]:
+    """Extract locally-pulled model tags from an Ollama `GET /api/tags` payload (issue #92).
+
+    Shape: ``{"models": [{"name": "qwen3:latest", ...}, ...]}``. De-duplicated, order preserved.
+    PURE — no I/O — so it's unit-tested offline with a fake payload."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in (payload or {}).get("models") or []:
+        name = str((m or {}).get("name", "")).strip() if isinstance(m, dict) else ""
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+def list_ollama_models(host: str, *, timeout=5) -> list[str]:  # noqa: ANN001
+    """`GET {host}/api/tags` → the locally-pulled model tags (no key — local). Raises on a non-200
+    or transport error; callers that want fail-soft wrap this (see `covas/catalog.py`)."""
+    r = requests.get(f"{host.rstrip('/')}/api/tags", timeout=timeout)
+    r.raise_for_status()
+    return parse_ollama_tags(r.json())
+
+
 def _model_available(model: str, names: list[str]) -> bool:
     """Whether Ollama would resolve `model` against the installed `names`, mirroring
     Ollama's real rule: an exact tag match, or a bare name resolving to '<name>:latest'.
