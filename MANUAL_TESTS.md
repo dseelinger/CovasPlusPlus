@@ -514,6 +514,19 @@ Notes:
 
 Notes:
 
+### 7.2 Ship specifications — grounded specs, newest hulls (#83)  🔊 HW
+> **Always on** — no config, no ED monitoring, no network. Grounds ship-SPEC answers in a
+> bundled dataset so newer hulls don't hallucinate. Cross-check figures against
+> [EDSY](https://edsy.org/) or Coriolis.
+- [ ] **Newer hull, real numbers:** *"How much cargo can a Type-8 carry?"* → a concrete figure (≈406 t), not a hedge or a wrong guess. Repeat for *"what pad does a Mandalay need?"* (medium) and *"how many hardpoints has the Corsair?"*.
+- [ ] **Panther Clipper Mk II:** *"What are the specs on a Panther Clipper?"* → large pad, Zorgon Peterson, big cargo — the model does **not** claim ignorance of it.
+- [ ] **Nickname + family:** *"Specs on a conda"* → Anaconda; *"tell me about the cobra"* → asks **MkIII / MkIV / MkV**, doesn't guess.
+- [ ] **No invented jump range:** *"What's the jump range of a Python Mk II?"* → it does **not** state a hull figure; it points to your loadout (for your own ship) or web search, per the guardrail.
+- [ ] **Won't confabulate:** ask about a hull with no bundled data (*"specs on a Lynx Highliner"*) → it says it has no data and offers to web-search, instead of making numbers up.
+- [ ] **Guardrail holds with personality OFF:** with `[personality].enabled = false`, ask a ship-spec question → it still calls the tool / refuses to invent (the guardrail is always in the system prompt).
+
+Notes:
+
 ## 8. Voice search categories  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
 > `[star_systems].enabled` and `[search].enabled` = true. Stateless conversational slot-filling over Spansh, nearest-first from your current system, each **copies the primary system** to the clipboard. Misheard filter values are validated against a bundled vocabulary and corrected.
 

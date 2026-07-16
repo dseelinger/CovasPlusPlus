@@ -16,6 +16,7 @@ from .modules import (Ambiguous, NeedAttrs, Resolved, Unknown, MODULE_NAMES, res
 from .module_index import ModuleIndex
 from .ships import (AmbiguousShip, ResolvedShip, UnknownShip, SHIP_NAMES, resolve_ship)
 from .ship_index import ShipIndex
+from .ship_specs import Spec, get_spec, has_spec, summary as ship_spec_summary
 from .closest import (ClosestResult, NavError, RequestsHttp, find_closest_module)
 from .ship_search import find_closest_ship
 from .clipboard import copy
@@ -36,6 +37,7 @@ __all__ = [
     "ResolvedShip",
     "SHIP_NAMES",
     "ShipIndex",
+    "Spec",
     "Unknown",
     "UnknownShip",
     "carrier_from_journals",
@@ -43,7 +45,10 @@ __all__ = [
     "current_system_from_journal",
     "find_closest_module",
     "find_closest_ship",
+    "get_spec",
+    "has_spec",
     "resolve",
     "resolve_ship",
+    "ship_spec_summary",
     "squadron_name_from_journals",
 ]

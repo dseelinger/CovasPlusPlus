@@ -169,6 +169,16 @@ class App:
         self.version_cap = VersionCapability(log=lambda m: self._log("version", m))
         self.registry.register(self.version_cap)
 
+        # Grounded ship specifications (issue #83): answer "what can a Type-8 carry / what pad
+        # does a Mandalay need" from a bundled, refreshable dataset keyed to the SAME canonical
+        # names ships.py resolves — so newer hulls (Python Mk II, Corsair, Cobra Mk V, …) get
+        # real numbers instead of training-cutoff guesses. Always on, like help/version: pure,
+        # offline, no network (the bundled roster already covers current hulls; a resolved hull
+        # with no bundled spec is spoken as "no data, web-search" rather than confabulated).
+        from .capabilities.ship_spec_capability import ShipSpecCapability
+        self.ship_spec = ShipSpecCapability(log=lambda m: self._log("ship_spec", m))
+        self.registry.register(self.ship_spec)
+
         # Elite Dangerous monitoring (DESIGN §5). Opt-in ([elite].enabled, off by
         # default). When on, two daemon watchers tail ED's journal + Status.json,
         # publishing events on the bus and updating a shared context the ED-context
