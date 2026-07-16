@@ -664,6 +664,21 @@ Notes:
 
 Notes:
 
+## 9b. On-foot (Odyssey) engineering (#73)  🎮 ED 🔊 HW 📋 clipboard
+> `[elite].enabled = true`. Suit/weapon recipes, the modification catalogue and engineer
+> locations come from a bundled offline table; unlock **status** for an engineer is joined live
+> from the same `EngineerProgress` event (log into the game once this session). This is a **data
+> + read** capability — it does not cross-reference your live material stock (planned follow-up).
+- [ ] **Suit upgrade recipe:** *"How do I engineer my Maverick suit?"* → speaks its role, the grade-5 materials (12× Carbon Fibre Plating, 12× Graphene, plus the schematic/monitor/instructions), where to source them, and the suit mods you can add. Cross-check the numbers against the in-game Pioneer Supplies upgrade screen.
+- [ ] **Explicit grade:** *"What do I need to upgrade my Dominator to grade 3?"* → the grade-3 counts (5× Titanium Plating, 5× Graphene, 2× each good), not grade 5.
+- [ ] **Weapon:** *"Engineer my Manticore Oppressor."* → names the family (Manticore / plasma) and its materials (Chemical Superbase, Microelectrode, Ionised Gas…).
+- [ ] **Modification → engineers:** *"Which engineer gives Greater Range?"* → lists the engineers who offer it (Domino Green, Wellington Beck, Rosa Dayette), each tagged with **your** unlock status from the journal.
+- [ ] **Engineer locate + plot:** *"How do I unlock Domino Green?"* → her system (Orishis) and workshop (The Jackrabbit), the access + unlock task, who she refers you to (Kit Fowler), the mods she offers, and it copies **Orishis** to the clipboard (paste to confirm). Ask while in Orishis → says you're already there and does **NOT** copy.
+- [ ] **Overview:** *"Give me the full on-foot engineering breakdown."* → the two-halves summary (grade upgrades vs modifications) and the 9-bubble / 4-Colonia engineer split.
+- [ ] **Never guesses:** *"How do I engineer my flight suit?"* → says the Flight Suit isn't engineerable and names the real suits; a made-up modification is refused with real examples.
+
+Notes:
+
 ## 10. Community Goals (N6)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
 > Journal-primary (works offline for CGs you've visited). Add an **Inara API key** (Settings API keys card, stored encrypted in `InaraAPIKey.txt`) to also surface CGs you HAVEN'T visited. Visit a CG board in-game first so the journal has your standing.
 - [ ] **List:** *"List the community goals."* → active CGs (title + system + expiry). With an Inara key, ones you haven't visited are flagged ("…one in <system> you haven't visited yet").
