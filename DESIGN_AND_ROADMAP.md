@@ -422,6 +422,39 @@ whole `search/spansh.py` transport — no duplicated plumbing.
   `integration+local` canary (`test_live_ship_index_harvest_covers_the_bundle`) fails if the live
   roster ever drifts far from the bundle, prompting a curated top-up.
 
+### Implemented — grounded ship specifications (`ship_spec`, issue #83)
+The roster above answers *which* hull the Commander means; this answers *what that hull is*. The
+model's ship knowledge is frozen at its training cutoff, so ship-SPEC questions about newer hulls
+(Panther Clipper Mk II, Python Mk II, Type-8, Mandalay, Cobra Mk V, Corsair, …) come back unknown
+or confidently wrong — provider-agnostic (reproduces on GPT-4o and Claude). The fix is data +
+tool + prompt, not a model swap:
+
+- **New bundled data source (`nav/ship_spec_data.py` + `ship_specs.py`).** A specification table
+  (manufacturer, pad size, hull mass, fuel/main-tank tonnage, weapon-hardpoint sizes, utility-mount
+  count, 7 core-internal sizes, optional-internal layout incl. military/cargo-only flags, computed
+  max cargo, crew seats, speed, shields, armour) **keyed to the SAME canonical ids `ships.py`
+  resolves** — so a resolved hull looks its spec straight up. Baked from the maintained
+  **EDCD/coriolis-data** ship JSON (the Coriolis/EDSY lineage; Spansh has no ship-reference
+  endpoint) by `scripts/gen_ship_specs.py` — a one-command refresh per ED release, no per-hull code.
+  Every value is a raw source field or a deterministic derivation of one (tonnage = 2**slot-size;
+  utility mounts = the zero entries coriolis packs into the hardpoint array); nothing is invented.
+  Mirrors the `modules.py`/`module_data.py` split (curated resolver + generated data table).
+- **`ship_spec` tool (`ShipSpecCapability`).** Always-on, pure/offline, no network or clipboard —
+  the same stateless resolve→answer pattern as find-closest-ship: resolve the name (ambiguous
+  family → ask which; unknown → suggest), then return the bundled spec. A resolved hull with **no**
+  bundled data (the un-sourced Lynx Highliner, or a name only just learned live from `ShipIndex`)
+  is spoken as "no data — web-search?" rather than confabulated. New hulls are covered as the
+  dataset refreshes; no code change per release.
+- **Jump range is deliberately absent.** Unlike hull mass or slot layout it isn't a hull constant
+  but a function of the fitted FSD, mass and fuel — so the tool carries the stock FSD *size* and
+  defers the actual figure to the loadout snapshot (own ship) or web search (any ship).
+- **System-prompt guardrail (the cheap immediate win), in `llm.build_system`.** A static always-on
+  fragment tells the model its ED ship knowledge is cutoff-limited and it must NOT invent ship
+  specs — use loadout for the Commander's own ship, `ship_spec` (or web search) for any ship, and
+  say so plainly if still ungrounded. It's assembled in the one provider-agnostic seam every LLM
+  provider calls (`build_system`), rides the cached prompt prefix (static → cache-safe), and applies
+  even with personality OFF.
+
 ### Implemented — search data freshness + local shipyard ground truth
 Born from a live bug (2026-07): COVAS recommended a Type-8 at the very station the Commander was
 docked at, while the vendor showed "does not currently stock this ship." Two findings, two layers
@@ -903,6 +936,7 @@ The original seven-phase plan is done and tested:
 17. **Search data freshness + local shipyard ground truth** (§5) — the staleness filter on volatile Spansh data and the `Shipyard.json` stock veto, from the live Type-8 bug.
 18. **Ship loadout & engineering** (N9) — the full journal `Loadout` snapshot on `EDContext`, offline symbol→spoken-name mapping (`ed/module_names.py`), and a `LoadoutCapability` answering "what's on my FSD" / experimental effects / the fitted rundown, with upgrade suggestions offered onto the checklist.
 19. **EDSM current-stock verification for ships** (§5) — every ship-search candidate confirmed against EDSM's live shipyard snapshot (the same data Inara shows) before being spoken, from the live Type-10 bug; answers now match Inara's nearest-seller search.
+19a. **Grounded ship specifications** (#83, §5) — a bundled, refreshable spec dataset (`nav/ship_spec_data.py` from EDCD/coriolis-data) keyed to `ships.py`'s canonical ids, an always-on offline `ship_spec` tool, and a provider-agnostic system-prompt guardrail in `llm.build_system` so newer hulls report real numbers instead of training-cutoff guesses; resolved-but-unsourced hulls defer to web search rather than confabulate.
 20. **Web checklist editor** (N10) — a `/checklist` tab rendering `ultimate_checklist.md` as WYSIWYG markdown (TOAST UI from CDN, dark theme, first-class task lists; plain-textarea fallback when the CDN is unreachable). Saves round-trip losslessly through `checklist.py` (editor `* [ ]` bullets normalized back to `- [ ]`, nesting preserved); voice and web share the file (reads are per-call fresh, the cursor is clamped on save), and a content-hash stale-write guard 409s a save when a voice edit landed underneath, offering reload-vs-overwrite instead of clobbering.
 
 21. **Audio / Comms / Chatter subsystem** (C1–C8, `covas/mixer/`) — an atmospheric audio layer where the LLM only ever produces text that is validated then routed; it is never in the realtime audio path. Built bottom-up: a multi-bus mixer with pure per-bus DSP (C1: COVAS/Comms/Ambient/Music/Alert, biquad bandpass + static + compressor comms radio treatment, applied at runtime not pre-edited); a structurally-enforced cue registry (C2: a cue can't target a nonexistent bus, and an empty eligibility set is valid-but-silent); the game-state eligibility engine + rate governor + driver (C3: Status/journal → state tokens, per-cue cooldowns + a rolling global cap, deterministic rotation, off by default); the **fail-closed `ReceiveText` channel gate** (C4: the core safety contract — player DMs verbatim, NPC lines variant-eligible, the Open-play firehose and any CMDR-ambiguous line dropped; template-identity dedup keyed to the governor); the comms variant pipeline (C5: verbatim/paraphrase/riff with a validator that rejects invented proper nouns/numbers/threats and always falls back to the verbatim source; players never paraphrased); space chatter (C6: template pools with fact gating — the LLM only voices `fact_bearing=false` flavor that asserts nothing checkable); a context-crossfaded music library (C7: curated local tracks, equal-power crossfades, generation a deliberate non-runtime seam); and worked-example cues (C8: the layered pirate-interdiction cue across the alert/COVAS/comms buses, plus eligibility-gated ambient SFX). Everything opt-in and off by default; the DSP, mix, classifier, validators, and crossfades are all pure and unit-tested (no device in the default run).

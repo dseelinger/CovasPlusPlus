@@ -216,14 +216,17 @@ def test_roster_dedupes_trims_and_caps():
 
 
 def test_build_system_appends_crew_instruction_statically():
-    # With personality off there's no base system, so the crew instruction becomes the whole
-    # (still static) system prompt — and it's None when crew is off.
+    # With personality off there's no base system, so the crew instruction rides alongside the
+    # always-on ship-spec guardrail (issue #83) in the (still static) system prompt.
     from covas.llm import build_system
     cfg = {"personality": {"enabled": False}, "crew": {"enabled": True}}
     sys1 = build_system(cfg)
     assert sys1 and "[Nyx]" in sys1
     assert sys1 == build_system(cfg)  # static -> cache-safe
-    assert build_system({"personality": {"enabled": False}, "crew": {"enabled": False}}) is None
+    # Personality AND crew off: the ship-spec grounding guardrail is still present (never None),
+    # so the model always knows not to invent ship specs, regardless of persona config.
+    bare = build_system({"personality": {"enabled": False}, "crew": {"enabled": False}})
+    assert bare is not None and "ship_spec" in bare
 
 
 # ============================================================================================

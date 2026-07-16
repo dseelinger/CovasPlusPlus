@@ -14,23 +14,36 @@ if TYPE_CHECKING:  # only for type hints — keep the offline stack importable w
     import anthropic
 
 
-def build_system(cfg: dict) -> str | None:
-    """The composed system prompt when personality is ON; else None (neutral). Composition
-    (Base + selected Persona + Campaign) lives in `personality.compose_system` (N7).
+# Grounding guardrail (issue #83), always on. The model's Elite Dangerous ship knowledge is
+# frozen at its training cutoff, so newer hulls (Panther Clipper Mk II, Python Mk II, Type-8,
+# Mandalay, Cobra Mk V, Corsair, …) are unknown or confidently wrong. Steer every ship-spec
+# answer to a grounded source instead of memory. Static text, so it rides the cached prompt
+# prefix and never busts the cache turn-to-turn.
+_SHIP_SPEC_GUARDRAIL = (
+    "Your built-in knowledge of Elite Dangerous ships is limited to your training cutoff and is "
+    "NOT reliable for ship specifications — newer hulls especially. Never invent or guess a "
+    "ship's stats (cargo capacity, jump range, pad size, hardpoints, slots, hull mass, "
+    "manufacturer). For the Commander's OWN ship, use the loadout tools for real fitted values. "
+    "For any ship's specifications, call the ship_spec tool; if it lacks the data, use web "
+    "search. If you still can't ground an answer, say so plainly rather than making one up."
+)
 
-    When CREW voicing is on ([crew].enabled, issue #69) a STATIC instruction is appended so the
-    model may voice named crew via a `[Name]` line prefix. It's a constant for a given config, so
-    it rides the cached prefix and never busts the prompt cache turn-to-turn (only the once when
-    the setting/roster changes). It applies even with personality OFF — otherwise there'd be no
-    system prompt to carry it — and stays static in either case."""
+
+def build_system(cfg: dict) -> str | None:
+    """The composed system prompt: `personality.compose_system` (Base + Persona + Campaign)
+    when personality is ON (N7), plus two STATIC always-on fragments — the ship-spec grounding
+    guardrail (issue #83) and, when CREW voicing is on ([crew].enabled, issue #69), the crew
+    line-prefix instruction.
+
+    Both static fragments apply even with personality OFF (otherwise there'd be no system prompt
+    to carry the guardrail) and are constant for a given config, so they ride the cached prefix
+    and never bust the prompt cache turn-to-turn (only the once when a setting/roster changes)."""
     from .crew import system_instruction
     from .personality import compose_system
 
-    system = compose_system(cfg)
-    crew = system_instruction(cfg)
-    if not crew:
-        return system
-    return f"{system}\n\n{crew}" if system else crew
+    parts = [compose_system(cfg), _SHIP_SPEC_GUARDRAIL, system_instruction(cfg)]
+    joined = "\n\n".join(p for p in parts if p)
+    return joined or None
 
 
 def _cache_control(cfg: dict) -> dict:
