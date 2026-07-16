@@ -164,13 +164,13 @@ def create_app(core) -> Flask:
 
     @flask_app.route("/api/state")
     def state():
+        # The LLM/Speech quick controls now come provider-shaped inside `settings` (issue #86) and
+        # carry their own resolved options; only whisper stays a flat top-level option list here.
         return jsonify({
             "status": core.state,
             "version": __version__,
             "settings": core.public_settings(),
             "options": {
-                "models": core.cfg["anthropic"]["available_models"],
-                "thinking": THINKING_TIERS,
                 "whisper": WHISPER_SIZES,
             },
             "keys": core.cfg["keys"],

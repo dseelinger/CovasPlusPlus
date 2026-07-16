@@ -846,6 +846,26 @@ Notes:
 ### 14.0 Version label (issue #78)
 - [ ] A small, muted **`vX.Y.Z`** tag sits in the bottom-right corner of the panel (matches `__version__` / `check_setup.py`'s reported version) — visible but out of the way of every control. 🖥️ **Native window:** its title bar also reads **"COVAS++ vX.Y.Z"** in the packaged app (not the plain browser build).
 
+### 14.0a Quick panel reflects the active LLM/TTS provider (issue #86)  🌐 PANEL 🌍 NET 📋 FILE
+> The left **Configuration** card's **LLM** and **Speech** blocks must MIRROR `[llm].provider` /
+> `[tts].provider`, rendered generically from the schema — not a hardcoded Anthropic/ElevenLabs panel.
+> Change providers by editing `overrides.json` / the Settings page and **restart** between checks.
+- [ ] **Anthropic + ElevenLabs** (`[llm].provider = "anthropic"`, `[tts].provider = "elevenlabs"`, EL key set):
+      the **LLM** block header reads *"Anthropic (Claude)"* and shows a **Claude model** dropdown **and a
+      Thinking depth** control; the **Speech** block reads *"ElevenLabs"* and shows **model + a searchable
+      voice picker (filter box + 🔍) + a voice-speed slider**. Changing any of them speaks/persists as before.
+- [ ] **Alternate LLM — e.g. Gemini or OpenAI-compatible** (`[llm].provider = "gemini"` / `"openai"`):
+      the LLM header names that provider, shows an **editable model combobox** (pick from the live catalog
+      with the provider key set, or type any id), and **no Thinking control** (Anthropic-only). For OpenAI,
+      the **base URL** shows read-only. With no key/offline the combobox degrades to a plain text box keeping
+      the current value (no error, no empty blocking control).
+- [ ] **Alternate TTS — e.g. Edge** (`[tts].provider = "edge"`, no ElevenLabs key needed): the Speech header
+      reads *"Edge (free)"* and shows an **Edge voice** combobox — NOT ElevenLabs fields. (Spot-check Azure /
+      OpenAI / Cartesia / Piper similarly if configured — each shows only its own voice fields.)
+- [ ] **`/api/elevenlabs` only when relevant:** with a **non-ElevenLabs** TTS active, open the browser
+      devtools **Network** tab and reload the panel → there is **no request to `/api/elevenlabs`**. Switch
+      `[tts].provider` back to elevenlabs, restart, reload → the request reappears (voice/model lists load).
+
 ### 14.1 Live status & log
 - [ ] The status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, status/search lines (timestamped).
 

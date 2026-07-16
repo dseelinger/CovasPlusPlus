@@ -29,6 +29,16 @@
   .voicesearch:hover{color:var(--text);border-color:var(--accent2)}
   input.voicefilter{background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:5px;
        padding:6px 8px;font-family:inherit;font-size:12px;width:100%}
+  /* #86: provider quick-block header — names the ACTIVE provider the block reflects. */
+  .pblock .phead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+       margin:6px 0 2px;color:var(--muted);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+  .pblock .phead .pname{color:var(--accent2);font-weight:bold}
+  .pblock .phead a{color:var(--muted);text-decoration:none;font-size:11px}
+  .pblock .phead a:hover{color:var(--accent2)}
+  .pblock input[type=text],.pblock input[type=number]{background:#0c1119;color:var(--text);
+       border:1px solid var(--edge);border-radius:5px;padding:6px 8px;font-family:inherit;
+       font-size:13px;min-width:180px}
+  .pblock input[disabled]{color:var(--muted);opacity:.8}
   .status{display:flex;align-items:center;gap:14px;margin-left:auto}
   .dot{width:16px;height:16px;border-radius:50%;background:#444;box-shadow:0 0 0 rgba(0,0,0,0)}
   .state-name{font-size:16px;letter-spacing:2px;min-width:170px}
@@ -141,16 +151,12 @@
   <div class="leftcol">
     <div class="card">
       <h2>Configuration</h2>
-      <div class="row"><label>Claude model</label><select id="model"></select></div>
-      <div class="row"><label>Thinking depth</label><select id="thinking"></select></div>
+      <!-- #86: the LLM + Speech blocks REFLECT the active [llm]/[tts].provider — rendered
+           generically from the schema payload (see renderProviderBlock). Switch providers on
+           the Settings page. -->
+      <div class="pblock" id="llmBlock"></div>
       <div class="row"><label>Whisper model</label><select id="whisper"></select></div>
-      <div class="row"><label>ElevenLabs model</label><select id="el_model"></select></div>
-      <div class="row voicerow">
-        <div class="voicehead"><label>ElevenLabs voice</label><select id="el_voice"></select>
-          <button type="button" id="el_voice_search" class="voicesearch" title="Search voices">🔍</button></div>
-        <input type="text" id="el_voice_filter" class="voicefilter" placeholder="Filter voices (3+ chars)…" autocomplete="off">
-      </div>
-      <div class="row"><label>Voice speed</label><input type="range" id="speed" min="1.0" max="1.2" step="0.05"><span class="speedval" id="speedVal">1.0×</span></div>
+      <div class="pblock" id="ttsBlock"></div>
       <div class="row"><label>Personality</label><div class="toggle" id="personality"><div class="knob"></div></div></div>
       <button class="cancel" id="cancelBtn">■ CANCEL / STOP</button>
       <div class="prow"><button id="openCues">OPEN CUES FOLDER</button><span class="pmsg" id="cuesMsg"></span></div>
@@ -326,74 +332,44 @@ function filterOptions(sel, raw){
     o.hidden = active && !o.selected && !o.textContent.toLowerCase().includes(q);
 }
 
-function post(body){
-  return fetch("/api/settings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+// Schema-key writes go straight to the validated schema endpoint (issue #86): the quick panel is
+// provider-generic now, so it posts canonical dotted keys instead of the old friendly aliases.
+function postKey(key, value){
+  return fetch("/api/settings/update",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({key, value})});
+}
+function postUpdates(updates){
+  return fetch("/api/settings/update",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({updates})});
 }
 
 let SETTINGS = {};
 let EL_VOICES = [];   // fetched ElevenLabs voices, fed to the command palette (#94)
+// Live per-field value setters, keyed by dotted schema key, so a settings event (a voice command
+// changed a value) can update the control in place without a full re-render.
+let FIELD_SETTERS = {};
+let LLM_PROVIDER = null, TTS_PROVIDER = null;
 
 async function init(){
   const st = await (await fetch("/api/state")).json();
   SETTINGS = st.settings;
   $("verLabel").textContent = st.version ? ("v" + st.version) : "";   // #78
 
-  st.options.models.forEach(m=>$("model").appendChild(opt(m)));
-  st.options.thinking.forEach(t=>$("thinking").appendChild(opt(t)));
-  st.options.whisper.forEach(w=>$("whisper").appendChild(opt(w)));
-  $("model").value = st.settings.model;
-  $("thinking").value = st.settings.thinking;
+  (st.options.whisper||[]).forEach(w=>$("whisper").appendChild(opt(w)));
   $("whisper").value = st.settings.whisper;
   setToggle("personality", st.settings.personality);
   $("keys").innerHTML = "Hold <kbd>"+st.keys.push_to_talk+"</kbd> to talk &nbsp;·&nbsp; " +
                         "tap it briefly to cancel &nbsp;·&nbsp; Quit <kbd>Ctrl+Alt+Q</kbd>";
   setStatus(st.status, "");
 
-  $("model").onchange = e => post({model:e.target.value});
-  $("thinking").onchange = e => post({thinking:e.target.value});
-  $("whisper").onchange = e => post({whisper:e.target.value});
+  $("whisper").onchange = e => postKey("whisper.model", e.target.value);
 
-  // ElevenLabs lists (may take a moment / may fail offline)
-  try{
-    const el = await (await fetch("/api/elevenlabs")).json();
-    if(el.error) throw new Error(el.error);
-    EL_VOICES = el.voices || [];
-    el.models.forEach(m=>$("el_model").appendChild(opt(m.model_id, m.name)));
-    el.voices.forEach(v=>$("el_voice").appendChild(opt(v.voice_id, v.name+" ["+v.category+"]")));
-    $("el_model").value = st.settings.el_model;
-    $("el_voice").value = st.settings.el_voice;
-    $("el_model").onchange = e => post({el_model:e.target.value});
-    const setVoice = (id, name) => {
-      const sel=$("el_voice");
-      if(sel.value!==id){ if(![...sel.options].some(o=>o.value===id)) sel.appendChild(opt(id,name||id)); sel.value=id; }
-      post({el_voice:id, el_voice_name:(name||"").split(" [")[0]});
-    };
-    $("el_voice").onchange = e => {
-      const name = e.target.selectedOptions[0].textContent.split(" [")[0];
-      post({el_voice:e.target.value, el_voice_name:name});
-    };
-    $("el_voice_filter").oninput = e => filterOptions($("el_voice"), e.target.value);
-    // Command palette (#94): the 100+ voice list gets a searchable, keyboard-driven picker with
-    // per-row category metadata; the current pick is always reachable (fail-soft, #26/#100).
-    $("el_voice_search").onclick = () => openPalette({
-      title: "Search ElevenLabs voices",
-      items: EL_VOICES.map(v=>({value:v.voice_id, label:v.name, meta:v.category||""})),
-      current: $("el_voice").value,
-      allowCustom: false,
-      onPick: (id, label) => setVoice(id, label),
-    });
-  }catch(err){
-    $("el_model").appendChild(opt("", "(fetch failed)"));
-    $("el_voice").appendChild(opt("", "(fetch failed)"));
-    // Fail-soft (#26/#100): the palette still opens showing the current value; never blocks.
-    $("el_voice_search").onclick = () => openPalette({
-      title:"Search ElevenLabs voices", items:[], current:$("el_voice").value, allowCustom:false,
-      onPick:(id)=>post({el_voice:id}),
-    });
-    addLog({type:"log",who:"system",text:"ElevenLabs list fetch failed: "+err.message});
-  }
+  // #86: render the LLM + Speech blocks from the active-provider payload. Each fetches only the
+  // catalogs its own fields need (ElevenLabs ONLY when TTS = elevenlabs), all fail-soft.
+  await renderLLM(st.settings.llm);
+  await renderTTS(st.settings.tts);
 
-  $("personality").onclick = () => { const v=!getToggle("personality"); setToggle("personality",v); post({personality:v}); };
+  $("personality").onclick = () => { const v=!getToggle("personality"); setToggle("personality",v); postKey("personality.enabled", v); };
   $("cancelBtn").onclick = () => fetch("/api/cancel",{method:"POST"});
 
   // Typed prompt (#76): Enter or ✈ sends a FULL normal turn (skips STT). Clears on send; the
@@ -418,17 +394,237 @@ async function init(){
     } catch(e){ msg.textContent = "couldn't open cues folder"; }
   };
 
-  // Voice speed (ElevenLabs native speed, clamped 1.0–1.2 server-side).
-  const spd = st.settings.speed || 1.0;
-  $("speed").value = spd; $("speedVal").textContent = (+spd).toFixed(2)+"×";
-  $("speed").oninput = e => $("speedVal").textContent = (+e.target.value).toFixed(2)+"×";
-  $("speed").onchange = e => post({speed: +e.target.value});
-
   initPersonality();
   initLogFilter();
   initUpdateCheck();
   initSelectionMenu();
   connectWS();
+}
+
+// ============================================================================
+// #86: provider-generic quick controls. The LLM/Speech blocks REFLECT the active [llm]/[tts]
+// provider — index.html no longer hardcodes Anthropic/ElevenLabs element ids. Each block renders
+// its provider's schema fields (from public_settings) with a control chosen by field type, and
+// posts the canonical dotted key back through the validated schema endpoint. Provider SWITCHING
+// lives on the Settings page; a link points there.
+// ============================================================================
+
+// Pretty provider names for the block header.
+const PROVIDER_LABELS = {
+  anthropic:"Anthropic (Claude)", openai:"OpenAI-compatible", gemini:"Google Gemini",
+  ollama:"Ollama (local)", elevenlabs:"ElevenLabs", edge:"Edge (free)", azure:"Azure",
+  cartesia:"Cartesia", piper:"Piper (local)",
+};
+function providerLabel(p){ return PROVIDER_LABELS[p] || p; }
+
+function blockHeader(kind, provider){
+  const h = document.createElement("div"); h.className = "phead";
+  h.innerHTML = '<span>'+kind+' — <span class="pname">'+escapeHtml(providerLabel(provider))+
+    '</span></span><a href="/settings" title="Switch provider on the Settings page">change ⚙</a>';
+  return h;
+}
+
+// Normalize a field's option list to [{value,label,meta}]. Server enums arrive as bare strings;
+// fetched catalogs / ElevenLabs arrive as dicts — accept either so one renderer covers all.
+function normOpts(list){
+  return (list||[]).map(o => {
+    if(typeof o === "string") return {value:o, label:o, meta:""};
+    const value = o.value != null ? o.value : (o.voice_id || o.model_id || "");
+    return {value, label:o.label || o.name || value, meta:o.meta || o.category || ""};
+  });
+}
+
+// Fetch a fetched-catalog options_source (editable comboboxes: OpenAI/Gemini/Ollama models, Edge/
+// Azure/Cartesia voices). ALWAYS resolves to an array (possibly []) — fail-soft, never throws — so
+// the control degrades to free-text with the current value kept.
+async function fetchCatalog(source, baseUrl){
+  try{
+    let url = "/api/catalog?source=" + encodeURIComponent(source);
+    if(baseUrl) url += "&base_url=" + encodeURIComponent(baseUrl);
+    const r = await (await fetch(url)).json();
+    return normOpts(r.options);
+  }catch(e){ return []; }
+}
+
+// Build the control element for one field, wire its change handler, and register a value setter
+// in FIELD_SETTERS so a later settings event can update it in place. `opts` is the resolved option
+// list (already normalized) when the caller pre-fetched one (ElevenLabs, catalogs); otherwise the
+// field's own server-resolved options are used. `baseUrl` seeds a combobox catalog refetch.
+function buildControl(field, opts){
+  const key = field.key;
+  const register = fn => { FIELD_SETTERS[key] = fn; };
+
+  // Read-only reflection (e.g. OpenAI base URL): show it, edit it on the Settings page.
+  if(field.readonly){
+    const inp = document.createElement("input"); inp.type="text"; inp.disabled = true;
+    inp.value = field.value == null ? "" : field.value;
+    inp.title = "Change this on the Settings page";
+    register(v => { inp.value = v == null ? "" : v; });
+    return inp;
+  }
+
+  const t = field.type;
+
+  if(t === "bool"){
+    const tg = document.createElement("div"); tg.className = "toggle";
+    tg.innerHTML = '<div class="knob"></div>';
+    const set = on => tg.classList.toggle("on", !!on);
+    set(field.value);
+    tg.onclick = () => { const v = !tg.classList.contains("on"); set(v); postKey(key, v); };
+    register(set);
+    return tg;
+  }
+
+  if(t === "int" || t === "float"){
+    const isFloat = t === "float";
+    if(field.min != null && field.max != null){        // bounded → slider (e.g. voice speed)
+      const wrap = document.createElement("span"); wrap.style.display="flex";
+      wrap.style.alignItems="center"; wrap.style.gap="8px"; wrap.style.flex="1";
+      const r = document.createElement("input"); r.type="range";
+      r.min = field.min; r.max = field.max; r.step = isFloat ? 0.05 : 1;
+      const unit = field.unit || (isFloat ? "×" : "");
+      const fmt = v => (isFloat ? (+v).toFixed(2) : (""+v)) + unit;
+      r.value = field.value;
+      const val = document.createElement("span"); val.className="speedval"; val.textContent = fmt(field.value);
+      r.oninput = () => val.textContent = fmt(r.value);
+      r.onchange = () => postKey(key, +r.value);
+      register(v => { if(v!=null && +r.value!==+v){ r.value=v; val.textContent=fmt(v); } });
+      wrap.appendChild(r); wrap.appendChild(val);
+      return wrap;
+    }
+    const n = document.createElement("input"); n.type="number";
+    if(field.min != null) n.min = field.min;
+    if(field.max != null) n.max = field.max;
+    n.value = field.value;
+    n.onchange = () => postKey(key, +n.value);
+    register(v => { if(v!=null) n.value = v; });
+    return n;
+  }
+
+  if(t === "enum" && field.combobox){                  // editable combobox: datalist + free text
+    const inp = document.createElement("input"); inp.type="text";
+    inp.setAttribute("list", "dl_" + key.replace(/\W/g,"_"));
+    inp.value = field.value == null ? "" : field.value;
+    const dl = document.createElement("datalist"); dl.id = "dl_" + key.replace(/\W/g,"_");
+    const fill = list => { dl.innerHTML=""; (list||[]).forEach(o=>{
+      const od=document.createElement("option"); od.value=o.value; od.label=o.label; dl.appendChild(od); }); };
+    fill(opts);
+    inp.onchange = () => postKey(key, inp.value.trim());
+    register(v => { if(v!=null) inp.value = v; });
+    const span = document.createElement("span"); span.style.display="inline-flex"; span.style.flex="1";
+    span.appendChild(inp); span.appendChild(dl);
+    return span;
+  }
+
+  if(t === "enum"){                                    // strict select
+    const sel = document.createElement("select");
+    const list = normOpts(field.options).length ? normOpts(field.options) : (opts || []);
+    list.forEach(o => sel.appendChild(opt(o.value, o.label)));
+    // Keep the current value reachable even if it isn't in the (maybe failed) fetched list.
+    if(field.value != null && ![...sel.options].some(o=>o.value===field.value))
+      sel.appendChild(opt(field.value, field.value + " (current)"));
+    sel.value = field.value;
+    sel.onchange = () => postKey(key, sel.value);
+    register(v => { if(v!=null && sel.value!==v) sel.value = v; });
+    return sel;
+  }
+
+  // string / path → free text
+  const inp = document.createElement("input"); inp.type="text";
+  inp.value = field.value == null ? "" : field.value;
+  inp.placeholder = field.default || "";
+  inp.onchange = () => postKey(key, inp.value);
+  register(v => { if(v!=null) inp.value = v; });
+  return inp;
+}
+
+// One label + control row for a field.
+function fieldRow(field, opts){
+  const row = document.createElement("div"); row.className = "row";
+  const lab = document.createElement("label"); lab.textContent = field.label; lab.title = field.help || "";
+  row.appendChild(lab);
+  row.appendChild(buildControl(field, opts));
+  return row;
+}
+
+// The ElevenLabs voice row keeps its type-to-filter (#26) + search palette (#94), since its catalog
+// is 100+ voices; it also pairs voice_name with the id. Rendered here (still driven by the payload)
+// rather than as a plain combobox. `voices` is the normalized fetched list ([] on failure).
+function elevenVoiceRow(field, voices){
+  const row = document.createElement("div"); row.className = "row voicerow";
+  const head = document.createElement("div"); head.className = "voicehead";
+  const lab = document.createElement("label"); lab.textContent = field.label;
+  const sel = document.createElement("select");
+  const search = document.createElement("button"); search.type="button"; search.className="voicesearch";
+  search.title="Search voices"; search.textContent="🔍";
+  head.appendChild(lab); head.appendChild(sel); head.appendChild(search);
+  const filter = document.createElement("input"); filter.type="text"; filter.className="voicefilter";
+  filter.placeholder="Filter voices (3+ chars)…"; filter.autocomplete="off";
+  row.appendChild(head); row.appendChild(filter);
+
+  voices.forEach(v => sel.appendChild(opt(v.value, v.label + (v.meta?" ["+v.meta+"]":""))));
+  if(field.value != null && ![...sel.options].some(o=>o.value===field.value))
+    sel.appendChild(opt(field.value, field.value + " (current)"));
+  if(!voices.length && field.value == null) sel.appendChild(opt("", "(fetch failed)"));
+  sel.value = field.value;
+
+  const setVoice = (id, name) => {
+    if(sel.value !== id){ if(![...sel.options].some(o=>o.value===id)) sel.appendChild(opt(id, name||id)); sel.value = id; }
+    postUpdates({ "elevenlabs.voice_id": id, "elevenlabs.voice_name": (name||"").split(" [")[0] });
+  };
+  sel.onchange = e => setVoice(e.target.value, e.target.selectedOptions[0].textContent);
+  filter.oninput = e => filterOptions(sel, e.target.value);
+  search.onclick = () => openPalette({
+    title:"Search ElevenLabs voices",
+    items: voices.map(v=>({value:v.value, label:v.label, meta:v.meta||""})),
+    current: sel.value, allowCustom:false,
+    onPick:(id,label)=>setVoice(id,label),
+  });
+  FIELD_SETTERS[field.key] = v => { if(v!=null && sel.value!==v) sel.value = v; };
+  return row;
+}
+
+async function renderLLM(llm){
+  LLM_PROVIDER = llm.provider;
+  const host = $("llmBlock"); host.innerHTML = "";
+  host.appendChild(blockHeader("LLM", llm.provider));
+  for(const f of (llm.fields||[])){
+    let opts = null;
+    if(f.combobox && !f.readonly){
+      // base_url for the OpenAI model catalog comes from the sibling base_url field's value.
+      const baseUrl = f.key === "openai.model"
+        ? ((llm.fields.find(x=>x.key==="openai.base_url")||{}).value || null) : null;
+      opts = await fetchCatalog(f.options_source, baseUrl);
+    }
+    host.appendChild(fieldRow(f, opts));
+  }
+}
+
+async function renderTTS(tts){
+  TTS_PROVIDER = tts.provider;
+  const host = $("ttsBlock"); host.innerHTML = "";
+  host.appendChild(blockHeader("Speech", tts.provider));
+
+  // ElevenLabs is the ONLY provider whose model/voice come from /api/elevenlabs — fetch it once,
+  // and ONLY for elevenlabs (issue #86). Fail-soft: an empty list degrades to the current value.
+  let elModels = [], elVoices = [];
+  if(tts.provider === "elevenlabs"){
+    try{
+      const el = await (await fetch("/api/elevenlabs")).json();
+      if(el.error) throw new Error(el.error);
+      EL_VOICES = el.voices || [];
+      elModels = (el.models||[]).map(m=>({value:m.model_id, label:m.name||m.model_id, meta:""}));
+      elVoices = (el.voices||[]).map(v=>({value:v.voice_id, label:v.name||v.voice_id, meta:v.category||""}));
+    }catch(err){ addLog({type:"log",who:"system",text:"ElevenLabs list fetch failed: "+err.message}); }
+  }
+
+  for(const f of (tts.fields||[])){
+    if(f.key === "elevenlabs.voice_id"){ host.appendChild(elevenVoiceRow(f, elVoices)); continue; }
+    let opts = null;
+    if(f.key === "elevenlabs.model") opts = elModels;
+    else if(f.combobox && !f.readonly) opts = await fetchCatalog(f.options_source, null);
+    host.appendChild(fieldRow(f, opts));
+  }
 }
 
 // ---- #75: custom right-click menu for a text selection. The packaged PyWebView/WebView2
@@ -571,13 +767,20 @@ function connectWS(){
 }
 function syncSettings(s){
   if(!s) return;
-  if($("model").value!==s.model) $("model").value=s.model;
-  if($("thinking").value!==s.thinking) $("thinking").value=s.thinking;
-  if($("whisper").value!==s.whisper) $("whisper").value=s.whisper;
-  if($("el_model").value!==s.el_model) $("el_model").value=s.el_model;
-  if($("el_voice").value!==s.el_voice) $("el_voice").value=s.el_voice;
-  if(s.speed!=null && +$("speed").value!==+s.speed){ $("speed").value=s.speed; $("speedVal").textContent=(+s.speed).toFixed(2)+"×"; }
-  setToggle("personality", s.personality);
+  // Flat, always-present controls.
+  if(s.whisper!=null && $("whisper").value!==s.whisper) $("whisper").value=s.whisper;
+  if(s.personality!=null) setToggle("personality", s.personality);
+  // Provider-shaped blocks: if the ACTIVE provider changed (a switch on the Settings page), the
+  // whole block must re-render (different fields/catalogs); otherwise just push new values into the
+  // existing controls via their registered setters (#86).
+  if(s.llm){
+    if(s.llm.provider !== LLM_PROVIDER) renderLLM(s.llm);
+    else (s.llm.fields||[]).forEach(f => { const fn=FIELD_SETTERS[f.key]; if(fn) fn(f.value); });
+  }
+  if(s.tts){
+    if(s.tts.provider !== TTS_PROVIDER) renderTTS(s.tts);
+    else (s.tts.fields||[]).forEach(f => { const fn=FIELD_SETTERS[f.key]; if(fn) fn(f.value); });
+  }
 }
 init();
 </script>
