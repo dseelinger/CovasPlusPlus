@@ -672,6 +672,18 @@ def create_app(core) -> Flask:
                           "text": f"Custom macro '{name}' deleted from the web editor."})
         return jsonify({"ok": True, "macros": [s.to_dict() for s in store.all()]})
 
+    @flask_app.route("/api/prompt", methods=["POST"])
+    def prompt():
+        """Type a prompt to the AI from the control panel (issue #76). Runs a FULL normal turn
+        (router tiering, ED/memory context, tools, spoken reply) — just skips STT. Empty/whitespace
+        is rejected, matching the transcription guard."""
+        b = request.get_json(force=True) or {}
+        text = str(b.get("text") or "").strip()
+        if not text:
+            return jsonify({"ok": False, "error": "empty prompt"}), 400
+        core.dispatch_text(text)
+        return jsonify({"ok": True})
+
     @flask_app.route("/api/cancel", methods=["POST"])
     def cancel():
         core.trigger_cancel()

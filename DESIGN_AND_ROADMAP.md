@@ -230,6 +230,16 @@ the rendering surface differs:
   `covas.spec` collects it (bundling `openvr_api.dll`) **only when present**, so a freeze without
   it still succeeds. Off by default (`[hud].vr_enabled = false`).
 
+### 3.9 Turn machinery — shared `_run_turn` and typed input (issue #76)
+
+The post-transcription half of `_process` (router tiering → ED/memory injection → tool loop →
+history commit → spoken reply) is factored into `App._run_turn`. `_process` now only does STT + the
+wake gate, then calls it, so the spoken path and the **typed-prompt** path share one identical
+implementation. Typed input from the control panel (`POST /api/prompt` → `App.dispatch_text`) runs a
+**full normal turn** minus STT — same routing, context, tools, history, cancel/barge-in, and spoken
+TTS reply. It's the only way to push exact text (system/station names, glyphs STT mangles) through
+the *live* pipeline, and a mic-less/accessible input path competitors (voice-first) don't offer.
+
 ---
 
 ## 4. Cloud model tiering strategy

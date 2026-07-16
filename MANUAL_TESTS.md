@@ -129,6 +129,21 @@ Notes:
 
 Notes:
 
+## 3c. Type a prompt in the control panel (issue #76 — feature 02)  🌐 PANEL 🔊 HW
+> The main panel has a **text box + ✈ send button** above the live log. A typed prompt runs a
+> **full normal turn** (routing, context, tools, history, spoken reply) — just no microphone.
+- [ ] 🌐 Type *"what time is it? keep it short"* in the box and press **Enter** → it appears in the log as
+      `Commander: …`, the status light runs **THINKING → SPEAKING → IDLE**, and you **hear** the reply.
+- [ ] 🌐 Type another prompt and click the **✈** button → same result (both Enter and click send).
+- [ ] 🌐 The box **clears** on send.
+- [ ] 🌐 An **empty / whitespace-only** box does nothing when sent (no turn, no log line).
+- [ ] 🌐 **Precise glyphs:** type a system with an odd glyph (e.g. *"how far is Col 285 Sector →"* or a
+      name with `café`) → it goes through **verbatim** (something STT would mangle by voice).
+- [ ] 🌐 **Barge-in parity:** while a spoken reply is playing, send a typed prompt → it interrupts and
+      starts the new turn (like a push-to-talk press).
+
+Notes:
+
 ## 3a. Hands-free / continuous listening (issue #63 — `[listen].mode = "continuous"`)  🔊 HW 🎧 headset
 > Off by default. Switch to continuous by voice (*"switch to continuous listening"*), on the Settings
 > page (**Activation mode** under *Voice input*), or in `config.toml` (`[listen].mode`). Best tested

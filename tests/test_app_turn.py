@@ -604,3 +604,58 @@ def test_history_not_poisoned_across_error_then_success(tmp_path):
         {"role": "user", "content": "give me the on-foot engineering breakdown"},
         {"role": "assistant", "content": "On foot? Different department, Commander."},
     ]
+
+
+# --- typed prompt from the control panel (issue #76) ----------------------------------
+# A typed prompt runs a FULL normal turn (router, context, tools, history, spoken reply) —
+# identical to a spoken turn, just skipping STT. The shared spine is _run_turn; dispatch_text
+# is the public entry the web /api/prompt route calls.
+
+def test_typed_prompt_runs_full_turn_end_to_end(tmp_path):
+    """A typed prompt streams the LLM, speaks the reply, and commits the user+assistant pair —
+    exactly like a spoken turn, without STT. Logged as Commander (the raw text is what's stored)."""
+    llm = FakeLLM(text="Plotting a course now, Commander.")
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=llm, tts=FakeTTS())
+    app._run_turn("plot a route to Sol", threading.Event())
+    assert llm.model_seen is not None                       # the LLM actually ran
+    assert app.tts.spoken == ["Plotting a course now, Commander."]
+    assert app.history == [
+        {"role": "user", "content": "plot a route to Sol"},
+        {"role": "assistant", "content": "Plotting a course now, Commander."},
+    ]
+    assert app.state == "Idle"
+
+
+def test_typed_prompt_routing_and_control_strip_parity(tmp_path):
+    """Parity with the spoken path: a typed control phrase ('use opus') routes the turn AND is
+    scrubbed from what the model sees / what's stored — the same _run_turn code drives both."""
+    cfg = _cfg(tmp_path)
+    cfg["router"] = {"enabled": True, "default_model": "claude-haiku-4-5",
+                     "premium_model": "claude-opus-4-8"}
+    llm = FakeLLM(text="ok")
+    app = App(cfg, stt=FakeSTT(), llm=llm, tts=FakeTTS())
+    app._run_turn("Use opus for this. What's the best weapon?", threading.Event())
+    assert llm.model_seen == "claude-opus-4-8"
+    assert app.history[0] == {"role": "user", "content": "What's the best weapon?"}
+
+
+def test_dispatch_text_empty_or_whitespace_is_dropped(tmp_path):
+    """Empty/whitespace typed input never spawns a turn — no worker, no history, no API call
+    (an empty user turn 400s the API), mirroring the transcription guard."""
+    llm = FakeLLM(text="should not run")
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=llm, tts=FakeTTS())
+    app.dispatch_text("   \n\t ")
+    assert app.worker is None                               # nothing dispatched
+    assert app.history == [] and llm.model_seen is None and app.tts.spoken == []
+
+
+def test_dispatch_text_runs_turn_on_worker_and_strips(tmp_path):
+    """The public entry spawns the worker, trims surrounding whitespace, and runs the full turn."""
+    llm = FakeLLM(text="Aye, Commander.")
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=llm, tts=FakeTTS())
+    app.dispatch_text("  hello COVAS  ")
+    assert app.worker is not None
+    app.worker.join(timeout=5)
+    assert app.history[0] == {"role": "user", "content": "hello COVAS"}   # stripped
+    assert app.tts.spoken == ["Aye, Commander."]
+

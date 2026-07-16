@@ -1602,6 +1602,33 @@ class App:
         )
         self.worker.start()
 
+    # ---- typed prompt (control panel, issue #76) --------------------------
+    def dispatch_text(self, text: str) -> None:
+        """Public entry for a TYPED prompt from the control panel (issue #76). Runs a FULL normal
+        turn — router tiering, ED + memory injection, capability tools, conversation history, and a
+        spoken TTS reply — identical to a spoken turn, just skipping STT. Empty/whitespace is
+        rejected (mirrors the transcription guard). Like a PTT press it barges in on anything in
+        flight, then runs on the worker thread."""
+        if not text or not text.strip():
+            return  # nothing to answer — never send an empty user turn (the API 400s on it)
+        # Barge-in exactly like on_ptt_down: interrupt any current thinking/speaking (incl. a
+        # proactive callout) and claim the turn under the proactive lock so a callout can't slip in.
+        with self._proactive_lock:
+            self._interrupt()
+        self._dispatch_text(text.strip())
+
+    def _dispatch_text(self, text: str) -> None:
+        """Run ONE typed turn on the worker thread — mirrors :meth:`_dispatch_utterance` minus STT
+        (no capture cue, no transcription): same soft-bed arming, cancel/barge-in wiring, and
+        transactional history path, straight into the shared :meth:`_run_turn`."""
+        self.cues.play("processing")
+        self._bed_armed = True
+        cancel = threading.Event()
+        self.active_cancel = cancel
+        self.worker = threading.Thread(
+            target=self._run_turn, args=(text, cancel), daemon=True)
+        self.worker.start()
+
     # ---- Tier-2 reflex FAST PATH (second PTT, issue #38) ------------------
     def on_reflex_ptt_down(self) -> None:
         """The reflex second-PTT was pressed. Same barge-in as the main PTT (interrupt anything in
@@ -1967,7 +1994,26 @@ class App:
                         self.set_state("Idle", "(no wake word)")
                         return
                     text = res.text  # run the turn on the stripped command
+        except Exception as e:  # noqa: BLE001 — a transcription/gate failure must not crash the loop
+            self.cues.play("failed")
+            self.set_state("Idle", f"error: {e}")
+            return
+        # Post-transcription: hand off to the shared turn logic (issue #76). _run_turn owns its own
+        # fail-soft guard plus the #97 retry/watchdog, so this STT try only has to cover transcription.
+        self._run_turn(text, cancel)
 
+    def _run_turn(self, text: str, cancel: threading.Event) -> None:
+        """Run ONE full conversation turn from ALREADY-RESOLVED text — the shared spine of a
+        spoken turn (:meth:`_process`, post-STT + wake gate) and a TYPED prompt from the control
+        panel (:meth:`dispatch_text`, issue #76). Router tiering, ED-context + memory injection,
+        capability tools, conversation history, and a spoken TTS reply are identical for both; the
+        typed path simply skips STT and logs the same ``Commander: …`` line.
+
+        Fail soft: any error returns to Idle leaving NO orphaned history turn — the user+assistant
+        pair commits atomically only on a successful reply."""
+        try:
+            if cancel.is_set():
+                return
             print(f"\nCommander: {text}")
             self._log("Commander", text)
 
