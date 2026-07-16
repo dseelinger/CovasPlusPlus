@@ -446,6 +446,7 @@ class App:
             from .capabilities.ed_context_capability import EDContextCapability
             from .capabilities.on_foot_srv_capability import OnFootSrvCapability
             from .capabilities.engineers_capability import EngineersCapability
+            from .capabilities.on_foot_engineering_capability import OnFootEngineeringCapability
             from .capabilities.loadout_capability import LoadoutCapability
             from .capabilities.blueprint_capability import BlueprintCapability
             from .capabilities.stored_capability import StoredCapability
@@ -485,6 +486,14 @@ class App:
                 get_current_system=lambda: self.ed_ctx.snapshot().get("system"),
                 clipboard=_nav_copy,
                 log=lambda m: self._log("engineers", m)))
+            # On-foot (Odyssey suit/weapon) engineering (#73): bundled reference for suits,
+            # weapons, modifications and the 13 on-foot engineers. Joins the SAME live
+            # EngineerProgress event (on-foot engineers share it) for grounded unlock status.
+            self.registry.register(OnFootEngineeringCapability(
+                get_progress=self.ed_ctx.engineer_progress,
+                get_current_system=lambda: self.ed_ctx.snapshot().get("system"),
+                clipboard=_nav_copy,
+                log=lambda m: self._log("on_foot_engineering", m)))
             self._start_carriers(jdir)
             self._start_cg(jdir)
 
