@@ -34,6 +34,8 @@
   .setting .control{flex:1;display:flex;align-items:center;gap:10px;justify-content:flex-end}
   .setting .help{color:var(--muted);font-size:12px;margin-top:6px;line-height:1.5;max-width:640px}
   .setting .example{color:#5c6b7d;font-style:italic}
+  /* Search-match highlight (issue #95) — readable on the dark panel and on a light theme alike. */
+  mark.hl{background:#ffe066;color:inherit;border-radius:2px;padding:0 1px}
   .setting .err{color:var(--err);font-size:12px;margin-top:6px;display:none}
   .setting.invalid .err{display:block}
   .reset{color:#5c6b7d;font-size:11px;letter-spacing:1px;cursor:pointer;visibility:hidden;white-space:nowrap}
@@ -184,6 +186,7 @@ function row(s, group){
 
   const help = document.createElement("div"); help.className="help";
   help.innerHTML = esc(s.help) + (s.example ? ' <span class="example">e.g. “'+esc(s.example)+'”</span>':'');
+  help._origHTML = help.innerHTML; // cached so search highlighting (issue #95) can restore cleanly
   wrap.appendChild(help);
   const err = document.createElement("div"); err.className="err";
   wrap.appendChild(err);
@@ -327,11 +330,66 @@ function filter(){
   const raw=$("search").value.trim().toLowerCase();
   // Only filter once the query is 3+ chars; shorter (or empty) shows everything (issue #7).
   const q = raw.length>=3 ? raw : "";
-  for(const el of document.querySelectorAll(".setting"))
-    el.classList.toggle("hidden", q && !el.dataset.search.includes(q));
+  for(const el of document.querySelectorAll(".setting")){
+    const hidden = q && !el.dataset.search.includes(q);
+    el.classList.toggle("hidden", hidden);
+    // Highlight matches only in visible rows (issue #95) — hidden ones get their marks stripped too,
+    // so nothing stale is left behind if the row reappears under a different query later.
+    highlightRow(el, hidden ? "" : q);
+  }
   for(const card of document.querySelectorAll(".card")){
     const any=[...card.querySelectorAll(".setting")].some(e=>!e.classList.contains("hidden"));
     card.style.display = any?"":"none";
+  }
+}
+
+// Escape a string for safe use inside a RegExp (issue #95).
+function escRe(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+// Wrap every case-insensitive occurrence of `q` in a live text node with <mark class="hl">,
+// preserving the original casing of the matched text. Operates on real DOM nodes (createTextNode /
+// createElement), never innerHTML, so there is no HTML-injection risk from the query string.
+function highlightTextNode(node, re){
+  const text = node.nodeValue;
+  re.lastIndex = 0;
+  if(!re.test(text)) return;
+  re.lastIndex = 0;
+  const frag = document.createDocumentFragment();
+  let last = 0, m;
+  while((m = re.exec(text))){
+    if(m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const mark = document.createElement("mark"); mark.className="hl"; mark.textContent = m[0];
+    frag.appendChild(mark);
+    last = m.index + m[0].length;
+  }
+  if(last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+  node.parentNode.replaceChild(frag, node);
+}
+
+// Walk every text node under `root` (skips tag names/attributes entirely) and highlight matches.
+function highlightTextNodesIn(root, q){
+  const re = new RegExp(escRe(q), "gi");
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let n; while((n = walker.nextNode())) nodes.push(n);
+  for(const node of nodes) highlightTextNode(node, re);
+}
+
+// Highlight the query in a single row's label + help text, restoring the pristine content first so
+// re-filtering never compounds marks or leaves stale ones (issue #95). Rows with no visible match
+// text (e.g. an API-key row whose match is only in hidden metadata) simply get nothing highlighted.
+function highlightRow(el, q){
+  const label = el.querySelector(".label");
+  if(label){
+    // textContent concatenates all descendant text — including inside existing <mark>s — so
+    // reading then rewriting it always yields the original plain string, flattened back to one node.
+    label.textContent = label.textContent;
+    if(q) highlightTextNodesIn(label, q);
+  }
+  const help = el.querySelector(".help");
+  if(help && help._origHTML!==undefined){
+    help.innerHTML = help._origHTML;
+    if(q) highlightTextNodesIn(help, q);
   }
 }
 
@@ -368,6 +426,7 @@ function keyRow(p){
 
   const help=document.createElement("div"); help.className="help";
   help.innerHTML='<a href="'+p.url+'" target="_blank" rel="noopener">Get a key →</a>';
+  help._origHTML = help.innerHTML; // cached so search highlighting (issue #95) can restore cleanly
   wrap.appendChild(help);
   const msg=document.createElement("div"); msg.className="kmsg"; wrap.appendChild(msg);
 
