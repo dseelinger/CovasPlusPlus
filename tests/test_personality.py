@@ -57,6 +57,54 @@ def test_parse_real_presets_file():
     assert any(p["name"] == "Classic" for p in personas)
 
 
+def test_every_preset_body_carries_in_character_examples():
+    # Issue #98: personas must ship few-shot example lines *in the body* (what the model sees),
+    # while the blockquote stays a UI-only preview. Guards the parser split + the content contract.
+    base, personas = persona.parse_presets(
+        (config.ROOT / "personalities" / "presets.md").read_text(encoding="utf-8"))
+    # Base must keep the voice-persistence + thinking-preservation guidance.
+    assert "in character" in base.lower()
+    for p in personas:
+        assert ">" not in p["body"], f"{p['name']}: preview quote leaked into the body"
+        assert p["preview"], f"{p['name']}: preview quote not extracted"
+        assert "In character" in p["body"], f"{p['name']}: no in-character examples in body"
+
+
+_MULTI_EXAMPLE = """# Title
+
+## Base — applied to every persona (do not delete)
+
+You are the onboard computer. Stay in character on every reply.
+
+---
+
+## Persona — Example Voice
+
+Terse and wry. Voice: clipped, "Copy," a dry aside.
+
+In character — asked to fly the ship: "Not my console. Heading: two-ninety."
+Handing over a number: "Fuel at eight percent. Barely."
+Flagging a bad idea: "Four ships, one of us. Your call."
+
+> *"The illustrative preview quote, Commander."*
+"""
+
+
+def test_multi_example_body_splits_cleanly_from_preview():
+    base, personas = persona.parse_presets(_MULTI_EXAMPLE)
+    assert "every reply" in base
+    (p,) = personas
+    assert p["name"] == "Example Voice"
+    # All three example beats survive in the body...
+    assert "Not my console" in p["body"]
+    assert "eight percent" in p["body"]
+    assert "Four ships" in p["body"]
+    # ...and none of the blockquote preview bleeds in.
+    assert ">" not in p["body"]
+    assert "illustrative preview quote" not in p["body"]
+    assert p["preview"] == "The illustrative preview quote, Commander."
+
+
 # --- composition -----------------------------------------------------------
 
 def _cfg(tmp_path, *, persona_name="Classic", enabled=True):

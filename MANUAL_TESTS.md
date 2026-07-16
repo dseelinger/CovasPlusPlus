@@ -787,6 +787,14 @@ Notes:
 - [ ] **Save as custom:** edit the persona box → **SAVE AS CUSTOM** → a new custom persona appears in the list (written git-ignored under `personalities/custom/`).
 - [ ] **Campaign editor:** edit the Campaign box → **SAVE CAMPAIGN** → a subsequent reply reflects the updated facts.
 
+### 14.3a Persona stays in character (issue #98)
+- [ ] **Voice persists on a practical turn:** with a persona selected (personality ON), ask a plain lookup ("how far is Sol?") → the answer is accurate **and** unmistakably in that persona's voice, not a flat neutral sentence.
+- [ ] **Can't-fly-the-ship, in character:** say *"retract the landing gear"* / *"boost"* / *"turn us to two-ninety."* → COVAS **declines in character** (never a flat "that's not my department") and still answers the real need (a heading/target). Spot-check across at least **Butler** (declines like a valet), **War-Weary Veteran** (grunts, redirects to a target), and **Overeager Rookie** (crestfallen-then-eager).
+- [ ] **Refusal turn keeps the voice:** ask for something it genuinely can't know or do → the refusal is delivered **in persona**, not a bare apology.
+- [ ] **Escape hatch survives:** say *"just give it to me straight"* (or "no jokes") → the very next reply drops the bit and answers plainly; the turn after, the voice returns.
+- [ ] **Accuracy guard:** confirm the added flavor never invents a station, price, or system value — numbers/names still come only from real data.
+- [ ] **Per-persona spot check:** cycle a few distinct personas (e.g. Stoic Zen = terse; Sassy Diva/Noir = a beat more room) and confirm each *reads* as its character on the same question.
+
 ### 14.4 Voice speed (N7)
 - [ ] Nudge the **Voice speed** slider (1.0–1.2×) and ask something → the reply is spoken **faster**; the value can't exceed 1.2 (clamped).
 

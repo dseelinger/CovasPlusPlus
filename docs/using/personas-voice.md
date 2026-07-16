@@ -25,6 +25,24 @@ You can also edit the persona box and **Save as custom** to create your own pers
 git-ignored folder so it stays private and never gets committed). Custom personas appear in the
 list alongside the presets.
 
+### Writing a persona that actually stays in character
+
+The strongest personas give the model something to **imitate**, not just adjectives to admire. When
+you write (or edit) one, include:
+
+- **A few verbal tics** — signature words, a cadence, a move it makes ("Copy," "darling," a dry aside
+  at the end). Concrete tics survive across turns far better than "witty" or "warm."
+- **One or two short in-character example lines** covering the beats that come up most: one where it
+  **can't** do a ship action (COVAS never flies the ship — the decline should sound like the
+  character, not a flat apology), one where it hands over a **number**, and one where it **flags
+  danger** or a bad plan.
+
+Keep example lines as ordinary prose in the persona body — that's the text the model actually reads.
+In the shipped presets, the single quoted line shown as a **preview** is UI-only and is stripped out
+before the model sees it, so it's not the place for instructions or examples. The Base prompt already
+tells every persona to hold its voice even on short, practical, or can't-do turns, so you don't need
+to repeat that — just show *how* your character sounds when it happens.
+
 ## Editing your campaign
 
 The **Campaign editor** on the Personality tab holds your personal facts — your Commander's name,
