@@ -9,9 +9,11 @@ LLM call.
 from __future__ import annotations
 
 import threading
+import time
 from typing import Iterator, Optional
 
 from covas.app import App
+from covas.providers._retry import ProviderError
 from tests.fakes import FakeLLM, FakeSTT, FakeTTS
 
 
@@ -658,4 +660,93 @@ def test_dispatch_text_runs_turn_on_worker_and_strips(tmp_path):
     app.worker.join(timeout=5)
     assert app.history[0] == {"role": "user", "content": "hello COVAS"}   # stripped
     assert app.tts.spoken == ["Aye, Commander."]
+
+
+# --- transient-provider degradation (issue #97) ---------------------------------------
+
+class _DegradedLLM:
+    """stream_reply raises a ProviderError(retryable=True) — a provider whose in-provider retries
+    were exhausted by a sustained overload (e.g. Anthropic 529)."""
+
+    def stream_reply(self, messages, cancel, on_event,
+                     tool_handler=None, tools=None, model=None, max_tokens=None):
+        raise ProviderError("Overloaded", provider="Anthropic", status=529,
+                            retryable=True, attempts=4)
+        yield ("text", "")  # unreachable — keeps this a generator like the real provider
+
+
+def test_exhausted_retries_speak_named_degraded_line_no_orphan(tmp_path):
+    """On exhausted retries the Commander hears a short, in-character, PROVIDER-NAMED line (not a
+    raw error), the turn returns to Idle, and history is left clean (no orphaned user turn)."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=_DegradedLLM(), tts=FakeTTS())
+    app._run_turn("what's the latest ED news?", threading.Event())
+    assert app.history == []                                # atomic commit never happened
+    assert app.state == "Idle"
+    assert app.tts.spoken, "a degraded provider must still say something"
+    said = app.tts.spoken[0].lower()
+    assert "overloaded" in said and "claude" in said       # provider named (anthropic default)
+
+
+def test_non_transient_error_does_not_speak_degraded_line(tmp_path):
+    """A plain (non-transient) failure falls soft WITHOUT the 'overloaded' line — that line is
+    reserved for genuine provider degradation."""
+    app = _make_app(tmp_path, stt=FakeSTT(text="hi"), llm=_RaisingLLM(), tts=FakeTTS())
+    app._process(object(), threading.Event())
+    assert app.history == [] and app.tts.spoken == []      # errored, nothing spoken
+    assert app.state == "Idle"
+
+
+def test_degraded_line_degrades_to_log_in_text_only(tmp_path):
+    """Fail-soft: with no TTS (text-only) the degraded message must not be spoken or crash — it
+    degrades to a logged line."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=_DegradedLLM(), tts=FakeTTS())
+    app.text_only = True
+    app._run_turn("what's the latest ED news?", threading.Event())  # must not raise
+    assert app.tts.spoken == []                            # nothing voiced in text-only
+    assert app.state == "Idle" and app.history == []
+
+
+# --- latency watchdog (issue #97) -----------------------------------------------------
+
+def test_latency_watchdog_speaks_interim_when_slow(tmp_path):
+    """A turn that goes past the threshold without a reply speaks a plain-language 'still trying'
+    line ONCE in the current voice."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=FakeLLM(), tts=FakeTTS())
+    app.cfg["llm"] = {"slow_warning_seconds": 0.02}
+    wd = app._arm_latency_watchdog(threading.Event())
+    time.sleep(0.12)
+    wd.disarm()
+    assert len(app.tts.spoken) == 1                        # fired exactly once
+    assert "slow" in app.tts.spoken[0].lower()
+
+
+def test_latency_watchdog_disarm_prevents_speak(tmp_path):
+    """Disarming (reply arrived, or turn cancelled) before the threshold suppresses the line."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=FakeLLM(), tts=FakeTTS())
+    app.cfg["llm"] = {"slow_warning_seconds": 0.05}
+    wd = app._arm_latency_watchdog(threading.Event())
+    wd.disarm()                                            # reply came back immediately
+    time.sleep(0.12)
+    assert app.tts.spoken == []                            # never fired
+
+
+def test_latency_watchdog_text_only_does_not_speak(tmp_path):
+    """In text-only mode the interim heads-up must not touch TTS (it degrades to a log line)."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=FakeLLM(), tts=FakeTTS())
+    app.text_only = True
+    app.cfg["llm"] = {"slow_warning_seconds": 0.02}
+    wd = app._arm_latency_watchdog(threading.Event())
+    time.sleep(0.1)
+    wd.disarm()
+    assert app.tts.spoken == []
+
+
+def test_latency_watchdog_disabled_when_threshold_zero(tmp_path):
+    """slow_warning_seconds = 0 disables the watchdog entirely."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=FakeLLM(), tts=FakeTTS())
+    app.cfg["llm"] = {"slow_warning_seconds": 0}
+    wd = app._arm_latency_watchdog(threading.Event())
+    time.sleep(0.05)
+    wd.disarm()
+    assert app.tts.spoken == []
 

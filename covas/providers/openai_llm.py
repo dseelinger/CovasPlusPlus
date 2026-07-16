@@ -29,6 +29,8 @@ from typing import Iterator, Optional
 import requests
 
 from ..llm import build_system, estimate_cost
+from ._retry import (RetryPolicy, TransientError, is_retryable_status,
+                     parse_retry_after, run_with_retry)
 from .base import OnEvent, ToolHandler
 
 _DEFAULT_BASE_URL = "https://api.openai.com/v1"
@@ -89,6 +91,7 @@ class OpenAILLM:
         oa_tools = _translate_tools(tools)
         mdl = str(model or self.model)
         cap = int(max_tokens if max_tokens is not None else self._max_tokens)
+        policy = RetryPolicy.from_cfg(self._cfg)  # transient-error retry (issue #97)
 
         for _round in range(_MAX_ROUNDS):
             body: dict = {"model": mdl, "messages": working, "stream": True,
@@ -102,7 +105,7 @@ class OpenAILLM:
             finish: Optional[str] = None
             usage: Optional[dict] = None
 
-            for chunk in _stream_chat(self.base_url, key, body, cancel):
+            for chunk in _stream_chat(self.base_url, key, body, cancel, policy=policy):
                 if cancel.is_set():
                     return
                 if chunk.get("usage"):
@@ -158,6 +161,14 @@ class OpenAILLM:
 
 
 # ---- module helpers -------------------------------------------------------
+def _close(r) -> None:  # noqa: ANN001 — a requests.Response (or a test double without .close)
+    """Best-effort release of a non-200 response before we raise — test doubles may lack close()."""
+    try:
+        r.close()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _translate_tools(tools: Optional[list[dict]]) -> list[dict]:
     """Translate the shared Anthropic-style tool schemas ({name, description, input_schema}) into
     OpenAI function tools ({type:'function', function:{name, description, parameters}})."""
@@ -211,17 +222,34 @@ def _usage_event(cfg: dict, model: str, usage: dict) -> dict:
     return ev
 
 
-def _stream_chat(base_url: str, key: str, body: dict,
-                 cancel: threading.Event, *, timeout=(10, 600)) -> Iterator[dict]:  # noqa: ANN001
+def _stream_chat(base_url: str, key: str, body: dict, cancel: threading.Event,
+                 *, policy: Optional[RetryPolicy] = None,
+                 timeout=(10, 600)) -> Iterator[dict]:  # noqa: ANN001
     """POST `chat/completions` with stream=True and yield each parsed SSE `data:` chunk as a dict.
-    Stops on `[DONE]` or `cancel`. Raises RuntimeError on a non-200 response."""
+    Stops on `[DONE]` or `cancel`.
+
+    Retry (issue #97) wraps the CONNECT only: a 429/5xx/529 or a connection/timeout on the initial
+    request backs off (honoring Retry-After) and re-tries per `policy`; a 4xx (bad key, 404 model)
+    fails fast. Once bytes stream, a mid-stream drop is NOT retried — it propagates and the turn
+    falls soft. A non-retryable non-200 raises the same RuntimeError the app already guards."""
     url = f"{base_url}/chat/completions"
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json",
                "User-Agent": _USER_AGENT}
-    with requests.post(url, data=json.dumps(body), headers=headers,
-                       stream=True, timeout=timeout) as r:
+    policy = policy or RetryPolicy()
+
+    def _connect() -> "requests.Response":
+        r = requests.post(url, data=json.dumps(body), headers=headers, stream=True, timeout=timeout)
         if r.status_code != 200:
-            raise RuntimeError(f"OpenAI LLM {r.status_code}: {r.text[:200]}")
+            detail = f"OpenAI LLM {r.status_code}: {r.text[:200]}"
+            retryable = is_retryable_status(r.status_code)
+            ra = parse_retry_after(r.headers.get("Retry-After")) if retryable else None
+            _close(r)
+            if retryable:
+                raise TransientError(detail, status=r.status_code, retry_after=ra, provider="OpenAI")
+            raise RuntimeError(detail)
+        return r
+
+    with run_with_retry(_connect, cancel, policy, provider="OpenAI") as r:
         for line in r.iter_lines():
             if cancel.is_set():
                 return

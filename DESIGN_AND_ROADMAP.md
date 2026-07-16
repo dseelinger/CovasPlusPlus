@@ -230,15 +230,33 @@ the rendering surface differs:
   `covas.spec` collects it (bundling `openvr_api.dll`) **only when present**, so a freeze without
   it still succeeds. Off by default (`[hud].vr_enabled = false`).
 
-### 3.9 Turn machinery — shared `_run_turn` and typed input (issue #76)
+### 3.9 Turn machinery — shared `_run_turn`, typed input, and provider resilience (issues #76, #97)
 
-The post-transcription half of `_process` (router tiering → ED/memory injection → tool loop →
-history commit → spoken reply) is factored into `App._run_turn`. `_process` now only does STT + the
-wake gate, then calls it, so the spoken path and the **typed-prompt** path share one identical
-implementation. Typed input from the control panel (`POST /api/prompt` → `App.dispatch_text`) runs a
-**full normal turn** minus STT — same routing, context, tools, history, cancel/barge-in, and spoken
-TTS reply. It's the only way to push exact text (system/station names, glyphs STT mangles) through
-the *live* pipeline, and a mic-less/accessible input path competitors (voice-first) don't offer.
+Two changes to the worker turn, both keeping the fail-soft discipline of principle #6:
+
+- **`_run_turn(text, cancel)` — the shared turn spine (#76).** The post-transcription half of
+  `_process` (router tiering → ED/memory injection → tool loop → history commit → spoken reply) is
+  factored into `App._run_turn`. `_process` now only does STT + the wake gate, then calls it, so the
+  spoken path and the **typed-prompt** path share one identical implementation. Typed input from the
+  control panel (`POST /api/prompt` → `App.dispatch_text`) runs a **full normal turn** minus STT —
+  same routing, context, tools, history, cancel/barge-in, and spoken TTS reply. It's the only way to
+  push exact text (system/station names, glyphs STT mangles) through the *live* pipeline, and a
+  mic-less/accessible input path competitors (voice-first) don't offer.
+
+- **Transient-provider resilience (#97).** A cloud LLM's bad minute (Anthropic 529, 429s, 503s,
+  connection blips) no longer kills the turn. A single shared classifier + backoff policy lives in
+  `providers/_retry.py` (retryable = 429/500/502/503/529 + connection/timeout; fail-fast = 4xx incl.
+  404) and every raw-`requests` provider (`openai_llm`, `gemini_llm`, `ollama_llm`) wraps its
+  **connect** in `run_with_retry` — exponential backoff + jitter, honoring `Retry-After`,
+  **cancel-aware** (a barge-in aborts the wait), with a **hard total-wait cap** so a turn never
+  feels hung. Retry covers the initial connect only; a **mid-stream** drop falls soft (can't re-emit
+  without double-speaking). The Anthropic SDK path is driven from the **same** `[llm.retry]` knobs
+  via `max_retries` (no double-retry). Two user-facing, **canned** (never another LLM call) spoken
+  signals route through the normal `_speak` voice and degrade to a log line in text-only: a
+  **latency watchdog** (`[llm].slow_warning_seconds`, default 30) speaks an interim "still trying"
+  line if a turn goes silent, and **exhausted retries** speak a provider-named "…is overloaded…"
+  line while the log records the precise reason. Retries happen **before** the atomic user+assistant
+  history commit, so a degraded turn leaves no orphan.
 
 ---
 

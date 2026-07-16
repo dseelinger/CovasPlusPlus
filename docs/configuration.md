@@ -501,6 +501,12 @@ See [Companion HUD](using/hud.md). **Off by default.**
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `llm.provider` | `anthropic` | `anthropic` (cloud, Claude), `openai` (any OpenAI-compatible cloud — OpenAI/Groq/DeepSeek/OpenRouter), `gemini` (Google Gemini native — function calling + Search grounding), or `ollama` (local, out-of-game only) |
+| `llm.slow_warning_seconds` | `30` | If a turn goes this long with no spoken reply (slow provider, retry/backoff, hung connection), COVAS speaks a plain-language "the AI service is being slow, still trying" heads-up in the **current voice**. `0` disables it |
+| `llm.retry.enabled` | `true` | Retry transient provider errors (overload/rate-limit/5xx, connection/timeout) with backoff before giving up. `false` = a single try, no retry |
+| `llm.retry.attempts` | `4` | Total tries per request (1 initial + up to 3 retries) |
+| `llm.retry.base_delay` / `.max_delay` | `0.5` / `4.0` | First backoff (seconds) and per-sleep ceiling; the delay grows ×2 each retry (0.5, 1, 2, 4…) |
+| `llm.retry.max_total_wait` | `20.0` | **Hard cap** on cumulative backoff for one turn — keeps a struggling provider from ever making the app feel hung |
+| `llm.retry.jitter` | `0.25` | Add up to this fraction of the delay at random, so retries don't stampede a recovering server |
 | `openai.base_url` / `.model` | OpenAI / `gpt-4o-mini` | OpenAI-compatible `chat/completions` endpoint + the model used when `llm.provider = "openai"`; `[openai.tiers]` ships **unset**, so every router tier reuses `.model` (a bare model swap to Groq/DeepSeek/OpenRouter just works) unless you set distinct per-tier ids there |
 | `gemini.model` | `gemini-3.1-flash-lite` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash-Lite cheap, 3.5 Flash for depth) live in `[gemini.tiers]` |
 | `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
@@ -527,6 +533,20 @@ See [Companion HUD](using/hud.md). **Off by default.**
 > `GeminiAPIKey.txt`) — a free key comes from [Google AI Studio](https://aistudio.google.com). Fail soft: a request error degrades the turn to
 > text. (Combining function calling + grounding needs a Gemini 2.x-or-newer model; older models may
 > reject the combo — turn `web_search.enabled` off for those.)
+
+> **Riding out a provider's bad minutes (`[llm.retry]` + `llm.slow_warning_seconds`).** Cloud LLMs
+> have overloaded moments — Anthropic **529 "Overloaded"**, OpenAI/Groq **429**s, Gemini **503**s,
+> plus plain connection blips. Instead of dying on one, COVAS **retries** the request with
+> exponential backoff + jitter, honoring the server's `Retry-After`, staying **cancel-aware** (a
+> push-to-talk barge-in aborts the wait immediately), and capping the **total** wait so a turn never
+> feels hung. Errors that *won't* get better on retry — a bad key (401), a nonexistent model (404),
+> a validation error (400) — **fail fast**. If a turn still drags past `slow_warning_seconds`, COVAS
+> speaks a plain-language "the AI service is being slow, I'm still trying" line so you're not left in
+> silence; if the retries are finally exhausted, it says the provider is **overloaded** (naming it)
+> and logs the precise reason (e.g. `provider degraded: Anthropic 529 Overloaded — retried 4×,
+> giving up`) — never a cryptic stack trace. Both spoken lines route through your **current voice**
+> and degrade to a text/log line when TTS is unavailable. The behavior is shared across every LLM
+> provider (the Anthropic SDK's own retries are driven from these same knobs).
 
 > **Provider suitability — what limits COVAS actually needs.** COVAS is a *tool-heavy, session-length*
 > workload: it sends a large tool set (**~10K tokens per turn**, growing with history) and runs many

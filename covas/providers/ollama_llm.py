@@ -23,11 +23,14 @@ from typing import Iterator, Optional
 import requests
 
 from ..llm import build_system
+from ._retry import (RetryPolicy, TransientError, is_retryable_status,
+                     parse_retry_after, run_with_retry)
 from .base import OnEvent, ToolHandler
 
 
 class OllamaLLM:
     def __init__(self, cfg: dict) -> None:
+        self._cfg = cfg
         o = cfg.get("ollama", {})
         self.host = str(o.get("host", "http://localhost:11434")).rstrip("/")
         self.model = str(o.get("model", "qwen3"))
@@ -79,11 +82,28 @@ class OllamaLLM:
         }
         in_think = False  # tracks inline <think> tag state
         pending = ""      # trailing fragment that may be the start of a split tag
+        policy = RetryPolicy.from_cfg(self._cfg)  # transient-error retry (issue #97)
+
+        def _connect() -> "requests.Response":
+            # Retry (issue #97) wraps the CONNECT only. A local Ollama rarely 429/5xxs, but a
+            # transient connection blip or a 503 while a model loads is worth a short backoff; a
+            # 4xx (bad model) fails fast. Mid-stream drops are NOT retried — they fall soft.
+            r = requests.post(f"{self.host}/api/chat", json=payload, stream=True, timeout=(10, 600))
+            if r.status_code != 200:
+                detail = f"Ollama LLM {r.status_code}: {r.text[:200]}"
+                retryable = is_retryable_status(r.status_code)
+                ra = parse_retry_after(r.headers.get("Retry-After")) if retryable else None
+                try:
+                    r.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                if retryable:
+                    raise TransientError(detail, status=r.status_code, retry_after=ra, provider="Ollama")
+                raise RuntimeError(detail)
+            return r
+
         try:
-            with requests.post(
-                f"{self.host}/api/chat", json=payload, stream=True, timeout=(10, 600)
-            ) as r:
-                r.raise_for_status()
+            with run_with_retry(_connect, cancel, policy, provider="Ollama") as r:
                 for line in r.iter_lines():
                     if cancel.is_set():
                         return
