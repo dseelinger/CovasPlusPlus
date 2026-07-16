@@ -10,7 +10,7 @@
         "GUI"
       ],
       "requires": "You installed the release intended for this test pass.",
-      "expected": "The control panel version banner shows the build under test (0.10.2), so every result maps to the right code. A stale install must never masquerade as a bug.",
+      "expected": "The control panel version banner shows the build under test (0.10.3), so every result maps to the right code. A stale install must never masquerade as a bug.",
       "steps": [
         {
           "id": "s1",
@@ -18,7 +18,7 @@
         },
         {
           "id": "s2",
-          "text": "Confirm the version banner reads 0.10.2 - it must match the installer you just ran."
+          "text": "Confirm the version banner reads 0.10.3 - it must match the installer you just ran."
         },
         {
           "id": "s3",
@@ -85,12 +85,12 @@
         "NET",
         "FILE"
       ],
-      "requires": "An OpenAI (or compatible) API key: enter it on the Settings **API keys** card (OpenAI field), or paste it into `OpenAIAPIKey.txt` in the data dir (migrated to DPAPI-encrypted on first read). Env vars are NOT read for keys (#22). Internet access. Set `[llm].provider = \"openai\"` and restart. For the alt-endpoint step, a Groq or OpenRouter key + `[openai].base_url`.",
+      "requires": "An OpenAI (or compatible) API key: enter it on the Settings **API keys** card (OpenAI field), or paste it into `OpenAIAPIKey.txt` in the data dir (migrated to DPAPI-encrypted on first read). Env vars are NOT read for keys (#22). Internet access. Set **LLM provider = openai** on the Settings **Providers** card and restart. For the alt-endpoint step, a Groq or OpenRouter key + the **OpenAI LLM base URL** field (Settings **Providers**). All config here is done from the Settings page — only the per-tier model maps (`[openai.tiers]`) stay in `config.toml`.",
       "expected": "COVAS answers via the OpenAI-compatible endpoint; the router tiers it (OpenAI model ids in the `[router]` line); tool calling (checklist) works over delta-assembled tool_calls; switching base_url to Groq/OpenRouter still works; a missing key/bad base_url degrades the turn to text without crashing.",
       "steps": [
         {
           "id": "s1",
-          "text": "Set `[llm].provider = \"openai\"` (default base_url/model = OpenAI gpt-4o-mini), set the OpenAI key via the Settings **API keys** card, restart, speak a turn -> COVAS answers via OpenAI; `[router]` line shows the OpenAI model (e.g. `[cheap] gpt-4o-mini`) and `[usage]` shows token counts."
+          "text": "On the Settings **Providers** card set **LLM provider = openai** (default base URL/model = OpenAI gpt-4o-mini), set the OpenAI key via the Settings **API keys** card, restart, speak a turn -> COVAS answers via OpenAI; `[router]` line shows the OpenAI model (e.g. `[cheap] gpt-4o-mini`) and `[usage]` shows token counts."
         },
         {
           "id": "s2",
@@ -102,7 +102,7 @@
         },
         {
           "id": "s4",
-          "text": "Alt endpoint: point `[openai].base_url` at Groq (`https://api.groq.com/openai/v1`, model `llama-3.3-70b-versatile`) or OpenRouter with that service's key, restart -> conversation still works through the same provider."
+          "text": "Alt endpoint: on the Settings **Providers** card set **OpenAI LLM base URL** to Groq (`https://api.groq.com/openai/v1`) and **OpenAI LLM model** to `llama-3.3-70b-versatile` (or OpenRouter), enter that service's key on the **API keys** card, restart -> conversation still works through the same provider."
         },
         {
           "id": "s5",
@@ -119,12 +119,12 @@
         "NET",
         "FILE"
       ],
-      "requires": "A Gemini API key (free from aistudio.google.com): export `GEMINI_API_KEY` (or `GOOGLE_API_KEY`, or paste into `GeminiAPIKey.txt`); internet access. Set `[llm].provider = \"gemini\"` and restart. For grounding, `[web_search].enabled = true`.",
+      "requires": "A Gemini API key (free from aistudio.google.com): enter it on the Settings **API keys** card (Gemini field), or paste it into `GeminiAPIKey.txt` in the data dir (DPAPI-encrypted on first read). Env vars are NOT read for keys (#22). Internet access. Set **LLM provider = gemini** on the Settings **Providers** card and restart. For grounding, turn on **Web search** on the Settings page. All config here is done from the Settings page — only the per-tier model maps (`[gemini.tiers]`) stay in `config.toml`.",
       "expected": "COVAS answers via Gemini; the router tiers it (Flash cheap / Pro depth in the `[router]` line); checklist tool calling works; with web search on, Google-Search grounding surfaces a Searching side-channel line; a missing key degrades the turn to text without crashing.",
       "steps": [
         {
           "id": "s1",
-          "text": "Set `[llm].provider = \"gemini\"`, export `GEMINI_API_KEY`, restart, speak a turn -> COVAS answers via Gemini; `[router]` line shows the model (e.g. `[cheap] gemini-2.5-flash`) and `[usage]` shows token counts."
+          "text": "On the Settings **Providers** card set **LLM provider = gemini**, set the Gemini key via the Settings **API keys** card, restart, speak a turn -> COVAS answers via Gemini; `[router]` line shows the model (e.g. `[cheap] gemini-2.5-flash`) and `[usage]` shows token counts."
         },
         {
           "id": "s2",
@@ -132,7 +132,7 @@
         },
         {
           "id": "s3",
-          "text": "Grounding: with `[web_search].enabled = true`, ask \"What's the latest on the Thargoid war?\" -> the log shows a `Searching...` side-channel line (grounding queries) and the answer reflects live info."
+          "text": "Grounding: with **Web search** turned on (Settings page), ask \"What's the latest on the Thargoid war?\" -> the log shows a `Searching...` side-channel line (grounding queries) and the answer reflects live info."
         },
         {
           "id": "s4",
@@ -187,8 +187,8 @@
       "tags": [
         "HW"
       ],
-      "requires": "App running (native window, browser UI, or headless). Know the expected version from `covas/__version__.py` (currently 0.3.1).",
-      "expected": "COVAS speaks the running version, e.g. \"I'm running COVAS++ version 0.3.1.\", matching covas/__version__.py exactly.",
+      "requires": "App running (native window, browser UI, or headless). Know the expected version from `covas/__version__.py` (currently 0.10.3).",
+      "expected": "COVAS speaks the running version, e.g. \"I'm running COVAS++ version 0.10.3.\", matching covas/__version__.py exactly.",
       "steps": [
         {
           "id": "s1",

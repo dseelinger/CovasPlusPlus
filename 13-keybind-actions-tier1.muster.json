@@ -10,7 +10,7 @@
         "GUI"
       ],
       "requires": "You installed the release intended for this test pass.",
-      "expected": "The control panel version banner shows the build under test (0.10.2), so every result maps to the right code. A stale install must never masquerade as a bug.",
+      "expected": "The control panel version banner shows the build under test (0.10.3), so every result maps to the right code. A stale install must never masquerade as a bug.",
       "steps": [
         {
           "id": "s1",
@@ -18,7 +18,7 @@
         },
         {
           "id": "s2",
-          "text": "Confirm the version banner reads 0.10.2 - it must match the installer you just ran."
+          "text": "Confirm the version banner reads 0.10.3 - it must match the installer you just ran."
         },
         {
           "id": "s3",
