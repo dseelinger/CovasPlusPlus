@@ -125,6 +125,7 @@ Notes:
 - [ ] Ask a long question (*"Tell me the history of the Elite Dangerous galaxy in detail."*). While it's **thinking or speaking**, **tap `[` briefly** → it stops instantly and returns to **IDLE**.
 - [ ] Confirm a normal **hold** still records fine (a hold is well over the 400 ms tap threshold).
 - [ ] **Barge-in:** while a reply is being spoken, **hold `[`** again → the speech cuts off and a fresh capture starts.
+- [ ] **Barge-in tail check (issue #71):** while COVAS is **mid-sentence**, hold `[`, immediately say a short new phrase, then release. In the session log the captured `Commander:` line contains **only your new phrase** — **no trailing fragment of COVAS's previous reply** leaks in from the speakers. (Playback is silenced before the mic opens; a short leading mute window is the backstop.)
 - [ ] 🌐 The panel's **CANCEL / STOP** button also stops an in-progress reply.
 
 Notes:

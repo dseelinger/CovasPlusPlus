@@ -26,7 +26,9 @@ so you can see exactly where a turn is.
   press shorter than ~400 ms). It stops instantly and returns to idle. This is the same key you
   hold to talk; a quick tap means "stop," a real hold means "listen."
 - **Barge-in** — while a reply is being spoken, just **hold** the talk key again. The speech cuts
-  off and a fresh capture starts. You never have to wait for it to finish.
+  off and a fresh capture starts. You never have to wait for it to finish. Playback is silenced
+  *before* the mic opens (and a short leading slice of the capture is muted as a backstop), so the
+  new capture never picks up the tail of the reply still leaving the speakers.
 - **The panel's CANCEL button** also stops an in-progress reply at any time.
 
 The tap-versus-hold threshold is `[keys].tap_cancel_ms` (default 400 ms) in

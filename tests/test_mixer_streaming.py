@@ -47,6 +47,19 @@ def test_cancel_speech_drops_buffered_audio_immediately():
     assert np.allclose(_pull(mix, 100), 0.0)   # nothing plays after cancel
 
 
+def test_speech_active_tracks_live_streams_and_clears_on_cancel():
+    """Barge-in relies on speech_active() reading False the instant cancel_speech() returns, so the
+    mic can await confirmed silence without racing the async feeder teardown (issue #71)."""
+    mix = _mixer()
+    assert not mix.speech_active()             # nothing playing
+    st = mix.open_speech(COVAS, 16000)
+    st.feed(float_to_pcm16(np.full(1000, 0.9, dtype=np.float32)))
+    assert mix.speech_active()                 # a live stream is queued
+    mix.cancel_speech()
+    assert not mix.speech_active()             # synchronously silent — no callback needed
+    assert st.done
+
+
 def test_wait_unblocks_on_finish_drain():
     mix = _mixer()
     st = mix.open_speech(COVAS, 16000)

@@ -202,11 +202,23 @@ class BusMixer:
         return st
 
     def cancel_speech(self) -> None:
-        """Barge-in: drop all in-flight streaming speech immediately (buffered audio discarded)."""
+        """Barge-in: drop all in-flight streaming speech immediately (buffered audio discarded).
+        Synchronous — every stream is marked cancelled/done before this returns, so the very next
+        device callback outputs silence and :meth:`speech_active` reads False right away. This is
+        the hard stop the app must call on barge-in (issue #71): merely setting the turn's cancel
+        event only silences the feeder a chunk-read later, leaving the mixer to keep playing already
+        buffered audio into an about-to-open mic."""
         with self._lock:
             streams = list(self._streams)
         for st in streams:
             st.cancel()
+
+    def speech_active(self) -> bool:
+        """True while any streaming speech source is still live (not finished/cancelled). Goes
+        False immediately after :meth:`cancel_speech`, so a barge-in can briefly AWAIT confirmed
+        silence before opening the mic — without racing the async feeder teardown (issue #71)."""
+        with self._lock:
+            return any(not st.done for st in self._streams)
 
     def clear_bus(self, bus: str) -> None:
         """Drop any pending buffer sources on `bus` (e.g. stop a cue). Streams are untouched."""

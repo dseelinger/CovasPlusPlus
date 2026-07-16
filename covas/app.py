@@ -54,6 +54,18 @@ STATES = ("Idle", "Listening", "Transcribing", "Thinking", "Searching", "Speakin
 # barge-in -> Listening) through the single set_state chokepoint.
 _WORKING_STATES = frozenset({"Transcribing", "Thinking", "Searching"})
 
+# Barge-in playback-halt bounds (issue #71). On barge-in the mic must not open until COVAS's own
+# reply has actually gone silent, or the capture records its tail (there is no acoustic echo
+# cancellation) and it pollutes the next utterance. _interrupt() hard-stops the mixer and AWAITS
+# confirmed silence, bounded by this timeout so barge-in still feels instant. The mute window is a
+# belt-and-braces backstop applied to the barge-in capture only (residual device-buffer tail, and
+# the direct-device TTS path the app can't synchronously stop).
+_HALT_PLAYBACK_TIMEOUT_MS = 150.0
+_BARGE_IN_MUTE_MS = 150.0
+# States in which playback (a spoken reply or the thinking bed / cues) may be audible, so a PTT/VAD
+# onset from one of them is a barge-in that needs the mute window.
+_PLAYBACK_STATES = _WORKING_STATES | frozenset({"Speaking"})
+
 
 def _pop_path(d: dict, path: tuple) -> None:
     """Remove the nested key at `path` from `d`, if present (no-op otherwise)."""
@@ -1555,9 +1567,29 @@ class App:
 
     # ---- cancellation -----------------------------------------------------
     def _interrupt(self) -> None:
+        """Abort whatever is in flight AND actively silence playback. Setting the turn's cancel
+        event alone (the old behaviour) only tells the async feeder to stop a chunk-read later —
+        the mixer keeps playing already-buffered speech for tens of ms, which on barge-in leaks
+        the reply's tail into the just-opened mic (issue #71). So we also hard-stop the mixer and
+        BRIEFLY await confirmed silence before returning, so callers can open the mic clean."""
         if self.active_cancel is not None and not self.active_cancel.is_set():
             self.active_cancel.set()
         self.cues.stop()  # stop any cue still playing
+        self._halt_playback()
+
+    def _halt_playback(self) -> None:
+        """Drop all in-flight TTS on the shared mixer and wait (bounded) for silence. No-op when
+        the audio layer is off (direct-device playback path, or tests) — the barge-in mute window
+        is the backstop there. Fail-soft: never let teardown crash the loop."""
+        if self.mixer is None:
+            return
+        try:
+            self.mixer.cancel_speech()
+            deadline = time.monotonic() + _HALT_PLAYBACK_TIMEOUT_MS / 1000.0
+            while self.mixer.speech_active() and time.monotonic() < deadline:
+                time.sleep(0.005)
+        except Exception:  # noqa: BLE001 — barge-in teardown must never break the voice loop
+            pass
 
     # ---- PTT / cancel handlers -------------------------------------------
     def on_ptt_down(self) -> None:
@@ -1566,9 +1598,12 @@ class App:
         # its idle-claim in between and end up speaking over this capture. Either the claim
         # loses (sees "Listening" -> skips) or it already won (this interrupt cancels it).
         with self._proactive_lock:
+            barged = self.state in _PLAYBACK_STATES
             self._interrupt()        # interrupt any current thinking/speaking (incl. a callout)
             self.set_state("Listening")
-        self.recorder.start()
+        # On a barge-in _interrupt() has already silenced the mixer + awaited it; the mute window
+        # is the backstop for any residual device-buffer tail (issue #71).
+        self.recorder.start(mute_ms=_BARGE_IN_MUTE_MS if barged else 0.0)
         self.cues.play("listening")
 
     def on_ptt_up(self) -> None:
@@ -1608,9 +1643,10 @@ class App:
         flight, flip to Listening under the proactive lock) — but this capture is destined for the
         local phrase-spotter fast path, not a conversation turn."""
         with self._proactive_lock:
+            barged = self.state in _PLAYBACK_STATES
             self._interrupt()
             self.set_state("Listening", "reflex")
-        self.recorder.start()
+        self.recorder.start(mute_ms=_BARGE_IN_MUTE_MS if barged else 0.0)
         self.cues.play("listening")
 
     def on_reflex_ptt_up(self) -> None:
