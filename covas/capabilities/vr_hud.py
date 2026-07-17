@@ -35,7 +35,7 @@ from __future__ import annotations
 import ctypes
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, List, Optional
 
 import numpy as np
@@ -355,11 +355,14 @@ class VrPlacement:
     offset_x_m: float = 0.0    # lateral offset (positive = to the right)
     pitch_deg: float = 0.0     # tilt; positive = top leans TOWARD you (good when placed low)
     curvature: float = 0.0     # 0 = flat, 1 = full cylinder; a gentle ED-style wrap is ~0.05–0.1
+    yaw_deg: float = 0.0       # heading; 0 = straight ahead. Set by "pin the HUD here" (look-to-
+                               # place) to the direction you're facing, so the panel swings to your
+                               # gaze. The forward/lateral offsets are applied in THIS yawed frame.
 
     @staticmethod
     def normalize(mode: object, width_m: object = 0.55, *, forward_m: object = 1.30,
                   up_m: object = -0.12, offset_x_m: object = 0.0, pitch_deg: object = 0.0,
-                  curvature: object = 0.0) -> "VrPlacement":
+                  curvature: object = 0.0, yaw_deg: object = 0.0) -> "VrPlacement":
         """Build a placement from raw config values, clamping each to a sane, comfortable range
         so a bad setting can never place the panel somewhere unusable (or raise)."""
         m = str(mode or "world").strip().lower()
@@ -372,6 +375,12 @@ class VrPlacement:
             except (TypeError, ValueError):
                 return default
 
+        def _wrap(v: object, default: float) -> float:
+            try:
+                return ((float(v) + 180.0) % 360.0) - 180.0  # wrap to (−180, 180]
+            except (TypeError, ValueError):
+                return default
+
         return VrPlacement(
             mode=m,
             width_m=_clamp(width_m, 0.55, 0.15, 3.0),        # 15 cm .. 3 m
@@ -380,24 +389,50 @@ class VrPlacement:
             offset_x_m=_clamp(offset_x_m, 0.0, -2.0, 2.0),   # ±2 m lateral
             pitch_deg=_clamp(pitch_deg, 0.0, -60.0, 60.0),   # ±60° tilt
             curvature=_clamp(curvature, 0.0, 0.0, 1.0),      # flat .. full cylinder
+            yaw_deg=_wrap(yaw_deg, 0.0),                       # heading, wrapped
         )
 
 
-def resolve_transform(p: VrPlacement) -> List[List[float]]:
-    """The overlay's 3x4 row-major transform: an X-axis pitch rotation plus a translation to
-    ``(offset_x_m, up_m, −forward_m)`` — lateral, vertical, and ``forward_m`` in front (−Z is
-    forward in OpenVR). Positive ``pitch_deg`` leans the panel's top toward the viewer (so a
-    low panel angles up to face you). At the default ``pitch_deg=0`` the rotation is identity.
-    For ``world`` this is relative to the seated origin; for ``head`` it is relative to the HMD
-    — the matrix is the same, only the binding call differs (see ``VrHudView``)."""
+def _mul_3x4(a: List[List[float]], b: List[List[float]]) -> List[List[float]]:
+    """Compose two 3x4 rigid transforms (each an ``[R | t]`` with an implicit ``[0 0 0 1]``
+    bottom row): returns ``a ∘ b``. Pure, so the placement math is unit-tested offline."""
+    out = [[0.0, 0.0, 0.0, 0.0] for _ in range(3)]
+    for i in range(3):
+        for j in range(3):
+            out[i][j] = sum(a[i][k] * b[k][j] for k in range(3))
+        out[i][3] = sum(a[i][k] * b[k][3] for k in range(3)) + a[i][3]
+    return out
+
+
+def hmd_yaw_deg(matrix: List[List[float]]) -> float:
+    """The heading (degrees) to give ``VrPlacement.yaw_deg`` so a panel placed by look-to-place
+    sits along the HMD's horizontal gaze and faces back at the viewer. ``matrix`` is the HMD's
+    3x4 device-to-absolute pose. Pure — unit-tested against known rotations."""
     import math
-    th = math.radians(float(p.pitch_deg))
-    c, s = math.cos(th), math.sin(th)
-    return [
+    return math.degrees(math.atan2(matrix[0][2], matrix[2][2]))
+
+
+def resolve_transform(p: VrPlacement) -> List[List[float]]:
+    """The overlay's 3x4 row-major transform: a heading rotation ``Ry(yaw)`` composed with the
+    panel's local pose — an X-axis ``pitch`` tilt plus a translation to ``(offset_x, up,
+    −forward)`` (lateral, vertical, and ``forward`` in front; −Z is forward in OpenVR). So the
+    offsets act in the yawed frame: after "pin here" swings the panel to your gaze, "left" /
+    "closer" still move it sensibly relative to that facing. Positive ``pitch_deg`` leans the
+    top toward the viewer (a low panel angles up to face you). At ``yaw=pitch=0`` the rotation
+    is identity. For ``world`` this is relative to the seated origin; for ``head`` relative to
+    the HMD — the matrix is the same, only the binding call differs (see ``VrHudView``)."""
+    import math
+    py = math.radians(float(p.yaw_deg))
+    cy, sy = math.cos(py), math.sin(py)
+    px = math.radians(float(p.pitch_deg))
+    c, s = math.cos(px), math.sin(px)
+    ry = [[cy, 0.0, sy, 0.0], [0.0, 1.0, 0.0, 0.0], [-sy, 0.0, cy, 0.0]]
+    local = [
         [1.0, 0.0, 0.0, float(p.offset_x_m)],
         [0.0, c,  -s,   float(p.up_m)],
         [0.0, s,   c,  -float(p.forward_m)],
     ]
+    return _mul_3x4(ry, local)
 
 
 # ---- the SteamVR sink (guarded — never imports openvr in the default test run) -------------
@@ -441,6 +476,11 @@ class VrHudView:
         # A new placement pushed from outside (voice/Settings) — the OpenVR thread picks it up on
         # its next poll and re-applies live, so repositioning never needs a re-toggle.
         self._pending_placement: Optional[VrPlacement] = None
+        # "Pin the HUD here" (look-to-place): the request is served on the OpenVR thread (HMD
+        # pose reads must stay there), which computes the new placement and signals the waiter.
+        self._pin_request = False
+        self._pin_event: Optional[threading.Event] = None
+        self._pin_result: Optional[VrPlacement] = None
 
     # -- lifecycle ---------------------------------------------------------------------
     def start(self, timeout: float = 8.0) -> bool:
@@ -469,6 +509,19 @@ class VrHudView:
         live overlay with no re-toggle. Thread-safe; a no-op if the overlay isn't up."""
         with self._lock:
             self._pending_placement = placement
+
+    def pin_here(self, timeout: float = 1.5) -> Optional[VrPlacement]:
+        """Look-to-place: swing the panel to the direction you're currently facing (the HMD
+        heading), centred on your gaze, keeping distance/height/tilt/curvature. Returns the new
+        placement (so the caller can persist it) or ``None`` if the overlay/HMD pose isn't
+        available. The HMD pose is read on the OpenVR thread; this blocks briefly for the result."""
+        with self._lock:
+            self._pin_request = True
+            self._pin_result = None
+            ev = self._pin_event = threading.Event()
+        ev.wait(timeout=timeout)
+        with self._lock:
+            return self._pin_result
 
     # -- OpenVR thread -----------------------------------------------------------------
     def _run(self) -> None:
@@ -526,6 +579,23 @@ class VrHudView:
         except Exception as e:  # noqa: BLE001 — old runtime w/o curvature -> flat, not fatal
             self._logline(f"VR curvature unavailable (flat): {e}")
 
+    def _pin_to_gaze(self, openvr, overlay, handle) -> Optional["VrPlacement"]:
+        """Read the HMD pose and swing the panel to that heading, centred on the gaze. Returns
+        the new placement (also applied to the live overlay) or ``None`` if the HMD pose isn't
+        valid yet. Runs on the OpenVR thread (all HMD reads do)."""
+        system = openvr.VRSystem()
+        poses = system.getDeviceToAbsoluteTrackingPose(
+            openvr.TrackingUniverseSeated, 0, openvr.k_unMaxTrackedDeviceCount)
+        hmd = poses[openvr.k_unTrackedDeviceIndex_Hmd]
+        if not hmd.bPoseIsValid:
+            return None
+        m = hmd.mDeviceToAbsoluteTracking
+        mat = [[float(m[r][c]) for c in range(4)] for r in range(3)]
+        # New heading = where you're looking; recentre laterally so it lands on your gaze.
+        pinned = replace(self._placement, yaw_deg=hmd_yaw_deg(mat), offset_x_m=0.0)
+        self._apply_placement(openvr, overlay, handle, pinned)
+        return pinned
+
     def _loop(self, openvr, overlay, handle) -> None:
         """Show/hide + repaint from the latest snapshot until closed. Re-uploads the RGBA
         buffer only when the snapshot changes, so a static HUD costs almost nothing."""
@@ -535,6 +605,8 @@ class VrHudView:
             with self._lock:
                 visible, closing = self._visible, self._closing
                 pending, self._pending_placement = self._pending_placement, None
+                pin, self._pin_request = self._pin_request, False
+                pin_ev = self._pin_event
             if closing:
                 break
             if pending is not None:
@@ -542,6 +614,16 @@ class VrHudView:
                     self._apply_placement(openvr, overlay, handle, pending)
                 except Exception as e:  # noqa: BLE001 — a bad reposition must not kill the overlay
                     self._logline(f"VR reposition error: {e}")
+            if pin:
+                result = None
+                try:
+                    result = self._pin_to_gaze(openvr, overlay, handle)
+                except Exception as e:  # noqa: BLE001 — a pin glitch must not kill the overlay
+                    self._logline(f"VR pin error: {e}")
+                with self._lock:
+                    self._pin_result = result
+                if pin_ev is not None:
+                    pin_ev.set()
             try:
                 if visible:
                     if not shown:

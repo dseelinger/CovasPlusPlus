@@ -500,6 +500,20 @@ class HudCapability:
             except Exception as e:  # noqa: BLE001 — a reposition glitch must not disturb the loop
                 self._logline(f"VR HUD reposition failed: {e}")
 
+    def pin_vr_here(self):
+        """Look-to-place: ask the live VR overlay to swing to the direction you're facing.
+        Returns the new placement (for the caller to persist) or None when the VR surface isn't
+        up or doesn't support pinning. Fail-soft."""
+        view = self._vr_view
+        pin = getattr(view, "pin_here", None)
+        if pin is None:
+            return None
+        try:
+            return pin()
+        except Exception as e:  # noqa: BLE001 — a pin glitch must not disturb the loop
+            self._logline(f"VR HUD pin failed: {e}")
+            return None
+
     def shutdown(self) -> None:
         """Tear both overlays down on app exit (idempotent)."""
         for attr in ("_view", "_vr_view"):

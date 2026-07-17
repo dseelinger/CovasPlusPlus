@@ -320,3 +320,32 @@ def test_set_vr_placement_is_safe_with_no_vr_view():
         view_factory=lambda p: None,
         vr_is_enabled=lambda: False, vr_view_factory=lambda p: None)
     cap.set_vr_placement(VrPlacement())  # must not raise
+
+
+# --- yaw / look-to-place math ----------------------------------------------
+
+def test_resolve_transform_yaw_is_identity_at_zero():
+    m = resolve_transform(VrPlacement(yaw_deg=0.0, pitch_deg=0.0, forward_m=1.3, up_m=-0.12))
+    assert [m[0][0], m[1][1], m[2][2]] == [1.0, 1.0, 1.0]
+    assert m[1][3] == -0.12 and m[2][3] == -1.3
+
+
+def test_resolve_transform_yaw_rotates_about_y():
+    """A 90° heading swings the forward translation from −Z onto the X axis (Ry rotation)."""
+    m = resolve_transform(VrPlacement(yaw_deg=90.0, forward_m=1.3))
+    assert abs(m[0][3] - (-1.3)) < 1e-9   # forward now lies along X
+    assert abs(m[2][3]) < 1e-9
+    assert abs(m[1][1] - 1.0) < 1e-9      # Y row untouched by a Y-axis rotation
+
+
+def test_hmd_yaw_deg_from_known_matrices():
+    from covas.capabilities.vr_hud import hmd_yaw_deg
+    ident = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]        # looking straight ahead
+    ry90 = [[0, 0, 1, 0], [0, 1, 0, 0], [-1, 0, 0, 0]]        # turned 90°
+    assert abs(hmd_yaw_deg(ident) - 0.0) < 1e-9
+    assert abs(hmd_yaw_deg(ry90) - 90.0) < 1e-9
+
+
+def test_normalize_wraps_yaw_to_signed_range():
+    assert VrPlacement.normalize("world", yaw_deg=270).yaw_deg == -90.0
+    assert VrPlacement.normalize("world", yaw_deg="x").yaw_deg == 0.0
