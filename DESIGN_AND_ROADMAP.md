@@ -151,7 +151,12 @@ The rendering-approach spike (#46) landed these decisions (full writeup + PoCs i
   it's required in the build env**, and a build that drops a shipped feature must fail loudly, not
   silently. Any future `collect_all` for a user-facing surface follows the same rule.
   The enabler: `setOverlayRaw` uploads a **raw RGBA buffer from system memory — no
-  DirectX/OpenGL context** — so it is pure Python. Init as `VRApplication_Overlay` (runs
+  DirectX/OpenGL context** — so it is pure Python. **The buffer must be a ctypes object whose
+  address is the pixels** (`(c_ubyte * n).from_buffer(arr)`); the binding calls `byref()` on it,
+  which rejects a bare `arr.ctypes.data` int. The spike POC used the int form and said outright
+  it was never run against SteamVR; #48 copied it, so every repaint raised into the fail-soft
+  guard and the overlay — correctly created and shown — never received a pixel. See
+  `as_overlay_buffer` in `covas/capabilities/vr_hud.py`. Init as `VRApplication_Overlay` (runs
   alongside the game); **fail soft** when SteamVR is not running. This matches how ED renders
   VR: **ED natively speaks OpenVR/SteamVR (and Oculus SDK) — it has no native OpenXR** — so a
   SteamVR overlay composites over the *native* ED render for the majority of PCVR players.

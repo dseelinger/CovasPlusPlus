@@ -12,11 +12,14 @@ assert that same snapshot renders to pixels and that the capability drives the V
 """
 from __future__ import annotations
 
+import ctypes
+
 import numpy as np
+import pytest
 
 from covas.capabilities.hud_capability import HudCapability, HudModel, HudSnapshot
 from covas.capabilities.vr_hud import (
-    VR_PLACEMENTS, VrPlacement, render_snapshot_rgba, resolve_transform,
+    VR_PLACEMENTS, VrPlacement, as_overlay_buffer, render_snapshot_rgba, resolve_transform,
 )
 
 
@@ -210,3 +213,51 @@ def test_the_two_surfaces_are_independent():
         vr_is_enabled=lambda: True,
         vr_view_factory=lambda p: vr_view)
     assert vr_view.visible is True and vr_view.shows == 1
+
+
+# --- the upload buffer (regression: #48 shipped an int here) ---------------
+#
+# These cover the ONE step the rest of this file can't: handing pixels to SteamVR. The pure
+# rasterizer and placement math were always tested, and both were always fine — yet the overlay
+# never showed a pixel on real hardware, because `setOverlayRaw` was passed `buf.ctypes.data`
+# (a plain int). pyopenvr calls `byref()` on that argument, which rejects ints outright, so
+# EVERY repaint raised into the fail-soft guard and logged "VR repaint error". The overlay was
+# created and shown correctly and stayed invisible.
+#
+# The trick is that a fake overlay recording its arguments would NOT have caught it: the int
+# arrives fine. Only calling `byref()` — exactly as the real binding does — reproduces it.
+
+def _pyopenvr_would_do(buffer):
+    """Mimic pyopenvr's binding: `fn(handle, byref(buffer), w, h, bpp)` with a c_void_p
+    argtype. Any argument the real call would reject must be rejected here too."""
+    ctypes.c_void_p.from_param(ctypes.byref(buffer))
+
+
+def test_overlay_buffer_survives_pyopenvrs_byref():
+    """The exact call that failed on hardware: byref() over what we pass setOverlayRaw."""
+    buf = render_snapshot_rgba(HudSnapshot(voice_state="IDLE"), width=64, height=32)
+    _pyopenvr_would_do(as_overlay_buffer(buf))  # raised TypeError before the fix
+
+
+def test_overlay_buffer_points_at_the_pixels_not_at_a_pointer():
+    """Guards the plausible-but-wrong fix. `data_as(POINTER(...))` and `c_void_p(addr)` both
+    satisfy byref() — and then hand SteamVR the address OF THE POINTER, not the pixels. Only a
+    buffer whose own address IS the image data is correct."""
+    buf = render_snapshot_rgba(HudSnapshot(voice_state="IDLE"), width=64, height=32)
+    assert ctypes.addressof(as_overlay_buffer(buf)) == buf.ctypes.data
+
+
+def test_overlay_buffer_aliases_without_copying():
+    """from_buffer must alias the numpy memory in place — a copy would upload stale pixels
+    (and silently waste 1 MB per repaint)."""
+    buf = render_snapshot_rgba(HudSnapshot(voice_state="IDLE"), width=64, height=32)
+    raw = as_overlay_buffer(buf)
+    buf[0, 0] = (7, 7, 7, 7)
+    assert list(raw[:4]) == [7, 7, 7, 7]
+
+
+def test_raw_address_int_is_rejected_by_byref():
+    """Documents the actual defect: the shipped form can't survive the binding at all."""
+    buf = render_snapshot_rgba(HudSnapshot(voice_state="IDLE"), width=64, height=32)
+    with pytest.raises(TypeError):
+        _pyopenvr_would_do(buf.ctypes.data)  # what #48 passed

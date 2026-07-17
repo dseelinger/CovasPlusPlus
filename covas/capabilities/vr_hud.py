@@ -32,6 +32,7 @@ shown overlay repaints only when the snapshot changes, so it is cheap next to th
 """
 from __future__ import annotations
 
+import ctypes
 import threading
 import time
 from dataclasses import dataclass
@@ -207,6 +208,28 @@ def render_snapshot_rgba(snap: HudSnapshot, *, width: int = 768, height: int = 3
     return buf
 
 
+def as_overlay_buffer(buf: "np.ndarray") -> "ctypes.Array":
+    """Wrap the RGBA buffer as the ctypes object ``IVROverlay.setOverlayRaw`` needs.
+
+    pyopenvr's binding does ``fn(handle, byref(buffer), w, h, bpp)`` — it calls ``byref()`` on
+    whatever we hand it. So the argument must be a ctypes object **whose own address is the
+    pixel data**. Two traps, both of which type-check and then fail:
+
+      * ``buf.ctypes.data`` is a plain ``int`` (an address). ``byref()`` rejects it outright:
+        *"byref() argument 1 must be _ctypes._CData, not int"*. This shipped in #48 (copied
+        from the spike POC, which its own header says was never run against SteamVR), so every
+        repaint raised and the overlay — created and shown correctly — never received a pixel.
+        An overlay with no pixels is indistinguishable from no overlay at all.
+      * ``data_as(POINTER(c_ubyte))`` / ``c_void_p(addr)`` DO satisfy ``byref()``, which makes
+        them look like fixes — but ``byref()`` then yields a pointer to the *pointer variable*,
+        not to the pixels, and SteamVR reads garbage. Silently wrong is worse than raising.
+
+    ``from_buffer`` is the one correct form: it aliases the numpy memory in place (no copy), so
+    ``addressof(result) == buf.ctypes.data``. Both invariants are asserted in the tests.
+    """
+    return (ctypes.c_ubyte * buf.nbytes).from_buffer(buf)
+
+
 # ---- placement (pure OpenVR transform math) -----------------------------------------------
 
 # Placement modes the setting accepts. "world" parks the panel in front of the seated origin
@@ -284,7 +307,10 @@ class VrHudView:
         self._ready = threading.Event()
         self._ok = False
         self._thread: Optional[threading.Thread] = None
-        self._buf: Optional["np.ndarray"] = None  # keep the uploaded buffer alive for OpenVR
+        # Keep the uploaded pixels alive for OpenVR: `_raw` aliases `_buf`'s memory (see
+        # `as_overlay_buffer`), so both must outlive the setOverlayRaw call.
+        self._buf: Optional["np.ndarray"] = None
+        self._raw: Optional["ctypes.Array"] = None
 
     # -- lifecycle ---------------------------------------------------------------------
     def start(self, timeout: float = 8.0) -> bool:
@@ -376,9 +402,12 @@ class VrHudView:
                     if snap != last:
                         buf = render_snapshot_rgba(
                             snap, width=self.WIDTH_PX, height=self.HEIGHT_PX)
-                        self._buf = buf  # hold a reference across the upload
+                        raw = as_overlay_buffer(buf)
+                        # Hold BOTH across the upload: `raw` aliases `buf`'s memory, so letting
+                        # either go while SteamVR reads would free the pixels underneath it.
+                        self._buf, self._raw = buf, raw
                         overlay.setOverlayRaw(
-                            handle, buf.ctypes.data, self.WIDTH_PX, self.HEIGHT_PX, 4)
+                            handle, raw, self.WIDTH_PX, self.HEIGHT_PX, 4)
                         last = snap
                 elif shown:
                     overlay.hideOverlay(handle)
