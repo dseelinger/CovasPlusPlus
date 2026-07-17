@@ -1112,6 +1112,15 @@ class App:
                 vr_view_factory=_vr_factory,
                 log=lambda m: self._log("hud", m))
             self.registry.register(self.hud)
+            # Voice repositioning for the VR overlay (nudges + look-to-place). Reuses the HUD's
+            # config + the app's live-apply settings path; pin reads the HMD gaze from the live
+            # overlay. Registered even when the VR HUD is off — the tool just reports it's not up.
+            from .capabilities.hud_placement_capability import HudPlacementCapability
+            self.registry.register(HudPlacementCapability(
+                get_hud=lambda: self.cfg.get("hud", {}),
+                apply_patch=self.update_settings,
+                pin=lambda: self.hud.pin_vr_here() if self.hud is not None else None,
+                log=lambda m: self._log("hud", m)))
             # A SHOWN HUD (either surface) repaints from live bus events (status/checklist/route/
             # callout), so it needs the shared event pump — but only when actually enabled. The
             # toggle itself is driven directly (see _reconcile_hud), so a disabled HUD adds no
@@ -1141,7 +1150,8 @@ class App:
             up_m=hud.get("vr_offset_y_m", -0.12),
             offset_x_m=hud.get("vr_offset_x_m", 0.0),
             pitch_deg=hud.get("vr_pitch_deg", 0.0),
-            curvature=hud.get("vr_curvature", 0.06))
+            curvature=hud.get("vr_curvature", 0.06),
+            yaw_deg=hud.get("vr_yaw_deg", 0.0))
 
     def _reconcile_hud(self) -> None:
         """Bring the HUD surfaces up/down after a settings change, and start the event pump when

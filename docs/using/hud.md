@@ -75,9 +75,20 @@ install — the `openvr` binding ships inside COVAS++.
 
 **Placement.** Every setting below is on the Settings page and in `config.toml` — and **applies
 live**: change it there or by voice and a shown overlay moves immediately, no re-toggle. So the
-way to place the panel is to put the headset on and adjust by voice until it sits right, e.g.
-*"set the VR HUD distance to 1.5,"* *"set the VR HUD tilt to 15,"* *"set the VR HUD curvature to
-0.1."*
+way to place the panel is to put the headset on and adjust by voice until it sits right.
+
+The natural way to do that, hands still on the stick, is two kinds of voice command:
+
+- **Look-to-place** — face where you want the panel and say *"pin the HUD here."* It swings to
+  your gaze, centred, keeping the current distance and tilt. (It uses your **heading**, so it's
+  aimed for seated cockpit play.)
+- **Nudges** — *"move the HUD left / right / up / down,"* *"closer" / "farther"* (or *"forward" /
+  "back"*), *"tilt it up / down,"* *"flatter" / "more curved,"* *"bigger" / "smaller,"* *"centre
+  the HUD,"* *"reset the HUD position."* Add an amount if you like: *"move it left 20
+  centimetres,"* *"tilt it up 10 degrees."*
+
+For an exact value, the absolute settings still work: *"set the VR HUD distance to 1.5,"* *"set
+the VR HUD curvature to 0.1."*
 
 | Setting | What it does |
 |---------|--------------|

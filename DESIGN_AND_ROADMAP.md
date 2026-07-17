@@ -238,7 +238,13 @@ the rendering surface differs:
   `_reconcile_hud`). Controller grab-to-move was evaluated and rejected: Quest controllers over
   Virtual Desktop deliver **poses but no buttons** through legacy `getControllerState` (buttons
   need an IVRInput action manifest), and ED renders no motion controllers anyway — so voice is
-  the placement trigger.
+  the placement trigger. **`HudPlacementCapability`** (one `adjust_vr_hud` tool, `core` tier)
+  adds what absolute settings can't express: **relative nudges** ("move it left", "closer",
+  "tilt up") and **look-to-place** ("pin the HUD here"). Pin reads the HMD heading on the OpenVR
+  thread (`VrHudView.pin_here` → `hmd_yaw_deg`) and writes `vr_yaw_deg`; nudges step + clamp one
+  `[hud]` value and persist via `update_settings` — both apply live through the same reconcile
+  path and survive a restart. Look-to-place is **yaw-only** (head ≈ the seated origin in a
+  cockpit), keeping the math pure/unit-tested and composing cleanly with the yawed-frame offsets.
 - **`VrHudView` / `make_vr_view` — the guarded sink.** `openvr` is imported **lazily** and
   SteamVR is `init`'d as `VRApplication_Overlay` only when the VR HUD is enabled; **any**
   import/init/runtime failure returns `None` (so `make_vr_view` yields "no VR surface"),
