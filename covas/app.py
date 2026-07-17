@@ -1955,16 +1955,42 @@ class App:
         return None
 
     def public_settings(self) -> dict:
+        """Provider-shaped quick-panel state (issue #86): the LLM/Speech blocks MIRROR the active
+        [llm]/[tts].provider — each carries only that provider's quick fields, serialized from the
+        ONE schema so index.html renders them generically (no hardcoded Anthropic/ElevenLabs ids).
+        Dynamic option lists that need the network (ElevenLabs/OpenAI/Edge/... catalogs) are left
+        unresolved here and fetched client-side, so this stays cheap and offline; only the cheap
+        Anthropic model list (from config) is folded in. whisper/web_search/personality stay flat."""
         c = self.cfg
+        llm_provider = str(c.get("llm", {}).get("provider", "anthropic"))
+        tts_provider = str(c.get("tts", {}).get("provider", "edge"))
+        dyn = {schema.OPT_MODELS: c["anthropic"]["available_models"]}
+
+        llm_panel = schema.LLM_PANELS.get(llm_provider)
+        llm_keys = list(llm_panel.fields) if llm_panel else []
+        supports_thinking = bool(llm_panel and llm_panel.supports_thinking)
+        if supports_thinking:
+            llm_keys.append(schema.THINKING_FIELD)
+        llm_ro = llm_panel.readonly if llm_panel else ()
+
+        tts_panel = schema.TTS_PANELS.get(tts_provider)
+        tts_keys = list(tts_panel.fields) if tts_panel else []
+        tts_ro = tts_panel.readonly if tts_panel else ()
+
         return {
-            "model": c["anthropic"]["model"],
-            "thinking": c["anthropic"]["thinking"].get("default", "Off"),
+            "llm": {
+                "provider": llm_provider,
+                "supports_thinking": supports_thinking,
+                "fields": schema.panel_fields(c, self.overrides, llm_keys,
+                                              readonly=llm_ro, dynamic=dyn),
+            },
+            "tts": {
+                "provider": tts_provider,
+                "fields": schema.panel_fields(c, self.overrides, tts_keys,
+                                              readonly=tts_ro, dynamic=dyn),
+            },
             "web_search": bool(c["web_search"]["enabled"]),
             "personality": bool(c["personality"]["enabled"]),
-            "el_model": c["elevenlabs"]["model"],
-            "el_voice": c["elevenlabs"]["voice_id"],
-            "el_voice_name": c["elevenlabs"].get("voice_name", ""),
-            "speed": c["elevenlabs"].get("speed", 1.0),
             "whisper": c["whisper"]["model"],
         }
 

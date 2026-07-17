@@ -846,6 +846,26 @@ Notes:
 ### 14.0 Version label (issue #78)
 - [ ] A small, muted **`vX.Y.Z`** tag sits in the bottom-right corner of the panel (matches `__version__` / `check_setup.py`'s reported version) — visible but out of the way of every control. 🖥️ **Native window:** its title bar also reads **"COVAS++ vX.Y.Z"** in the packaged app (not the plain browser build).
 
+### 14.0a Quick panel reflects the active LLM/TTS provider (issue #86)  🌐 PANEL 🌍 NET 📋 FILE
+> The left **Configuration** card's **LLM** and **Speech** blocks must MIRROR `[llm].provider` /
+> `[tts].provider`, rendered generically from the schema — not a hardcoded Anthropic/ElevenLabs panel.
+> Change providers by editing `overrides.json` / the Settings page and **restart** between checks.
+- [ ] **Anthropic + ElevenLabs** (`[llm].provider = "anthropic"`, `[tts].provider = "elevenlabs"`, EL key set):
+      the **LLM** block header reads *"Anthropic (Claude)"* and shows a **Claude model** dropdown **and a
+      Thinking depth** control; the **Speech** block reads *"ElevenLabs"* and shows **model + a searchable
+      voice picker (filter box + 🔍) + a voice-speed slider**. Changing any of them speaks/persists as before.
+- [ ] **Alternate LLM — e.g. Gemini or OpenAI-compatible** (`[llm].provider = "gemini"` / `"openai"`):
+      the LLM header names that provider, shows an **editable model combobox** (pick from the live catalog
+      with the provider key set, or type any id), and **no Thinking control** (Anthropic-only). For OpenAI,
+      the **base URL** shows read-only. With no key/offline the combobox degrades to a plain text box keeping
+      the current value (no error, no empty blocking control).
+- [ ] **Alternate TTS — e.g. Edge** (`[tts].provider = "edge"`, no ElevenLabs key needed): the Speech header
+      reads *"Edge (free)"* and shows an **Edge voice** combobox — NOT ElevenLabs fields. (Spot-check Azure /
+      OpenAI / Cartesia / Piper similarly if configured — each shows only its own voice fields.)
+- [ ] **`/api/elevenlabs` only when relevant:** with a **non-ElevenLabs** TTS active, open the browser
+      devtools **Network** tab and reload the panel → there is **no request to `/api/elevenlabs`**. Switch
+      `[tts].provider` back to elevenlabs, restart, reload → the request reappears (voice/model lists load).
+
 ### 14.1 Live status & log
 - [ ] The status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, status/search lines (timestamped).
 
@@ -1269,16 +1289,30 @@ Notes:
 
 Notes:
 
-### 19.2 First-run wizard  📦 🖥️ 🔊 HW 🌍 NET
-> On a machine with none of the dev state — that absence *is* the test.
+### 19.2 First-run wizard — pick any LLM/TTS combo (issue #87)  📦 🖥️ 🔊 HW 🌍 NET
+> On a machine with none of the dev state — that absence *is* the test. The wizard must let you
+> finish with ANY supported LLM + TTS, **not** only Anthropic + ElevenLabs.
 - [ ] First launch (empty `%APPDATA%\COVAS++`) opens the **setup wizard**, not the panel.
-- [ ] **Anthropic key** entry → accepted; **ElevenLabs key** entry → accepted (or skipped).
+- [ ] **LLM provider picker** offers **Anthropic / OpenAI-compatible / Gemini / Ollama**; selecting one
+      reveals just its fields (Anthropic → key; OpenAI → endpoint preset + model + key; Gemini → key
+      (+ model); Ollama → host + model, no key). The **"AI ready"** badge names the chosen provider.
+- [ ] **TTS provider picker** offers **Edge (free, no key) / ElevenLabs / Azure / OpenAI / Cartesia /
+      Piper**; selecting one reveals just its fields. Edge/Piper show **no key field**.
+- [ ] **Non-Anthropic + non-ElevenLabs onboarding (the key case): pick Gemini (or OpenRouter) + Edge**,
+      paste ONLY the Gemini/OpenRouter key, download the STT model → the **Launch** button enables with
+      **no Anthropic key and no ElevenLabs key**. Finish → the app starts and speaks a turn in the
+      **Edge** voice (not text-only).
 - [ ] **Mic** picker lists your input devices; pick one.
 - [ ] **STT model** downloads (`small.en`, ~250 MB) with a **progress** indicator (needs internet); it's fetched **once**.
 - [ ] Wizard **hands off to the control panel in the same window** — no second window, no browser. The finish message says it's **switching to the control panel** (NOT "close this tab"); the panel appears **without you closing anything** (closing the single native window quits the app).
-- [ ] **No-ElevenLabs path:** finish the wizard with **no** EL key → the app runs **text-only** and says so; add a key later in Settings → spoken replies start working.
-- [ ] **Default voice:** with an EL key, the voice defaults to **George** (or the first valid voice if George isn't in your catalog).
-- [ ] 📋 After the wizard, `%APPDATA%\COVAS++` holds `config.toml`/keys/etc. and the model is under `%LOCALAPPDATA%`; **nothing** was written into the install tree (`%LOCALAPPDATA%\Programs\COVAS++`).
+- [ ] **Keyless-cloud-voice → text-only:** pick a cloud voice (e.g. ElevenLabs) but leave its key blank
+      → the voice badge shows **text-only** and the app still finishes (on the LLM + STT); add the key
+      later in Settings → spoken replies start working. (Edge/Piper never hit this — they're free.)
+- [ ] **ElevenLabs default voice:** with an EL key + TTS = ElevenLabs, "Save voice" resolves **George**
+      (or the first valid voice if George isn't in your catalog).
+- [ ] 📋 After the wizard, `%APPDATA%\COVAS++` holds `overrides.json` with your `[llm].provider` /
+      `[tts].provider` choices + keys, and the model is under `%LOCALAPPDATA%`; **nothing** was written
+      into the install tree (`%LOCALAPPDATA%\Programs\COVAS++`).
 
 Notes:
 

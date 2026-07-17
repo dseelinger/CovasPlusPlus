@@ -40,18 +40,33 @@ installs cleanly over the old one — your settings are untouched (see
 ## 3. First-run wizard
 
 Launch COVAS++ from the **desktop icon** or the **Start menu**. The very first launch opens a
-short setup wizard that builds your configuration from nothing:
+short setup wizard that builds your configuration from nothing. **You pick any AI + voice
+combination you like** — you're not locked to one vendor:
 
-1. **Anthropic key** — Claude is the language model COVAS++ talks *with*. Paste your key (it
-   starts with `sk-ant-`). **Required** — without it there's no brain.
-2. **ElevenLabs key** — the spoken voice. **Optional**: with a key, COVAS++ speaks in the
-   ElevenLabs **"George"** voice by default (you can change it later); with no key it runs
-   **text-only** (it still listens and thinks, it just doesn't talk back) until you add one.
-3. **Microphone** — pick the mic you'll push-to-talk with.
-4. **Speech model** — COVAS++ downloads its local speech-to-text model
+1. **AI brain (LLM)** — choose the provider that powers the conversation and give it what it needs:
+    - **Anthropic — Claude** (paste an `sk-ant-` key),
+    - **OpenAI-compatible** — OpenAI / Groq / DeepSeek / OpenRouter (pick the endpoint preset, a
+      model, and paste that service's key),
+    - **Google Gemini** (paste a Gemini key — Google's free tier is generous), or
+    - **Ollama** — a local model on this PC, no key (*advanced; best out-of-game since a good local
+      model competes with Elite for your GPU*).
+
+    This is **required** — without a working AI provider there's no brain — but it does **not** have
+    to be Anthropic.
+2. **Voice (TTS)** — choose how COVAS speaks. **Edge is the free default and needs no key**, so you
+   always get a voice. You can also pick **ElevenLabs**, **Azure**, **OpenAI**, **Cartesia**, or
+   local **Piper**. Only the premium cloud voices need their own key; leave a keyless cloud voice
+   unset and COVAS runs **text-only** (it still listens and thinks, it just doesn't talk back) until
+   you add one — but with Edge you never have to.
+3. **Speech model** — COVAS++ downloads its local speech-to-text model
    (faster-whisper `small.en`, ~250 MB) with a progress bar. **This step needs internet**, and
    the model is downloaded **once** — it's not bundled in the installer, which keeps the download
    small. Speech-to-text always runs **locally** and free after that.
+4. **Microphone** — pick the mic you'll push-to-talk with.
+
+The **Launch** button lights up once your chosen AI provider is ready and the speech model is
+installed — a voice is optional. A fully free path exists: **Gemini (free tier) or OpenRouter + Edge**
+gets you talking without paying for a voice at all.
 
 When the wizard finishes it hands straight off to the **control panel** in the same window, and
 you're ready to talk. Everything you entered is saved under `%APPDATA%\COVAS++` and reused every

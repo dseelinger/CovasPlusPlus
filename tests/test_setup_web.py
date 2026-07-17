@@ -20,13 +20,27 @@ def client(tmp_path, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     cfg = {
         "ui": {"host": "127.0.0.1", "port": 8765},
+        # A key file per managed section + provider selections (default anthropic + edge, matching
+        # config.toml). The wizard may switch these to any supported combo (issue #87).
+        "llm": {"provider": "anthropic"},
+        "tts": {"provider": "elevenlabs"},
         "anthropic": {"api_key_file": str(tmp_path / "anth.txt")},
+        "openai": {"api_key_file": str(tmp_path / "openai.txt"),
+                   "base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini"},
+        "gemini": {"api_key_file": str(tmp_path / "gemini.txt"), "model": "gemini-flash-lite-latest"},
+        "ollama": {"host": "http://localhost:11434", "model": "qwen3"},
         "elevenlabs": {"api_key_file": str(tmp_path / "el.txt")},
+        "azure": {"api_key_file": str(tmp_path / "azure.txt")},
+        "cartesia": {"api_key_file": str(tmp_path / "cartesia.txt")},
+        "edge": {"voice": "en-US-AriaNeural"},
+        "piper": {"model": ""},
+        "openai_tts": {"voice": "alloy"},
         "whisper": {"model": "small.en", "download_root": ""},
     }
-    # Never touch the real overrides.json when the wizard writes choices.
-    monkeypatch.setattr(firstrun, "load_overrides", lambda: {})
+    # Never touch the real overrides.json when the wizard writes choices; merge overrides into the
+    # live cfg (as firstrun.apply_override does) so status reads reflect provider switches.
     saved = {}
+    monkeypatch.setattr(firstrun, "load_overrides", lambda: {})
     monkeypatch.setattr(firstrun, "save_overrides", lambda o: saved.update({"o": o}))
     done = threading.Event()
     app = setup_web.create_setup_app(cfg, done)
@@ -38,13 +52,16 @@ def test_status_reports_unconfigured_fresh(client, monkeypatch):
     c, cfg, _, _ = client
     monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: False)
     st = c.get("/api/setup/status").get_json()
-    assert st["anthropic"] is False and st["stt"] is False and st["configured"] is False
+    # Provider-aware shape (issue #87): active provider + readiness flags, no bare "anthropic" key.
+    assert st["llm_provider"] == "anthropic" and st["tts_provider"] == "elevenlabs"
+    assert st["llm"] is False and st["stt"] is False and st["configured"] is False
     assert st["download"]["state"] == "idle"
 
 
 def test_save_keys_persists_and_ignores_blank_el(client):
     c, cfg, _, _ = client
-    r = c.post("/api/setup/keys", json={"anthropic": "sk-ant-1", "elevenlabs": ""})
+    r = c.post("/api/setup/keys", json={"llm_provider": "anthropic",
+                                        "keys": {"anthropic": "sk-ant-1", "elevenlabs": ""}})
     assert r.status_code == 200 and r.get_json()["ok"] is True
     assert firstrun.anthropic_key(cfg) == "sk-ant-1"
     assert firstrun.elevenlabs_key(cfg) is None      # blank EL not written
@@ -57,14 +74,14 @@ def test_finish_refused_until_configured(client, monkeypatch):
     r = c.post("/api/setup/finish")
     assert r.status_code == 400 and done.is_set() is False
     # Add key + model -> finish succeeds and sets the done event.
-    c.post("/api/setup/keys", json={"anthropic": "k"})
+    c.post("/api/setup/keys", json={"keys": {"anthropic": "k"}})
     monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
     r2 = c.post("/api/setup/finish")
     assert r2.status_code == 200 and done.is_set() is True
 
 
 def test_voice_step_skips_without_el_key(client):
-    c, cfg, _, _ = client
+    c, cfg, _, _ = client   # fixture sets tts.provider = elevenlabs
     data = c.post("/api/setup/voice").get_json()
     assert data["ok"] is True and data["skipped"] is True
 
@@ -79,6 +96,53 @@ def test_voice_step_resolves_and_saves(client, monkeypatch):
     # Persisted to overrides.
     assert saved["o"]["elevenlabs"]["voice_id"] == "2"
     assert cfg["elevenlabs"]["voice_id"] == "2"        # merged into live cfg too
+
+
+# --- provider-aware onboarding (issue #87) -----------------------------------------------
+
+def test_finish_succeeds_with_gemini_edge_no_anthropic(client, monkeypatch):
+    """A non-Anthropic LLM + a free non-ElevenLabs voice (Gemini + Edge) can finish onboarding —
+    NO Anthropic key, NO ElevenLabs key, ending at a launchable state."""
+    c, cfg, done, _ = client
+    monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
+    # Pick Gemini + Edge and paste only the Gemini key.
+    r = c.post("/api/setup/keys", json={"llm_provider": "gemini", "tts_provider": "edge",
+                                        "keys": {"gemini": "AIza-key"}})
+    assert r.status_code == 200
+    st = r.get_json()["status"]
+    assert st["llm_provider"] == "gemini" and st["tts_provider"] == "edge"
+    assert st["llm"] is True and st["voice"] is True and st["configured"] is True
+    assert firstrun.anthropic_key(cfg) is None            # finished with no Anthropic key
+    r2 = c.post("/api/setup/finish")
+    assert r2.status_code == 200 and done.is_set() is True
+
+
+def test_save_keys_switches_provider_and_persists_fields(client, monkeypatch):
+    c, cfg, _, _ = client
+    monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
+    c.post("/api/setup/keys", json={
+        "llm_provider": "openai", "keys": {"openai": "sk-groq"},
+        "openai_base_url": "https://api.groq.com/openai/v1", "openai_model": "llama-3.3-70b"})
+    assert cfg["llm"]["provider"] == "openai"
+    assert cfg["openai"]["base_url"] == "https://api.groq.com/openai/v1"
+    assert cfg["openai"]["model"] == "llama-3.3-70b"
+    assert firstrun.openai_key(cfg) == "sk-groq"
+
+
+def test_voice_edge_needs_no_key_and_persists_voice(client):
+    c, cfg, _, _ = client
+    c.post("/api/setup/keys", json={"tts_provider": "edge"})
+    data = c.post("/api/setup/voice", json={"voice": "en-GB-RyanNeural"}).get_json()
+    assert data["ok"] is True and not data.get("skipped")     # free voice, never text-only
+    assert cfg["edge"]["voice"] == "en-GB-RyanNeural"
+
+
+def test_voice_piper_persists_model_no_fetch(client):
+    c, cfg, _, _ = client
+    c.post("/api/setup/keys", json={"tts_provider": "piper"})
+    data = c.post("/api/setup/voice", json={"model": "voices/en_US-lessac-medium.onnx"}).get_json()
+    assert data["ok"] is True and data["provider"] == "piper"
+    assert cfg["piper"]["model"] == "voices/en_US-lessac-medium.onnx"
 
 
 def test_model_download_runs_and_flips_ready(client, monkeypatch):

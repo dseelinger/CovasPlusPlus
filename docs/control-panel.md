@@ -53,6 +53,31 @@ behind-the-scenes lines (routing decisions, usage/cost, status, searches) — al
   context menu entirely, so without it a selection there would have no Copy at all; the same menu
   also appears in the plain browser build for consistency.
 
+## Quick configuration
+
+The left card carries the handful of controls you reach for most, and it **reflects whichever
+providers you're actually running**. The **LLM** block and the **Speech** block each name the active
+provider and show only *its* quick controls — so if `[llm].provider` is OpenAI-compatible you get an
+editable **model** combobox and a read-only view of the endpoint; if `[tts].provider` is Edge you get
+the free Edge **voice** picker, not ElevenLabs fields you can't use. Between them sits the **Whisper
+model** (speech-to-text) and a **Personality** toggle.
+
+- **It mirrors, it doesn't switch.** To change *which* provider is active, use the **Settings page**
+  (there's a `change ⚙` link on each block). The quick card then re-renders to match.
+- **Anthropic (Claude)** — a **model** dropdown plus a **Thinking depth** control. Thinking is
+  Anthropic-only for now; other LLM providers simply don't show it.
+- **OpenAI-compatible / Gemini / Ollama** — an editable **model** combobox: pick from the endpoint's
+  live catalog, or type any model id (free text is always accepted). If the catalog can't be
+  fetched (no key, offline), it quietly degrades to a plain text box with your current value kept.
+- **ElevenLabs** — **model**, a searchable **voice** picker (with the type-to-filter box and 🔍
+  search palette), and a **voice speed** slider. The voice/model lists are fetched from ElevenLabs
+  **only when ElevenLabs is the active TTS provider**.
+- **Edge / Azure / OpenAI / Cartesia / Piper** — each shows its own voice fields (an Edge/Azure/
+  Cartesia voice combobox, the OpenAI TTS model/voice, a local Piper `.onnx` path, etc.).
+
+Every control writes straight to `overrides.json` through the same validated schema the Settings
+page and voice commands use, so nothing here can drift from the rest of the app.
+
 ## Settings page — `/settings`
 
 A schema-driven [settings page](using/settings.md) that renders every setting with the right

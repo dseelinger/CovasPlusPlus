@@ -38,6 +38,48 @@ LLM_PROVIDERS = ["anthropic", "openai", "gemini", "ollama"]
 TTS_PROVIDERS = ["elevenlabs", "piper", "edge", "azure", "openai", "cartesia"]
 CAST_PROVIDERS = ["piper", "elevenlabs", "edge", "azure", "openai"]
 
+# --- quick-panel per-provider descriptors (issue #86) ----------------------
+# The control panel's LLM/Speech quick blocks MIRROR the active [llm]/[tts].provider: they render
+# just the ACTIVE provider's fields listed here, GENERICALLY from the schema — no hardcoded element
+# ids in index.html. Switching providers stays on the Settings page (reflect-don't-switch, v1).
+#   * `fields`  — the schema keys that provider exposes as quick controls, in display order.
+#   * `readonly`— of those, the ones shown but not editable on the quick panel (base_url is a
+#                 Settings-page concern; the panel just reflects which endpoint is active).
+#   * `supports_thinking` — LLM only: a capability flag gating the extended-thinking control
+#                 (Anthropic-only in v1). The panel checks THIS flag, never `if provider ==
+#                 "anthropic"`, so adding thinking to another provider is a one-line schema change.
+class ProviderPanel:
+    __slots__ = ("fields", "readonly", "supports_thinking")
+
+    def __init__(self, fields, readonly=(), supports_thinking=False):
+        self.fields = tuple(fields)
+        self.readonly = frozenset(readonly)
+        self.supports_thinking = bool(supports_thinking)
+
+
+# The Anthropic-only Thinking-depth control, appended to the LLM block when the active provider's
+# panel sets supports_thinking (decision 4). Kept out of `fields` so the gate is the flag, not order.
+THINKING_FIELD = "anthropic.thinking.default"
+
+LLM_PANELS: dict[str, ProviderPanel] = {
+    "anthropic": ProviderPanel(("anthropic.model",), supports_thinking=True),
+    "openai": ProviderPanel(("openai.base_url", "openai.model"), readonly=("openai.base_url",)),
+    "gemini": ProviderPanel(("gemini.model",)),
+    "ollama": ProviderPanel(("ollama.model",)),
+}
+
+TTS_PANELS: dict[str, ProviderPanel] = {
+    # elevenlabs: the voice field carries the #26 filter + #94 search palette in the template (its
+    # catalog is 100+ voices); speed is rendered GENERICALLY off its schema min/max so a merge with
+    # #99's normalized `tts.speed` field composes cleanly (never hardcode 1.0-1.2 in the panel).
+    "elevenlabs": ProviderPanel(("elevenlabs.model", "elevenlabs.voice_id", "elevenlabs.speed")),
+    "edge": ProviderPanel(("edge.voice",)),
+    "azure": ProviderPanel(("azure.region", "azure.voice", "azure.style")),
+    "openai": ProviderPanel(("openai_tts.model", "openai_tts.voice", "openai_tts.instructions")),
+    "cartesia": ProviderPanel(("cartesia.model", "cartesia.voice", "cartesia.language")),
+    "piper": ProviderPanel(("piper.model",)),
+}
+
 # Sentinels for enum options that can only be resolved at runtime (from config
 # or a live API). The web/voice layer supplies the concrete list; when it can't
 # (offline), validation falls back to a plain type check rather than guessing.
@@ -198,6 +240,12 @@ SCHEMA: list[Setting] = [
             "Cartesia language", "Providers",
             "Synthesis language (BCP-47 primary subtag) for the Cartesia voice, e.g. en.",
             default="en", phrasings=("cartesia language",)),
+    Setting("piper.model", ("piper", "model"), "path",
+            "Piper voice", "Providers",
+            "Local Piper voice .onnx path when TTS provider = piper (offline, free). Download one "
+            "with `python -m piper.download_voices en_US-lessac-medium`; the .onnx.json must sit "
+            "beside it. Relative paths resolve against the project root.",
+            default="", phrasings=("piper voice", "piper model", "local voice")),
 
     # --- Language model ----------------------------------------------------
     Setting("anthropic.model", ("anthropic", "model"), "enum",
@@ -975,6 +1023,47 @@ def _fmt(n: float) -> str:
     return str(int(n)) if float(n).is_integer() else str(n)
 
 
+def field_payload(cfg: dict, overrides: dict, s: Setting,
+                  dynamic: Optional[dict] = None, readonly: bool = False) -> dict:
+    """Serialize ONE setting into the dict the web surfaces render from: type + display metadata,
+    resolved options, current value, and the overridden flag. `readonly` marks a control the quick
+    panel shows but edits on the Settings page (issue #86). Shared by `public_schema` (the full
+    settings page) and `panel_fields` (the quick panel) so the two can't describe a field
+    differently."""
+    return {
+        "key": s.key,
+        "type": s.type,
+        "label": s.label,
+        "help": s.help,
+        "options": resolve_options(s, dynamic),
+        "options_source": s.options_source,
+        "combobox": is_combobox(s),
+        "min": s.min,
+        "max": s.max,
+        "unit": s.unit,
+        "value": get_value(cfg, s),
+        "default": s.default,
+        "overridden": is_overridden(overrides, s),
+        "example": s.example,
+        "readonly": readonly,
+    }
+
+
+def panel_fields(cfg: dict, overrides: dict, keys, readonly=(),
+                 dynamic: Optional[dict] = None) -> list[dict]:
+    """The quick-panel payload for a provider (issue #86): serialize each schema key in `keys`
+    (skipping any unknown one) into a field dict the control panel renders GENERICALLY. `readonly`
+    is the set of keys shown but not editable there. Order follows `keys`."""
+    ro = set(readonly)
+    out: list[dict] = []
+    for k in keys:
+        s = by_key.get(k)
+        if s is None:  # a panel descriptor naming a key that isn't in the schema — skip, fail-soft
+            continue
+        out.append(field_payload(cfg, overrides, s, dynamic, readonly=k in ro))
+    return out
+
+
 def public_schema(cfg: dict, overrides: dict,
                   dynamic: Optional[dict] = None) -> list[dict]:
     """Serialize the (visible) schema into groups for the web page, folding in
@@ -989,20 +1078,5 @@ def public_schema(cfg: dict, overrides: dict,
             grp = {"name": s.group, "settings": []}
             index[s.group] = grp
             groups.append(grp)
-        grp["settings"].append({
-            "key": s.key,
-            "type": s.type,
-            "label": s.label,
-            "help": s.help,
-            "options": resolve_options(s, dynamic),
-            "options_source": s.options_source,
-            "combobox": is_combobox(s),
-            "min": s.min,
-            "max": s.max,
-            "unit": s.unit,
-            "value": get_value(cfg, s),
-            "default": s.default,
-            "overridden": is_overridden(overrides, s),
-            "example": s.example,
-        })
+        grp["settings"].append(field_payload(cfg, overrides, s, dynamic))
     return groups

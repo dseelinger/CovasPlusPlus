@@ -194,11 +194,75 @@ def test_configured_status_shape(tmp_path, monkeypatch):
     firstrun.save_elevenlabs_key(cfg, "e")
     monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
     st = firstrun.configured_status(cfg)
-    assert st == {"anthropic": True, "elevenlabs": True, "stt": True, "configured": True}
-    # ElevenLabs is optional: absent EL key still leaves the app "configured".
-    firstrun.save_elevenlabs_key(cfg, "")
-    assert firstrun.configured_status(cfg)["configured"] is True
-    assert firstrun.configured_status(cfg)["elevenlabs"] is False
+    # Provider-aware shape (issue #87): active LLM/TTS provider + readiness + STT + per-section keys.
+    assert st["llm_provider"] == "anthropic" and st["tts_provider"] == "edge"
+    assert st["llm"] is True and st["stt"] is True and st["configured"] is True
+    assert st["voice"] is True                       # edge (default) is a free voice, no key needed
+    assert st["keys"]["anthropic"] is True and st["keys"]["elevenlabs"] is True
+    assert st["keys"]["gemini"] is False
+
+
+# ---- provider-aware gate (issue #87) -------------------------------------------------
+
+def _provider_cfg(tmp_path, llm, tts="edge"):
+    """A cfg with a key file per section and the chosen llm/tts providers — NO Anthropic key set."""
+    return {
+        "llm": {"provider": llm}, "tts": {"provider": tts},
+        "anthropic": {"api_key_file": str(tmp_path / "anth.txt")},
+        "openai": {"api_key_file": str(tmp_path / "openai.txt"),
+                   "base_url": "https://api.groq.com/openai/v1", "model": "llama-3.3-70b"},
+        "gemini": {"api_key_file": str(tmp_path / "gemini.txt"), "model": "gemini-flash-lite-latest"},
+        "ollama": {"host": "http://localhost:11434", "model": "qwen3"},
+        "elevenlabs": {"api_key_file": str(tmp_path / "el.txt")},
+        "azure": {"api_key_file": str(tmp_path / "azure.txt")},
+        "cartesia": {"api_key_file": str(tmp_path / "cartesia.txt")},
+        "whisper": {"model": "small.en", "download_root": ""},
+    }
+
+
+def test_is_configured_openai_llm_no_anthropic_key(tmp_path, monkeypatch):
+    """A configured OpenAI-compatible LLM (its own key) finishes with NO Anthropic key."""
+    cfg = _provider_cfg(tmp_path, "openai")
+    monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
+    assert firstrun.is_configured(cfg) is False        # no OpenAI key yet
+    firstrun.save_key(cfg, "openai", "sk-openai")
+    assert firstrun.anthropic_key_available(cfg) is False
+    assert firstrun.is_configured(cfg) is True          # ready on the OpenAI key alone
+
+
+def test_is_configured_gemini_llm_no_anthropic_key(tmp_path, monkeypatch):
+    cfg = _provider_cfg(tmp_path, "gemini")
+    monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
+    assert firstrun.is_configured(cfg) is False
+    firstrun.save_key(cfg, "gemini", "AIza-key")
+    assert firstrun.is_configured(cfg) is True
+
+
+def test_is_configured_ollama_llm_reachable_model(tmp_path, monkeypatch):
+    """Ollama has no key — readiness is a reachable pulled model (fetcher stubbed, offline)."""
+    import sys
+    cfg = _provider_cfg(tmp_path, "ollama")
+    monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
+    # Patch on the sys.modules entry — `ollama_available` resolves the fetcher via
+    # `from .providers.ollama_llm import list_ollama_models` (sys.modules), which can diverge from the
+    # package attribute after another test re-imports the module; patching here covers both paths.
+    ollama_llm = sys.modules["covas.providers.ollama_llm"]
+    monkeypatch.setattr(ollama_llm, "list_ollama_models", lambda host, **k: [])
+    assert firstrun.is_configured(cfg) is False          # model not pulled
+    monkeypatch.setattr(ollama_llm, "list_ollama_models", lambda host, **k: ["qwen3:latest"])
+    assert firstrun.is_configured(cfg) is True            # qwen3 resolves to qwen3:latest
+
+
+def test_tts_ready_edge_and_piper_need_no_key(tmp_path):
+    assert firstrun.tts_ready(_provider_cfg(tmp_path, "anthropic", tts="edge")) is True
+    assert firstrun.tts_ready(_provider_cfg(tmp_path, "anthropic", tts="piper")) is True
+
+
+def test_tts_ready_cloud_voice_needs_key(tmp_path):
+    cfg = _provider_cfg(tmp_path, "anthropic", tts="elevenlabs")
+    assert firstrun.tts_ready(cfg) is False
+    firstrun.save_key(cfg, "elevenlabs", "el-key")
+    assert firstrun.tts_ready(cfg) is True
 
 
 # ---- default voice resolution -------------------------------------------------------

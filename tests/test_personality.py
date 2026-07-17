@@ -266,6 +266,8 @@ def test_save_custom_selects_it(client):
 def test_index_page_has_personality_speed_and_logfilter(client):
     c, _ = client
     html = c.get("/").get_data(as_text=True)
-    for marker in ('id="persona"', 'id="campaign"', 'id="speed"', 'id="fConv"', 'id="fAll"',
+    # The voice-speed control is now rendered generically inside the provider-shaped Speech block
+    # (issue #86), not a static id="speed" element — assert the block host instead.
+    for marker in ('id="persona"', 'id="campaign"', 'id="ttsBlock"', 'id="fConv"', 'id="fAll"',
                    'conv-only'):
         assert marker in html
