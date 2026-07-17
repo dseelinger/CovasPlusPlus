@@ -925,6 +925,36 @@ SCHEMA: list[Setting] = [
             "Physical width of the VR overlay panel in metres. ~0.55 m reads well at arm's length.",
             default=0.55, min=0.15, max=3.0, unit="m",
             phrasings=("vr hud width", "vr overlay size")),
+    Setting("hud.vr_distance_m", ("hud", "vr_distance_m"), "float",
+            "VR HUD distance", "Companion HUD",
+            "How far in front the VR panel sits, in metres. Applies live — say a new value to "
+            "move it closer or farther.",
+            default=1.30, min=0.30, max=5.0, unit="m",
+            phrasings=("vr hud distance", "vr overlay distance")),
+    Setting("hud.vr_offset_x_m", ("hud", "vr_offset_x_m"), "float",
+            "VR HUD lateral offset", "Companion HUD",
+            "Left/right offset of the VR panel in metres (positive = right, negative = left). "
+            "Applies live.",
+            default=0.0, min=-2.0, max=2.0, unit="m",
+            phrasings=("vr hud left right", "vr overlay sideways")),
+    Setting("hud.vr_offset_y_m", ("hud", "vr_offset_y_m"), "float",
+            "VR HUD height", "Companion HUD",
+            "Up/down offset of the VR panel in metres (positive = up, negative = below eye-line). "
+            "Applies live.",
+            default=-0.12, min=-2.0, max=2.0, unit="m",
+            phrasings=("vr hud height", "vr overlay up down")),
+    Setting("hud.vr_pitch_deg", ("hud", "vr_pitch_deg"), "float",
+            "VR HUD tilt", "Companion HUD",
+            "Tilt of the VR panel in degrees; positive leans the top toward you, so a panel below "
+            "your eye-line angles up to face you. Applies live.",
+            default=0.0, min=-60.0, max=60.0, unit="°",
+            phrasings=("vr hud tilt", "vr overlay pitch")),
+    Setting("hud.vr_curvature", ("hud", "vr_curvature"), "float",
+            "VR HUD curvature", "Companion HUD",
+            "Curve of the VR panel: 0 is flat, 1 is a full cylinder. A gentle ED-style wrap is "
+            "~0.05–0.1. Applies live.",
+            default=0.06, min=0.0, max=1.0,
+            phrasings=("vr hud curve", "vr overlay curvature")),
 
     # --- Control panel -----------------------------------------------------
     Setting("ui.host", ("ui", "host"), "string",

@@ -488,6 +488,18 @@ class HudCapability:
         voice) does not depend on the event pump running."""
         self._reconcile()
 
+    def set_vr_placement(self, placement) -> None:
+        """Relay a new placement to the live VR overlay (position / distance / pitch / curvature
+        / width), so a Settings or voice change repositions it without a re-toggle. No-op when the
+        VR surface isn't up or doesn't support live placement. Fail-soft."""
+        view = self._vr_view
+        setter = getattr(view, "set_placement", None)
+        if setter is not None:
+            try:
+                setter(placement)
+            except Exception as e:  # noqa: BLE001 — a reposition glitch must not disturb the loop
+                self._logline(f"VR HUD reposition failed: {e}")
+
     def shutdown(self) -> None:
         """Tear both overlays down on app exit (idempotent)."""
         for attr in ("_view", "_vr_view"):

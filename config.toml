@@ -1143,6 +1143,14 @@ vr_enabled = false
 vr_placement = "world"
 # Physical width of the overlay quad in metres (0.15–3.0). ~0.55 m reads well at arm's length.
 vr_width_m = 0.55
+# The panel's position, tilt, and curve. ALL of these apply LIVE — change them on the Settings
+# page or by voice ("set the VR HUD distance to 1.5", "set the VR HUD curvature to 0.1") and a
+# shown overlay moves immediately, no re-toggle. Tune them in-headset and keep what feels right.
+vr_distance_m = 1.30    # how far in front, in metres (0.30–5.0)
+vr_offset_x_m = 0.0     # left/right, in metres (−2.0–2.0; + = right)
+vr_offset_y_m = -0.12   # up/down, in metres (−2.0–2.0; + = up, − = below eye-line)
+vr_pitch_deg = 0.0      # tilt in degrees (−60–60; + leans the top toward you, good when low)
+vr_curvature = 0.06     # 0 = flat, 1 = full cylinder; ~0.05–0.1 is a gentle ED-style wrap
 
 
 [ui]

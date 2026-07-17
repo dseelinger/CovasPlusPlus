@@ -33,6 +33,7 @@ class FakeView:
         self.closed = False
         self.shows = 0
         self.hides = 0
+        self.placements = []  # every set_placement() call, in order
 
     def show(self):
         self.visible = True
@@ -44,6 +45,9 @@ class FakeView:
 
     def close(self):
         self.closed = True
+
+    def set_placement(self, placement):
+        self.placements.append(placement)
 
 
 # --- RGBA rasterizer (pure) ------------------------------------------------
@@ -261,3 +265,58 @@ def test_raw_address_int_is_rejected_by_byref():
     buf = render_snapshot_rgba(HudSnapshot(voice_state="IDLE"), width=64, height=32)
     with pytest.raises(TypeError):
         _pyopenvr_would_do(buf.ctypes.data)  # what #48 passed
+
+
+# --- placement: position / distance / pitch / curvature (live-adjustable) ---
+
+def test_normalize_clamps_all_placement_fields():
+    """Every field clamps to its comfortable range so a bad setting can't place the panel
+    unusably or raise."""
+    p = VrPlacement.normalize("world", 99.0, forward_m=99.0, up_m=99.0,
+                              offset_x_m=-99.0, pitch_deg=999.0, curvature=9.0)
+    assert p.width_m == 3.0 and p.forward_m == 5.0 and p.up_m == 2.0
+    assert p.offset_x_m == -2.0 and p.pitch_deg == 60.0 and p.curvature == 1.0
+
+
+def test_normalize_defaults_new_fields_on_bad_input():
+    p = VrPlacement.normalize("world", forward_m="x", pitch_deg=None, curvature="nope")
+    assert p.forward_m == 1.30 and p.pitch_deg == 0.0 and p.curvature == 0.0
+
+
+def test_resolve_transform_applies_lateral_and_distance_offsets():
+    m = resolve_transform(VrPlacement(offset_x_m=0.3, up_m=-0.1, forward_m=1.5))
+    assert m[0][3] == 0.3          # lateral (+X = right)
+    assert m[1][3] == -0.1         # vertical
+    assert m[2][3] == -1.5         # forward is -Z
+
+
+def test_resolve_transform_pitch_rotates_about_x():
+    """A nonzero pitch makes the rotation non-identity (top leans toward the viewer)."""
+    flat = resolve_transform(VrPlacement(pitch_deg=0.0))
+    tilted = resolve_transform(VrPlacement(pitch_deg=30.0))
+    assert [flat[0][0], flat[1][1], flat[2][2]] == [1.0, 1.0, 1.0]   # identity at 0
+    assert tilted[1][1] != 1.0 and tilted[2][1] > 0.0                # rotated about X
+    # X row is untouched by an X-axis rotation
+    assert tilted[0][0] == 1.0 and tilted[0][1] == 0.0
+
+
+def test_set_vr_placement_relays_to_the_live_view():
+    """HudCapability.set_vr_placement forwards to a live VR view; the app calls this after any
+    settings change so distance / pitch / curvature apply without a re-toggle."""
+    vr_view = FakeView()
+    cap = HudCapability(
+        HudModel(), is_enabled=lambda: False,
+        view_factory=lambda p: None,
+        vr_is_enabled=lambda: True, vr_view_factory=lambda p: vr_view)
+    p = VrPlacement.normalize("world", 0.6, curvature=0.1)
+    cap.set_vr_placement(p)
+    assert vr_view.placements == [p]
+
+
+def test_set_vr_placement_is_safe_with_no_vr_view():
+    """No VR surface up (or a view without set_placement) -> no-op, never raises."""
+    cap = HudCapability(
+        HudModel(), is_enabled=lambda: False,
+        view_factory=lambda p: None,
+        vr_is_enabled=lambda: False, vr_view_factory=lambda p: None)
+    cap.set_vr_placement(VrPlacement())  # must not raise

@@ -345,36 +345,58 @@ VR_PLACEMENTS = ("world", "head")
 @dataclass(frozen=True)
 class VrPlacement:
     """A comfortable, non-interactive placement for the overlay quad. Pure data — the numbers
-    are turned into an OpenVR transform by ``resolve_transform`` and applied by the view."""
-    mode: str = "world"       # "world" (cockpit-fixed) or "head" (locked to the view)
-    width_m: float = 0.55     # physical width of the quad in metres
-    forward_m: float = 1.30   # distance the panel sits in front of the anchor
-    up_m: float = -0.12       # vertical offset (negative = slightly below eye-line, glanceable)
+    become an OpenVR transform (``resolve_transform``) plus a curvature the view applies. Every
+    field is voice-adjustable live (see the ``[hud].vr_*`` settings); defaults are the seated,
+    slightly-below-eye-line spot that reads well at a glance."""
+    mode: str = "world"        # "world" (cockpit-fixed) or "head" (locked to the view)
+    width_m: float = 0.55      # physical width of the quad in metres
+    forward_m: float = 1.30    # distance the panel sits in front of the anchor
+    up_m: float = -0.12        # vertical offset (negative = below eye-line, glanceable)
+    offset_x_m: float = 0.0    # lateral offset (positive = to the right)
+    pitch_deg: float = 0.0     # tilt; positive = top leans TOWARD you (good when placed low)
+    curvature: float = 0.0     # 0 = flat, 1 = full cylinder; a gentle ED-style wrap is ~0.05–0.1
 
     @staticmethod
-    def normalize(mode: object, width_m: object = 0.55) -> "VrPlacement":
-        """Build a placement from raw config values, clamping to sane, comfortable ranges so a
-        bad setting can never place the panel somewhere unusable (or raise)."""
+    def normalize(mode: object, width_m: object = 0.55, *, forward_m: object = 1.30,
+                  up_m: object = -0.12, offset_x_m: object = 0.0, pitch_deg: object = 0.0,
+                  curvature: object = 0.0) -> "VrPlacement":
+        """Build a placement from raw config values, clamping each to a sane, comfortable range
+        so a bad setting can never place the panel somewhere unusable (or raise)."""
         m = str(mode or "world").strip().lower()
         if m not in VR_PLACEMENTS:
             m = "world"
-        try:
-            w = float(width_m)
-        except (TypeError, ValueError):
-            w = 0.55
-        w = min(max(w, 0.15), 3.0)  # 15 cm .. 3 m
-        return VrPlacement(mode=m, width_m=w)
+
+        def _clamp(v: object, default: float, lo: float, hi: float) -> float:
+            try:
+                return min(max(float(v), lo), hi)
+            except (TypeError, ValueError):
+                return default
+
+        return VrPlacement(
+            mode=m,
+            width_m=_clamp(width_m, 0.55, 0.15, 3.0),        # 15 cm .. 3 m
+            forward_m=_clamp(forward_m, 1.30, 0.30, 5.0),    # 30 cm .. 5 m in front
+            up_m=_clamp(up_m, -0.12, -2.0, 2.0),             # ±2 m vertical
+            offset_x_m=_clamp(offset_x_m, 0.0, -2.0, 2.0),   # ±2 m lateral
+            pitch_deg=_clamp(pitch_deg, 0.0, -60.0, 60.0),   # ±60° tilt
+            curvature=_clamp(curvature, 0.0, 0.0, 1.0),      # flat .. full cylinder
+        )
 
 
 def resolve_transform(p: VrPlacement) -> List[List[float]]:
-    """The overlay's 3x4 row-major transform (identity rotation + a translation): centred,
-    ``up_m`` above/below the anchor, ``forward_m`` in front (−Z is forward in OpenVR). For
-    ``world`` this is relative to the seated origin; for ``head`` it is relative to the HMD —
-    the matrix is the same, only the binding call differs (see ``VrHudView``)."""
+    """The overlay's 3x4 row-major transform: an X-axis pitch rotation plus a translation to
+    ``(offset_x_m, up_m, −forward_m)`` — lateral, vertical, and ``forward_m`` in front (−Z is
+    forward in OpenVR). Positive ``pitch_deg`` leans the panel's top toward the viewer (so a
+    low panel angles up to face you). At the default ``pitch_deg=0`` the rotation is identity.
+    For ``world`` this is relative to the seated origin; for ``head`` it is relative to the HMD
+    — the matrix is the same, only the binding call differs (see ``VrHudView``)."""
+    import math
+    th = math.radians(float(p.pitch_deg))
+    c, s = math.cos(th), math.sin(th)
     return [
-        [1.0, 0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0, float(p.up_m)],
-        [0.0, 0.0, 1.0, -float(p.forward_m)],
+        [1.0, 0.0, 0.0, float(p.offset_x_m)],
+        [0.0, c,  -s,   float(p.up_m)],
+        [0.0, s,   c,  -float(p.forward_m)],
     ]
 
 
@@ -416,6 +438,9 @@ class VrHudView:
         # `as_overlay_buffer`), so both must outlive the setOverlayRaw call.
         self._buf: Optional["np.ndarray"] = None
         self._raw: Optional["ctypes.Array"] = None
+        # A new placement pushed from outside (voice/Settings) — the OpenVR thread picks it up on
+        # its next poll and re-applies live, so repositioning never needs a re-toggle.
+        self._pending_placement: Optional[VrPlacement] = None
 
     # -- lifecycle ---------------------------------------------------------------------
     def start(self, timeout: float = 8.0) -> bool:
@@ -438,6 +463,13 @@ class VrHudView:
         with self._lock:
             self._closing = True
 
+    def set_placement(self, placement: VrPlacement) -> None:
+        """Push a new placement (position / distance / pitch / curvature / width). The OpenVR
+        thread applies it on its next poll, so a Settings change or voice command repositions the
+        live overlay with no re-toggle. Thread-safe; a no-op if the overlay isn't up."""
+        with self._lock:
+            self._pending_placement = placement
+
     # -- OpenVR thread -----------------------------------------------------------------
     def _run(self) -> None:
         try:
@@ -456,12 +488,11 @@ class VrHudView:
         try:
             overlay = openvr.IVROverlay()
             handle = overlay.createOverlay(self.KEY, self.NAME)
-            overlay.setOverlayWidthInMeters(handle, float(self._placement.width_m))
             overlay.setOverlayAlpha(handle, 0.92)
-            self._apply_transform(openvr, overlay, handle)
+            self._apply_placement(openvr, overlay, handle, self._placement)
             self._ok = True
             self._ready.set()
-            self._loop(overlay, handle)
+            self._loop(openvr, overlay, handle)
         except Exception as e:  # noqa: BLE001 — any overlay error -> tear down, never crash
             self._logline(f"VR overlay failed: {e}")
             self._ok = False
@@ -472,23 +503,30 @@ class VrHudView:
             except Exception:  # noqa: BLE001
                 pass
 
-    def _apply_transform(self, openvr, overlay, handle) -> None:
-        """Bind the placement transform. World-locked uses the seated origin
-        (``setOverlayTransformAbsolute``); head-locked follows the HMD
-        (``setOverlayTransformTrackedDeviceRelative`` on device 0)."""
-        m = resolve_transform(self._placement)
+    def _apply_placement(self, openvr, overlay, handle, p: "VrPlacement") -> None:
+        """Apply an entire placement to the live overlay: physical width, the pose transform
+        (position + pitch), and curvature. Used both at setup and for live re-apply, so a
+        Settings/voice change repositions without recreating the overlay. Curvature is
+        best-effort — an older runtime without ``setOverlayCurvature`` just stays flat."""
+        self._placement = p
+        overlay.setOverlayWidthInMeters(handle, float(p.width_m))
+        m = resolve_transform(p)
         mat = openvr.HmdMatrix34_t()
         for r in range(3):
             for c in range(4):
                 mat.m[r][c] = m[r][c]
-        if self._placement.mode == "head":
+        if p.mode == "head":
             overlay.setOverlayTransformTrackedDeviceRelative(
                 handle, openvr.k_unTrackedDeviceIndex_Hmd, mat)
         else:
             overlay.setOverlayTransformAbsolute(
                 handle, openvr.TrackingUniverseSeated, mat)
+        try:
+            overlay.setOverlayCurvature(handle, float(p.curvature))
+        except Exception as e:  # noqa: BLE001 — old runtime w/o curvature -> flat, not fatal
+            self._logline(f"VR curvature unavailable (flat): {e}")
 
-    def _loop(self, overlay, handle) -> None:
+    def _loop(self, openvr, overlay, handle) -> None:
         """Show/hide + repaint from the latest snapshot until closed. Re-uploads the RGBA
         buffer only when the snapshot changes, so a static HUD costs almost nothing."""
         last: Optional[HudSnapshot] = None
@@ -496,8 +534,14 @@ class VrHudView:
         while True:
             with self._lock:
                 visible, closing = self._visible, self._closing
+                pending, self._pending_placement = self._pending_placement, None
             if closing:
                 break
+            if pending is not None:
+                try:
+                    self._apply_placement(openvr, overlay, handle, pending)
+                except Exception as e:  # noqa: BLE001 — a bad reposition must not kill the overlay
+                    self._logline(f"VR reposition error: {e}")
             try:
                 if visible:
                     if not shown:

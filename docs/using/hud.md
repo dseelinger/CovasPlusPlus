@@ -73,12 +73,21 @@ install — the `openvr` binding ships inside COVAS++.
     COVAS++, which has no Python environment of its own. **Update to a later release** to use the
     VR overlay.
 
-**Placement** (both configurable on the Settings page or in `config.toml`):
+**Placement.** Every setting below is on the Settings page and in `config.toml` — and **applies
+live**: change it there or by voice and a shown overlay moves immediately, no re-toggle. So the
+way to place the panel is to put the headset on and adjust by voice until it sits right, e.g.
+*"set the VR HUD distance to 1.5,"* *"set the VR HUD tilt to 15,"* *"set the VR HUD curvature to
+0.1."*
 
 | Setting | What it does |
 |---------|--------------|
 | **`[hud].vr_placement`** | `world` (default) parks the panel **cockpit-fixed** in front of you; `head` **locks it to your view** so it follows where you look |
 | **`[hud].vr_width_m`** | Physical width of the panel in metres (default `0.55` — reads well at arm's length) |
+| **`[hud].vr_distance_m`** | How far in front the panel sits, in metres (default `1.30`; range `0.30`–`5.0`) |
+| **`[hud].vr_offset_x_m`** | Left/right offset in metres (default `0.0`; `+` = right, `−` = left) |
+| **`[hud].vr_offset_y_m`** | Up/down offset in metres (default `−0.12`, slightly below eye-line; `+` = up) |
+| **`[hud].vr_pitch_deg`** | Tilt in degrees (default `0`; **positive leans the top toward you**, so a low panel angles up to face you) |
+| **`[hud].vr_curvature`** | Curve of the panel: `0` flat … `1` a full cylinder. Default `0.06` — a gentle ED-style wrap |
 
 !!! note "Meta Quest"
     A Quest reaches this overlay **when it runs ED through SteamVR** — Quest Link / Air Link with
