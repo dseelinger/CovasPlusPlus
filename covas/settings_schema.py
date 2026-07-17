@@ -100,6 +100,7 @@ OPT_OPENAI_BASE_URLS = "@openai_base_urls"  # preset OpenAI/Groq/DeepSeek/OpenRo
 OPT_EDGE_VOICES = "@edge_voices"            # list_edge_voices() — no key (#88)
 OPT_AZURE_VOICES = "@azure_voices"          # list_azure_voices(key, region) — key+region gated (#88)
 OPT_CARTESIA_VOICES = "@cartesia_voices"    # GET {cartesia.base_url}/voices — key gated
+OPT_INPUT_DEVICES = "@input_devices"        # firstrun.list_input_devices() — local, no key (#89)
 
 # Small static option vocabularies for TTS model/voice fields (issue #92).
 OPENAI_TTS_VOICES = ["alloy", "ash", "ballad", "coral", "echo", "fable",
@@ -113,6 +114,9 @@ CARTESIA_MODELS = ["sonic-2", "sonic", "sonic-turbo"]
 _COMBOBOX_SOURCES = frozenset({
     OPT_OPENAI_MODELS, OPT_GEMINI_MODELS, OPT_OLLAMA_MODELS, OPT_ANTHROPIC_MODELS_LIVE,
     OPT_OPENAI_BASE_URLS, OPT_EDGE_VOICES, OPT_AZURE_VOICES, OPT_CARTESIA_VOICES,
+    # The mic picker (#89) is a combobox too: a saved device may be unplugged when the page loads,
+    # and blank = system default — both must stay valid rather than be rejected against a live list.
+    OPT_INPUT_DEVICES,
 })
 
 
@@ -366,6 +370,15 @@ SCHEMA: list[Setting] = [
             "Optional dedicated cancel key. Blank = cancel via a tap of the talk key.",
             default="", phrasings=("cancel key",),
             example="set the cancel key to escape"),
+    Setting("audio.input_device", ("audio", "input_device"), "enum",
+            "Microphone", "Voice input",
+            "Which capture device COVAS listens to. Pick from your input devices (blank = the "
+            "Windows default mic). Prefer the FULL-name entry over a truncated duplicate — the "
+            "short copy is often a silent MME clone. Stored by NAME, so it survives reconnects; "
+            "changing it applies live (the recorder + hands-free listener re-open on the new mic).",
+            default="", options_source=OPT_INPUT_DEVICES,
+            phrasings=("microphone", "mic", "input device", "capture device"),
+            example="set the microphone to headset"),
 
     # --- Activation mode (issue #63) --------------------------------------
     # Hands-free continuous listening vs push-to-talk. Switching this applies LIVE

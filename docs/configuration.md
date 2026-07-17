@@ -39,8 +39,17 @@ itself carries a comment on every line.
 | `keys.push_to_talk` | `[` | The key you **hold** to talk; a brief **tap** cancels |
 | `keys.tap_cancel_ms` | `400` | A press shorter than this (ms) counts as a cancel tap, not speech |
 | `keys.cancel` | *(blank)* | Optional dedicated cancel key (blank = cancel via a tap of the talk key) |
+| `audio.input_device` | *(blank)* | Which **microphone** to capture (blank = the Windows default). Stored by **name** |
 
 You can bind a joystick/HOTAS button to the talk key with a tool like JoyToKey.
+
+!!! tip "Pick your microphone on the Settings page (issue #89)"
+    The **Microphone** picker (under *Voice input* on the [Settings page](control-panel.md)) lists
+    your capture devices — not just the first-run wizard anymore. Windows lists the same mic several
+    times (one per audio API); the picker **de-duplicates** and drops the truncated short-name copy,
+    which is often a **silent** MME clone, so you land on the working full-name device. It's stored by
+    **name** (survives reconnects), blank = the system default, and the change applies **live** — the
+    recorder (and the hands-free listener, in continuous mode) re-open on the new mic with no restart.
 
 ## Activation mode (`[listen]`)
 

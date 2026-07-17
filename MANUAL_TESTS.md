@@ -960,6 +960,14 @@ Notes:
 - [ ] **Hotkeys live:** change the **push-to-talk key** (and/or cancel/reflex key) and SAVE → the log notes the hotkeys updated; the **new** key holds-to-talk immediately and the **old** key no longer does — **no restart, no re-hook**.
 - [ ] **Mic change is safe mid-press (issue #90 review):** while **holding PTT and talking**, change the **input device** in Settings and SAVE → the log notes the change is **deferred** until the capture ends; the utterance you were speaking still transcribes (not dropped), and the **next** press uses the new mic.
 
+### 14.2b Microphone picker on the Settings page (issue #89)  🔊 HW 🌐 PANEL
+> Previously the mic could only be chosen in the first-run wizard; #89 adds it to the Settings page,
+> riding the live mic-reconcile path from #90.
+- [ ] **Picker present:** under *Voice input* on the Settings page there's a **Microphone** combobox listing your capture devices. It's **de-duplicated** — the truncated short-name copy of a device (often a **silent** MME clone, e.g. `Microphone (Logi 4K Stream Edit`) is dropped in favour of the **full-name** entry (`…Edition)`). Blank = the Windows default.
+- [ ] **Pick + apply live:** choose a **different** mic and **SAVE CHANGES** → the log notes the recorder was rebuilt (no restart). Hold PTT and speak → the turn transcribes from the **newly selected** mic. Pick the full-name entry that used to be silent → capture now has audio.
+- [ ] **Continuous mode too:** with `[listen].mode = continuous`, changing the mic restarts the VAD listener on the new device (a subsequent hands-free utterance is captured from it).
+- [ ] **Survives a saved-but-absent device:** the combobox keeps a saved mic name even if that device isn't currently connected (it's an editable combobox — the value is never silently wiped); blank falls back to the default.
+
 ### 14.3 Personality tab (N7)
 - [ ] **Persona picker:** the Personality tab lists personas; selecting one shows a **preview**. Pick a different persona → the next reply's **voice/register changes**.
 - [ ] **Campaign preserved:** switch persona and confirm your **Campaign** text (personal facts) is unchanged — switching voice never wipes it.

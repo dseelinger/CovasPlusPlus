@@ -33,6 +33,57 @@ def test_parse_gemini_models_strips_prefix():
     assert gemini_llm.parse_models_list(payload) == ["gemini-2.5-flash", "gemini-2.5-pro"]
 
 
+# ---- mic picker (issue #89) ------------------------------------------------
+def test_input_devices_source_from_list_input_devices(monkeypatch):
+    """OPT_INPUT_DEVICES resolves from firstrun.list_input_devices() — local, no network/key."""
+    from covas import firstrun
+    monkeypatch.setattr(firstrun, "list_input_devices",
+                        lambda: [{"index": 0, "name": "Headset Mic"},
+                                 {"index": 1, "name": "Webcam Mic"}])
+    opts, err = catalog.resolve(schema.OPT_INPUT_DEVICES, {})
+    assert err is None
+    assert [o["value"] for o in opts] == ["Headset Mic", "Webcam Mic"]
+    assert all(o["label"] == o["value"] for o in opts)
+
+
+def test_input_devices_prefers_full_name_over_truncated_mme_clone(monkeypatch):
+    """The truncated MME clone (a strict prefix of the full name) is dropped so the audible
+    full-name device is what the picker offers — the whole reason for issue #89."""
+    from covas import firstrun
+    monkeypatch.setattr(firstrun, "list_input_devices", lambda: [
+        {"index": 0, "name": "Microphone (Logi 4K Stream Edit"},   # truncated MME copy (silent)
+        {"index": 1, "name": "Microphone (Logi 4K Stream Edition)"},  # full WASAPI name
+        {"index": 2, "name": "Microphone (Logi 4K Stream Edition)"},  # exact dup (DirectSound)
+        {"index": 3, "name": "Headset"},
+    ])
+    values = [o["value"] for o in catalog.resolve(schema.OPT_INPUT_DEVICES, {})[0]]
+    assert values == ["Microphone (Logi 4K Stream Edition)", "Headset"]
+
+
+def test_input_devices_fail_soft_when_no_audio(monkeypatch):
+    """A device-enumeration failure degrades to (None, reason), never a raise — combobox keeps
+    the current value typeable."""
+    from covas import firstrun
+
+    def _boom():
+        raise OSError("no PortAudio")
+
+    monkeypatch.setattr(firstrun, "list_input_devices", _boom)
+    opts, err = catalog.resolve(schema.OPT_INPUT_DEVICES, {})
+    assert opts is None and err
+
+
+def test_input_device_setting_is_editable_combobox():
+    """The mic setting is a combobox so a saved-but-unplugged device (or blank = default) stays
+    valid instead of being rejected against the live list (issue #89)."""
+    s = schema.by_key["audio.input_device"]
+    assert s.options_source == schema.OPT_INPUT_DEVICES
+    assert schema.is_combobox(s)
+    # blank (system default) and an unlisted name are both accepted (combobox type-check only).
+    assert schema.validate_value(s, "") == ("", None)
+    assert schema.validate_value(s, "Some Unplugged Mic") == ("Some Unplugged Mic", None)
+
+
 # ---- static sources (always available, no network) -------------------------
 def test_base_urls_source_is_static_presets():
     opts, err = catalog.resolve(schema.OPT_OPENAI_BASE_URLS, {})
