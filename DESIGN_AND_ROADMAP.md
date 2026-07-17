@@ -245,6 +245,12 @@ the rendering surface differs:
   `[hud]` value and persist via `update_settings` — both apply live through the same reconcile
   path and survive a restart. Look-to-place is **yaw-only** (head ≈ the seated origin in a
   cockpit), keeping the math pure/unit-tested and composing cleanly with the yawed-frame offsets.
+- **Attach-only, never launches SteamVR.** `init(VRApplication_Overlay)` *starts* SteamVR if it
+  isn't running — unwanted for a Commander on VDXR/OpenComposite/desktop who just left the VR HUD
+  enabled (SteamVR isn't their compositor and the overlay can't render there). So `_run` gates
+  `openvr.init` on `_steamvr_running()` (a `vrserver.exe` process check) and bails with "SteamVR
+  not running" if it's down. The HUD only ever attaches to a SteamVR that's already up; enabling
+  it is a harmless no-op otherwise. (v0.13.1.)
 - **`VrHudView` / `make_vr_view` — the guarded sink.** `openvr` is imported **lazily** and
   SteamVR is `init`'d as `VRApplication_Overlay` only when the VR HUD is enabled; **any**
   import/init/runtime failure returns `None` (so `make_vr_view` yields "no VR surface"),
