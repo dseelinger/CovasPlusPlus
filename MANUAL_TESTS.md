@@ -62,7 +62,7 @@ Confirm each before running its section (as shipped,
 - [ ] `[proactive].enabled = true` — proactive callouts. (§5.2)
 - [ ] `[route].enabled = true` — Route callouts while flying a plotted route. (§5.3)
 - [ ] `[hud].enabled = true` — Companion HUD overlay (**off** by default; applies **live**, no restart). (§5a)
-- [ ] `[hud].vr_enabled = true` — in-headset VR HUD overlay (**off** by default; needs SteamVR + `pip install openvr`). (§5b)
+- [ ] `[hud].vr_enabled = true` — in-headset VR HUD overlay (**off** by default; needs SteamVR running, nothing to install). (§5b)
 - [ ] `[keybinds].enabled = true` — Landing-gear automation. Keep `require_confirmation`/`combat_guard = true`. (§6.1)
 - [ ] `[reflex].enabled = true` — Tier-2 combat reflexes (fire chaff / heat sink). **Off** by default, allowlist ships empty — set `[reflex].allowlist = ["chaff", "heat_sink"]` to opt in the spoken/hotword path. Keep `combat_guard = true`. (§6.3)
 - [ ] `[reflex.auto].enabled = true` — Tier-2 **ambient** auto-reflexes (no voice). **Off** by default; needs `[reflex].enabled` too, plus a per-reflex enable (`[reflex.auto.heat_sink].enabled` / `[reflex.auto.chaff].enabled`). (§6.3.2)
@@ -405,8 +405,11 @@ Notes:
 - [ ] **Fail-soft:** it never blocks startup or the voice loop; with `[hud].enabled = false` no window appears and nothing is logged as an error.
 
 ## 5b. VR HUD overlay (issue #48 — `[hud].vr_enabled`)  🥽 VR 🎮 ED
-> The **same** four-row HUD as §5a rendered as a true in-headset **SteamVR overlay** (reuses the identical data adapter — only the rendering surface differs). **Off by default** and **independent** of the 2D HUD. Cannot be exercised offline/headless — needs a VR headset, SteamVR, and the optional dep. **Setup:** `pip install openvr` into the app's environment, start **SteamVR**, and run **Elite Dangerous in VR through SteamVR** (native SteamVR headset, or Quest via Link/Air Link/Virtual Desktop in SteamVR mode).
-- [ ] **No-dep fail-soft (do this first, no headset needed):** with `openvr` **not** installed, set `[hud].vr_enabled = true` → the app starts normally, the VR overlay simply doesn't appear, and the log notes `openvr unavailable` (a `hud` info line) — no crash, no error, and the 2D HUD (if on) still works.
+> The **same** four-row HUD as §5a rendered as a true in-headset **SteamVR overlay** (reuses the identical data adapter — only the rendering surface differs). **Off by default** and **independent** of the 2D HUD. Cannot be exercised offline/headless — needs a VR headset and SteamVR. **Setup:** start **SteamVR**, and run **Elite Dangerous in VR through SteamVR** (native SteamVR headset, or Quest via Link/Air Link/Virtual Desktop in SteamVR mode). Nothing to install — `openvr` is bundled.
+>
+> **Test the FROZEN build (`build.ps1 -Installer`), not just the venv.** The venv has `openvr` because it's a build dep; that tells you nothing about whether the *shipped* app does. Releases through v0.12.0 froze without it and the VR HUD was dead code in every one — running from source would never have caught it.
+- [ ] **Binding survives the freeze (do this first, no headset, no SteamVR):** run the **installed/frozen** app with `[hud].vr_enabled = true` and SteamVR **not** running. The log must say **`SteamVR not available`** — that line proves the bundled binding *imported and ran*. If it instead says **`openvr unavailable`**, the freeze is broken (the binding didn't load) and the VR HUD is dead code in this build, exactly as it was through v0.12.0. The two messages are the whole test: they come from different `except` branches in `vr_hud.py`, and only the second one is a bug.
+- [ ] **Bundled files:** `dist/COVAS++/_internal/openvr/` exists and contains `libopenvr_api_64.dll`. (Absent → the build log will also have shouted a WARNING; see `covas.spec`.)
 - [ ] **No-SteamVR fail-soft:** with `openvr` installed but **SteamVR not running**, enable the VR HUD → it logs `SteamVR not available` and continues; nothing appears; the voice loop is unaffected.
 - [ ] **Toggle on — Settings page:** with SteamVR + ED-in-VR running, flip **VR HUD overlay** on the [Settings page](docs/using/hud.md) → the panel appears **floating in the headset** at a readable size, showing the state/checklist/route/callout rows.
 - [ ] **Toggle on — voice:** say *"turn the VR HUD on"* → the overlay appears; *"turn the VR HUD off"* → it disappears. Live, no restart.

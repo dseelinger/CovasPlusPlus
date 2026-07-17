@@ -910,8 +910,8 @@ SCHEMA: list[Setting] = [
     Setting("hud.vr_enabled", ("hud", "vr_enabled"), "bool",
             "VR HUD overlay", "Companion HUD",
             "Show the same HUD as a true in-headset SteamVR overlay floating in the cockpit. Off "
-            "by default; needs SteamVR running and the optional 'openvr' package. Fails soft with "
-            "no VR runtime (the panel simply doesn't appear).",
+            "by default; needs SteamVR running and Elite Dangerous rendering through it — nothing "
+            "to install. Fails soft with no VR runtime (the panel simply doesn't appear).",
             default=False, phrasings=("vr hud", "the vr hud", "vr overlay", "headset hud"),
             example="turn the VR HUD on"),
     Setting("hud.vr_placement", ("hud", "vr_placement"), "enum",

@@ -17,6 +17,7 @@
 #     "DLL load failed while importing _core". A frozen --selftest proved this, so no av trim.
 # Net: ~260 MB onedir, no trims. Inno LZMA (I6) still gets that to a ~120-150 MB download.
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files
 
@@ -51,17 +52,26 @@ for _pkg in ("ctranslate2", "sounddevice", "soundfile", "faster_whisper", "onnxr
 # them even though nothing imports them at module top level.
 hiddenimports += ["onnxruntime", "faster_whisper.vad"]
 
-# openvr (the VR HUD's SteamVR overlay, issue #48) is an OPTIONAL dependency — it may not be
-# installed in a given build env. Collect it (bundling openvr_api.dll) ONLY when present, so a
-# build without it still succeeds; a build with it ships the VR overlay. The runtime import is
-# lazy + fail-soft, so the frozen app runs either way.
+# openvr (the VR HUD's SteamVR overlay, issue #48) bundles openvr_api.dll via collect_all. It is
+# in requirements.txt, so a correct build env HAS it and the freeze ships the VR overlay.
+#
+# The build still succeeds without it (the runtime import is lazy + fail-soft), because failing
+# the whole build over one optional surface is worse than shipping without it. But it must SHOUT:
+# a silent `except: pass` here is exactly how v0.12.0 shipped the VR HUD as unreachable dead code
+# — the setting existed, the docs told users to `pip install openvr` into a frozen app, and no
+# build log ever mentioned that the feature had been dropped on the floor.
 try:
     _d, _b, _h = collect_all("openvr")
     datas += _d
     binaries += _b
     hiddenimports += _h
-except Exception:
-    pass  # openvr not installed in this build env — VR HUD unavailable in the freeze
+except Exception as _e:
+    print("=" * 78, file=sys.stderr)
+    print("WARNING: openvr NOT FOUND — this build will ship WITHOUT the in-headset VR HUD.", file=sys.stderr)
+    print(f"         ({_e})", file=sys.stderr)
+    print("         [hud].vr_enabled will silently do nothing for every user of this build.", file=sys.stderr)
+    print("         Fix:  .venv\\Scripts\\python.exe -m pip install -r requirements.txt", file=sys.stderr)
+    print("=" * 78, file=sys.stderr)
 
 # Shipped, read-only assets resolved via app_dir() at runtime (the writable copies are seeded into
 # data_dir on first run): the default config.toml and the personality presets.

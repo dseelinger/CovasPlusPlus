@@ -11,7 +11,10 @@ edge-tts>=7.0             # OPTIONAL free neural TTS (Edge Read-Aloud); no SLA �
 # --- Phase 3 (web UI) — installed now so we don't stop later ---
 flask>=3.0                # localhost control panel
 flask-sock>=0.7           # websocket for live log/status push
-# --- OPTIONAL: in-headset VR HUD (issue #48). The SteamVR overlay path (IVROverlay) via the
-#     pyopenvr binding. NOT required — the app + tests run without it; the VR HUD fails soft
-#     when it's absent. Install only if you want the VR overlay:  pip install openvr
-# openvr>=1.23             # SteamVR IVROverlay (BSD-3; bundles openvr_api.dll)
+# --- in-headset VR HUD (issue #48). The SteamVR overlay path (IVROverlay) via the pyopenvr
+#     binding. REQUIRED IN THE BUILD ENV, because covas.spec's collect_all("openvr") can only
+#     bundle what's installed here — and a frozen build is the ONLY way a user can ever get it
+#     (there is no pip in an installed COVAS++). It was commented out through v0.12.0, which
+#     silently shipped the VR HUD as dead code. The runtime import stays lazy + fail-soft, so
+#     users with no SteamVR pay nothing but ~1 MB of installer.
+openvr>=1.23             # SteamVR IVROverlay (BSD-3; bundles openvr_api.dll)
