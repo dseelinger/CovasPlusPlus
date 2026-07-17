@@ -34,7 +34,7 @@ _RANGES = {
 }
 _DEFAULTS = {  # config defaults, for reading current values and for "reset"
     "vr_distance_m": 1.30, "vr_offset_x_m": 0.0, "vr_offset_y_m": -0.12,
-    "vr_pitch_deg": 0.0, "vr_curvature": 0.06, "vr_width_m": 0.55, "vr_yaw_deg": 0.0,
+    "vr_pitch_deg": 0.0, "vr_curvature": 0.1, "vr_width_m": 0.55, "vr_yaw_deg": 0.0,
 }
 _STEP_M, _STEP_DEG, _STEP_CURVE, _STEP_W = 0.10, 5.0, 0.02, 0.05  # default nudge sizes
 

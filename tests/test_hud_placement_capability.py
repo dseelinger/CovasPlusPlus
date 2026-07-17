@@ -15,7 +15,7 @@ def _cap(pin=None):
     """A capability over a mutable [hud] dict that records + applies each patch (so successive
     nudges accumulate, exactly like the real persist-then-reload path)."""
     hud = {"vr_distance_m": 1.30, "vr_offset_x_m": 0.0, "vr_offset_y_m": -0.12,
-           "vr_pitch_deg": 0.0, "vr_curvature": 0.06, "vr_width_m": 0.55, "vr_yaw_deg": 0.0}
+           "vr_pitch_deg": 0.0, "vr_curvature": 0.1, "vr_width_m": 0.55, "vr_yaw_deg": 0.0}
     applied = []
 
     def apply(patch):
@@ -69,7 +69,7 @@ def test_tilt_curve_size_nudges():
     _run(cap, "tilt_up")
     assert hud["vr_pitch_deg"] == 5.0
     _run(cap, "rounder")
-    assert round(hud["vr_curvature"], 3) == 0.08
+    assert round(hud["vr_curvature"], 3) == 0.12
     _run(cap, "bigger")
     assert round(hud["vr_width_m"], 3) == 0.60
 
@@ -102,7 +102,7 @@ def test_reset_restores_defaults():
     _run(cap, "left"); _run(cap, "tilt_up"); _run(cap, "closer")
     _run(cap, "reset")
     assert hud["vr_distance_m"] == 1.30 and hud["vr_offset_x_m"] == 0.0
-    assert hud["vr_pitch_deg"] == 0.0 and hud["vr_curvature"] == 0.06
+    assert hud["vr_pitch_deg"] == 0.0 and hud["vr_curvature"] == 0.1
 
 
 def test_unknown_action_lists_the_valid_ones():
