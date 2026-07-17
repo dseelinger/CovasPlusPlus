@@ -94,6 +94,35 @@ def test_retries_transient_then_succeeds():
     assert calls["n"] == 3
 
 
+def test_on_retry_fires_once_per_backoff_with_attempt_and_delay():
+    # The providers rely on this hook to surface a backoff to the log (issue #97): it must fire
+    # before each retry (not after the final success/failure) with the 1-based attempt + delay.
+    seen = []
+    calls = {"n": 0}
+
+    def connect():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise TransientError("503", status=503)
+        return "ok"
+
+    def on_retry(attempt, delay, exc):
+        seen.append((attempt, delay, exc.status))
+
+    run_with_retry(connect, threading.Event(), _tiny(), on_retry=on_retry)
+    assert [a for a, _d, _s in seen] == [1, 2]        # two retries, 1-based, none after success
+    assert all(d >= 0 for _a, d, _s in seen) and all(s == 503 for *_x, s in seen)
+
+
+def test_retry_event_shape():
+    from covas.providers._retry import retry_event
+    ev = retry_event("OpenAI", 2, 4, 1.0, TransientError("boom", status=503))
+    assert ev == {"provider": "OpenAI", "attempt": 2, "attempts": 4,
+                  "delay": 1.0, "reason": "HTTP 503"}
+    # No status on the exception -> fall back to the class name, still a usable log reason.
+    assert retry_event("Ollama", 1, 3, 0.5, ConnectionError())["reason"] == "ConnectionError"
+
+
 def test_exhausts_retries_and_marks_degraded():
     calls = {"n": 0}
 

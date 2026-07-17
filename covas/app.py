@@ -2658,6 +2658,18 @@ class App:
                                           "text": "Consulting the ultimate checklist"})
                 elif kind == "usage":
                     self._log_usage(data)
+                elif kind == "retry":
+                    # A transient provider blip being retried (issue #97). Surface it so the log
+                    # SHOWS the backoff instead of just a mysterious pause before the reply arrives.
+                    # Route through _log (file + bus), like the router line, so it lands wherever the
+                    # Commander reads the log — NOT bus.publish alone (that skips the log file).
+                    d = data if isinstance(data, dict) else {}
+                    prov = d.get("provider") or "LLM"
+                    reason = d.get("reason") or "transient error"
+                    self.set_state("Thinking", "retrying")
+                    self._log("retry", f"{prov} {reason} — retry {d.get('attempt')}/"
+                                       f"{d.get('attempts')}, backing off "
+                                       f"{float(d.get('delay') or 0.0):.1f}s")
 
             def flush_thinking() -> None:
                 if think["buf"].strip() and not think["shown"]:
