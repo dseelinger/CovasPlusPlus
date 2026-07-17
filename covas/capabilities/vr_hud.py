@@ -435,6 +435,26 @@ def resolve_transform(p: VrPlacement) -> List[List[float]]:
     return _mul_3x4(ry, local)
 
 
+def _steamvr_running() -> bool:
+    """True if the SteamVR runtime (``vrserver.exe``) is already up. We gate ``openvr.init`` on
+    this because initialising as a ``VRApplication_Overlay`` app **launches SteamVR** when it
+    isn't running — unwanted for a Commander on VDXR/OpenComposite or flat desktop who merely
+    left the VR HUD enabled (SteamVR isn't their compositor, and the overlay can't render there
+    anyway). So the HUD only ever *attaches* to a SteamVR that's already running, never starts
+    one. Windows-only (the app's platform); any failure returns False — fail soft = don't
+    launch. Cheap: a one-shot process query at enable time, not in the poll loop."""
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq vrserver.exe", "/NH"],
+            capture_output=True, text=True, timeout=5,
+            creationflags=0x08000000,  # CREATE_NO_WINDOW — no console flash from the frozen app
+        ).stdout.lower()
+        return "vrserver.exe" in out
+    except Exception:  # noqa: BLE001 — tasklist missing / odd platform -> assume not running
+        return False
+
+
 # ---- the SteamVR sink (guarded — never imports openvr in the default test run) -------------
 
 
@@ -531,10 +551,17 @@ class VrHudView:
             self._logline(f"openvr unavailable: {e}")
             self._ready.set()
             return
+        # ATTACH-ONLY: init(VRApplication_Overlay) would LAUNCH SteamVR if it isn't running, so
+        # gate on the runtime already being up. Enabling the VR HUD is then a no-op until the
+        # Commander is actually in SteamVR — it never drags SteamVR up under VDXR/desktop.
+        if not _steamvr_running():
+            self._logline("SteamVR not running; VR overlay stays off (won't launch SteamVR).")
+            self._ready.set()
+            return
         try:
-            # VRApplication_Overlay runs ALONGSIDE a VR game; raises if SteamVR isn't running.
+            # SteamVR is up — attach ALONGSIDE the VR game as an overlay app.
             openvr.init(openvr.VRApplication_Overlay)
-        except Exception as e:  # noqa: BLE001 — SteamVR not running -> fail soft, 2D still works
+        except Exception as e:  # noqa: BLE001 — attach failed despite SteamVR up -> fail soft
             self._logline(f"SteamVR not available ({e}); no VR overlay.")
             self._ready.set()
             return

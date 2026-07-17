@@ -1130,10 +1130,12 @@ enabled = false
 # or neither.
 #
 # DEFAULT OFF. Needs SteamVR running and Elite Dangerous rendering in VR through SteamVR (Link /
-# Air Link / Virtual Desktop in SteamVR mode all count) — nothing to install. FAILS SOFT with no
-# VR: if SteamVR isn't running it simply doesn't appear — no error, the 2D HUD (if enabled) still
-# works. Quest players on the native Oculus runtime / OpenComposite are covered by capturing the
-# 2D window with OpenKneeboard/OVR Toolkit (see docs/using/hud.md).
+# Air Link / Virtual Desktop in SteamVR mode all count) — nothing to install. ATTACH-ONLY: it
+# only shows if SteamVR is ALREADY running and never launches it, so leaving this on under VDXR /
+# OpenComposite / flat desktop is harmless (it just stays off — no SteamVR gets dragged up). FAILS
+# SOFT with no VR: if SteamVR isn't running it simply doesn't appear — no error, the 2D HUD (if
+# enabled) still works. Quest players on the native Oculus runtime / OpenComposite are covered by
+# capturing the 2D window with OpenKneeboard/OVR Toolkit (see docs/using/hud.md).
 #
 # NOTE: releases up to v0.12.0 were frozen WITHOUT the openvr binding, so this setting did
 # nothing at all in them regardless of your VR setup.

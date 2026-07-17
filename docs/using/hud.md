@@ -66,6 +66,13 @@ rendering through it. ED natively speaks OpenVR/SteamVR, so that's the default f
 headsets (Valve Index, HTC Vive, Windows Mixed Reality via SteamVR, and so on). Nothing to
 install — the `openvr` binding ships inside COVAS++.
 
+!!! note "Attach-only — it never launches SteamVR"
+    The overlay only *attaches* to a SteamVR that's **already running**; enabling it never starts
+    SteamVR. So if you normally play through **VDXR / OpenComposite** (or on a flat monitor), you
+    can leave `[hud].vr_enabled = true` set and it simply stays off in those sessions — it won't
+    drag SteamVR up for an overlay it can't render there. It comes to life only when you're
+    actually in a SteamVR session.
+
 !!! warning "Not in v0.12.0 or earlier"
     Releases up to and including **v0.12.0** were built without the `openvr` binding, so
     `[hud].vr_enabled` silently did nothing no matter how it was set. Earlier versions of this
