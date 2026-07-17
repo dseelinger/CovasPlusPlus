@@ -471,9 +471,9 @@ api_key_file = "ElevenLabsAPIKey.txt"
 model      = "eleven_flash_v2_5"
 voice_id   = "EXAVITQu4vr4xnSDxMaL"
 voice_name = "Sarah"
-# Speaking speed (ElevenLabs native voice `speed`). 1.0 = normal; exposed range is 1.0–1.2
-# (clamped). Only sent when > 1.0, so the default request is unchanged.
-speed = 1.0
+# Voice speed is now the ONE normalized [tts].speed below (issue #99), applied to WHICHEVER TTS
+# provider is active — not a per-provider setting. (A legacy [elevenlabs].speed in an old config or
+# overrides.json is still honored as a fallback when [tts].speed is absent.)
 # Audio format streamed back for playback. pcm_16000 = low-latency, cancellable.
 output_format = "pcm_16000"
 
@@ -1232,6 +1232,13 @@ think       = true          # route <think>/thinking output away from speech
 # NOTE: Edge is free but rides an undocumented, no-SLA endpoint (see [edge]); set [piper].model so
 # a broken endpoint falls back to local Piper instead of degrading to text.
 provider = "edge"
+# ONE normalized voice speed (issue #99) for whichever provider above is active: 1.0 = the voice's
+# normal pace, below 1.0 slower, above 1.0 faster; range 0.5–2.0. Each adapter maps this into its own
+# native speed control and clamps to that voice's real limits (ElevenLabs 0.7–1.2; Edge/Azure/OpenAI/
+# Cartesia/Piper go wider), so a value a provider can't reach is capped, never sent raw to error the
+# API — and switching providers can't carry an out-of-range value across. Sent only when != 1.0, so
+# the default request is unchanged.
+speed = 1.0
 
 [piper]
 # Local neural TTS. Download a voice on this machine, e.g.:

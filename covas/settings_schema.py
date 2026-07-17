@@ -70,14 +70,16 @@ LLM_PANELS: dict[str, ProviderPanel] = {
 
 TTS_PANELS: dict[str, ProviderPanel] = {
     # elevenlabs: the voice field carries the #26 filter + #94 search palette in the template (its
-    # catalog is 100+ voices); speed is rendered GENERICALLY off its schema min/max so a merge with
-    # #99's normalized `tts.speed` field composes cleanly (never hardcode 1.0-1.2 in the panel).
-    "elevenlabs": ProviderPanel(("elevenlabs.model", "elevenlabs.voice_id", "elevenlabs.speed")),
-    "edge": ProviderPanel(("edge.voice",)),
-    "azure": ProviderPanel(("azure.region", "azure.voice", "azure.style")),
-    "openai": ProviderPanel(("openai_tts.model", "openai_tts.voice", "openai_tts.instructions")),
-    "cartesia": ProviderPanel(("cartesia.model", "cartesia.voice", "cartesia.language")),
-    "piper": ProviderPanel(("piper.model",)),
+    # catalog is 100+ voices). Voice speed is the ONE normalized, provider-agnostic `tts.speed`
+    # field (#99) — shown on EVERY provider's panel and rendered GENERICALLY off its schema min/max
+    # (never hardcode 1.0-1.2), so any TTS backend gets its real speed range.
+    "elevenlabs": ProviderPanel(("elevenlabs.model", "elevenlabs.voice_id", "tts.speed")),
+    "edge": ProviderPanel(("edge.voice", "tts.speed")),
+    "azure": ProviderPanel(("azure.region", "azure.voice", "azure.style", "tts.speed")),
+    "openai": ProviderPanel(
+        ("openai_tts.model", "openai_tts.voice", "openai_tts.instructions", "tts.speed")),
+    "cartesia": ProviderPanel(("cartesia.model", "cartesia.voice", "cartesia.language", "tts.speed")),
+    "piper": ProviderPanel(("piper.model", "tts.speed")),
 }
 
 # Sentinels for enum options that can only be resolved at runtime (from config
@@ -273,6 +275,22 @@ SCHEMA: list[Setting] = [
             example="set thinking to high"),
 
     # --- Text-to-speech ----------------------------------------------------
+    # ONE normalized, provider-agnostic voice speed (issue #99): 1.0 = normal, <1.0 slower, >1.0
+    # faster. Each TTS adapter maps this single value into its OWN native mechanism (ElevenLabs
+    # voice_settings.speed, Edge/Azure SSML rate, OpenAI speed, Cartesia speed, Piper length_scale)
+    # and clamps to that backend's real limits — so a stored value a provider can't reach is capped,
+    # never errored, and a provider switch can't carry an out-of-range value across. This is the
+    # quick-config "Voice speed" control (web.py maps the friendly `speed` key here).
+    Setting("tts.speed", ("tts", "speed"), "float",
+            "Voice speed", "Text-to-speech",
+            "How fast COVAS speaks, as a normalized multiplier — 1.0 = the voice's normal pace, "
+            "below 1.0 slower, above 1.0 faster. Applies to whichever TTS provider is active; each "
+            "maps it into its own speed control and clamps to that voice's real range (ElevenLabs "
+            "0.7–1.2; Edge/Azure/OpenAI/Cartesia/Piper go wider), so a value a provider can't reach "
+            "is safely capped rather than erroring the request.",
+            default=1.0, min=0.5, max=2.0, unit="×",
+            phrasings=("voice speed", "speaking speed", "talk speed"),
+            example="set the voice speed to 1.5"),
     Setting("elevenlabs.model", ("elevenlabs", "model"), "enum",
             "ElevenLabs model", "Text-to-speech",
             "TTS model. flash is the low-latency default.",
@@ -288,12 +306,6 @@ SCHEMA: list[Setting] = [
             "ElevenLabs voice name", "Text-to-speech",
             "Display name paired with the selected voice id.",
             default="Sarah", hidden=True),
-    Setting("elevenlabs.speed", ("elevenlabs", "speed"), "float",
-            "Voice speed", "Text-to-speech",
-            "How fast COVAS speaks (ElevenLabs native speed). 1.0 = normal.",
-            default=1.0, min=1.0, max=1.2, unit="×",
-            phrasings=("voice speed", "speaking speed", "talk speed"),
-            example="set the voice speed to 1.1"),
     Setting("elevenlabs.output_format", ("elevenlabs", "output_format"), "enum",
             "Audio format", "Text-to-speech",
             "pcm_16000 = low-latency, cancellable. Change only if you know why.",

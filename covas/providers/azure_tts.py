@@ -47,6 +47,14 @@ class AzureTTS:
         self._style = str(a.get("style", "")).strip()
         self._out_device = cfg.get("audio", {}).get("tts_output_device") or None
 
+    def _rate(self) -> str | None:
+        """The SSML prosody `rate` for the current normalized `[tts].speed` (issue #99), or None at
+        normal speed so no `<prosody>` wrapper is added. Read per-call so a live speed change applies
+        to the next line."""
+        from .. import tts_speed
+        n = tts_speed.normalized_speed(self._cfg)
+        return None if tts_speed.is_default(n) else tts_speed.azure_rate(n)
+
     def _key(self) -> str:
         """Resolve the Azure Speech key from its (DPAPI-encrypted) key file. Raises a clear error if
         unconfigured — callers fail soft (persona -> text, cast -> silence)."""
@@ -67,7 +75,7 @@ class AzureTTS:
         if not text:
             return b"", _SAMPLE_RATE
         voice = (voice_id or "").strip() or self._voice
-        ssml = _build_ssml(text, voice, self._style)
+        ssml = _build_ssml(text, voice, self._style, self._rate())
         pcm, _ = _collect_pcm(self._key(), self._region, ssml, None)
         if not pcm:
             raise RuntimeError("Azure TTS returned no audio")
@@ -79,7 +87,7 @@ class AzureTTS:
         text = (text or "").strip()
         if not text:
             return
-        ssml = _build_ssml(text, self._voice, self._style)
+        ssml = _build_ssml(text, self._voice, self._style, self._rate())
         pcm, cancelled = _collect_pcm(self._key(), self._region, ssml, cancel)
         if cancelled or not pcm:
             return  # barged in during synth, or no audio -> nothing to play
@@ -147,12 +155,16 @@ def _lang_of(voice: str) -> str:
     return f"{parts[0]}-{parts[1]}" if len(parts) >= 2 else "en-US"
 
 
-def _build_ssml(text: str, voice: str, style: str = "") -> str:
+def _build_ssml(text: str, voice: str, style: str = "", rate: str | None = None) -> str:
     """Build the SSML request body. XML-escapes `text`; when `style` is set, wraps it in an
-    `mstts:express-as` block (voice-dependent speaking style/emotion). Pure — no I/O."""
+    `mstts:express-as` block (voice-dependent speaking style/emotion); when `rate` is set (e.g.
+    '+30%' / '-20%', from the normalized voice speed #99), wraps it in a `<prosody rate=…>` block
+    (Azure treats the percent as a signed-relative change). Pure — no I/O."""
     inner = _xml_escape(text)
     if style:
         inner = (f"<mstts:express-as style='{_xml_escape(style)}'>{inner}</mstts:express-as>")
+    if rate:
+        inner = f"<prosody rate='{_xml_escape(rate)}'>{inner}</prosody>"
     return (
         "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' "
         "xmlns:mstts='https://www.w3.org/2001/mstts' "

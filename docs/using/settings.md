@@ -18,7 +18,7 @@ change a setting either way and it lands in the same place (`overrides.json`, la
 | *"Turn personality off."* | Personality disabled (say the same to turn it back on) |
 | *"Use the George voice."* | Switches the ElevenLabs voice |
 | *"Set thinking to high."* | Raises the thinking depth |
-| *"Set the voice speed to 1.1."* | Speeds up speech (clamped to 1.0–1.2×) |
+| *"Set the voice speed to 1.5."* | Sets the normalized voice speed (0.5–2.0×, 1.0 = normal) for the active TTS provider — each provider clamps it to its own range |
 | *"Set the chatter min gap to 30 seconds."* | Makes space chatter more frequent in busy systems |
 | *"Turn web search off."* | Disables automatic web search |
 | *"What's my Whisper model set to?"* | Reads back the current value |

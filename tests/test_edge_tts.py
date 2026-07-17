@@ -78,7 +78,7 @@ def test_normalize_voices_filters_and_sorts():
 
 # ---- synth_pcm -------------------------------------------------------------
 def test_synth_pcm_decodes_edge_audio(monkeypatch):
-    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel: (_mp3_fixture(), False))
+    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel, rate=None: (_mp3_fixture(), False))
     pcm, sr = EdgeUnderTest().synth_pcm("hello", "en-US-AriaNeural")
     assert sr == 24000 and len(pcm) > 0
 
@@ -117,7 +117,7 @@ def test_synth_pcm_no_audio_is_an_error(monkeypatch):
 # ---- speak (playback + cancellation) ---------------------------------------
 def test_speak_cancelled_during_synth_plays_nothing(monkeypatch):
     # _collect_mp3 signals it was cancelled mid-stream -> speak must not open any device.
-    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel: (_mp3_fixture(), True))
+    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel, rate=None: (_mp3_fixture(), True))
     played = []
     monkeypatch.setattr(edge.EdgeTTS, "_play_direct",
                         lambda self, pcm, sr, cancel: played.append(pcm))
@@ -126,7 +126,7 @@ def test_speak_cancelled_during_synth_plays_nothing(monkeypatch):
 
 
 def test_speak_plays_decoded_pcm(monkeypatch):
-    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel: (_mp3_fixture(), False))
+    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel, rate=None: (_mp3_fixture(), False))
     played = []
     monkeypatch.setattr(edge.EdgeTTS, "_play_direct",
                         lambda self, pcm, sr, cancel: played.append((len(pcm), sr)))
@@ -149,7 +149,7 @@ def test_speak_empty_text_noop(monkeypatch):
 
 
 def test_play_via_mixer_feeds_and_finishes(monkeypatch):
-    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel: (_mp3_fixture(), False))
+    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel, rate=None: (_mp3_fixture(), False))
     sink = _FakeSink()
     e = EdgeUnderTest(mixer=_FakeMixer(sink))
     e.speak("hi", threading.Event())
@@ -157,7 +157,7 @@ def test_play_via_mixer_feeds_and_finishes(monkeypatch):
 
 
 def test_play_via_mixer_cancel_aborts(monkeypatch):
-    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel: (_mp3_fixture(), False))
+    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel, rate=None: (_mp3_fixture(), False))
     sink = _FakeSink()
     cancel = threading.Event()
     cancel.set()                              # already cancelled -> first chunk aborts
@@ -175,7 +175,7 @@ def test_list_voices_fails_soft_to_empty(monkeypatch):
 
 # ---- cast registry integration ---------------------------------------------
 def test_edge_is_cast_eligible_via_registry(monkeypatch):
-    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel: (_mp3_fixture(), False))
+    monkeypatch.setattr(edge, "_collect_mp3", lambda text, voice, cancel, rate=None: (_mp3_fixture(), False))
     e = EdgeUnderTest()
     cs = CastSynth(el_synth=None, piper_loader=None)
     cs.registry.register("edge", lambda text, ref: e.synth_pcm(text, ref or None))

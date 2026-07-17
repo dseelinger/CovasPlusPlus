@@ -40,12 +40,21 @@ class EdgeTTS:
         # Import lazily so the rest of the stack doesn't require edge-tts installed.
         import edge_tts  # noqa: F401  (import-check only; used in the helpers below)
 
+        self._cfg = cfg
         self._mixer = mixer
         self._bus = bus
         self._fallback = fallback
         e = cfg.get("edge", {}) or {}
         self._voice = str(e.get("voice", "")).strip() or _DEFAULT_VOICE
         self._out_device = cfg.get("audio", {}).get("tts_output_device") or None
+
+    def _rate(self) -> str | None:
+        """The edge-tts `rate` string for the current normalized `[tts].speed` (issue #99), or
+        None at normal speed so the request stays the library default. Read per-call so a live
+        speed change (settings/voice) applies to the next line."""
+        from .. import tts_speed
+        n = tts_speed.normalized_speed(self._cfg)
+        return None if tts_speed.is_default(n) else tts_speed.edge_rate(n)
 
     # ---- synthesis --------------------------------------------------------
     def synth_pcm(self, text: str, voice_id: str | None = None) -> tuple[bytes, int]:
@@ -57,7 +66,7 @@ class EdgeTTS:
             return b"", 24000
         voice = (voice_id or "").strip() or self._voice
         try:
-            mp3, _ = _collect_mp3(text, voice, None)
+            mp3, _ = _collect_mp3(text, voice, None, self._rate())
             if not mp3:
                 raise RuntimeError("edge-tts returned no audio (endpoint may be blocked)")
             return _decode_pcm(mp3)
@@ -74,7 +83,7 @@ class EdgeTTS:
         if not text:
             return
         try:
-            mp3, cancelled = _collect_mp3(text, self._voice, cancel)
+            mp3, cancelled = _collect_mp3(text, self._voice, cancel, self._rate())
             if cancelled or not mp3:
                 return  # barged in during synth, or no audio -> nothing to play
             pcm, sr = _decode_pcm(mp3)
@@ -143,15 +152,18 @@ class EdgeTTS:
 
 # ---- module helpers (pure-ish; the network lives here) --------------------
 def _collect_mp3(text: str, voice: str,
-                 cancel: Optional[threading.Event]) -> tuple[bytes, bool]:
+                 cancel: Optional[threading.Event],
+                 rate: Optional[str] = None) -> tuple[bytes, bool]:
     """Drive edge-tts to completion, returning (mp3_bytes, cancelled). Pulls audio chunks in a
     fresh event loop (the app is thread-based, no running loop), checking `cancel` between chunks
-    so a barge-in stops synthesis promptly. A partial (cancelled) buffer is discarded by callers."""
+    so a barge-in stops synthesis promptly. A partial (cancelled) buffer is discarded by callers.
+    `rate` (e.g. '+30%' / '-20%') applies the normalized voice speed (#99); None = the default pace."""
     import edge_tts
 
     async def _run() -> tuple[bytes, bool]:
         buf = bytearray()
-        comm = edge_tts.Communicate(text, voice)
+        comm = (edge_tts.Communicate(text, voice, rate=rate) if rate
+                else edge_tts.Communicate(text, voice))
         async for chunk in comm.stream():
             if cancel is not None and cancel.is_set():
                 return bytes(buf), True

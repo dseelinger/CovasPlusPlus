@@ -25,7 +25,7 @@ def _cfg(tmp_path, llm_provider="anthropic", tts_provider="elevenlabs") -> dict:
         "sound_cues": {},
         "whisper": {"model": "small", "device": "cpu", "compute_type": "int8", "language": "en"},
         "llm": {"provider": llm_provider},
-        "tts": {"provider": tts_provider},
+        "tts": {"provider": tts_provider, "speed": 1.0},
         "anthropic": {
             "model": "claude-sonnet-5",
             "available_models": ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5-20251001"],
@@ -98,18 +98,19 @@ def test_gemini_and_ollama_llm_blocks(tmp_path, monkeypatch):
 def test_elevenlabs_tts_block(tmp_path, monkeypatch):
     s = _app(tmp_path, monkeypatch, tts_provider="elevenlabs").public_settings()
     assert s["tts"]["provider"] == "elevenlabs"
-    assert _keys(s["tts"]) == ["elevenlabs.model", "elevenlabs.voice_id", "elevenlabs.speed"]
-    speed = next(f for f in s["tts"]["fields"] if f["key"] == "elevenlabs.speed")
-    # Speed is rendered generically off the schema field's bounds — never hardcoded in the panel.
-    assert speed["min"] == 1.0 and speed["max"] == 1.2 and speed["value"] == 1.0
+    assert _keys(s["tts"]) == ["elevenlabs.model", "elevenlabs.voice_id", "tts.speed"]
+    speed = next(f for f in s["tts"]["fields"] if f["key"] == "tts.speed")
+    # Speed is the ONE normalized provider-agnostic field (#99), rendered generically off the
+    # schema field's bounds — never hardcoded in the panel.
+    assert speed["min"] == 0.5 and speed["max"] == 2.0 and speed["value"] == 1.0
 
 
 @pytest.mark.parametrize("provider,expected", [
-    ("edge", ["edge.voice"]),
-    ("azure", ["azure.region", "azure.voice", "azure.style"]),
-    ("openai", ["openai_tts.model", "openai_tts.voice", "openai_tts.instructions"]),
-    ("cartesia", ["cartesia.model", "cartesia.voice", "cartesia.language"]),
-    ("piper", ["piper.model"]),
+    ("edge", ["edge.voice", "tts.speed"]),
+    ("azure", ["azure.region", "azure.voice", "azure.style", "tts.speed"]),
+    ("openai", ["openai_tts.model", "openai_tts.voice", "openai_tts.instructions", "tts.speed"]),
+    ("cartesia", ["cartesia.model", "cartesia.voice", "cartesia.language", "tts.speed"]),
+    ("piper", ["piper.model", "tts.speed"]),
 ])
 def test_alternate_tts_blocks(tmp_path, monkeypatch, provider, expected):
     s = _app(tmp_path, monkeypatch, tts_provider=provider).public_settings()
