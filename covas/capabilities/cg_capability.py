@@ -52,6 +52,9 @@ _GOAL_ARGS = {"type": "object", "properties": dict(_GOAL_PROP), "required": ["go
 
 class CGCapability:
     """Advertises the three CG tools; merges journal + external feed and answers from them."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "location"
 
     def __init__(
         self,

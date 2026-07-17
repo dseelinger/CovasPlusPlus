@@ -49,6 +49,26 @@ def test_set_providers_repoints_tts_and_rebuilds_generators():
     assert layer._comms._generate is not None         # comms-variant generator rebuilt from new LLM
 
 
+def test_set_providers_respects_tier_gate():
+    """A live LLM swap (issue #90) must NOT re-enable a background LLM path the optimization level
+    disabled (issue #84): set_providers re-applies the stored allow_chatter_flavor/allow_comms_
+    variants gate, so a lean tier stays canned/verbatim even across a provider hot-swap."""
+    cfg = {"audio": {"mix_sample_rate": 16000, "cues": {"enabled": True, "flavor": True},
+                     "comms": {"enabled": True, "variants": True}}}
+    layer = AudioLayer(cfg, BusMixer(cfg), _FakeTTS(), ed_ctx=None, llm=None,
+                       allow_chatter_flavor=False, allow_comms_variants=False)
+
+    class _LLM:
+        def stream_reply(self, *a, **k):
+            yield ("text", "x")
+
+    layer.set_providers(llm=_LLM(), cheap_model="m")
+    # config flavor/variants flags are ON, but the tier disallows -> generators stay None.
+    assert layer._chatter._generate is None
+    assert layer._persona_chatter._generate is None
+    assert layer._comms._generate is None
+
+
 def test_layer_ignores_non_ed_events():
     layer, tts, _ = _layer()
     layer.on_event({"type": "log", "text": "hi"})

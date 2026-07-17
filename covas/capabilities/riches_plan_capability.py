@@ -93,6 +93,9 @@ _SCHEMA_PROPS = {
 
 class RichesPlanCapability:
     """Advertises `plan_riches_route` and runs it over the shared route client + plot seam."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
 
     def __init__(
         self,

@@ -80,6 +80,9 @@ _NO_LOADOUT = ("I haven't read your ship's loadout yet — board your ship or op
 class LoadoutCapability:
     """Advertises the loadout/engineering tools and answers them from the injected
     snapshot getter (the live `EDContext.loadout_snapshot` in the app; a stub in tests)."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "commander_state"
 
     def __init__(self, *, get_loadout: Callable[[], LoadoutSnapshot | None],
                  log: Callable[[str], None] | None = None) -> None:

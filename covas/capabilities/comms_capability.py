@@ -174,6 +174,9 @@ class CommsSendCapability:
       * `copy`     — the clipboard writer, used only to build the default injector.
       * `clock`    — monotonic clock for the confirm-window (injected in tests).
     """
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "keybinds"
 
     def __init__(
         self,

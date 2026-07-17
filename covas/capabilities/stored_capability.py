@@ -106,6 +106,9 @@ _MODULE_ARG = {
 class StoredCapability:
     """Advertises the stored-ships/modules tools and answers them from injected snapshot
     getters (the live EDContext getters in the app; stubs in tests)."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "engineering"
 
     def __init__(
         self,

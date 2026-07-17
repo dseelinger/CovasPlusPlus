@@ -136,6 +136,9 @@ _RUN_TOOL = {
 class MacroCapability:
     """Advertises the authoring + run/confirm/abort tools, runs authored macros behind the same
     safety layer as the keybind capability, and auto-runs triggered macros off the event bus."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "keybinds"
 
     def __init__(
         self,

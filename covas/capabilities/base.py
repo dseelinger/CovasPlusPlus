@@ -172,6 +172,24 @@ class CapabilityRegistry:
             out.extend(cap.tools())
         return out
 
+    def tools_for_level(self, level: object) -> list[dict]:
+        """Tool schemas filtered to the capabilities whose tiering group is included at `level`
+        (issue #84). The level -> token-budget -> which-groups decision lives in `covas.tiering`;
+        this just applies it, so the whole filter is in ONE place feeding `stream_reply`. A
+        capability declares its group via a `TIERING_GROUP` attribute (untagged -> the default
+        group, still included at every level but Bare). Config gates already ran at registration,
+        so this filter is applied ON TOP: a capability that isn't registered can't reappear here.
+        A falsy `level` returns the unfiltered set (defensive: never silently drop every tool)."""
+        if not level:
+            return self.tools()
+        from ..tiering import group_of_capability, included_groups_for_level
+        allowed = included_groups_for_level(level)
+        out: list[dict] = []
+        for cap in self._caps:
+            if group_of_capability(cap) in allowed:
+                out.extend(cap.tools())
+        return out
+
     def run_tool(self, name: str, inp: dict) -> str:
         """Dispatch to the capability that advertises `name`. Unknown -> soft error
         string (the loop must survive any tool call, so we never raise). Usage of the

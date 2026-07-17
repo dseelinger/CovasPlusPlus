@@ -87,6 +87,9 @@ _SCHEMA_PROPS = {
 
 class NeutronPlanCapability:
     """Advertises `plot_neutron_route` and runs it over the shared galaxy plotter + plot seam."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
 
     def __init__(
         self,

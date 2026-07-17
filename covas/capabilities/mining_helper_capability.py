@@ -133,6 +133,9 @@ _SCHEMA_PROPS = {
 
 class MiningHelperCapability:
     """Advertises `plan_mining_session` and runs the hotspot + best-sell + checklist + plot flow."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
 
     def __init__(
         self,

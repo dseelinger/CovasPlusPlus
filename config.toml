@@ -1145,6 +1145,25 @@ port = 8765
 # OUT-OF-GAME only; a local model competes with ED for the GPU). Cloud providers are fine in-game
 # and are tiered by the cost router (see [router]).
 provider = "anthropic"
+# Capability/token OPTIMIZATION LEVEL (issue #84). COVAS advertises ~47 tools every turn (~10.4K
+# tokens of tool schemas). That's fine on a prompt-caching, high-TPM endpoint but fatal on a low-TPM
+# free tier (Groq free = 12K tokens-per-minute -> HTTP 413/429) and wasteful on a non-caching paid
+# one. This picks how many tool clusters to advertise AND whether background LLM calls (proactive
+# callouts, chatter flavor, comms variants) run, packed by a token budget:
+#   "auto"     — choose per provider (DEFAULT): Anthropic/Gemini/OpenAI/DeepSeek/OpenRouter -> Full;
+#                Groq (groq.com) -> Minimal (its free tier is token-starved; a PAID Groq user sets
+#                this to "Full"); an unknown custom base_url -> Full (or use custom_tpm below).
+#   "Full"     — every tool; proactive + chatter-flavor + comms-variants ON.
+#   "Standard" — drop the Search + Engineering clusters; proactive ON, chatter/variants OFF.
+#   "Lean"     — core + checklist + Commander-state + settings/help; all background OFF.
+#   "Minimal"  — core + checklist only; all background OFF (safe for a 12K-TPM free tier).
+#   "Bare"     — conversation only, NO tools; all background OFF.
+# Chosen ONCE at startup and held for the session so prompt caching stays warm.
+optimization_level = "auto"
+# Optional tokens-per-minute for a CUSTOM/unknown endpoint (auto mode only). 0 = ignore. When set,
+# auto maps it to a level (<15K -> Minimal, <30K -> Lean, <60K -> Standard, else Full), so you can
+# right-size the tool budget for an endpoint we don't recognize without picking a level by hand.
+custom_tpm = 0
 # Latency watchdog (issue #97): if a turn goes this many seconds WITHOUT a spoken reply — a slow
 # first token, a provider retry/backoff, or a hung connection — COVAS speaks a short, plain-language
 # "the AI service is being slow, I'm still trying" line in the CURRENT voice so you're not left in

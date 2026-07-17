@@ -230,6 +230,9 @@ class AutoReflexCapability:
     No LLM tools: this is a fast, silent path (the issue's "no voice" requirement). It exposes only
     the bus `on_event` hook; the verbal `ReflexCapability` still owns the spoken tools + help.
     """
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "keybinds"
 
     def __init__(
         self,

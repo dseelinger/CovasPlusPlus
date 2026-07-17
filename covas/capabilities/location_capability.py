@@ -51,6 +51,9 @@ _NO_ARGS = {"type": "object", "properties": {}, "required": []}
 
 class LocationCarrierCapability:
     """Advertises the location/carrier tools and answers them from injected state."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "location"
 
     def __init__(
         self,

@@ -105,6 +105,9 @@ class HonkCapability:
         defaults to a daemon thread. Tests inject a synchronous runner.
       * `speak` — speaks a Surface-Scanner-misfire warning (falls back to the log if absent).
     """
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "keybinds"
 
     def __init__(
         self,

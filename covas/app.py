@@ -29,6 +29,7 @@ from .providers.base import LLMProvider, STTProvider, TTSProvider
 from .providers.factory import make_llm, make_stt, make_tts
 from .providers import _retry
 from .router import Router
+from . import tiering
 from .ed import ContextDetector
 from .memory import MemoryDetector
 from . import crew as crew_mod
@@ -228,6 +229,12 @@ class App:
         # one; ED-context and keybinds will be others (DESIGN §3.3). Present only
         # when a checklist file is configured, matching the prior tool-gating.
         self.checklist = Checklist(self.cfg["checklist"]["file"])
+        # Capability/token tiering (issue #84): resolve the optimization level ONCE at startup —
+        # auto-selected from the provider (a low-TPM free tier like Groq-free -> Minimal so the
+        # ~10K-token tool set can't blow the TPM budget) or a manual override. Stable for the whole
+        # session so the tool set — and the prompt cache — stay warm (v2 per-turn gating is out of
+        # scope). Filters registry.tools() before stream_reply and gates the background LLM paths.
+        self.tier_level = tiering.resolve_level(self.cfg)
         self.registry = CapabilityRegistry()
         # Help is first-class and always on: it registers ITSELF so "what can you do" always
         # has one honest answer, and it projects the other capabilities' help metadata (it
@@ -386,6 +393,7 @@ class App:
 
         self._logf = self._open_log()
         self._log("system", _cost_summary(self.cfg, self.mock))
+        self._log("system", tiering.describe_level(self.cfg))
         if self.text_only:
             self._log("system", "No ElevenLabs key — running in text-only mode; "
                                 "COVAS replies appear as text in the log (add a key in Settings "
@@ -454,6 +462,10 @@ class App:
                 self.cfg, self.mixer, self.tts,
                 ed_ctx=self.ed_ctx, llm=self.llm, cheap_model=cheap,
                 cast_synth=self._build_cast_synth(), content=content,
+                # Tiering (#84): the level gates the two LLM-generated background paths — below Full
+                # these fall back to canned chatter / verbatim comms (no background LLM call).
+                allow_chatter_flavor=self.tier_level.chatter_flavor,
+                allow_comms_variants=self.tier_level.comms_variants,
                 log=lambda m: self._log("audio", m))
             self.registry.register(
                 AudioControlsCapability(self.audio, log=lambda m: self._log("audio", m)))
@@ -787,6 +799,11 @@ class App:
         an in-progress user turn — the Commander always has the floor. The line is generated
         on the cheap tier and spoken through the existing cancel path, so a PTT press
         mid-callout cancels it like any other utterance (on_ptt_down sets active_cancel)."""
+        # Tiering second axis (issue #84): proactive callouts are LLM-generated background turns
+        # the Commander never PTT'd for. The lean levels (Lean/Minimal/Bare) suppress them entirely
+        # — return False WITHOUT claiming the turn or arming the cooldown, so no LLM call is spawned.
+        if not self.tier_level.proactive:
+            return False
         with self._proactive_lock:
             if self.state != "Idle":
                 return False
@@ -2487,7 +2504,8 @@ class App:
             try:
                 stream = llm.stream_reply(
                     messages, cancel, on_event,
-                    tool_handler=self.registry.run_tool, tools=self.registry.tools(),
+                    tool_handler=self.registry.run_tool,
+                    tools=self.registry.tools_for_level(self.tier_level),
                     model=route.model, max_tokens=route.max_tokens)
                 for kind, chunk in stream:
                     if cancel.is_set():

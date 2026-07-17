@@ -79,6 +79,9 @@ _SCHEMA_PROPS = {
 class StationSearchCapability:
     """Advertises `search_stations`; stateless slot-fill -> validate -> search. Injected seams
     (`http`, `get_current_system`, `clipboard`) keep the default test run offline."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
 
     def __init__(self, config: SearchConfig, *, http: Http | None = None,
                  get_current_system: Callable[[], str | None] | None = None,

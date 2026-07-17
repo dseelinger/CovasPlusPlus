@@ -161,6 +161,9 @@ class KeybindCapability:
       * `status_snapshot` — Callable[[], dict|None] returning the live EDContext snapshot for
         the combat guard, or None when ED monitoring isn't running.
     """
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "keybinds"
 
     def __init__(
         self,

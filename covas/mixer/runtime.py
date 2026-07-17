@@ -96,6 +96,8 @@ class AudioLayer:
         cheap_model: Optional[str] = None,
         cast_synth: Optional[Callable] = None,  # noqa: ANN001 — (Voice, text) -> (pcm, sr)
         content: Optional[ContentBundle] = None,
+        allow_chatter_flavor: bool = True,  # tiering (#84): False -> canned chatter only, no LLM
+        allow_comms_variants: bool = True,  # tiering (#84): False -> verbatim comms only, no LLM
         clock: Callable[[], float] = time.monotonic,
         log: Optional[Callable[[str], None]] = None,
     ) -> None:
@@ -170,9 +172,15 @@ class AudioLayer:
         self._engine = EligibilityEngine()
         # LLM use in the ambient layer is OFF by default (cost): fact-bearing chatter and NPC
         # comms are pool/verbatim unless explicitly opted in. Flavor chatter / comms variants
-        # only wire the LLM when their flag is set.
-        chatter_flavor = bool((audio.get("cues", {}) or {}).get("flavor", False))
-        comms_variants = bool((audio.get("comms", {}) or {}).get("variants", False))
+        # only wire the LLM when their flag is set. The tiering level (#84) is a SECOND gate on top
+        # of the config flag: a lean level forces `allow_*` off so the layer FALLS BACK to the
+        # canned/verbatim path (generate=None) and no background LLM call is ever spawned.
+        # Stored so a later live LLM hot-swap (set_providers, issue #90) re-applies the SAME tier
+        # gate — otherwise a swap could re-enable a background path the optimization level disabled.
+        self._allow_chatter_flavor = allow_chatter_flavor
+        self._allow_comms_variants = allow_comms_variants
+        chatter_flavor = bool((audio.get("cues", {}) or {}).get("flavor", False)) and allow_chatter_flavor
+        comms_variants = bool((audio.get("comms", {}) or {}).get("variants", False)) and allow_comms_variants
         chatter_gen = _text_generator(llm, cheap_model) if (llm is not None and chatter_flavor) else None
         self._chatter = ChatterPlayer(self._speak_bus, generate=chatter_gen,
                                       min_interval=self._chatter_interval, clock=clock)
@@ -519,8 +527,12 @@ class AudioLayer:
             self.rebuild_cast()
         if llm is not None:
             audio = self.cfg.get("audio", {}) or {}
-            chatter_flavor = bool((audio.get("cues", {}) or {}).get("flavor", False))
-            comms_variants = bool((audio.get("comms", {}) or {}).get("variants", False))
+            # AND with the tier gate (issue #84) so a live LLM swap can't re-enable a background
+            # LLM path the active optimization level disabled — canned/verbatim stays canned.
+            chatter_flavor = (bool((audio.get("cues", {}) or {}).get("flavor", False))
+                              and self._allow_chatter_flavor)
+            comms_variants = (bool((audio.get("comms", {}) or {}).get("variants", False))
+                              and self._allow_comms_variants)
             chatter_gen = _text_generator(llm, cheap_model) if chatter_flavor else None
             comms_gen = make_variant_generator(llm, model=cheap_model) if comms_variants else None
             self._chatter.set_generate(chatter_gen)

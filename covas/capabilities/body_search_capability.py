@@ -86,6 +86,9 @@ class BodySearchCapability:
     """Advertises `search_bodies`; stateless slot-fill -> validate -> search over the shared
     Spansh client. Injected seams (`http`, `get_current_system`, `clipboard`) keep the default
     test run offline."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
 
     def __init__(self, config: SearchConfig, *, http: Http | None = None,
                  get_current_system: Callable[[], str | None] | None = None,

@@ -130,6 +130,9 @@ CHECKLIST_TOOLS = [
 
 class ChecklistCapability:
     """Wraps a Checklist model and serves the checklist tools to the LLM."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "checklist"
 
     def __init__(self, checklist: Checklist,
                  on_change: Callable[[dict], None] | None = None) -> None:

@@ -74,6 +74,9 @@ class OnFootEngineeringCapability:
     """Advertises the on-foot engineering read tool and answers it from the bundled Odyssey
     reference, optionally joined with the injected journal-progress getter (live EDContext in
     the app; a stub/None in tests). Static data — no network."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "engineering"
 
     def __init__(
         self,
