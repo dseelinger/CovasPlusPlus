@@ -43,6 +43,31 @@ def list_voices(cfg: dict) -> list[dict]:
     ])
 
 
+def list_voices_detailed(cfg: dict) -> list[dict]:
+    """Like `list_voices` but carrying the richer METADATA a matcher needs (issue #96): each entry
+    keeps `category` plus the ElevenLabs `labels` (gender / age / accent / descriptive / use-case)
+    and free-text `description`, so an LLM can pair a voice to a persona on something more than a
+    name. A SIBLING of `list_voices` (which stays a lean id/name/category list for the picker) so
+    the two callers don't fight over the shape. 'Famous' voices are filtered out identically."""
+    r = requests.get(f"{BASE}/voices", headers={"xi-api-key": _key(cfg)}, timeout=15)
+    r.raise_for_status()
+    out: list[dict] = []
+    for v in r.json().get("voices", []):
+        if is_famous(v):
+            continue
+        labels = v.get("labels") or {}
+        out.append({
+            "voice_id": v["voice_id"],
+            "name": v["name"],
+            "category": v.get("category", ""),
+            # Pass the labels through as-is (keys vary a little across roster vintages) plus the
+            # free-text description — both are optional and simply absent when EL doesn't supply them.
+            "labels": {k: labels[k] for k in labels if labels[k]},
+            "description": v.get("description") or "",
+        })
+    return sort_by_name(out)
+
+
 def list_models(cfg: dict) -> list[dict]:
     r = requests.get(f"{BASE}/models", headers={"xi-api-key": _key(cfg)}, timeout=15)
     r.raise_for_status()

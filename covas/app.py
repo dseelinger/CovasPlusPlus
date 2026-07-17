@@ -301,6 +301,14 @@ class App:
         if self.cfg.get("elite", {}).get("enabled"):
             self._start_ed_monitoring()
 
+        # Auto persona->voice pairing (issue #96): computed in the BACKGROUND at startup and applied
+        # on persona selection. `_voice_pairings` is {persona_name(lower) -> voice_id}; `_voice_names`
+        # maps a voice_id back to its display name for the applied `voice_name`. `_applying_persona_
+        # voice` guards the reconcile re-entry when WE apply a paired voice via update_settings.
+        self._voice_pairings: dict[str, str] = {}
+        self._voice_names: dict[str, str] = {}
+        self._applying_persona_voice = False
+
         self.history: list[dict] = []
         self.active_cancel: threading.Event | None = None
         self.worker: threading.Thread | None = None
@@ -437,6 +445,8 @@ class App:
         # C9: compose the audio layer once the mixer, providers, and ED context all exist.
         if self.mixer is not None:
             self._start_audio_layer()
+        # Auto-pair a default voice per persona (issue #96) — off the hot path, never blocks startup.
+        self._start_voice_pairing()
 
     # ---- Audio layer (C1-C8 composition, C9) ------------------------------
     def _start_audio_layer(self) -> None:
@@ -570,6 +580,133 @@ class App:
                 self.audio.rebuild_cast(el_voices=voices)
         except Exception as e:  # noqa: BLE001 — best-effort; no filtering if the API is unreachable
             self._log("audio", f"cast voice-exclusion refresh skipped: {e}")
+
+    # ---- Auto persona->voice pairing (issue #96) --------------------------
+    def _voice_pairing_allowed(self) -> bool:
+        """Gate the ONE background pairing call: only when it's opted in, the active TTS is
+        ElevenLabs with a key, and the tiering level (#84) permits a background call. A lean/
+        constrained level (proactive off) SKIPS it — the current default voice is kept. Consulting
+        `tier_level.proactive` reuses #84's 'may I make a background call' axis (on at Full/Standard,
+        off at Lean/Minimal/Bare) rather than inventing a new flag."""
+        if not (self.cfg.get("personality", {}) or {}).get("auto_voice_pairing", True):
+            return False
+        if self.text_only:            # no ElevenLabs key -> no catalog, nothing to pair
+            return False
+        if (self.cfg.get("tts", {}) or {}).get("provider") != "elevenlabs":
+            return False
+        if self.llm is None or not self.tier_level.proactive:
+            return False
+        return True
+
+    def _start_voice_pairing(self) -> None:
+        """Kick off the background pairing thread (never blocks startup). Gated by
+        `_voice_pairing_allowed`; skipped quietly otherwise."""
+        if not self._voice_pairing_allowed():
+            return
+        threading.Thread(target=self._pair_persona_voices, name="voice-pairing",
+                         daemon=True).start()
+
+    def _pair_persona_voices(self) -> None:
+        """Background worker: pair a default voice with each PRE-BUILT persona via one cheap-tier,
+        one-time (cached) LLM call, then apply it to the current persona if it has no explicit
+        voice. Fail-soft throughout — any failure just leaves the current default voice in place."""
+        try:
+            from . import elevenlabs as el
+            from . import personality as persona_mod
+            from . import voice_pairing as vp
+            presets = [p for p in persona_mod.list_personas(self.cfg)
+                       if p.get("source") == "preset"]
+            if not presets:
+                return
+            voices = el.list_voices_detailed(self.cfg)
+            if not voices:
+                return
+            cheap = Router.from_cfg(self.cfg).cheap_route(None).model
+            gen = vp.make_pairing_generator(self.llm, model=cheap)
+            result = vp.pair_voices(presets, voices, gen,
+                                    cache_path=vp.default_cache_path(self.cfg),
+                                    log=lambda m: self._log("voice", m))
+            if result is None or not result.mapping:
+                return
+            self._voice_pairings = {k.strip().lower(): v for k, v in result.mapping.items()}
+            self._voice_names = {v["voice_id"]: v.get("name", "") for v in voices}
+            self._log("voice", f"persona voices paired ({'cache' if result.from_cache else 'fresh'}): "
+                               f"{len(self._voice_pairings)}")
+            # If a persona is already selected and has no explicit voice, dress it now.
+            cur = str((self.cfg.get("personality", {}) or {}).get("persona") or "").strip()
+            if cur:
+                self._apply_persona_voice(cur)
+        except Exception as e:  # noqa: BLE001 — pairing is best-effort; never crash/block the app
+            self._log("voice", f"voice pairing skipped: {e}")
+
+    def _persona_explicit_voices(self) -> dict:
+        """The per-persona EXPLICIT voice choices ([personality].persona_voices) the user has made —
+        these ALWAYS win over an auto pairing and are never overwritten."""
+        return (self.cfg.get("personality", {}) or {}).get("persona_voices", {}) or {}
+
+    def _remember_persona_voice(self, persona: str, voice_id: str, voice_name) -> None:  # noqa: ANN001
+        """Record that the user EXPLICITLY chose `voice_id` for `persona` (a manual voice change while
+        that persona is active), persisted to overrides so it survives a restart and always wins."""
+        persona = str(persona or "").strip()
+        if not persona or not voice_id:
+            return
+        patch = {"personality": {"persona_voices": {persona: str(voice_id)}}}
+        deep_merge(self.cfg, patch)
+        deep_merge(self.overrides, patch)
+        save_overrides(self.overrides)
+        self._log("voice", f"remembered explicit voice for persona {persona!r}")
+
+    def _apply_persona_voice(self, persona: str) -> None:
+        """Apply the paired default voice for `persona` — UNLESS the user has set an explicit voice
+        for it (which always wins). No-op when TTS isn't ElevenLabs, nothing is paired, or the voice
+        already matches. Routed through update_settings (persist + live TTS reload); a re-entry guard
+        stops the resulting voice change from being mis-recorded as an explicit user choice."""
+        if self._applying_persona_voice:
+            return
+        if (self.cfg.get("tts", {}) or {}).get("provider") != "elevenlabs":
+            return
+        from . import voice_pairing as vp
+        target = vp.voice_for_persona(self._persona_explicit_voices(), self._voice_pairings, persona)
+        if not target:
+            return
+        el = self.cfg.get("elevenlabs", {}) or {}
+        if str(el.get("voice_id") or "") == target:
+            return  # already on the right voice
+        patch = {"elevenlabs": {"voice_id": target}}
+        name = self._voice_names.get(target)
+        if name:
+            patch["elevenlabs"]["voice_name"] = name
+        self._applying_persona_voice = True
+        try:
+            self.update_settings(patch)
+            self._log("voice", f"persona {persona!r} -> paired voice {name or target}")
+        finally:
+            self._applying_persona_voice = False
+
+    def _reconcile_persona_voice(self, before: dict) -> None:
+        """On a settings change (issue #96): if the user changed the VOICE while staying on a persona,
+        remember it as that persona's explicit choice; if the PERSONA changed, dress it in its paired
+        (or explicit) voice. Skipped during our own apply (the re-entry guard). Fail-soft."""
+        if self._applying_persona_voice:
+            return
+        try:
+            pers = self.cfg.get("personality", {}) or {}
+            if not pers.get("enabled"):
+                return
+            now_name = str(pers.get("persona") or "").strip()
+            before_name = str((before.get("personality") or {}).get("persona") or "").strip()
+            now_voice = str((self.cfg.get("elevenlabs", {}) or {}).get("voice_id") or "")
+            before_voice = str((before.get("elevenlabs") or {}).get("voice_id") or "")
+            persona_changed = now_name.lower() != before_name.lower()
+            voice_changed = now_voice != before_voice
+            if voice_changed and not persona_changed and now_name \
+                    and (self.cfg.get("tts", {}) or {}).get("provider") == "elevenlabs":
+                self._remember_persona_voice(
+                    now_name, now_voice, (self.cfg.get("elevenlabs", {}) or {}).get("voice_name"))
+            elif persona_changed and now_name:
+                self._apply_persona_voice(now_name)
+        except Exception as e:  # noqa: BLE001 — a reconcile glitch must never crash the loop
+            self._log("voice", f"persona-voice reconcile failed: {e}")
 
     # ---- Elite Dangerous monitoring (DESIGN §5) ---------------------------
     def _start_ed_monitoring(self) -> None:
@@ -1977,7 +2114,7 @@ class App:
         granularity (issue #90, decision #3). Cheap — these sections are small dicts."""
         import copy
         sections = (set(_LLM_SECTIONS) | set(_TTS_SECTIONS)
-                    | {"whisper", "keys", "reflex", "listen", "audio"})
+                    | {"whisper", "keys", "reflex", "listen", "audio", "personality"})
         return {s: copy.deepcopy(self.cfg.get(s)) for s in sections}
 
     def _after_settings_change(self, before: dict) -> None:
@@ -2023,6 +2160,10 @@ class App:
         ):
             self.set_state(self.state, f"reloading Whisper: {w['model']}")
             threading.Thread(target=self._reload_whisper, daemon=True).start()
+        # Persona->voice pairing (issue #96): a persona switch dresses it in its paired/explicit
+        # voice; a manual voice change on the current persona is remembered as explicit. Routed
+        # through its own update_settings (guarded), so it rides the normal persist + TTS-reload path.
+        self._reconcile_persona_voice(before)
 
     def _reload_whisper(self) -> None:
         try:

@@ -433,6 +433,17 @@ persona = "Classic"
 presets_file = "personalities/presets.md"
 # Custom personas you save (git-ignored). One file per persona.
 custom_dir = "personalities/custom"
+# Auto-voice-pairing (issue #96). When ON, at startup the app pairs a sensible default ElevenLabs
+# voice with EACH shipped persona (LLM-decided, in the BACKGROUND — startup is never blocked), so
+# selecting a persona brings a fitting voice instead of everyone using the one configured voice.
+# An explicit voice you set for a persona ALWAYS wins and is never overwritten. Needs the active
+# TTS provider to be ElevenLabs with a key + catalog; it's ONE cheap-tier, one-time (cached) call,
+# gated by the optimization level (#84) — skipped on lean/constrained levels. Off -> no pairing,
+# the current default voice is kept.
+auto_voice_pairing = true
+# Where the generated pairing cache is written (git-ignored, per-account). Keyed by a hash of the
+# persona set + your available voice ids, so it recomputes ONLY when those change — not every launch.
+voice_pairings_file = "personalities/voice_pairings.json"
 # Your CAMPAIGN — personal facts about your Commander (name, ranks, holdings, ongoing goals).
 # Git-ignored, kept SEPARATE from the persona so switching voice never wipes it.
 campaign_file = "campaign.txt"

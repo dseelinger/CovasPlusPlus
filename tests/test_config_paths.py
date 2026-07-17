@@ -54,7 +54,8 @@ def test_missing_sections_do_not_crash():
 def test_all_path_fields_resolved():
     cfg = {
         "personality": {"file": "personality.txt", "presets_file": "personalities/presets.md",
-                        "campaign_file": "campaign.txt", "custom_dir": "personalities/custom"},
+                        "campaign_file": "campaign.txt", "custom_dir": "personalities/custom",
+                        "voice_pairings_file": "personalities/voice_pairings.json"},
         "anthropic": {"api_key_file": "AnthropicAPIKey.txt"},
         "elevenlabs": {"api_key_file": "ElevenLabsAPIKey.txt"},
         "azure": {"api_key_file": "AzureSpeechKey.txt"},

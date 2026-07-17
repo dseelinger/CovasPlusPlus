@@ -1003,6 +1003,29 @@ Notes:
 - [ ] **Save as custom:** edit the persona box → **SAVE AS CUSTOM** → a new custom persona appears in the list (written git-ignored under `personalities/custom/`).
 - [ ] **Campaign editor:** edit the Campaign box → **SAVE CAMPAIGN** → a subsequent reply reflects the updated facts.
 
+### 14.3b Auto-paired persona voices (issue #96 — ElevenLabs)  🔊 HW 🌍 NET
+> requires: `[tts].provider = "elevenlabs"` with a valid key, `[personality].enabled = true`,
+> `[personality].auto_voice_pairing = true`, optimization level `Full` (or a non-lean level), and a
+> couple of distinct voices in your ElevenLabs library. First launch makes ONE cheap-tier call.
+- [ ] **A fitting voice on selection:** on first launch, wait a few seconds (the pairing runs in the
+  background), then pick a persona you've **never** set a voice for → the next reply speaks in a
+  **paired voice that suits the character** (not always the same one configured voice). Confirm
+  `personalities/voice_pairings.json` was written and is **git-ignored** (`git status` shows it
+  untracked/ignored).
+- [ ] **Startup is never blocked:** the app is fully usable **immediately** on launch (before the
+  pairing lands) on the current default voice — no hang, no delay waiting on the pairing call.
+- [ ] **Explicit override persists + wins:** set a voice for a persona yourself (Settings →
+  Text-to-speech, or *"use the George voice"*) while that persona is active → re-select another
+  persona and come back → **your** chosen voice returns, NOT the auto-paired one (it's remembered
+  under `[personality].persona_voices` and never overwritten).
+- [ ] **Cached — no call on the next launch:** restart with the same personas + voice library →
+  there is **no** new pairing call (watch the cost/voice log); the cached `voice_pairings.json` is
+  reused. Add/remove an ElevenLabs voice (or edit a persona) → the next launch **recomputes** once.
+- [ ] **Fail-soft / gated:** with no ElevenLabs key (or offline, or `[tts].provider` set to
+  Edge/Piper, or the optimization level set to `Lean`/lower, or `auto_voice_pairing = false`) → **no
+  pairing happens**, the current default voice is kept, and nothing errors or leaves a persona
+  voiceless.
+
 ### 14.3a Persona stays in character (issue #98)
 - [ ] **Voice persists on a practical turn:** with a persona selected (personality ON), ask a plain lookup ("how far is Sol?") → the answer is accurate **and** unmistakably in that persona's voice, not a flat neutral sentence.
 - [ ] **Can't-fly-the-ship, in character:** say *"retract the landing gear"* / *"boost"* / *"turn us to two-ninety."* → COVAS **declines in character** (never a flat "that's not my department") and still answers the real need (a heading/target). Spot-check across at least **Butler** (declines like a valet), **War-Weary Veteran** (grunts, redirects to a target), and **Overeager Rookie** (crestfallen-then-eager).
