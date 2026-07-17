@@ -286,6 +286,14 @@ class App:
         self.ship_spec = ShipSpecCapability(log=lambda m: self._log("ship_spec", m))
         self.registry.register(self.ship_spec)
 
+        # Game-data freshness (issue #101): "how current is your ship/game data?" answered from
+        # the bundled dataset manifest (sources + generation dates) — the honest companion to the
+        # ship_spec "no data yet, web-search" path. Always on: pure, offline, no network.
+        from .capabilities.game_data_status_capability import GameDataStatusCapability
+        self.game_data_status = GameDataStatusCapability(
+            log=lambda m: self._log("game_data_status", m))
+        self.registry.register(self.game_data_status)
+
         # Elite Dangerous monitoring (DESIGN §5). Opt-in ([elite].enabled, off by
         # default). When on, two daemon watchers tail ED's journal + Status.json,
         # publishing events on the bus and updating a shared context the ED-context

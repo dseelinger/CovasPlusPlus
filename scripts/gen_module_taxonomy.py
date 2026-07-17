@@ -17,7 +17,14 @@ Grouping: one taxonomy row per distinct `name`, aggregating the per-variant CSV 
   * mounts     weapons only: Fixed / Gimballed→Gimbal / Turreted→Turret (Spansh short forms)
   * ratings    distinct rating letters, informational only (Spansh filters on name+class)
 
-Run from the repo root:  python scripts/gen_module_taxonomy.py
+Two stages (issue #101), so runtime stays offline while the snapshot keeps up with FDev:
+  * FETCH   — `--fetch`: download EDCD/FDevIDs outfitting.csv and overwrite the committed
+              fixture. Network; FAIL-LOUD on error (a bad fetch must not silently ship stale
+              data), matching `regen_engineering_data.py`.
+  * GENERATE — default: a PURE function of the committed CSV, so regen is deterministic/offline.
+
+Run from the repo root:  python scripts/gen_module_taxonomy.py            # generate
+                         python scripts/gen_module_taxonomy.py --fetch    # + refresh the CSV
 Then run the tests — `tests/test_nav_modules.py` guards resolve()'s behaviour and
 `tests/test_nav_module_completeness.py` guards that every CSV symbol stays represented.
 """
@@ -25,12 +32,18 @@ from __future__ import annotations
 
 import csv
 import re
+import sys
+import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+from scripts import dataset_manifest  # noqa: E402 — after sys.path so the repo package imports
+
 _CSV = _ROOT / "tests" / "fixtures" / "fdevids_outfitting.csv"
 _OUT = _ROOT / "covas" / "nav" / "module_data.py"
+_URL = "https://raw.githubusercontent.com/EDCD/FDevIDs/master/outfitting.csv"
 
 # EDCD category → ModuleSpec.category. "hardpoint" is what the game calls weapons.
 _CATEGORY = {"hardpoint": "weapon", "standard": "standard",
@@ -107,11 +120,25 @@ def _render(rows: list[tuple]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def main() -> None:
+def _fetch_csv() -> None:
+    """FETCH stage — refresh the committed outfitting.csv from EDCD/FDevIDs. FAIL-LOUD: a fetch
+    error raises rather than shipping a stale/partial table (the `regen_engineering_data.py`
+    contract). The CSV stays committed so the GENERATE stage and tests run offline."""
+    with urllib.request.urlopen(_URL, timeout=30) as r:  # noqa: S310 — pinned trusted host
+        _CSV.write_bytes(r.read())
+    print(f"fetched outfitting.csv -> {_CSV.relative_to(_ROOT)}")
+
+
+def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    if "--fetch" in argv:
+        _fetch_csv()
     with _CSV.open(encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     out_rows = _rows_out(_aggregate(rows))
     _OUT.write_text(_render(out_rows), encoding="utf-8")
+    dataset_manifest.update("module_taxonomy", source="EDCD/FDevIDs outfitting.csv",
+                            source_ref="tests/fixtures/fdevids_outfitting.csv", row_count=len(out_rows))
     print(f"wrote {len(out_rows)} modules to {_OUT.relative_to(_ROOT)}")
 
 

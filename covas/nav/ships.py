@@ -2,8 +2,18 @@
 
 The sibling of `modules.py`, for "find the closest station that sells SHIP X". As with the
 outfitting taxonomy, the whole point is that understanding *which ship the Commander asked
-for* — the disambiguation dialog — never touches the network. The roster below is baked from
-Spansh's live shipyard data (2026-07: the `ships` array every station carries), so
+for* — the disambiguation dialog — never touches the network.
+
+The roster is two layers merged at import (issue #101), so keeping up with FDev content is a
+data update, not a code edit:
+
+  * a GENERATED base — `data/ship_roster.json` (`{id, name, ed_symbol}` per hull), baked from a
+    Spansh shipyard harvest by `scripts/gen_ship_roster.py`; the same Spansh-live lineage this
+    roster always trusted, but now regenerated instead of hand-typed.
+  * a CURATED overlay below — aliases (mishears, "fdl"), `_FAMILIES` disambiguation, `_COMMON` —
+    kept hand-maintained because it is genuinely editorial. Overlay rows key on the base `id`;
+    an alias row for an id the base doesn't have is a build error (`_build_roster` fails loud).
+
 `resolve_ship()` is a pure function returning one of three structured outcomes the LLM turns
 into speech:
 
@@ -28,8 +38,12 @@ Diamondback (Explorer vs Scout), and Type (Type-6/7/8/9/10/11). Bare "krait"/"co
 from __future__ import annotations
 
 import difflib
+import json
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
+
+_DATA = Path(__file__).resolve().parent / "data"
 
 
 @dataclass(frozen=True)
@@ -74,87 +88,78 @@ class UnknownShip:
     kind: str = "unknown"
 
 
-# ---- the roster ---------------------------------------------------------------------------
-# Baked from Spansh's live shipyard data (2026-07). Names + symbols verified against the
-# `ships` arrays real stations return. Aliases cover the common short names and Whisper
-# mishears; FAMILY roots (bare "krait", "cobra", …) are handled separately (see _FAMILIES)
-# so they ask rather than resolve, so they must NOT appear as a single ship's alias here.
+# ---- curated overlay: aliases per canonical id --------------------------------------------
+# Aliases cover common short names and Whisper mishears; they stay hand-maintained (editorial)
+# next to the resolution logic, keyed by the GENERATED base's id. FAMILY roots (bare "krait",
+# "cobra", …) are handled separately (see _FAMILIES) so they ASK rather than resolve, so they
+# must NOT appear as a single ship's alias here. An alias row whose id is absent from the base
+# is caught by `_build_roster` (fail loud) — the "orphaned overlay" contract from issue #101.
+
+_ALIASES: dict[str, tuple[str, ...]] = {
+    "sidewinder": ("sidey", "side winder"),
+    "eagle": ("eagle mk2", "eagle mkii"),
+    "imperial_eagle": ("i eagle", "imp eagle"),
+    "viper_mk3": ("viper mk3", "viper mark 3", "viper mark three", "viper three", "viper 3"),
+    "cobra_mk3": ("cobra mk3", "cobra mark 3", "cobra mark three", "cobra three", "cobra 3"),
+    "viper_mk4": ("viper mk4", "viper mark 4", "viper mark four", "viper four", "viper 4"),
+    "diamondback_scout": ("dbs", "diamond back scout"),
+    "cobra_mk4": ("cobra mk4", "cobra mark 4", "cobra mark four", "cobra four", "cobra 4"),
+    "cobra_mk5": ("cobra mk5", "cobra mark 5", "cobra mark five", "cobra five", "cobra 5"),
+    "type_6": ("type 6", "type six", "t6", "type-6", "type 6 transporter"),
+    # bare "diamondback" is an ambiguous family (see _FAMILIES)
+    "diamondback_explorer": ("dbx", "diamond back explorer"),
+    "imperial_courier": ("courier", "imp courier"),
+    "asp_scout": ("asp s",),
+    "asp_explorer": ("aspx", "asp x", "asp e"),
+    "federal_dropship": ("dropship",),
+    "imperial_clipper": ("clipper", "imp clipper"),  # "clipper" in ED parlance == Imperial Clipper
+    "federal_assault_ship": ("fas", "assault ship"),
+    "type_7": ("type 7", "type seven", "t7", "type-7", "type 7 transporter"),
+    "type_8": ("type 8", "type eight", "t8", "type-8", "type 8 transporter"),
+    "federal_gunship": ("gunship",),
+    "krait_mk2": ("krait mk2", "krait mark 2", "krait mark two", "krait two", "krait 2"),
+    "krait_phantom": ("phantom", "krait light"),
+    "fer_de_lance": ("fdl", "fer de lance", "ferdelance", "fur de lance"),
+    "python_mk2": ("python mk2", "python mark 2", "python mark two", "python two", "python 2"),
+    "type_9": ("type 9", "type nine", "t9", "type-9", "type 9 heavy", "type 9 transporter"),
+    "type_10": ("type 10", "type ten", "t10", "type-10", "type 10 defender"),
+    "type_11": ("type 11", "type eleven", "t11", "type-11", "type 11 prospector"),
+    "beluga": ("beluga",),
+    "alliance_chieftain": ("chieftain", "chief"),
+    "alliance_crusader": ("crusader",),
+    "alliance_challenger": ("challenger",),
+    "federal_corvette": ("corvette",),
+    "imperial_cutter": ("cutter", "imp cutter"),
+    "anaconda": ("conda",),
+    "panther_clipper": ("panther", "panther clipper"),
+    "kestrel": ("kestrel", "kestrel mk2", "kestrel mark 2"),
+    "caspian": ("caspian",),
+    "lynx": ("lynx", "highliner"),
+}
 
 
-ROSTER: tuple[ShipSpec, ...] = (
-    ShipSpec("sidewinder", "Sidewinder", "SideWinder", ("sidey", "side winder")),
-    ShipSpec("eagle", "Eagle", "Eagle", ("eagle mk2", "eagle mkii")),
-    ShipSpec("hauler", "Hauler", "Hauler", ()),
-    ShipSpec("adder", "Adder", "Adder", ()),
-    ShipSpec("imperial_eagle", "Imperial Eagle", "Empire_Eagle", ("i eagle", "imp eagle")),
-    ShipSpec("viper_mk3", "Viper MkIII", "Viper",
-             ("viper mk3", "viper mark 3", "viper mark three", "viper three", "viper 3")),
-    ShipSpec("cobra_mk3", "Cobra MkIII", "CobraMkIII",
-             ("cobra mk3", "cobra mark 3", "cobra mark three", "cobra three", "cobra 3")),
-    ShipSpec("viper_mk4", "Viper MkIV", "Viper_MkIV",
-             ("viper mk4", "viper mark 4", "viper mark four", "viper four", "viper 4")),
-    ShipSpec("diamondback_scout", "Diamondback Scout", "DiamondBack",
-             ("dbs", "diamond back scout")),
-    ShipSpec("cobra_mk4", "Cobra MkIV", "CobraMkIV",
-             ("cobra mk4", "cobra mark 4", "cobra mark four", "cobra four", "cobra 4")),
-    ShipSpec("cobra_mk5", "Cobra MkV", "CobraMkV",
-             ("cobra mk5", "cobra mark 5", "cobra mark five", "cobra five", "cobra 5")),
-    ShipSpec("type_6", "Type-6 Transporter", "Type6",
-             ("type 6", "type six", "t6", "type-6", "type 6 transporter")),
-    ShipSpec("dolphin", "Dolphin", "Dolphin", ()),
-    ShipSpec("diamondback_explorer", "Diamondback Explorer", "DiamondBackXL",
-             ("dbx", "diamond back explorer")),  # bare "diamondback" is an ambiguous family
-    ShipSpec("imperial_courier", "Imperial Courier", "Empire_Courier",
-             ("courier", "imp courier")),
-    ShipSpec("keelback", "Keelback", "Independant_Trader", ()),
-    ShipSpec("asp_scout", "Asp Scout", "Asp_Scout", ("asp s",)),
-    ShipSpec("asp_explorer", "Asp Explorer", "Asp",
-             ("aspx", "asp x", "asp e")),
-    ShipSpec("vulture", "Vulture", "Vulture", ()),
-    ShipSpec("federal_dropship", "Federal Dropship", "Federation_Dropship", ("dropship",)),
-    ShipSpec("imperial_clipper", "Imperial Clipper", "Empire_Trader",
-             ("clipper", "imp clipper")),  # "clipper" in ED parlance == Imperial Clipper
-    ShipSpec("federal_assault_ship", "Federal Assault Ship", "Federation_Dropship_MkII",
-             ("fas", "assault ship")),
-    ShipSpec("type_7", "Type-7 Transporter", "Type7",
-             ("type 7", "type seven", "t7", "type-7", "type 7 transporter")),
-    ShipSpec("type_8", "Type-8 Transporter", "Type8",
-             ("type 8", "type eight", "t8", "type-8", "type 8 transporter")),
-    ShipSpec("federal_gunship", "Federal Gunship", "Federation_Gunship", ("gunship",)),
-    ShipSpec("krait_mk2", "Krait MkII", "Krait_MkII",
-             ("krait mk2", "krait mark 2", "krait mark two", "krait two", "krait 2")),
-    ShipSpec("krait_phantom", "Krait Phantom", "Krait_Light",
-             ("phantom", "krait light")),
-    ShipSpec("orca", "Orca", "Orca", ()),
-    ShipSpec("mamba", "Mamba", "Mamba", ()),
-    ShipSpec("fer_de_lance", "Fer-de-Lance", "FerDeLance",
-             ("fdl", "fer de lance", "ferdelance", "fur de lance")),
-    ShipSpec("python", "Python", "Python", ()),
-    ShipSpec("python_mk2", "Python MkII", "Python_NX",
-             ("python mk2", "python mark 2", "python mark two", "python two", "python 2")),
-    ShipSpec("mandalay", "Mandalay", "Mandalay", ()),
-    ShipSpec("corsair", "Corsair", "Corsair", ()),
-    ShipSpec("type_9", "Type-9 Heavy", "Type9",
-             ("type 9", "type nine", "t9", "type-9", "type 9 heavy", "type 9 transporter")),
-    ShipSpec("type_10", "Type-10 Defender", "Type9_Military",
-             ("type 10", "type ten", "t10", "type-10", "type 10 defender")),
-    ShipSpec("type_11", "Type-11 Prospector", "LakonMiner",
-             ("type 11", "type eleven", "t11", "type-11", "type 11 prospector")),
-    ShipSpec("beluga", "Beluga Liner", "BelugaLiner", ("beluga",)),
-    ShipSpec("alliance_chieftain", "Alliance Chieftain", "TypeX",
-             ("chieftain", "chief")),
-    ShipSpec("alliance_crusader", "Alliance Crusader", "TypeX_2", ("crusader",)),
-    ShipSpec("alliance_challenger", "Alliance Challenger", "TypeX_3", ("challenger",)),
-    ShipSpec("federal_corvette", "Federal Corvette", "Federation_Corvette", ("corvette",)),
-    ShipSpec("imperial_cutter", "Imperial Cutter", "Cutter", ("cutter", "imp cutter")),
-    ShipSpec("anaconda", "Anaconda", "Anaconda", ("conda",)),
-    ShipSpec("panther_clipper", "Panther Clipper MkII", "PantherMkII",
-             ("panther", "panther clipper")),
-    ShipSpec("kestrel", "Kestrel Mk II", "SmallCombat01_NX",
-             ("kestrel", "kestrel mk2", "kestrel mark 2")),
-    ShipSpec("caspian", "Caspian Explorer", "Explorer_NX", ("caspian",)),
-    ShipSpec("lynx", "Lynx Highliner", "MediumTransport01", ("lynx", "highliner")),
-)
+def _build_roster(base: list[dict], aliases: dict[str, tuple[str, ...]]) -> tuple[ShipSpec, ...]:
+    """Merge the generated base (`{id, name, ed_symbol}` rows) with the curated alias overlay.
+    FAIL LOUD on an orphaned overlay row (an alias id the base doesn't define) — the same
+    regen-time contract `regen_engineering_data.py` uses, so drift is a build error not a silent
+    gap. Base order is preserved so resolution behaviour is stable across regens."""
+    ids = {row["id"] for row in base}
+    orphans = sorted(set(aliases) - ids)
+    if orphans:
+        raise ValueError(f"ship alias overlay references unknown id(s): {orphans} — regenerate "
+                         "covas/nav/data/ship_roster.json or fix _ALIASES")
+    return tuple(
+        ShipSpec(row["id"], row["name"], row.get("ed_symbol", ""), tuple(aliases.get(row["id"], ())))
+        for row in base
+    )
+
+
+def _load_base() -> list[dict]:
+    """The generated roster base (offline; read once at import — the blueprints.py pattern)."""
+    return json.loads((_DATA / "ship_roster.json").read_text(encoding="utf-8"))
+
+
+ROSTER: tuple[ShipSpec, ...] = _build_roster(_load_base(), _ALIASES)
 
 
 # ---- genuine ship families (ask, don't guess) ---------------------------------------------

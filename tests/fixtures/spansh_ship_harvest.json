@@ -1,0 +1,194 @@
+[
+ {
+  "name": "Sidewinder",
+  "symbol": "SideWinder"
+ },
+ {
+  "name": "Eagle",
+  "symbol": "Eagle"
+ },
+ {
+  "name": "Hauler",
+  "symbol": "Hauler"
+ },
+ {
+  "name": "Adder",
+  "symbol": "Adder"
+ },
+ {
+  "name": "Imperial Eagle",
+  "symbol": "Empire_Eagle"
+ },
+ {
+  "name": "Viper MkIII",
+  "symbol": "Viper"
+ },
+ {
+  "name": "Cobra MkIII",
+  "symbol": "CobraMkIII"
+ },
+ {
+  "name": "Viper MkIV",
+  "symbol": "Viper_MkIV"
+ },
+ {
+  "name": "Diamondback Scout",
+  "symbol": "DiamondBack"
+ },
+ {
+  "name": "Cobra MkIV",
+  "symbol": "CobraMkIV"
+ },
+ {
+  "name": "Cobra MkV",
+  "symbol": "CobraMkV"
+ },
+ {
+  "name": "Type-6 Transporter",
+  "symbol": "Type6"
+ },
+ {
+  "name": "Dolphin",
+  "symbol": "Dolphin"
+ },
+ {
+  "name": "Diamondback Explorer",
+  "symbol": "DiamondBackXL"
+ },
+ {
+  "name": "Imperial Courier",
+  "symbol": "Empire_Courier"
+ },
+ {
+  "name": "Keelback",
+  "symbol": "Independant_Trader"
+ },
+ {
+  "name": "Asp Scout",
+  "symbol": "Asp_Scout"
+ },
+ {
+  "name": "Asp Explorer",
+  "symbol": "Asp"
+ },
+ {
+  "name": "Vulture",
+  "symbol": "Vulture"
+ },
+ {
+  "name": "Federal Dropship",
+  "symbol": "Federation_Dropship"
+ },
+ {
+  "name": "Imperial Clipper",
+  "symbol": "Empire_Trader"
+ },
+ {
+  "name": "Federal Assault Ship",
+  "symbol": "Federation_Dropship_MkII"
+ },
+ {
+  "name": "Type-7 Transporter",
+  "symbol": "Type7"
+ },
+ {
+  "name": "Type-8 Transporter",
+  "symbol": "Type8"
+ },
+ {
+  "name": "Federal Gunship",
+  "symbol": "Federation_Gunship"
+ },
+ {
+  "name": "Krait MkII",
+  "symbol": "Krait_MkII"
+ },
+ {
+  "name": "Krait Phantom",
+  "symbol": "Krait_Light"
+ },
+ {
+  "name": "Orca",
+  "symbol": "Orca"
+ },
+ {
+  "name": "Mamba",
+  "symbol": "Mamba"
+ },
+ {
+  "name": "Fer-de-Lance",
+  "symbol": "FerDeLance"
+ },
+ {
+  "name": "Python",
+  "symbol": "Python"
+ },
+ {
+  "name": "Python MkII",
+  "symbol": "Python_NX"
+ },
+ {
+  "name": "Mandalay",
+  "symbol": "Mandalay"
+ },
+ {
+  "name": "Corsair",
+  "symbol": "Corsair"
+ },
+ {
+  "name": "Type-9 Heavy",
+  "symbol": "Type9"
+ },
+ {
+  "name": "Type-10 Defender",
+  "symbol": "Type9_Military"
+ },
+ {
+  "name": "Type-11 Prospector",
+  "symbol": "LakonMiner"
+ },
+ {
+  "name": "Beluga Liner",
+  "symbol": "BelugaLiner"
+ },
+ {
+  "name": "Alliance Chieftain",
+  "symbol": "TypeX"
+ },
+ {
+  "name": "Alliance Crusader",
+  "symbol": "TypeX_2"
+ },
+ {
+  "name": "Alliance Challenger",
+  "symbol": "TypeX_3"
+ },
+ {
+  "name": "Federal Corvette",
+  "symbol": "Federation_Corvette"
+ },
+ {
+  "name": "Imperial Cutter",
+  "symbol": "Cutter"
+ },
+ {
+  "name": "Anaconda",
+  "symbol": "Anaconda"
+ },
+ {
+  "name": "Panther Clipper MkII",
+  "symbol": "PantherMkII"
+ },
+ {
+  "name": "Kestrel Mk II",
+  "symbol": "SmallCombat01_NX"
+ },
+ {
+  "name": "Caspian Explorer",
+  "symbol": "Explorer_NX"
+ },
+ {
+  "name": "Lynx Highliner",
+  "symbol": "MediumTransport01"
+ }
+]

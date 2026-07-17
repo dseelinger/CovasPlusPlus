@@ -1,0 +1,242 @@
+[
+ {
+  "id": "sidewinder",
+  "name": "Sidewinder",
+  "ed_symbol": "SideWinder"
+ },
+ {
+  "id": "eagle",
+  "name": "Eagle",
+  "ed_symbol": "Eagle"
+ },
+ {
+  "id": "hauler",
+  "name": "Hauler",
+  "ed_symbol": "Hauler"
+ },
+ {
+  "id": "adder",
+  "name": "Adder",
+  "ed_symbol": "Adder"
+ },
+ {
+  "id": "imperial_eagle",
+  "name": "Imperial Eagle",
+  "ed_symbol": "Empire_Eagle"
+ },
+ {
+  "id": "viper_mk3",
+  "name": "Viper MkIII",
+  "ed_symbol": "Viper"
+ },
+ {
+  "id": "cobra_mk3",
+  "name": "Cobra MkIII",
+  "ed_symbol": "CobraMkIII"
+ },
+ {
+  "id": "viper_mk4",
+  "name": "Viper MkIV",
+  "ed_symbol": "Viper_MkIV"
+ },
+ {
+  "id": "diamondback_scout",
+  "name": "Diamondback Scout",
+  "ed_symbol": "DiamondBack"
+ },
+ {
+  "id": "cobra_mk4",
+  "name": "Cobra MkIV",
+  "ed_symbol": "CobraMkIV"
+ },
+ {
+  "id": "cobra_mk5",
+  "name": "Cobra MkV",
+  "ed_symbol": "CobraMkV"
+ },
+ {
+  "id": "type_6",
+  "name": "Type-6 Transporter",
+  "ed_symbol": "Type6"
+ },
+ {
+  "id": "dolphin",
+  "name": "Dolphin",
+  "ed_symbol": "Dolphin"
+ },
+ {
+  "id": "diamondback_explorer",
+  "name": "Diamondback Explorer",
+  "ed_symbol": "DiamondBackXL"
+ },
+ {
+  "id": "imperial_courier",
+  "name": "Imperial Courier",
+  "ed_symbol": "Empire_Courier"
+ },
+ {
+  "id": "keelback",
+  "name": "Keelback",
+  "ed_symbol": "Independant_Trader"
+ },
+ {
+  "id": "asp_scout",
+  "name": "Asp Scout",
+  "ed_symbol": "Asp_Scout"
+ },
+ {
+  "id": "asp_explorer",
+  "name": "Asp Explorer",
+  "ed_symbol": "Asp"
+ },
+ {
+  "id": "vulture",
+  "name": "Vulture",
+  "ed_symbol": "Vulture"
+ },
+ {
+  "id": "federal_dropship",
+  "name": "Federal Dropship",
+  "ed_symbol": "Federation_Dropship"
+ },
+ {
+  "id": "imperial_clipper",
+  "name": "Imperial Clipper",
+  "ed_symbol": "Empire_Trader"
+ },
+ {
+  "id": "federal_assault_ship",
+  "name": "Federal Assault Ship",
+  "ed_symbol": "Federation_Dropship_MkII"
+ },
+ {
+  "id": "type_7",
+  "name": "Type-7 Transporter",
+  "ed_symbol": "Type7"
+ },
+ {
+  "id": "type_8",
+  "name": "Type-8 Transporter",
+  "ed_symbol": "Type8"
+ },
+ {
+  "id": "federal_gunship",
+  "name": "Federal Gunship",
+  "ed_symbol": "Federation_Gunship"
+ },
+ {
+  "id": "krait_mk2",
+  "name": "Krait MkII",
+  "ed_symbol": "Krait_MkII"
+ },
+ {
+  "id": "krait_phantom",
+  "name": "Krait Phantom",
+  "ed_symbol": "Krait_Light"
+ },
+ {
+  "id": "orca",
+  "name": "Orca",
+  "ed_symbol": "Orca"
+ },
+ {
+  "id": "mamba",
+  "name": "Mamba",
+  "ed_symbol": "Mamba"
+ },
+ {
+  "id": "fer_de_lance",
+  "name": "Fer-de-Lance",
+  "ed_symbol": "FerDeLance"
+ },
+ {
+  "id": "python",
+  "name": "Python",
+  "ed_symbol": "Python"
+ },
+ {
+  "id": "python_mk2",
+  "name": "Python MkII",
+  "ed_symbol": "Python_NX"
+ },
+ {
+  "id": "mandalay",
+  "name": "Mandalay",
+  "ed_symbol": "Mandalay"
+ },
+ {
+  "id": "corsair",
+  "name": "Corsair",
+  "ed_symbol": "Corsair"
+ },
+ {
+  "id": "type_9",
+  "name": "Type-9 Heavy",
+  "ed_symbol": "Type9"
+ },
+ {
+  "id": "type_10",
+  "name": "Type-10 Defender",
+  "ed_symbol": "Type9_Military"
+ },
+ {
+  "id": "type_11",
+  "name": "Type-11 Prospector",
+  "ed_symbol": "LakonMiner"
+ },
+ {
+  "id": "beluga",
+  "name": "Beluga Liner",
+  "ed_symbol": "BelugaLiner"
+ },
+ {
+  "id": "alliance_chieftain",
+  "name": "Alliance Chieftain",
+  "ed_symbol": "TypeX"
+ },
+ {
+  "id": "alliance_crusader",
+  "name": "Alliance Crusader",
+  "ed_symbol": "TypeX_2"
+ },
+ {
+  "id": "alliance_challenger",
+  "name": "Alliance Challenger",
+  "ed_symbol": "TypeX_3"
+ },
+ {
+  "id": "federal_corvette",
+  "name": "Federal Corvette",
+  "ed_symbol": "Federation_Corvette"
+ },
+ {
+  "id": "imperial_cutter",
+  "name": "Imperial Cutter",
+  "ed_symbol": "Cutter"
+ },
+ {
+  "id": "anaconda",
+  "name": "Anaconda",
+  "ed_symbol": "Anaconda"
+ },
+ {
+  "id": "panther_clipper",
+  "name": "Panther Clipper MkII",
+  "ed_symbol": "PantherMkII"
+ },
+ {
+  "id": "kestrel",
+  "name": "Kestrel Mk II",
+  "ed_symbol": "SmallCombat01_NX"
+ },
+ {
+  "id": "caspian",
+  "name": "Caspian Explorer",
+  "ed_symbol": "Explorer_NX"
+ },
+ {
+  "id": "lynx",
+  "name": "Lynx Highliner",
+  "ed_symbol": "MediumTransport01"
+ }
+]

@@ -19,6 +19,7 @@ in the hardpoint array). Nothing is invented — that is the whole point of bund
 from __future__ import annotations
 
 import json
+import re
 import sys
 import urllib.request
 from pathlib import Path
@@ -26,8 +27,12 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 from covas.nav.ships import ROSTER  # noqa: E402 — after sys.path so the repo package imports
+from scripts import dataset_manifest  # noqa: E402
 
 _BASE = "https://raw.githubusercontent.com/EDCD/coriolis-data/master/ships/"
+# GitHub API dir listing — the authoritative, self-updating set of coriolis ship files, so a
+# brand-new hull's JSON is picked up without a hand-maintained file list.
+_INDEX = "https://api.github.com/repos/EDCD/coriolis-data/contents/ships"
 _OUT = _ROOT / "covas" / "nav" / "ship_spec_data.py"
 
 # The canonical (Spansh) ship name per id, so the bundled spec's `name` is the SAME string the
@@ -35,28 +40,23 @@ _OUT = _ROOT / "covas" / "nav" / "ship_spec_data.py"
 # the Viper MkIII). One canonical name across the app, no dual-naming.
 _CANON_NAME = {s.id: s.name for s in ROSTER}
 
-# coriolis-data filename (no .json) -> the canonical ship id in covas/nav/ships.py. Keying to
-# the SAME slug the resolver returns is what lets `ship_spec` look a resolved hull straight up.
-# `lynx` (Lynx Highliner) has no coriolis entry, so it simply carries no bundled spec.
-_FILE_TO_ID: dict[str, str] = {
-    "sidewinder": "sidewinder", "eagle": "eagle", "hauler": "hauler", "adder": "adder",
-    "imperial_eagle": "imperial_eagle", "viper": "viper_mk3", "cobra_mk_iii": "cobra_mk3",
-    "viper_mk_iv": "viper_mk4", "diamondback_scout": "diamondback_scout",
-    "cobra_mk_iv": "cobra_mk4", "cobra_mk_v": "cobra_mk5", "type_6_transporter": "type_6",
-    "dolphin": "dolphin", "diamondback_explorer": "diamondback_explorer",
-    "imperial_courier": "imperial_courier", "keelback": "keelback", "asp_scout": "asp_scout",
-    "asp": "asp_explorer", "vulture": "vulture", "federal_dropship": "federal_dropship",
-    "imperial_clipper": "imperial_clipper", "federal_assault_ship": "federal_assault_ship",
-    "type_7_transport": "type_7", "type_8_transport": "type_8",
-    "federal_gunship": "federal_gunship", "krait_mkii": "krait_mk2",
-    "krait_phantom": "krait_phantom", "orca": "orca", "mamba": "mamba",
-    "fer_de_lance": "fer_de_lance", "python": "python", "python_nx": "python_mk2",
-    "mandalay": "mandalay", "imperial_corsair": "corsair", "type_9_heavy": "type_9",
-    "type_10_defender": "type_10", "type_11_prospector": "type_11", "beluga": "beluga",
-    "alliance_chieftain": "alliance_chieftain", "alliance_crusader": "alliance_crusader",
-    "alliance_challenger": "alliance_challenger", "federal_corvette": "federal_corvette",
-    "imperial_cutter": "imperial_cutter", "anaconda": "anaconda",
-    "panther_clipper": "panther_clipper", "kestrel": "kestrel", "explorer_nx": "caspian",
+_NON_ALNUM = re.compile(r"[^a-z0-9]+")
+
+
+def _norm(text: str) -> str:
+    """Fold a name to a comparison key: 'Cobra Mk III' / 'Cobra MkIII' -> 'cobramkiii'."""
+    return _NON_ALNUM.sub("", str(text).lower())
+
+
+# Auto-match: a coriolis ship JSON's `properties.name` normalizes to the SAME key as the
+# roster's canonical name for almost every hull (Anaconda, Cobra MkIII, Type-6 Transporter, …),
+# so the file->id map is DERIVED, not hand-typed (issue #101 killed the old `_FILE_TO_ID`). Only
+# the genuinely irregular coriolis spellings need an explicit override, keyed by the coriolis
+# name's normalized form. Everything else is matched by name; an unmatched file FAILS LOUD (the
+# new-ship detection signal).
+_NAME_EXCEPTIONS: dict[str, str] = {
+    "viper": "viper_mk3",      # coriolis "Viper" is the Viper MkIII
+    "asp": "asp_explorer",     # coriolis "Asp" is the Asp Explorer
 }
 
 # The coriolis `slots.standard` array order (from coriolis Ship.js). Baked here so the row
@@ -68,6 +68,34 @@ _CORE_ORDER = ("power_plant", "thrusters", "frame_shift_drive", "life_support",
 def _fetch(name: str) -> dict:
     with urllib.request.urlopen(_BASE + name + ".json", timeout=60) as r:  # noqa: S310 (trusted host)
         return json.load(r)
+
+
+def _list_ship_files() -> list[str]:
+    """Every coriolis ship filename (no .json), from the repo's dir listing — so a hull added to
+    coriolis-data is discovered with no hand-maintained file list. FAIL-LOUD on a fetch error
+    (network required, like the whole script), matching `regen_engineering_data.py`."""
+    req = urllib.request.Request(_INDEX, headers={"Accept": "application/vnd.github+json",
+                                                  "User-Agent": "covas-gen-ship-specs"})
+    with urllib.request.urlopen(req, timeout=60) as r:  # noqa: S310 — pinned trusted host
+        entries = json.load(r)
+    return sorted(e["name"][:-5] for e in entries
+                  if isinstance(e, dict) and str(e.get("name", "")).endswith(".json"))
+
+
+def _coriolis_name(data: dict) -> str:
+    """The ship's display name from a coriolis ship JSON ('Cobra Mk III')."""
+    key = next(iter(data))
+    return str(data[key]["properties"]["name"])
+
+
+def match_id(coriolis_name: str, name_index: dict[str, str]) -> str | None:
+    """The canonical roster id for a coriolis ship name, or None if unmatched. `name_index` is
+    `{normalized canonical name: id}`. Irregular coriolis spellings resolve via `_NAME_EXCEPTIONS`;
+    everything else matches on the normalized name. A None here is a NEW-HULL signal (fail loud)."""
+    n = _norm(coriolis_name)
+    if n in _NAME_EXCEPTIONS:
+        return _NAME_EXCEPTIONS[n]
+    return name_index.get(n)
 
 
 def _optional(internal: list) -> list[tuple[int, str]]:
@@ -124,9 +152,24 @@ def _row(ship_id: str, data: dict) -> dict:
 
 
 def main() -> None:
+    name_index = {_norm(s.name): s.id for s in ROSTER}
     rows: list[dict] = []
-    for fname, ship_id in _FILE_TO_ID.items():
-        rows.append(_row(ship_id, _fetch(fname)))
+    unmatched: list[str] = []
+    for fname in _list_ship_files():
+        data = _fetch(fname)
+        cname = _coriolis_name(data)
+        ship_id = match_id(cname, name_index)
+        if ship_id is None:
+            unmatched.append(f"{fname}.json ({cname!r})")
+            continue
+        rows.append(_row(ship_id, data))
+    if unmatched:
+        # This loud failure IS the new-ship detector: a coriolis hull with no roster id means
+        # Frontier shipped a ship the roster hasn't harvested yet — run gen_ship_roster.py first.
+        raise SystemExit(
+            "Unmatched coriolis ship file(s) — new FDev hull(s)? Regenerate the roster "
+            "(scripts/gen_ship_roster.py --fetch) so these get a canonical id, or add a "
+            f"_NAME_EXCEPTIONS override:\n  " + "\n  ".join(unmatched))
     rows.sort(key=lambda r: r["id"])
 
     lines = [
@@ -172,6 +215,8 @@ def main() -> None:
         lines.append("    },")
     lines.append("}")
     _OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    dataset_manifest.update("ship_specs", source="EDCD/coriolis-data ships/*.json",
+                            source_ref="github.com/EDCD/coriolis-data@master", row_count=len(rows))
     print(f"wrote {len(rows)} ships -> {_OUT}")
     # spot-check a few well-known figures so a bad refresh is caught immediately.
     by_id = {r["id"]: r for r in rows}
