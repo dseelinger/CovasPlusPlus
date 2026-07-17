@@ -24,6 +24,31 @@ def _layer(**audio):
     return AudioLayer(cfg, mix, tts, ed_ctx=None, llm=None), tts, mix
 
 
+def test_set_providers_repoints_tts_and_rebuilds_generators():
+    """A live provider hot-swap (issue #90 review) re-points the layer's TTS + rebuilds the opt-in
+    LLM generators, so ambient/comms audio never stays on the OLD provider after a Settings swap."""
+    layer, _tts, _mix = _layer(cues={"enabled": True, "flavor": True},
+                               comms={"enabled": True, "variants": True})
+    # Built with llm=None -> the opt-in LLM generators are absent.
+    assert layer._chatter._generate is None
+    assert layer._persona_chatter._generate is None
+    assert layer._comms._generate is None
+
+    new_tts = _FakeTTS()
+    new_cast = lambda voice, text: (b"", 16000)  # noqa: E731 — a (Voice, text) synth stub
+
+    class _LLM:
+        def stream_reply(self, *a, **k):
+            yield ("text", "x")
+
+    layer.set_providers(tts=new_tts, cast_synth=new_cast, llm=_LLM(), cheap_model="m")
+    assert layer.tts is new_tts              # voice re-pointed for persona/interdiction/comms lines
+    assert layer._cast_synth is new_cast     # cast synth swapped (cast rebuilt through it)
+    assert layer._chatter._generate is not None       # chatter-flavor generator rebuilt from new LLM
+    assert layer._persona_chatter._generate is not None
+    assert layer._comms._generate is not None         # comms-variant generator rebuilt from new LLM
+
+
 def test_layer_ignores_non_ed_events():
     layer, tts, _ = _layer()
     layer.on_event({"type": "log", "text": "hi"})

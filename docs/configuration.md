@@ -10,9 +10,14 @@ settings, with **relative paths** so your checkout stays portable. Anything you 
     [by voice](using/settings.md). To **reset** a setting, delete its key from `overrides.json` or
     click **Reset** on the Settings page.
 
-!!! warning "Enabling a capability applies on restart"
-    Turning a whole feature on or off takes effect the next time you launch. A few settings (the
-    Whisper model, bus volumes, some audio toggles) apply live.
+!!! success "Settings changes apply live"
+    Almost every setting takes effect immediately — no relaunch. Switch your **LLM or TTS
+    provider** (or its model/voice/base URL/key) and the **next turn** uses it (an in-flight turn
+    finishes on the previous one); change the **talk/cancel/reflex keys**, the **microphone**, the
+    Whisper model, the activation mode, bus volumes, or any toggle and it applies in place. Only a
+    tiny set needs a restart: `audio.enabled` and `audio.mix_sample_rate` (they open the shared
+    audio device at launch), `ui.host` / `ui.port` (the control panel binds at launch), and
+    `dev.mock`. A failed provider switch is fail-soft — COVAS++ keeps the working one and says so.
 
 !!! note "Upgrades pick up new defaults automatically"
     In a packaged install your editable `config.toml` lives in the writable data dir

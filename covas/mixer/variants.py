@@ -188,6 +188,11 @@ class CommsVoicer:
         self._clock = clock
         self._log = log
 
+    def set_generate(self, generate: Optional[Callable[[str, str], str]]) -> None:
+        """Swap the LLM variant generator after a live provider hot-swap (issue #90). None =>
+        always verbatim, exactly as construction with no LLM — no stale provider is kept."""
+        self._generate = generate
+
     def resolve_text(self, record: VoiceableComms, tier: Optional[str]) -> tuple[str, str, str]:
         """Decide the final SAFE text to voice and the tier actually applied. Verbatim needs no
         generation; a generated variant that fails validation falls back to the verbatim source.

@@ -87,6 +87,49 @@ def _prune_empty(d: dict) -> None:
             del d[k]
 
 
+# ---- Live-settings classification (issue #90) -------------------------------
+# Providers are built once at the composition root and cached for the process; the LLM/TTS impls
+# read their config at CONSTRUCTION, so a config change to their sections means a REBUILD (a fresh
+# instance rebound in place), never an in-place mutation. Everything else (router tiers, ED/memory
+# detectors, whisper, the VAD listener, hotkeys, the mic, audio volumes/toggles) is read fresh each
+# turn or reconciled, so it applies live WITHOUT a rebuild.
+#
+# Section-granularity diff (decision #3): any change ANYWHERE under one of these top-level sections
+# rebuilds that provider; an unrelated key never does.
+_LLM_SECTIONS: tuple[str, ...] = ("llm", "anthropic", "openai", "gemini", "ollama")
+_TTS_SECTIONS: tuple[str, ...] = (
+    "tts", "elevenlabs", "edge", "azure", "openai_tts", "cartesia", "piper")
+
+# The TRUE minimum of settings that ONLY take effect on a RESTART (decision #5), as schema keys:
+#   audio.enabled / audio.mix_sample_rate — the bus-mixer graph is cross-wired and the shared
+#     output device opened at init/start (see the load-bearing fallback around BusMixer.start);
+#   dev.mock — swaps the whole LLM/TTS/STT set for fakes at the composition root;
+#   ui.host / ui.port — bound by Flask when the control panel launches.
+# Explicitly NOT here (all live): provider/base_url/model/key/voice (rebuild), whisper.* (reload),
+# keys.* + reflex.ptt (hotkey reconcile), audio.input_device (mic reconcile), volumes/toggles
+# (audio.apply_settings), listen.* (listener reconcile).
+RESTART_REQUIRED: frozenset[str] = frozenset({
+    "audio.enabled", "audio.mix_sample_rate", "dev.mock", "ui.host", "ui.port",
+})
+# Top-level config sections that apply LIVE. Single source of truth paired with RESTART_REQUIRED:
+# the drift-guard unit test asserts every settings_schema key falls under LIVE_SECTIONS ∪
+# RESTART_REQUIRED, so a NEW setting in an unclassified section fails the test until it's placed.
+LIVE_SECTIONS: tuple[str, ...] = (
+    "llm", "openai", "gemini", "ollama", "tts", "edge", "azure", "openai_tts",
+    "cartesia", "anthropic", "elevenlabs", "piper", "router", "web_search",
+    "conversation", "keys", "listen", "whisper", "personality", "crew", "elite",
+    "proactive", "route", "nav", "star_systems", "search", "route_plan",
+    "neutron_plan", "riches_plan", "keybinds", "macros", "honk", "reflex",
+    "comms_send", "audio", "music", "hud",
+)
+
+
+def _section_changed(before: dict, cfg: dict, sections: tuple[str, ...]) -> bool:
+    """True if any of the named top-level config sub-trees differs between the pre-merge
+    snapshot and the live config — the section-granularity rebuild trigger (decision #3)."""
+    return any(before.get(s) != cfg.get(s) for s in sections)
+
+
 class _LatencyWatchdog:
     """Background timer for the >Ns latency heads-up (issue #97). If a turn goes `seconds` without
     a reply in hand, it fires ONCE and calls `speak` (the normal voice path, or a logged line in
@@ -261,6 +304,17 @@ class App:
         # LLM (routing through the same #36 guard/executor). Default unbound -> the hook never
         # installs, so the main PTT + conversation path are untouched.
         self.reflex_held = False
+        # Resolved PTT/cancel/reflex scan-code SETS (issue #90). Populated by _resolve_hotkeys()
+        # in start(); on_key reads these in place so a [keys]/[reflex].ptt change applies LIVE via
+        # _reconcile_hotkeys() with no re-hook. Empty until start() (a pre-start settings change
+        # just re-resolves into empty sets and start() resolves them for real).
+        self._ptt_codes: set[int] = set()
+        self._cancel_codes: set[int] = set()
+        self._reflex_codes: set[int] = set()
+        # An [audio].input_device change that arrives WHILE a PTT/reflex capture is in flight is
+        # deferred (issue #90 review): rebuilding the Recorder mid-capture would strand the open
+        # input stream and drop the utterance. This flag defers the rebuild to the capture boundary.
+        self._recorder_dirty = False
         self.state = "Idle"
         # Armed for the duration of a USER (PTT) turn, so the "thinking" bed (issue #5) fills the
         # wait for those turns only — never a proactive callout (which has no "did it hear me" gap).
@@ -751,6 +805,11 @@ class App:
     def _proactive_worker(self, event_name: str, event: dict,
                           cancel: threading.Event) -> None:
         from .capabilities.proactive_capability import build_prompt
+        # Turn-local provider binding (issue #90): one callout runs on one consistent LLM+TTS pair
+        # (and text-only state) even if a hot-swap rebinds self.llm/self.tts mid-callout (decision #2).
+        llm = self.llm
+        tts = self.tts
+        text_only = self.text_only
         try:
             if cancel.is_set():
                 self.set_state("Idle")
@@ -767,7 +826,7 @@ class App:
                     self._log_usage(data)
 
             reply = ""
-            stream = self.llm.stream_reply(
+            stream = llm.stream_reply(
                 [{"role": "user", "content": prompt}], cancel, on_event,
                 model=route.model, max_tokens=route.max_tokens)
             for kind, chunk in stream:
@@ -785,7 +844,7 @@ class App:
             self._log("COVAS", f"(proactive) {reply}")
             print(f"\n>> [proactive] {reply}")
             self.set_state("Speaking", "proactive")
-            self._speak(reply, cancel)
+            self._speak(reply, cancel, tts=tts, text_only=text_only)
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — a proactive failure must never crash the app
             self.set_state("Idle", f"proactive error: {e}")
@@ -1653,6 +1712,7 @@ class App:
 
     def on_ptt_up(self) -> None:
         audio = self.recorder.stop()
+        self._apply_pending_recorder()  # apply a mic change that arrived during the hold (issue #90)
         held_ms = (time.monotonic() - self._ptt_t0) * 1000.0
         tap_ms = float(self.cfg["keys"].get("tap_cancel_ms", 400))
         if held_ms < tap_ms:
@@ -1724,6 +1784,7 @@ class App:
     def on_reflex_ptt_up(self) -> None:
         """Reflex second-PTT released — dispatch the capture down the fast path."""
         audio = self.recorder.stop()
+        self._apply_pending_recorder()  # apply a mic change that arrived during the hold (issue #90)
         self._dispatch_reflex(audio)
 
     def _dispatch_reflex(self, audio) -> None:
@@ -1869,19 +1930,19 @@ class App:
 
     # ---- live settings (from the web UI) ----------------------------------
     def update_settings(self, patch: dict) -> None:
-        """Merge a settings patch into the running config, persist it to
-        overrides.json, and reload anything that needs it (Whisper model)."""
-        old_whisper = dict(self.cfg["whisper"])
+        """Merge a settings patch into the running config, persist it to overrides.json, and
+        live-apply anything that changed (providers, Whisper, listener, hotkeys, mic, audio)."""
+        before = self._settings_snapshot()
         deep_merge(self.cfg, patch)
         deep_merge(self.overrides, patch)
         save_overrides(self.overrides)
-        self._after_settings_change(old_whisper)
+        self._after_settings_change(before)
 
     def reset_setting(self, path) -> None:
         """Reset ONE setting to its config.toml default by dropping it from
         overrides.json (the file's own reset mechanism) and reloading config.
-        Reloads Whisper too if that's the setting that changed."""
-        old_whisper = dict(self.cfg["whisper"])
+        Live-applies the change (providers/Whisper/listener/hotkeys/mic) like update_settings."""
+        before = self._settings_snapshot()
         _pop_path(self.overrides, tuple(path))
         _prune_empty(self.overrides)
         save_overrides(self.overrides)
@@ -1891,26 +1952,57 @@ class App:
         fresh = load_config()
         self.cfg.clear()
         self.cfg.update(fresh)
-        self._after_settings_change(old_whisper)
+        self._after_settings_change(before)
 
-    def _after_settings_change(self, old_whisper: dict) -> None:
-        """Shared tail for update/reset: broadcast the new settings and reload
-        Whisper in the background if its model/device/compute changed."""
+    def _settings_snapshot(self) -> dict:
+        """Deep-copy the config sub-trees whose changes drive a live rebuild/reconcile, taken
+        BEFORE a settings merge so _after_settings_change can diff old vs new at section
+        granularity (issue #90, decision #3). Cheap — these sections are small dicts."""
+        import copy
+        sections = (set(_LLM_SECTIONS) | set(_TTS_SECTIONS)
+                    | {"whisper", "keys", "reflex", "listen", "audio"})
+        return {s: copy.deepcopy(self.cfg.get(s)) for s in sections}
+
+    def _after_settings_change(self, before: dict) -> None:
+        """Shared tail for update/reset: broadcast the new settings and LIVE-APPLY every change
+        that can be (issue #90). Providers rebuild on a background thread when their config section
+        changed (fail-soft, next-turn), Whisper reloads on model/device/compute change, and the
+        listener/hotkeys/mic/audio reconcile in place. Only RESTART_REQUIRED settings need a
+        relaunch — everything here takes effect without one."""
         self.bus.publish({"type": "settings", "settings": self.public_settings()})
         # Companion HUD (issue #47): apply an [hud].enabled toggle live (Settings page or voice).
         self._reconcile_hud()
         # Activation mode (issue #63): apply a [listen].mode switch live — start/stop the VAD
         # mic listener to match, so "switch to continuous listening" takes effect immediately.
         self._reconcile_listener()
+        # Mic device (issue #89): rebuild the Recorder + restart the VAD listener when the input
+        # device changed — rides the same reconcile path as the listen-mode switch.
+        if (before.get("audio") or {}).get("input_device") != \
+                self.cfg.get("audio", {}).get("input_device"):
+            self._reconcile_recorder()
+        # Hotkeys (issue #90): re-resolve the PTT/cancel/reflex scan-code sets in place on a
+        # [keys].* or [reflex].ptt change — the single keyboard hook stays installed, no re-hook.
+        if (before.get("keys") != self.cfg.get("keys")
+                or (before.get("reflex") or {}).get("ptt")
+                != (self.cfg.get("reflex", {}) or {}).get("ptt")):
+            self._reconcile_hotkeys()
         # Audio settings (bus volumes, enable toggles, comms treatment) apply live.
         if self.audio is not None:
             try:
                 self.audio.apply_settings()
             except Exception as e:  # noqa: BLE001 — a settings glitch must not crash the loop
                 self._log("system", f"audio settings apply failed: {e}")
+        # Providers (issue #90): a change under an LLM/TTS config section swaps that provider on the
+        # NEXT turn. Built on a daemon thread (a provider build may touch the network/GPU) then
+        # rebound in place; an in-flight turn finishes on its turn-local instance (decision #2).
+        if _section_changed(before, self.cfg, _LLM_SECTIONS):
+            threading.Thread(target=self._reload_llm, name="reload-llm", daemon=True).start()
+        if _section_changed(before, self.cfg, _TTS_SECTIONS):
+            threading.Thread(target=self._reload_tts, name="reload-tts", daemon=True).start()
         w = self.cfg["whisper"]
+        ow = before.get("whisper") or {}
         if (w["model"], w["device"], w["compute_type"]) != (
-            old_whisper["model"], old_whisper["device"], old_whisper["compute_type"]
+            ow.get("model"), ow.get("device"), ow.get("compute_type")
         ):
             self.set_state(self.state, f"reloading Whisper: {w['model']}")
             threading.Thread(target=self._reload_whisper, daemon=True).start()
@@ -1923,6 +2015,117 @@ class App:
         except Exception as e:  # noqa: BLE001
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Whisper reload failed: {e}"})
+
+    def _reload_llm(self) -> None:
+        """Rebuild + rebind the LLM provider after an [llm]/[<provider>] change (issue #90). Runs
+        on a daemon thread (a build may hit the network). Fail-soft (non-negotiable): on failure do
+        NOT rebind — keep the working provider and say so; on success rebind (GIL-atomic — the next
+        turn picks it up via its turn-local) and publish the new provider/model as a UI toast."""
+        try:
+            new = make_llm(self.cfg)
+        except Exception as e:  # noqa: BLE001 — keep the previous provider on any build error
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Couldn't switch the LLM: {e}; keeping the previous one."})
+            return
+        self.llm = new
+        # Re-point the ambient audio layer's LLM too (issue #90 review): it captured the LLM at
+        # construction for opt-in chatter-flavor / comms-variants, so without this a swap would
+        # half-apply (main turns switch, ambient generation stays on the old provider). Fail-soft.
+        if self.audio is not None:
+            try:
+                cheap = Router.from_cfg(self.cfg).cheap_route(None).model
+                self.audio.set_providers(llm=new, cheap_model=cheap)
+            except Exception as e:  # noqa: BLE001 — a generator refresh glitch must not fail the swap
+                self._log("system", f"audio layer LLM refresh failed: {e}")
+        prov = str(self.cfg.get("llm", {}).get("provider", "anthropic"))
+        model = str(self.cfg.get(prov, {}).get("model", "") or "default")
+        self.bus.publish({"type": "log", "who": "system", "text": f"LLM now: {prov} / {model}."})
+
+    def _reload_tts(self) -> None:
+        """Rebuild + rebind the TTS provider after a [tts]/[<voice>] change (issue #90). Passes the
+        EXISTING mixer (never rebuilt — that's what keeps a TTS swap safe against the shared output
+        device). Fail-soft like _reload_llm: keep the previous voice on failure. Recomputes
+        text-only mode so switching to/from a keyless ElevenLabs flips voice output correctly."""
+        try:
+            new = make_tts(self.cfg, mixer=self.mixer)
+        except Exception as e:  # noqa: BLE001 — keep the previous voice on any build error
+            self.bus.publish({"type": "log", "who": "system",
+                              "text": f"Couldn't switch the voice: {e}; keeping the previous one."})
+            return
+        self.tts = new
+        from .firstrun import text_only_mode
+        self.text_only = text_only_mode(self.cfg, mock=self.mock, tts_injected=False)
+        # Re-point the ambient audio layer's voice too (issue #90 review): it holds its own TTS
+        # (persona/interdiction/comms lines) and a cast synth closed over the OLD provider, so
+        # without this the swap half-applies (main replies switch, ambient/comms/crew stay old).
+        # _build_cast_synth() reads self.tts, which is already the new provider here. Fail-soft.
+        if self.audio is not None:
+            try:
+                self.audio.set_providers(tts=new, cast_synth=self._build_cast_synth())
+            except Exception as e:  # noqa: BLE001 — a cast refresh glitch must not fail the swap
+                self._log("system", f"audio layer voice refresh failed: {e}")
+        prov = str(self.cfg.get("tts", {}).get("provider", "elevenlabs"))
+        self.bus.publish({"type": "log", "who": "system", "text": f"Voice now: {prov}."})
+
+    def _reconcile_recorder(self) -> None:
+        """Rebuild the Recorder for a new [audio].input_device and restart the VAD listener if it's
+        running so the change (device resolved at construction) applies live (issue #89). Fail-soft
+        — a bad device just logs; the loop keeps the previous recorder. Mirrors _reconcile_listener,
+        so a mic change and a listen-mode change ride the same reconcile path (decision #7).
+
+        Deferral (issue #90 review): if a PTT/reflex capture is in flight, rebuilding now would
+        strand the OLD recorder's open input stream and make the pending stop() read an unstarted
+        NEW recorder (dropping the utterance). Defer to the capture boundary instead — on_ptt_up /
+        on_reflex_ptt_up call _apply_pending_recorder() right after stop() closes the old stream."""
+        if self.ptt_held or self.reflex_held:
+            self._recorder_dirty = True
+            self._log("system", "Microphone change deferred until the current capture ends.")
+            return
+        try:
+            self.recorder = Recorder(self.cfg)
+            # If continuous listening is on, the VAD listener holds its own device stream — bounce
+            # it so it reopens on the new mic. _reconcile_listener is idempotent (start when
+            # continuous, stop otherwise), so a stop-then-reconcile cleanly rebinds.
+            if self.listener is not None:
+                self._stop_listener()
+                self._reconcile_listener()
+            self._log("system", "Microphone changed; recorder rebuilt.")
+        except Exception as e:  # noqa: BLE001 — a bad mic must not crash the loop
+            self._log("system", f"microphone reconcile failed: {e}")
+
+    def _apply_pending_recorder(self) -> None:
+        """Rebuild a mic that was changed mid-capture (issue #90 review), now that stop() has closed
+        the old input stream and on_key has already cleared ptt_held/reflex_held — so _reconcile_
+        recorder rebuilds instead of re-deferring. No-op when nothing was deferred."""
+        if self._recorder_dirty:
+            self._recorder_dirty = False
+            self._reconcile_recorder()
+
+    def _resolve_hotkeys(self) -> None:
+        """(Re)resolve the PTT/cancel/reflex scan-code SETS from the live [keys]/[reflex] config
+        into instance attributes (issue #90). on_key reads these in place, so a hotkey change
+        applies with NO re-hook — the single keyboard hook stays installed, only the sets change.
+        The reflex set subtracts the PTT/cancel codes so a mis-configuration can't double-dispatch."""
+        keys = self.cfg["keys"]
+        self._ptt_codes = _resolve_codes(keys["push_to_talk"])
+        cancel_key = str(keys.get("cancel", "")).strip()
+        self._cancel_codes = _resolve_codes(cancel_key) if cancel_key else set()
+        reflex_key = str((self.cfg.get("reflex", {}) or {}).get("ptt", "")).strip()
+        self._reflex_codes = ((_resolve_codes(reflex_key) - self._ptt_codes - self._cancel_codes)
+                              if reflex_key else set())
+
+    def _reconcile_hotkeys(self) -> None:
+        """Apply a [keys].*/[reflex].ptt change live by re-resolving the scan-code sets (issue #90).
+        No re-hook: on_key already reads self._{ptt,cancel,reflex}_codes. Fail-soft — a bad key name
+        logs and leaves the previous sets in place rather than crashing the loop."""
+        try:
+            self._resolve_hotkeys()
+            self._log("keys",
+                      f"Hotkeys updated (PTT {sorted(self._ptt_codes)}, "
+                      f"cancel {sorted(self._cancel_codes) or 'tap-PTT'}, "
+                      f"reflex {sorted(self._reflex_codes) or 'unbound'}).")
+        except Exception as e:  # noqa: BLE001 — a bad key name must not crash the loop
+            self._log("keys", f"hotkey reconcile failed: {e}")
 
     def _settings_option_pairs(self, setting) -> list | None:
         """Resolve a DYNAMIC enum's (value, label) options for the voice settings layer:
@@ -1995,8 +2198,15 @@ class App:
         }
 
     # ---- local voice commands --------------------------------------------
-    def _speak(self, text: str, cancel: threading.Event) -> None:
-        """Play `text` through the injected TTS provider (real, mock, or fake).
+    def _speak(self, text: str, cancel: threading.Event, *, tts=None,  # noqa: ANN001
+               text_only=None) -> None:
+        """Play `text` through the TTS provider (real, mock, or fake). `tts` is the turn-local
+        provider captured at the start of a turn (issue #90) so a mid-turn hot-swap can't change the
+        voice underneath a reply; callers outside a turn omit it and get the live `self.tts`.
+        `text_only` is the turn-local text-only flag, captured with `tts` (issue #90 review): a
+        mid-turn swap to a keyless provider flips the LIVE `self.text_only`, so a turn that started
+        with a working voice must gate on the flag it CAPTURED, not the live one — otherwise its
+        reply is silently dropped. None => use the live `self.text_only` (callers outside a turn).
         On failure, log LOUDLY (session log + stderr) before re-raising — a dead TTS must be
         diagnosable, not a silent no-op (e.g. a 401 famous_voice_not_permitted). Callers keep
         their broad guards and still degrade to text/Idle. In text-only mode (no ElevenLabs key)
@@ -2007,25 +2217,26 @@ class App:
         `[Name]`-prefixed segments: persona lines keep the direct TTS path below, crew lines are
         voiced in their own deterministic cast voice on the radio-treated comms bus. When it's off
         (the default) the reply is spoken verbatim, exactly as before — the parser isn't invoked."""
-        if self.text_only:
+        if self.text_only if text_only is None else text_only:
             return
         if not crew_mod.is_enabled(self.cfg):
-            self._speak_persona(text, cancel)
+            self._speak_persona(text, cancel, tts=tts)
             return
         segments = crew_mod.parse_segments(text, enabled=True)
         crew_mod.speak_segments(
             segments,
-            persona_speak=lambda t: self._speak_persona(t, cancel),
+            persona_speak=lambda t: self._speak_persona(t, cancel, tts=tts),
             crew_speak=lambda name, t: self._speak_crew(name, t, cancel),
             cancel=cancel,
         )
 
-    def _speak_persona(self, text: str, cancel: threading.Event) -> None:
-        """Voice the ship persona (COVAS++) via the injected TTS provider — the direct path that
-        every reply used before crew. Raises on failure after logging LOUDLY so a dead TTS stays
-        diagnosable; callers keep their broad guards and degrade to text/Idle."""
+    def _speak_persona(self, text: str, cancel: threading.Event, *, tts=None) -> None:  # noqa: ANN001
+        """Voice the ship persona (COVAS++) via the TTS provider — the direct path that every reply
+        used before crew. `tts` is the turn-local provider (issue #90); None falls back to the live
+        `self.tts` for callers outside a turn. Raises on failure after logging LOUDLY so a dead TTS
+        stays diagnosable; callers keep their broad guards and degrade to text/Idle."""
         try:
-            self.tts.speak(text, cancel)
+            (tts if tts is not None else self.tts).speak(text, cancel)
         except Exception as e:  # noqa: BLE001 — re-raised after logging; callers fail soft
             msg = f"TTS FAILED ({type(e).__name__}): {e}"
             self._log("system", msg)
@@ -2076,11 +2287,15 @@ class App:
             self.history = self.history[-cap:]
 
     def _process(self, audio, cancel: threading.Event, *, wake_gated: bool = False) -> None:
+        # Turn-local STT binding (issue #90): capture the provider ONCE so a mid-turn hot-swap
+        # (self.stt rebound by _reload_whisper) can't change instances underneath this turn — it
+        # finishes on the one it started with; the swap lands on the next turn (decision #2).
+        stt = self.stt
         try:
             if cancel.is_set():
                 return
             self.set_state("Transcribing")
-            text = self.stt.transcribe(audio)
+            text = stt.transcribe(audio)
             if cancel.is_set():
                 return
             if not text.strip():
@@ -2127,6 +2342,15 @@ class App:
         trying" line via the watchdog; exhausted retries speak an in-character, provider-named
         degraded line. Fail soft: any error returns to Idle leaving NO orphaned history turn — the
         user+assistant pair commits atomically only on a successful reply."""
+        # Turn-local provider binding (issue #90): capture the LLM + TTS ONCE at the top so a
+        # mid-turn hot-swap (self.llm/self.tts rebound by _reload_llm/_reload_tts) can't split a
+        # single turn across two provider sets — it runs to completion on the pair it started with;
+        # the swap takes effect on the next turn (decision #2). Capture text_only too (issue #90
+        # review) so every speak path in this turn — reply, the watchdog "still trying" line, and
+        # the degraded apology — gates on the turn's OWN text-only state, not a mid-turn flip.
+        llm = self.llm
+        tts = self.tts
+        text_only = self.text_only
         watchdog = None
         try:
             if cancel.is_set():
@@ -2259,9 +2483,9 @@ class App:
             # retry/backoff, or a hung connection all live here. It speaks a plain-language "still
             # trying" line once past the threshold; disarmed the instant the reply is in hand (the
             # finally), which is just before any reply audio plays.
-            watchdog = self._arm_latency_watchdog(cancel)
+            watchdog = self._arm_latency_watchdog(cancel, tts=tts, text_only=text_only)
             try:
-                stream = self.llm.stream_reply(
+                stream = llm.stream_reply(
                     messages, cancel, on_event,
                     tool_handler=self.registry.run_tool, tools=self.registry.tools(),
                     model=route.model, max_tokens=route.max_tokens)
@@ -2305,7 +2529,7 @@ class App:
                 return
 
             self.set_state("Speaking")
-            self._speak(reply, cancel)
+            self._speak(reply, cancel, tts=tts, text_only=text_only)
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — keep the loop alive on any failure
             if watchdog is not None:
@@ -2317,24 +2541,27 @@ class App:
             # down. History is untouched here (the commit is after a successful reply), so a failed
             # turn leaves NO orphan.
             if _retry.is_degraded_error(e):
-                self._speak_degraded(e, cancel)
+                self._speak_degraded(e, cancel, tts=tts, text_only=text_only)
             self.set_state("Idle", f"error: {e}")
 
     # ---- provider reliability (issue #97) ---------------------------------
-    def _arm_latency_watchdog(self, cancel: threading.Event) -> "_LatencyWatchdog":
+    def _arm_latency_watchdog(self, cancel: threading.Event, *, tts=None,  # noqa: ANN001
+                              text_only=None) -> "_LatencyWatchdog":
         """Arm the >Ns latency watchdog for a turn (issue #97). Threshold from
         ``[llm].slow_warning_seconds`` (default 30; <=0 disables). When it fires it speaks a canned,
         plain-language "the AI service is being slow, still trying" line in the CURRENT voice via
         the normal `_speak` path (degrading to a logged line in text-only mode) — never another LLM
-        call. Always returns a watchdog object (disabled ones no-op) so callers can disarm blindly."""
+        call. Always returns a watchdog object (disabled ones no-op) so callers can disarm blindly.
+        `tts`/`text_only` are the turn-locals (issue #90 review) so this interim line stays on the
+        turn's own provider + text-only state, never split across a mid-turn hot-swap."""
         seconds = float((self.cfg.get("llm", {}) or {}).get("slow_warning_seconds", 30) or 0)
         line = "Sorry, Commander — the AI service is being slow to respond. I'm still trying."
 
         def _interim() -> None:
-            if self.text_only:
+            if self.text_only if text_only is None else text_only:
                 self._log("COVAS", line)  # no voice — surface it as text so it's never silent
             else:
-                self._speak(line, cancel)
+                self._speak(line, cancel, tts=tts, text_only=text_only)
 
         return _LatencyWatchdog(
             seconds, speak=_interim, cancel=cancel,
@@ -2348,19 +2575,21 @@ class App:
         return {"anthropic": "Claude", "gemini": "Gemini",
                 "openai": "The AI service", "ollama": "The local model"}.get(name, "The AI service")
 
-    def _speak_degraded(self, err: Exception, cancel: threading.Event) -> None:
+    def _speak_degraded(self, err: Exception, cancel: threading.Event, *, tts=None,  # noqa: ANN001
+                        text_only=None) -> None:
         """Tell the Commander, in character, that the provider is overloaded (issue #97) and log
         the precise reason. Canned/verbatim — the LLM is the thing that's down, so we NEVER call it
         to narrate its own outage. Fail soft: degrade to a logged line when TTS is unavailable and
-        never raise."""
+        never raise. `tts`/`text_only` are the turn-locals (issue #90 review) so the apology stays
+        on the turn's own provider + text-only state through a mid-turn hot-swap."""
         name = self._provider_display_name()
         line = f"{name} is overloaded right now, Commander — give it a moment and try again."
         self._log("system", f"provider degraded: {_retry.degraded_reason(err)}")
-        if self.text_only:
+        if self.text_only if text_only is None else text_only:
             self._log("COVAS", line)
             return
         try:
-            self._speak(line, cancel)
+            self._speak(line, cancel, tts=tts, text_only=text_only)
         except Exception:  # noqa: BLE001 — _speak already logged loudly; degrade to text
             self._log("COVAS", line)
 
@@ -2368,27 +2597,25 @@ class App:
     def start(self) -> None:
         """Install the global key hooks (non-blocking). Used by both the
         headless entry point and the web-UI entry point."""
-        keys = self.cfg["keys"]
-        ptt_codes = _resolve_codes(keys["push_to_talk"])
-        cancel_key = str(keys.get("cancel", "")).strip()
-        cancel_codes = _resolve_codes(cancel_key) if cancel_key else set()
-        # Second PTT for the Tier-2 reflex fast path (issue #38). Default unbound = the hook never
-        # fires. Subtract the main PTT/cancel codes so a mis-configuration (same key) can never
-        # double-dispatch — the main PTT keeps priority and the reflex hook simply doesn't engage.
-        reflex_key = str((self.cfg.get("reflex", {}) or {}).get("ptt", "")).strip()
-        reflex_codes = (_resolve_codes(reflex_key) - ptt_codes - cancel_codes) if reflex_key else set()
-        print(f"(PTT scan codes {sorted(ptt_codes)}, cancel {sorted(cancel_codes) or 'tap-PTT'}, "
-              f"reflex {sorted(reflex_codes) or 'unbound'})")
+        # Resolve the PTT/cancel/reflex scan-code sets into instance attributes (issue #90). The
+        # reflex second-PTT (issue #38) is default-unbound = its branch never fires; its set already
+        # subtracts the PTT/cancel codes so a mis-configuration (same key) can't double-dispatch —
+        # the main PTT keeps priority. on_key reads these live, so a later hotkey change applies via
+        # _reconcile_hotkeys() with NO re-hook.
+        self._resolve_hotkeys()
+        print(f"(PTT scan codes {sorted(self._ptt_codes)}, "
+              f"cancel {sorted(self._cancel_codes) or 'tap-PTT'}, "
+              f"reflex {sorted(self._reflex_codes) or 'unbound'})")
 
         def on_key(e):  # noqa: ANN001
-            if e.scan_code in ptt_codes:
+            if e.scan_code in self._ptt_codes:
                 if e.event_type == "down" and not self.ptt_held:
                     self.ptt_held = True
                     self.on_ptt_down()
                 elif e.event_type == "up" and self.ptt_held:
                     self.ptt_held = False
                     self.on_ptt_up()
-            elif e.scan_code in reflex_codes:
+            elif e.scan_code in self._reflex_codes:
                 # Reflex fast-path capture (issue #38) — separate from the main PTT so a snap combat
                 # call isn't queued behind the conversation turn.
                 if e.event_type == "down" and not self.reflex_held:
@@ -2397,7 +2624,7 @@ class App:
                 elif e.event_type == "up" and self.reflex_held:
                     self.reflex_held = False
                     self.on_reflex_ptt_up()
-            elif e.scan_code in cancel_codes and e.event_type == "down":
+            elif e.scan_code in self._cancel_codes and e.event_type == "down":
                 self.on_cancel()
 
         keyboard.hook(on_key)
