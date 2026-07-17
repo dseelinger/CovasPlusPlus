@@ -1,9 +1,11 @@
 # COVAS++
 
 **A local voice AI companion for [Elite Dangerous](https://www.elitedangerous.com/), for Windows.**
-Hold a key, talk, and get a spoken reply in character. COVAS++ converses, watches your
-game state, tracks a checklist, runs galaxy-wide searches by voice, presses the odd ship
-control on request, and can look things up on the web — all through one push-to-talk loop.
+Hold a key, talk, and get a spoken reply in character. Because COVAS++ reads the same journal
+Elite writes to disk, its answers are **grounded in your actual game, not guessed**. It searches
+the whole galaxy by voice, plans routes, tracks your engineering materials, tracks a checklist,
+remembers what matters to you, layers in an optional cockpit soundscape, and presses the odd ship
+control on request — all through one push-to-talk loop.
 
 !!! info "Unofficial, fan-made"
     Elite Dangerous is a trademark of Frontier Developments plc. COVAS++ is not
@@ -27,6 +29,39 @@ guesses.
   **fleet-carrier tracking**, and a handful of **guarded ship controls**.
 - **In character** — swappable personas, an ElevenLabs or local voice, and your own personal
   Commander facts kept separate so switching voice never wipes them.
+
+## Why COVAS++
+
+Other Elite voice assistants converse and read your game state too. What sets COVAS++ apart:
+
+- **Grounded, not guessed.** [Ship specs](elite/ship-specs.md), [module costs](search/outfitting.md),
+  [blueprint materials](elite/blueprints.md), [engineer unlocks](elite/engineers.md) and your
+  [credits](elite/currency-behavior.md) come from **bundled datasets and your real journal**, not the
+  language model's training-cutoff memory — so the newest hulls stay accurate and money is never
+  invented. [Voice search](search/index.md) is **structurally anti-hallucination**: any name spoken
+  back must resolve against a canonical vocabulary, or you get a "did you mean…" instead of a made-up
+  answer.
+- **Galaxy-wide search & planning by voice** — the nearest station selling a
+  [module](search/outfitting.md) or [ship](search/shipyards.md);
+  [systems](search/star-systems.md), [stations](search/stations.md) and
+  [factions](search/minor-factions.md) matching what you describe; [bodies](search/bodies.md) by type
+  or exobiology; plus [trade-route](search/trade-routes.md), [neutron](search/neutron-route.md),
+  [Road-to-Riches](search/road-to-riches.md) and [mining](search/mining.md) planners — each result
+  copied to your clipboard for the galaxy map.
+- **Immersion, not just answers** — an optional cockpit [ambient-audio](audio/ambient-audio.md)
+  layer, a multi-voice [interactive crew](using/crew.md), a glanceable [HUD](using/hud.md) overlay,
+  and swappable [personas](using/personas-voice.md).
+- **It remembers you.** A transparent, editable [persistent memory](using/memory.md) of how you like
+  to be addressed, your main ship, and standing preferences — a plain file you own, never leaving your
+  machine.
+- **Local-first and private.** Speech-to-text always runs **on your machine**, there's a fully
+  offline mode, and your API keys are encrypted at rest.
+- **Affordable to leave on.** A cost-engineered router keeps routine turns on a cheap model and
+  escalates only when a turn earns it — no local model fighting Elite for your GPU.
+- **Safety-first automation.** The [handful of keystrokes](automation/keybinds.md) it will send sit
+  behind an allowlist, a separate spoken confirmation, a combat/interdiction guard, and a hard abort.
+- **Hands-free option** for accessibility — a [voice-activity gate](getting-started/hands-free.md) so
+  you never have to touch a key.
 
 ## What it does **not** do
 
