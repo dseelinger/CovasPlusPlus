@@ -30,7 +30,7 @@ import requests
 
 from ..llm import build_system, estimate_cost
 from ._retry import (RetryPolicy, TransientError, is_retryable_status,
-                     parse_retry_after, run_with_retry)
+                     parse_retry_after, retry_event, run_with_retry)
 from .base import OnEvent, ToolHandler
 
 _DEFAULT_BASE_URL = "https://api.openai.com/v1"
@@ -92,6 +92,10 @@ class OpenAILLM:
         mdl = str(model or self.model)
         cap = int(max_tokens if max_tokens is not None else self._max_tokens)
         policy = RetryPolicy.from_cfg(self._cfg)  # transient-error retry (issue #97)
+        # Surface each transient retry to the log channel so a recovered blip shows its backoff
+        # instead of a silent pause (issue #97). retry_event shapes the descriptor the app renders.
+        def _on_retry(attempt: int, delay: float, exc: BaseException) -> None:
+            on_event("retry", retry_event("OpenAI", attempt, policy.attempts, delay, exc))
 
         for _round in range(_MAX_ROUNDS):
             body: dict = {"model": mdl, "messages": working, "stream": True,
@@ -105,7 +109,8 @@ class OpenAILLM:
             finish: Optional[str] = None
             usage: Optional[dict] = None
 
-            for chunk in _stream_chat(self.base_url, key, body, cancel, policy=policy):
+            for chunk in _stream_chat(self.base_url, key, body, cancel, policy=policy,
+                                      on_retry=_on_retry):
                 if cancel.is_set():
                     return
                 if chunk.get("usage"):
@@ -253,7 +258,7 @@ def _usage_event(cfg: dict, model: str, usage: dict) -> dict:
 
 
 def _stream_chat(base_url: str, key: str, body: dict, cancel: threading.Event,
-                 *, policy: Optional[RetryPolicy] = None,
+                 *, policy: Optional[RetryPolicy] = None, on_retry=None,
                  timeout=(10, 600)) -> Iterator[dict]:  # noqa: ANN001
     """POST `chat/completions` with stream=True and yield each parsed SSE `data:` chunk as a dict.
     Stops on `[DONE]` or `cancel`.
@@ -279,7 +284,7 @@ def _stream_chat(base_url: str, key: str, body: dict, cancel: threading.Event,
             raise RuntimeError(detail)
         return r
 
-    with run_with_retry(_connect, cancel, policy, provider="OpenAI") as r:
+    with run_with_retry(_connect, cancel, policy, provider="OpenAI", on_retry=on_retry) as r:
         for line in r.iter_lines():
             if cancel.is_set():
                 return

@@ -197,6 +197,53 @@ def test_cancel_stops_streaming(monkeypatch):
     assert out == [("text", "first ")]              # stopped before the second chunk
 
 
+# ---- transient retry (issue #97) -------------------------------------------
+def test_transient_503_then_success_emits_retry_and_recovers(monkeypatch):
+    """Drive the REAL _stream_chat retry loop (not the monkeypatched shortcut): a 503 then a 200
+    streaming reply. The turn must recover AND surface a 'retry' event so the log shows the backoff."""
+    monkeypatch.setattr(firstrun, "openai_key", lambda cfg: "k")
+
+    class _Resp:
+        def __init__(self, status, *, lines=()):
+            self.status_code = status
+            self.text = "" if status == 200 else "overloaded (stub)"
+            self.headers = {}          # no Retry-After -> uses the (tiny) backoff below
+            self._lines = list(lines)
+
+        def iter_lines(self):
+            yield from self._lines
+
+        def close(self):
+            pass
+
+        def __enter__(self):        # a real requests.Response is a context manager
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    ok = [b'data: {"choices":[{"delta":{"content":"hello"}}]}', b'', b'data: [DONE]']
+    seq = iter([_Resp(503), _Resp(200, lines=ok)])
+    monkeypatch.setattr(oai.requests, "post", lambda *a, **k: next(seq))
+
+    llm = oai.OpenAILLM({
+        "openai": {"model": "gpt-4o-mini", "base_url": "http://stub/v1"},
+        "personality": {"enabled": False},
+        # microscopic backoff so the test doesn't actually wait out the retry
+        "llm": {"retry": {"base_delay": 0.001, "max_delay": 0.001, "factor": 1.0, "jitter": 0.0}},
+    })
+    events: list[tuple] = []
+    text = "".join(piece for kind, piece in llm.stream_reply(
+        [{"role": "user", "content": "hi"}], threading.Event(),
+        lambda k, d: events.append((k, d))) if kind == "text")
+
+    assert text == "hello"                                  # recovered on the retry
+    retries = [d for k, d in events if k == "retry"]
+    assert len(retries) == 1                                # the single 503 surfaced one backoff
+    assert retries[0]["provider"] == "OpenAI" and retries[0]["reason"] == "HTTP 503"
+    assert retries[0]["attempt"] == 1 and retries[0]["attempts"] >= 1
+
+
 # ---- no key -----------------------------------------------------------------
 def test_no_key_raises(monkeypatch):
     monkeypatch.setattr(firstrun, "openai_key", lambda cfg: None)

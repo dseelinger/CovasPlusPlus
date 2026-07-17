@@ -228,6 +228,19 @@ def is_degraded_error(err: BaseException) -> bool:
     return _is_transient(err)
 
 
+def retry_event(provider: str, attempt: int, attempts: int, delay: float,
+                exc: BaseException) -> dict:
+    """Shape a per-retry descriptor for the app's ``on_event('retry', …)`` log channel (issue #97).
+
+    Wired as the ``on_retry`` hook of :func:`run_with_retry`, this is what turns a silent backoff
+    into a visible 'retrying, backing off Ns' line — so a transient blip that recovers is no longer
+    just a mysterious pause before the reply. `attempt` is 1-based (the try that just failed);
+    `attempts` is the policy's total budget; `delay` is the coming backoff in seconds."""
+    status = _status_of(exc)
+    return {"provider": provider, "attempt": int(attempt), "attempts": int(attempts),
+            "delay": float(delay), "reason": (f"HTTP {status}" if status else type(exc).__name__)}
+
+
 def degraded_reason(err: BaseException) -> str:
     """A precise one-line reason for the log, e.g. 'Anthropic 529 Overloaded — retried 4×, giving
     up'. Always the real detail even when the spoken line is the friendly canned version."""

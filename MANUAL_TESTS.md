@@ -283,12 +283,19 @@ Notes:
 > provider is **overloaded** (named) instead of dying. Simulate an outage without waiting for a real
 > one by pointing a provider at a URL that returns errors, or by using a throwaway/over-quota key.
 > **How to force a 529/5xx or timeout (pick one):**
-> - Set `[llm].provider = "openai"` and `[openai].base_url` to an endpoint that returns 5xx/429 (e.g.
->   a local stub, or `https://httpstat.us/529` style mock), restart, and speak/type a turn.
-> - Or set `[openai].base_url` to an unroutable host/port to force a **connection timeout**.
+> - **Fail-then-succeed** (for "Retry then recover"): run `python scripts\flaky_llm_stub.py` — a local
+>   OpenAI-compatible endpoint that returns 503 twice **then** streams a real reply, re-arming each turn.
+>   Set `[llm].provider = "openai"` and `[openai].base_url = "http://127.0.0.1:8799/v1"` (any throwaway
+>   key/model — a hand-dropped plaintext `OpenAIAPIKey.txt` is accepted), restart, and speak/type a turn.
+> - **Always-fail** (for "Exhausted → degraded"): point `[openai].base_url` at an endpoint that returns
+>   5xx/429 (e.g. `https://httpstat.us/529`), or at an unroutable host/port to force a **connection timeout**.
 > - Or temporarily lower `[llm.retry].max_total_wait` / raise `attempts` to watch the backoff.
-- [ ] **Retry then recover:** with an endpoint that fails a couple of times then succeeds, one turn
-      **still answers** — the log shows retry attempts (backoff) before the reply. No user-visible error.
+> - **Note:** retry logging is wired for the raw providers (**openai / gemini / ollama**). The default
+>   **Anthropic** provider retries *inside its own SDK*, which is silent to the COVAS log — so use the
+>   OpenAI stub above to see the retry lines.
+- [ ] **Retry then recover:** with the flaky stub (fails twice then succeeds), one turn **still answers** —
+      the log shows `OpenAI HTTP 503 — retry N/4, backing off …s` lines (backoff) before the reply. No
+      user-visible error.
 - [ ] **Slow heads-up (watchdog):** set `[llm].slow_warning_seconds` low (e.g. `5`) against a slow/hung
       endpoint → after ~5 s COVAS **speaks** *"the AI service is being slow… I'm still trying"* in the
       **current voice**, and still delivers the real reply (or the degraded line) afterward.

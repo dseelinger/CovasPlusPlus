@@ -24,7 +24,7 @@ import requests
 
 from ..llm import build_system
 from ._retry import (RetryPolicy, TransientError, is_retryable_status,
-                     parse_retry_after, run_with_retry)
+                     parse_retry_after, retry_event, run_with_retry)
 from .base import OnEvent, ToolHandler
 
 
@@ -83,6 +83,9 @@ class OllamaLLM:
         in_think = False  # tracks inline <think> tag state
         pending = ""      # trailing fragment that may be the start of a split tag
         policy = RetryPolicy.from_cfg(self._cfg)  # transient-error retry (issue #97)
+        # Surface each transient retry to the log so a recovered blip shows its backoff (issue #97).
+        def _on_retry(attempt: int, delay: float, exc: BaseException) -> None:
+            on_event("retry", retry_event("Ollama", attempt, policy.attempts, delay, exc))
 
         def _connect() -> "requests.Response":
             # Retry (issue #97) wraps the CONNECT only. A local Ollama rarely 429/5xxs, but a
@@ -103,7 +106,7 @@ class OllamaLLM:
             return r
 
         try:
-            with run_with_retry(_connect, cancel, policy, provider="Ollama") as r:
+            with run_with_retry(_connect, cancel, policy, provider="Ollama", on_retry=_on_retry) as r:
                 for line in r.iter_lines():
                     if cancel.is_set():
                         return

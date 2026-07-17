@@ -33,7 +33,7 @@ import requests
 
 from ..llm import build_system, estimate_cost
 from ._retry import (RetryPolicy, TransientError, is_retryable_status,
-                     parse_retry_after, run_with_retry)
+                     parse_retry_after, retry_event, run_with_retry)
 from .base import OnEvent, ToolHandler
 
 _DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
@@ -113,6 +113,9 @@ class GeminiLLM:
         cap = int(max_tokens if max_tokens is not None else self._max_tokens)
         gem_tools = _build_tools(tools, self._grounding)
         policy = RetryPolicy.from_cfg(self._cfg)  # transient-error retry (issue #97)
+        # Surface each transient retry to the log so a recovered blip shows its backoff (issue #97).
+        def _on_retry(attempt: int, delay: float, exc: BaseException) -> None:
+            on_event("retry", retry_event("Gemini", attempt, policy.attempts, delay, exc))
 
         for _round in range(_MAX_ROUNDS):
             body: dict = {"contents": contents,
@@ -126,7 +129,8 @@ class GeminiLLM:
             fn_calls: list[dict] = []
             usage: Optional[dict] = None
 
-            for chunk in _stream_generate(self.base_url, mdl, key, body, cancel, policy=policy):
+            for chunk in _stream_generate(self.base_url, mdl, key, body, cancel, policy=policy,
+                                          on_retry=_on_retry):
                 if cancel.is_set():
                     return
                 if chunk.get("usageMetadata"):
@@ -247,7 +251,7 @@ def _usage_event(cfg: dict, model: str, usage: dict) -> dict:
 
 
 def _stream_generate(base_url: str, model: str, key: str, body: dict, cancel: threading.Event,
-                     *, policy: Optional[RetryPolicy] = None,
+                     *, policy: Optional[RetryPolicy] = None, on_retry=None,
                      timeout=(10, 600)) -> Iterator[dict]:  # noqa: ANN001
     """POST `models/{model}:streamGenerateContent?alt=sse` and yield each parsed SSE `data:` chunk.
     The key rides the `x-goog-api-key` header (never the URL).
@@ -277,7 +281,7 @@ def _stream_generate(base_url: str, model: str, key: str, body: dict, cancel: th
             raise RuntimeError(detail)
         return r
 
-    with run_with_retry(_connect, cancel, policy, provider="Gemini") as r:
+    with run_with_retry(_connect, cancel, policy, provider="Gemini", on_retry=on_retry) as r:
         for line in r.iter_lines():
             if cancel.is_set():
                 return
