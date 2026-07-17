@@ -227,9 +227,18 @@ the rendering surface differs:
   snapshot. (The original bitmap was zero-dep but read "1980s" in a headset; Pillow is Windows-
   guaranteed and small, so it earns its place — see the `openvr`/Pillow build-env note in §3.8.)
 - **`VrPlacement` / `resolve_transform` — pure placement math.** A placement mode
-  (`world` cockpit-fixed / `head` view-locked) + a physical width become an OpenVR 3x4
-  transform; the mode picks the binding (`setOverlayTransformAbsolute` vs
-  `…TrackedDeviceRelative`). Clamped and unit-tested — a bad setting can't place it unusably.
+  (`world` cockpit-fixed / `head` view-locked) plus width, distance, lateral/vertical offset,
+  and pitch become an OpenVR 3x4 transform (X-axis pitch + translation); the mode picks the
+  binding (`setOverlayTransformAbsolute` vs `…TrackedDeviceRelative`). A `curvature` field maps
+  to `setOverlayCurvature` (0 flat … 1 cylinder; ~0.06 by default for a gentle ED-style wrap).
+  All fields clamp and are unit-tested — a bad setting can't place it unusably. **Every field is
+  live-adjustable:** `VrHudView.set_placement` hands a new `VrPlacement` to the OpenVR thread,
+  which re-applies width/transform/curvature on its next poll — so voice/Settings reposition a
+  shown overlay with no re-toggle (the app relays it via `HudCapability.set_vr_placement` from
+  `_reconcile_hud`). Controller grab-to-move was evaluated and rejected: Quest controllers over
+  Virtual Desktop deliver **poses but no buttons** through legacy `getControllerState` (buttons
+  need an IVRInput action manifest), and ED renders no motion controllers anyway — so voice is
+  the placement trigger.
 - **`VrHudView` / `make_vr_view` — the guarded sink.** `openvr` is imported **lazily** and
   SteamVR is `init`'d as `VRApplication_Overlay` only when the VR HUD is enabled; **any**
   import/init/runtime failure returns `None` (so `make_vr_view` yields "no VR surface"),

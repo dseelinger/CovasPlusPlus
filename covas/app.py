@@ -1130,11 +1130,18 @@ class App:
         return bool(self.cfg.get("hud", {}).get("vr_enabled", False))
 
     def _vr_hud_placement(self):
-        """Build the VR overlay placement from the live [hud] config (clamped to sane ranges)."""
+        """Build the VR overlay placement from the live [hud] config (clamped to sane ranges).
+        Every field is voice-adjustable and applies live via _reconcile_hud -> set_vr_placement."""
         from .capabilities.vr_hud import VrPlacement
         hud = self.cfg.get("hud", {})
-        return VrPlacement.normalize(hud.get("vr_placement", "world"),
-                                     hud.get("vr_width_m", 0.55))
+        return VrPlacement.normalize(
+            hud.get("vr_placement", "world"),
+            hud.get("vr_width_m", 0.55),
+            forward_m=hud.get("vr_distance_m", 1.30),
+            up_m=hud.get("vr_offset_y_m", -0.12),
+            offset_x_m=hud.get("vr_offset_x_m", 0.0),
+            pitch_deg=hud.get("vr_pitch_deg", 0.0),
+            curvature=hud.get("vr_curvature", 0.06))
 
     def _reconcile_hud(self) -> None:
         """Bring the HUD surfaces up/down after a settings change, and start the event pump when
@@ -1146,6 +1153,9 @@ class App:
             if self._hud_enabled() or self._vr_hud_enabled():
                 self._start_event_pump()  # idempotent
             self.hud.reconcile()
+            # Push the live placement so a Settings/voice change to distance / offset / pitch /
+            # curvature / width repositions a SHOWN VR overlay immediately (no re-toggle).
+            self.hud.set_vr_placement(self._vr_hud_placement())
         except Exception as e:  # noqa: BLE001 — a toggle glitch must not crash the loop
             self._log("hud", f"reconcile failed: {e}")
 
