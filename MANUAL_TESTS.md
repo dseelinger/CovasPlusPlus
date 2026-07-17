@@ -303,6 +303,35 @@ Notes:
 
 Notes:
 
+### 4.4 Optimization level — capability/token tiering (issue #84)  🔊 HW 🌐 PANEL
+> `[llm].optimization_level` picks how many tool clusters COVAS advertises (the full set is ~10K
+> tokens) **and** whether background LLM calls (proactive callouts, chatter flavor, comms variants)
+> run. `auto` (default) chooses per provider; the five manual levels are `Full` / `Standard` / `Lean`
+> / `Minimal` / `Bare`. Chosen **once at startup** — restart after changing it. Watch the startup log
+> for the `Optimization level: … — tools: …; background: …` line.
+- [ ] **Auto default (Anthropic):** with the stock config, the startup log reports **`Full (auto)`**
+      with all tool groups listed and all three background flags **on**. Tool-using turns (checklist,
+      "where am I", a Spansh search) all still work.
+- [ ] **Manual `Minimal`:** set `[llm].optimization_level = "Minimal"`, restart → the log shows
+      **`Minimal (manual)`** with **`tools: core, checklist`** and **all background off**. Checklist
+      voice commands still work; a **Spansh/engineering** request is politely declined / not tool-driven
+      (those tools aren't advertised), and **proactive callouts stay silent** even with
+      `[proactive].enabled = true`.
+- [ ] **Manual `Bare`:** set `Bare`, restart → **`tools: no tools`**; COVAS still converses but drives
+      no tools at all (e.g. it won't tick the checklist).
+- [ ] **Groq-free auto → Minimal:** set `[llm].provider = "openai"` and `[openai].base_url =
+      "https://api.groq.com/openai/v1"`, keep `optimization_level = "auto"`, restart → the log reports
+      **`Minimal (auto)`**. (A **paid** Groq user would set `Full` manually.) 🌍 NET
+- [ ] **Custom TPM:** with an unknown `[openai].base_url` and `auto`, set `[llm].custom_tpm = 20000`,
+      restart → the log reports **`Lean (auto)`** (the TPM mapped it), not `Full`.
+- [ ] **Background suppressed vs. Full:** at `Full`, an ambient chatter line (with `[audio.cues].flavor
+      = true`) can be **LLM-flavored**; at `Standard`/`Lean`/etc. the same line is **canned/pooled only**
+      — and comms lines are read **verbatim** — with **no extra LLM cost** in the usage log.
+- [ ] **Cache stays warm:** the level doesn't change mid-session (no per-turn tool churn), so repeated
+      turns keep hitting the prompt cache (usage log shows cache reads, not full re-writes each turn).
+
+Notes:
+
 ## 5. ED monitoring, proactive & route callouts  🎮 ED 🔊 HW
 > Requires `[elite].enabled = true` and ED running. Fly around so there's live telemetry.
 

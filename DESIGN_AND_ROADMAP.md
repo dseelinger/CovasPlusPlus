@@ -297,8 +297,24 @@ halving the tool payload only reaches ~18 turns/day, so the daily-token ceiling,
 the wall. Documented stance: Groq-free is **unsupported** (Groq *paid* is excellent); the recommended
 **free** provider is **Gemini Flash** (~250K TPM / 1,500 req/day); cheap-paid options (OpenAI
 `gpt-4o-mini`, DeepSeek, paid Groq) all clear the floor. The standing lever to lower the floor is
-**context-aware tool gating** (advertise only tools relevant to the turn/mode instead of all ~47) —
-a real cost/latency win on every provider, tracked as a backlog item; it does *not* rescue Groq-free.
+**capability/token tiering** — advertise fewer tool clusters, and suppress background LLM calls, on
+a token-starved endpoint — a real cost/latency win on every provider; it does *not* rescue Groq-free.
+
+**Implemented — capability/token tiering (`[llm].optimization_level`, issue #84).** Both cost axes
+are tiered together against a **token budget packed by priority**. Each capability *declares* the
+tiering group its tools belong to (a one-line `TIERING_GROUP`; untagged → the default `core` group);
+`covas/tiering.py` owns the group table (measured `token_cost` + `priority`) and the five named
+**levels** — `Full` / `Standard` / `Lean` / `Minimal` / `Bare` — which are budget presets that also
+carry three background-call flags. `CapabilityRegistry.tools_for_level` applies the filter in **one
+place** (feeding `stream_reply` in `app.py`), on top of the existing config gates; the same level
+gates the LLM-generated background paths (proactive callouts, chatter flavor, comms variants), which
+fall back to their canned/pooled lines rather than spawning a generator. The level is **auto-selected
+per provider** (Anthropic/Gemini/OpenAI/DeepSeek/OpenRouter → `Full`; a `groq.com` endpoint →
+`Minimal`; unknown custom `base_url` → `Full`, or map an entered `[llm].custom_tpm`) with a manual
+override, and is chosen **once at startup** so prompt caching stays warm. Two deliberate follow-ups
+are deferred: **schema-trim** (shrinking each individual tool's JSON schema — an orthogonal per-tool
+win that can land independently) and **v2 per-turn context-gating** (swapping the tool set mid-turn
+by what the request needs — out of scope here because it would break the warm prompt cache).
 
 ### TTS: the one worthwhile local move
 TTS is a light CPU burst, not a GPU hog, so **Piper runs fine alongside the game**. Defaulting TTS to Piper takes ElevenLabs cost to zero; keep ElevenLabs as a "premium voice" toggle for relaxed sessions. Because both emit the same PCM, this is a config/router choice, not a code change. Whisper STT is already local for the same reason. Note the voice character differs — Piper is good but not ElevenLabs-smooth; worth an A/B once wired.

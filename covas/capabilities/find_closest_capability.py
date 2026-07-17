@@ -188,6 +188,9 @@ class FindClosestCapability:
       * `resolve` / `search` / `clipboard` — pure/offline deps, defaulted to the real ones
         but overridable in tests.
     """
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
 
     def __init__(
         self,

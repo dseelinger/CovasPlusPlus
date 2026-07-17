@@ -145,6 +145,9 @@ class SystemSearchCapability:
     """Advertises `search_star_systems` and runs the stateless slot-fill -> validate -> search
     flow. Injected seams (so the default test run is offline): `http` (Spansh poster),
     `get_current_system` (Callable[[], str|None]), `clipboard`."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
 
     def __init__(
         self,

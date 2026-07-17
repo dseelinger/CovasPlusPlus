@@ -63,6 +63,9 @@ _SCHEMA_PROPS = {
 
 class MinorFactionSearchCapability:
     """Advertises `search_minor_factions`; stateless slot-fill -> validate -> search."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
 
     def __init__(self, config: SearchConfig, *, http: Http | None = None,
                  get_current_system: Callable[[], str | None] | None = None,

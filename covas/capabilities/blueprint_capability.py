@@ -67,6 +67,9 @@ class BlueprintCapability:
     """Advertises the blueprint/material tools and answers them from the bundled engineering
     library crossed with the injected materials-inventory getter (live `EDContext` in the app,
     a stub in tests)."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "engineering"
 
     def __init__(self, *, get_materials: Callable[[], MaterialsSnapshot | None],
                  library: BlueprintLibrary | None = None,

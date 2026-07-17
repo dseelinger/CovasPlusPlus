@@ -74,6 +74,9 @@ class EngineersCapability:
     """Advertises the engineer-finder tools and answers them from the bundled reference table
     joined with the injected journal-progress getter (live EDContext in the app; a stub in
     tests). Static data — no network."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "engineering"
 
     def __init__(
         self,

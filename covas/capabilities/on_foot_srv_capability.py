@@ -45,6 +45,9 @@ ON_FOOT_SRV_TOOLS = [
 
 class OnFootSrvCapability:
     """Serves live on-foot / SRV / exobiology context to the LLM via read tools (#54)."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "commander_state"
 
     def __init__(self, ctx: EDContext) -> None:
         self.ctx = ctx

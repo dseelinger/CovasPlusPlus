@@ -111,6 +111,9 @@ class MemoryCapability:
     `remember_this` store tool, via a `MemoryCapture` dedup/cap sink) and RECALL (a cache-safe
     `recall_block` for the worker loop + a `recall_memory` tool, via a `Retriever`). Recall is
     keyword/tag by default — free and offline; the embedding seam stays OFF."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "memory"
 
     def __init__(self, capture: MemoryCapture, retriever: Retriever,
                  *, log: Optional[Callable[[str], None]] = None) -> None:

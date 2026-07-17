@@ -33,6 +33,10 @@ ROUTER_PINS = ["", "cheap", "standard", "premium", "haiku", "sonnet", "opus"]
 PAD_SIZES = ["S", "M", "L", "any"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
 LLM_PROVIDERS = ["anthropic", "openai", "gemini", "ollama"]
+# Capability/token optimization levels (issue #84): "auto" (per-provider default) + the 5 named
+# budget presets, richest -> leanest. Mirrors covas/tiering.py LEVEL_NAMES (a unit test asserts the
+# two stay in lock-step so this list can't drift from the real levels).
+OPTIMIZATION_LEVELS = ["auto", "Full", "Standard", "Lean", "Minimal", "Bare"]
 # cartesia is PERSONA-only (a premium low-latency persona voice, #18) — it is intentionally NOT in
 # CAST_PROVIDERS (not offered for the NPC/comms/chatter cast).
 TTS_PROVIDERS = ["elevenlabs", "piper", "edge", "azure", "openai", "cartesia"]
@@ -256,6 +260,26 @@ SCHEMA: list[Setting] = [
             default="claude-sonnet-5", options_source=OPT_MODELS,
             phrasings=("claude model", "language model", "the model"),
             example="switch to opus"),
+    Setting("llm.optimization_level", ("llm", "optimization_level"), "enum",
+            "Optimization level", "Language model",
+            "How many tool clusters COVAS advertises each turn (the full set is ~10K tokens) and "
+            "whether background LLM calls (proactive callouts, chatter flavor, comms variants) run. "
+            "'auto' (default) picks per provider — Anthropic/Gemini/OpenAI/DeepSeek/OpenRouter get "
+            "Full; Groq's token-starved free tier gets Minimal (a PAID Groq user picks Full). "
+            "Manual: Full (everything), Standard (drop Search + Engineering, background off except "
+            "proactive), Lean (core + checklist + Commander-state + settings, no background), "
+            "Minimal (core + checklist only — safe for a 12K-TPM free tier), Bare (no tools). "
+            "Chosen at startup and held for the session.",
+            default="auto", options=OPTIMIZATION_LEVELS,
+            phrasings=("optimization level", "tool level", "capability level"),
+            example="set the optimization level to minimal"),
+    Setting("llm.custom_tpm", ("llm", "custom_tpm"), "int",
+            "Custom endpoint tokens/min", "Language model",
+            "Tokens-per-minute for a CUSTOM/unknown LLM endpoint, used only in 'auto' mode to "
+            "right-size the tool budget (<15K -> Minimal, <30K -> Lean, <60K -> Standard, else "
+            "Full). 0 = ignore. Leave 0 for known providers.",
+            default=0, min=0, max=100000000, unit="TPM",
+            phrasings=("custom tpm", "tokens per minute", "endpoint token limit")),
     Setting("anthropic.max_tokens", ("anthropic", "max_tokens"), "int",
             "Max reply tokens", "Language model",
             "Hard cap on reply length. Replies are spoken, so short is good.",

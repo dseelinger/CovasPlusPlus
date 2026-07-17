@@ -97,6 +97,47 @@ card, and it's stored in `anthropic.api_key_file` (`AnthropicAPIKey.txt`).
 > decrypt on a different machine/account, so re-enter keys after a move. As defense-in-depth, use
 > **spend-capped or restricted keys** where your provider offers them.
 
+## Optimization level (`[llm]`)
+
+COVAS advertises its tool set (checklist, ED context, engineering, Spansh/EDSM search, keybinds, …)
+to the LLM every turn — the full set is roughly **10K tokens** of tool schemas. That's free on a
+prompt-caching, high-throughput endpoint (Anthropic, Gemini, OpenAI, DeepSeek, OpenRouter) but can
+overflow a **low-TPM free tier** (Groq's free tier is ~12K tokens-per-minute → HTTP 413/429) and is
+paid-per-turn on a non-caching endpoint. The **optimization level** picks how many tool clusters to
+advertise *and* whether the LLM-generated **background** calls (proactive callouts, chatter flavor,
+comms variants) run — packed against a token budget by priority. It's chosen **once at startup** and
+held for the session, so prompt caching stays warm.
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `llm.optimization_level` | `auto` | `auto` (per-provider default) or a manual level: `Full` / `Standard` / `Lean` / `Minimal` / `Bare` |
+| `llm.custom_tpm` | `0` | Tokens-per-minute for a **custom/unknown** endpoint (auto mode only); `0` = ignore |
+
+**The five levels** (each level is a token budget; groups are kept in priority order until it's spent):
+
+| Level | Tools advertised | Background LLM calls |
+|-------|------------------|----------------------|
+| `Full` | Everything | Proactive **on**, chatter-flavor **on**, comms-variants **on** |
+| `Standard` | Drop the **Search** + **Engineering** clusters | Proactive **on**; chatter/variants **off** |
+| `Lean` | Core + checklist + Commander-state + settings/help | All background **off** |
+| `Minimal` | Core + checklist only | All background **off** |
+| `Bare` | No tools — conversation only | All background **off** |
+
+**Auto-selection** (`auto`) picks per provider: Anthropic / Gemini / OpenAI / DeepSeek / OpenRouter →
+`Full`; a **Groq** endpoint (`groq.com`) → `Minimal`, because its free tier is token-starved (a
+**paid** Groq user should set `Full` manually — free vs paid isn't visible from the URL); an unknown
+**custom `base_url`** → `Full`, unless you set `custom_tpm` (then `<15K` → `Minimal`, `<30K` → `Lean`,
+`<60K` → `Standard`, else `Full`).
+
+Existing feature toggles apply **first**: a level never *adds* a capability you disabled (keybinds
+still need `[keybinds].enabled`, memory `[memory].enabled`, ED context `[elite].enabled`) — the level
+only trims what's already registered. When a background path is off for the level, COVAS falls back to
+its **canned/pooled** line (which costs nothing), never spawning the generator.
+
+> **Planned follow-ups (not in this build):** *schema-trim* (shrinking each individual tool's JSON
+> schema, an orthogonal win) and *v2 per-turn context-gating* (swapping the tool set mid-session by
+> what the turn needs — deliberately deferred because it would break prompt caching).
+
 ## Cost router (`[router]`)
 
 Routes each turn to the cheapest capable model, escalating only when a turn earns it. See
