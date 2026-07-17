@@ -44,6 +44,24 @@ outpost near the slow end. You set the two bounds — `[audio.chatter].min_secon
 and `max_seconds` (barely-populated) — and lower `full_population` to make more systems feel lively.
 All three are on the Settings page.
 
+### Context-grounded chatter (opt-in)
+
+By default those lines come from a curated pool. Turn on **`[audio.cues].flavor`** and the companion
+instead **generates each musing with the cheap LLM, grounded in your live situation** — where you
+are (inhabited vs. the empty black, and how busy), what you're doing (docked, in supercruise, on
+foot, in the SRV), your ship, and recent beats like an interdiction, a close call, or low fuel. So a
+quiet run through deep space and a bustling core-world dock *sound different*, and each line has a
+real reason behind it. It stays honest: the same fact-safe guard applies (no names, no numbers,
+nothing checkable — the situation only colours the **mood**), repeats are filtered out, and if the
+LLM is off, errors, or times out it **falls straight back to the canned pool** — chatter never stalls
+the loop.
+
+!!! note "Cost & the optimization level"
+    Each grounded line is a small **cheap-tier** call, so it's gated by the [optimization
+    level](../elite/proactive-callouts.md). It's **only active at the `Full` level** (or with
+    `flavor` explicitly on where the level permits it); at `Standard` and leaner the flavor path is
+    switched off automatically and chatter is pool-only, so no background call is ever made.
+
 ## Fleet-carrier voices
 
 When you're **at, or in the same system as, the fleet carrier you own**, the carrier comes alive

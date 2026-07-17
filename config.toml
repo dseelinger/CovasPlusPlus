@@ -254,7 +254,11 @@ min_interval     = 8.0    # seconds between ANY two cues (a hard gap so nothing 
 max_per_minute   = 6      # global cap: at most this many cues in any rolling 60 seconds
 default_cooldown = 30.0   # a cue won't repeat within this many seconds unless it sets its own
 # Let the LLM generate flavor chatter musings (fact_bearing=false lines only, validated to assert
-# nothing checkable — C6). OFF by default (cost); when off, chatter is curated pool lines only.
+# nothing checkable — C6). When on, each musing is GROUNDED in your live situation (issue #85) —
+# inhabited vs. the empty black, what you're doing, recent beats like an interdiction or low fuel —
+# so lines vary with the moment while staying fact-safe; repeats are filtered and any LLM
+# error/off falls back to the curated pool. OFF by default (cost) and gated by the optimization
+# level (only active at "Full"); when off, chatter is curated pool lines only.
 flavor           = false
 
 

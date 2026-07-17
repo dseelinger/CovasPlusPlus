@@ -1127,6 +1127,19 @@ on in config (or the Settings page) before testing.
   `[audio.chatter].min_seconds` (or `full_population`) → chatter speeds up. Confirm each chatter line
   uses a **different random voice**.
 
+### 18.3.1 Context-grounded chatter (issue #85 — `[audio.cues].flavor`, `Full` level)
+- [ ] 🎮 With `[audio.cues].enabled` **and** `[audio.cues].flavor = true`, optimization level `Full`,
+  fly a varied session: dock at a **busy core-world** station, then jump out into **deep/unpopulated
+  space**, then get **interdicted** or run **low on fuel**. Listen to the ambient musings → the lines
+  are **situationally motivated and varied** (a lived-in-hub mood vs. a lonely-black mood vs. a rattled
+  post-danger mood), not the same generic pool loop. Confirm they never state a **name or number**
+  (fact-safe) and don't obviously **repeat** back-to-back.
+- [ ] 🎮 **Fail-soft to canned:** stop/misconfigure the LLM (or pull the network) with `flavor` still
+  on → ambient chatter keeps playing from the **canned pool**, the loop never stalls or errors.
+- [ ] 🎮 **Off at lean tiers:** set the optimization level to `Standard` (or leaner), or leave
+  `[audio.cues].flavor = false` → chatter is **pool-only**, and no background LLM call is made for a
+  musing (watch the cost log — no cheap-tier chatter calls).
+
 ### 18.4 Voice controls + live settings (C9)
 - [ ] 🔊 By voice: *"mute the chatter"*, *"quiet the comms"*, *"turn the music down"*, *"turn the
   music up"*, *"stop the music"*, *"silence all the background audio"*, *"turn the ambient audio

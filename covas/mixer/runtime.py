@@ -22,7 +22,7 @@ from typing import Callable, Optional
 from ..capabilities.base import HelpMeta, Slot
 from .buses import ALERT, AMBIENT, COMMS, COVAS, MUSIC
 from .carrier import CarrierPlayer, build_carrier_config, carrier_cues
-from .chatter import ChatterPlayer, chatter_cues, chatter_interval
+from .chatter import ChatterPlayer, chatter_cues, chatter_interval, situation_context
 from .comms import capture
 from .content import (
     ContentBundle,
@@ -182,13 +182,18 @@ class AudioLayer:
         chatter_flavor = bool((audio.get("cues", {}) or {}).get("flavor", False)) and allow_chatter_flavor
         comms_variants = bool((audio.get("comms", {}) or {}).get("variants", False)) and allow_comms_variants
         chatter_gen = _text_generator(llm, cheap_model) if (llm is not None and chatter_flavor) else None
+        # Context grounding (issue #85): a flavor musing is seeded from a COMPACT live-ED slice so
+        # each line has a real reason. The slice is derived from the SAME EDContext the main loop
+        # uses (no parallel tracker); it only shapes the mood — the output stays fact-safe.
         self._chatter = ChatterPlayer(self._speak_bus, generate=chatter_gen,
+                                      context=self._chatter_context,
                                       min_interval=self._chatter_interval, clock=clock)
         # "Our"-perspective musings (issue #57): a cue tagged voice_role=PERSONA is something the
         # companion itself notices, so it speaks in COVAS's OWN voice on the clean COVAS bus instead
         # of a random radioed cast voice. Same player shape (flavor generator + frequency gate) as
         # ambient chatter, just a different `speak` seam.
         self._persona_chatter = ChatterPlayer(self._speak_persona, generate=chatter_gen,
+                                               context=self._chatter_context,
                                                min_interval=self._chatter_interval, clock=clock)
         self._sfx = SfxPlayer(self._play_sample)
         # Carrier context voices (#19): each role speaks its own configured voice (or a stable
@@ -324,6 +329,20 @@ class AudioLayer:
             self._population,
             float(ch.get("full_population", 1_000_000_000.0)),
         )
+
+    def _chatter_context(self) -> str:
+        """The compact live-ED situation slice that grounds a flavor musing (issue #85). Reuses the
+        shared EDContext (the same snapshot/recent feed the main loop injects) plus the population
+        this layer already tracks from arrival events — NO parallel tracker. Fail-soft: any missing
+        context or read error yields "" (an ungrounded musing), never an exception into the pump."""
+        if self._ed_ctx is None:
+            return ""
+        try:
+            snap = self._ed_ctx.snapshot()
+            recent = self._ed_ctx.recent(3)
+        except Exception:  # noqa: BLE001 — a context glitch just yields an ungrounded musing
+            return ""
+        return situation_context(snap, recent, self._population)
 
     def _speak_bus(self, text: str, bus: str) -> bool:
         """Speak an AMBIENT chatter line on its bus with a FRESH RANDOM cast voice per line, so the
