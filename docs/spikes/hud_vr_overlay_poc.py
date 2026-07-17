@@ -34,6 +34,7 @@ like the guard below when SteamVR is absent.
 
 from __future__ import annotations
 
+import ctypes
 import sys
 import time
 
@@ -97,8 +98,13 @@ def _run_overlay():
         overlay.showOverlay(handle)
 
         buf = _render_demo_rgba()
-        # setOverlayRaw(handle, ptr, width, height, bytes_per_pixel=4). No DirectX texture.
-        overlay.setOverlayRaw(handle, buf.ctypes.data, HUD_W, HUD_H, 4)
+        # setOverlayRaw(handle, buffer, width, height, bytes_per_pixel=4). No DirectX texture.
+        # The binding does byref(buffer), so this must be a ctypes object whose address IS the
+        # pixels — NOT buf.ctypes.data (a plain int; byref() rejects it). This POC shipped the
+        # int form and was never run against SteamVR (see the header), and #48 copied it, so the
+        # real overlay raised on every repaint and never showed. See covas/capabilities/vr_hud.py.
+        raw = (ctypes.c_ubyte * buf.nbytes).from_buffer(buf)
+        overlay.setOverlayRaw(handle, raw, HUD_W, HUD_H, 4)
 
         print("Overlay up. It should now be visible in the headset. Ctrl+C to quit.")
         # A real feature re-uploads setOverlayRaw only when the HudModel changes (throttled).
