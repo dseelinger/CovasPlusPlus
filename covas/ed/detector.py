@@ -21,6 +21,19 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from .currencies import known_names
+
+# Base status phrases (location/ship/fuel/cargo). Money-question phrases are NOT hardcoded here:
+# they come from the currency registry (`currencies.known_names()`) so the set of currencies the
+# detector will inject a wallet for stays a one-row registry edit — and an UNKNOWN currency's name
+# is deliberately absent, so "how many merc coins" never trips a status lookup (#101).
+_BASE_STATUS_PHRASES: list[str] = [
+    "where am i", "where are we", "what system", "current system", "which system",
+    "am i docked", "docked at", "my fuel", "how much fuel", "fuel level", "how's my fuel",
+    "my ship", "what ship", "my cargo", "how much cargo", "landing gear", "hardpoints",
+    "supercruise", "am i in", "my location", "my status", "ship status",
+]
+
 
 @dataclass(frozen=True)
 class ContextRef:
@@ -49,12 +62,8 @@ class ContextDetectorConfig:
     """Immutable snapshot of the detection policy, built from `[elite]`. Kept separate
     from `ContextDetector` so `decide()` is a pure function of (config, text)."""
     wake_phrases: list[str] = field(default_factory=lambda: ["context"])
-    status_phrases: list[str] = field(default_factory=lambda: [
-        "where am i", "where are we", "what system", "current system", "which system",
-        "am i docked", "docked at", "my fuel", "how much fuel", "fuel level", "how's my fuel",
-        "my ship", "what ship", "my cargo", "how much cargo", "landing gear", "hardpoints",
-        "supercruise", "am i in", "my location", "my status", "ship status",
-    ])
+    status_phrases: list[str] = field(
+        default_factory=lambda: _BASE_STATUS_PHRASES + known_names())
     log_phrases: list[str] = field(default_factory=lambda: [
         "what just happened", "what happened", "recent events", "my log", "my logs",
         "check the log", "check my log", "last jump", "what did i just", "what have i been",
