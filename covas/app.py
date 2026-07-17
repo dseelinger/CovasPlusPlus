@@ -2569,7 +2569,11 @@ class App:
             # a model switch it can't make — it just answers the request. Built fresh from
             # live cfg so UI overrides apply; off by default -> the fixed [anthropic] tier.
             router = Router.from_cfg(self.cfg)
-            route = router.decide(text)
+            # Tell the router the HUD is on so bare placement nudges ("bigger", "move it left")
+            # escalate to a tier that reliably fires adjust_vr_hud; when it's off they stay cheap
+            # and can't over-escalate ordinary chat (issue #48 retest).
+            route = router.decide(
+                text, {"hud_active": self._hud_enabled() or self._vr_hud_enabled()})
             self._log("router",
                       f"[{route.tier}] {route.model} max_tokens={route.max_tokens} — {route.reason}")
             self.bus.publish({"type": "router", "model": route.model, "tier": route.tier,

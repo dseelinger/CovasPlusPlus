@@ -84,6 +84,42 @@ def test_context_needs_web_flag_escalates_without_a_phrase():
     assert "current/web data" in route.reason
 
 
+# ---- escalation: HUD / overlay control (issue #48 retest) -------------------
+# Haiku confabulates a refusal on HUD-control follow-ups instead of calling adjust_vr_hud, so
+# these deterministic commands escalate to Sonnet, which fires the tool reliably.
+@pytest.mark.parametrize("text", [
+    "turn the VR HUD on",
+    "turn the VR HUD off",
+    "move the HUD left",
+    "make the HUD bigger",
+    "pin the HUD here",
+    "put the overlay closer",
+])
+def test_hud_qualified_commands_escalate_anytime(text):
+    # HUD-qualified phrases match whether or not we pass a hud_active hint.
+    route = _router().decide(text)
+    assert route.model == SONNET
+    assert "HUD control" in route.reason
+
+
+@pytest.mark.parametrize("text", ["bigger", "smaller", "move it left", "tilt it up", "pin it here"])
+def test_bare_nudges_escalate_only_when_hud_active(text):
+    r = _router()
+    # HUD on -> escalate so the nudge lands; HUD off -> stay cheap (no over-escalation of chat).
+    assert r.decide(text, context={"hud_active": True}).model == SONNET
+    assert "HUD nudge" in r.decide(text, context={"hud_active": True}).reason
+    assert r.decide(text, context={"hud_active": False}).model == HAIKU
+    assert r.decide(text).model == HAIKU   # no context at all -> cheap
+
+
+@pytest.mark.parametrize("text", [
+    "how much closer is the station",   # 'closer' in ordinary chat
+    "give me the bigger picture",       # 'bigger' in ordinary chat
+])
+def test_bare_nudge_words_dont_escalate_ordinary_chat_when_hud_off(text):
+    assert _router().decide(text, context={"hud_active": False}).model == HAIKU
+
+
 # ---- premium override -------------------------------------------------------
 def test_use_opus_override_selects_opus():
     route = _router().decide("Use opus for this, please.")
