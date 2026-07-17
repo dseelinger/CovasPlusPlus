@@ -167,6 +167,31 @@ def check_gemini(cfg: dict) -> None:
         print(WARN + f"Gemini model-list check skipped: {e}")
 
 
+def check_datasets() -> None:
+    """Bundled-data freshness (issue #101). WARNS (never FAILS) when a generated dataset is older
+    than ~6 months, so a release remembers to run `scripts/refresh_datasets.py` and keep up with
+    FDev content. Purely informational — stale data still works, it just may miss newer hulls."""
+    section("Game data freshness")
+    try:
+        from covas.nav.datasets import load_manifest, stale_datasets
+        rows = load_manifest()
+        if not rows:
+            print(WARN + "no dataset manifest found (run scripts/refresh_datasets.py)")
+            return
+        max_age = 183  # ~6 months
+        stale = stale_datasets(max_age)
+        for d in rows:
+            age = "unknown" if d.age_days is None else f"{d.age_days}d"
+            mark = WARN if d in stale else OK
+            print(mark + f"{d.label}: {d.row_count} rows, generated {d.generated_at} ({age} old)")
+        if stale:
+            print("        (Some datasets are >6 months old — run "
+                  "`.venv\\Scripts\\python.exe scripts/refresh_datasets.py` to refresh from the "
+                  "community sources, review the diff, and commit.)")
+    except Exception as e:  # noqa: BLE001 — a freshness check must never fail setup
+        print(WARN + f"dataset freshness check skipped: {e}")
+
+
 def check_audio(cfg: dict) -> None:
     section("Audio devices")
     try:
@@ -191,6 +216,7 @@ def main() -> None:
     check_anthropic(anth_key)
     check_elevenlabs(el_key)
     check_gemini(cfg)
+    check_datasets()
     check_audio(cfg)
 
     section("Result")

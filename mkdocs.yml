@@ -117,6 +117,7 @@ nav:
       - Send in-game messages: automation/comms.md
       - Auto-honk: automation/auto-honk.md
   - Ambient audio: audio/ambient-audio.md
+  - Keeping game data current: data-refresh.md
   - The control panel: control-panel.md
   - Configuration reference: configuration.md
   - Roadmap: roadmap.md

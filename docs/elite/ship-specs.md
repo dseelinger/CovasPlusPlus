@@ -45,4 +45,6 @@ no login — the dataset is bundled and offline, so it works any time, even out 
 The dataset is baked from the community-maintained
 [EDCD/coriolis-data](https://github.com/EDCD/coriolis-data) ship files — the same lineage
 Coriolis and EDSY use. When Frontier releases a new hull, refreshing is a single command
-(`scripts/gen_ship_specs.py`); no per-release code change is needed.
+(`scripts/refresh_datasets.py`) and no per-release code change is needed — see [keeping game data
+current](../data-refresh.md) for how the two-stage refresh works and how to check how fresh the
+data is (or just ask *"how up to date is your ship data?"*).

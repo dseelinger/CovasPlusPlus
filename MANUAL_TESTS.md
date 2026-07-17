@@ -615,6 +615,18 @@ Notes:
 
 Notes:
 
+### 7.3 Game-data freshness & new-content refresh (#101)  🔊 HW 🌍 NET (dev tool)
+> **Always on** — no config. The honest companion to 7.2: reports how current the bundled
+> ship/module/engineering data is, and how a new FDev hull enters the app as a **data update, not
+> a code edit**. The refresh commands need network; the voice question does not.
+- [ ] **"How up to date is your ship data?"** → COVAS++ names its datasets (ship specs, modules, engineering, roster), each with a source and a *generation date*, and says it'll web-search rather than guess for anything newer. It does **not** invent a version or claim to be perfectly current.
+- [ ] **Startup freshness:** run `.venv\Scripts\python.exe check_setup.py` → a **Game data freshness** section lists each dataset's age; datasets older than ~6 months are flagged `[warn]` with a hint to run `scripts\refresh_datasets.py`.
+- [ ] **Refresh diff (dev):** run `.venv\Scripts\python.exe scripts\refresh_datasets.py` → it fetches, regenerates, and prints a **diff summary** (new hulls / modules / blueprints, orphaned overlay rows, hulls with no bundled spec) plus a *last refreshed* nag for the hand-curated engineer tables. Re-running with no game change shows "no change" everywhere. Then `pytest` is green.
+- [ ] **New-hull detection is loud (dev):** the mechanism to verify when Frontier ships a hull — after a refresh that pulls a coriolis ship file with no roster id yet, `scripts\gen_ship_specs.py` **fails loudly naming the ship** ("new FDev hull?") instead of silently dropping it; running `scripts\gen_ship_roster.py --fetch` first harvests its name/symbol so the next spec regen matches it with no hand edits.
+- [ ] **Offline determinism:** `.venv\Scripts\python.exe scripts\refresh_datasets.py --no-fetch` regenerates from the committed snapshots with **no network** and leaves the generated files byte-identical (`git status` clean apart from the manifest date).
+
+Notes:
+
 ## 8. Voice search categories  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
 > `[star_systems].enabled` and `[search].enabled` = true. Stateless conversational slot-filling over Spansh, nearest-first from your current system, each **copies the primary system** to the clipboard. Misheard filter values are validated against a bundled vocabulary and corrected.
 
@@ -1348,6 +1360,14 @@ Notes:
 > available on Win11 Home) so "no Python/keys/model preinstalled" is actually proven. Revert the
 > snapshot between passes. A partial dev-machine shortcut: delete `%APPDATA%\COVAS++` + the HF
 > model cache to re-exercise the wizard (does **not** prove the no-runtimes case).
+
+### 19.0a Release prep — refresh bundled game data (issue #101)  🌍 NET
+> Before cutting a release, bring the bundled FDev-content datasets up to date so a downloaded
+> build ships current ship/module/engineering data (the app is offline at runtime, so this is the
+> only moment it converges on live community data). Do this **before** the version bump / build.
+- [ ] Run `.venv\Scripts\python.exe scripts\refresh_datasets.py` → review the printed **diff summary** (new hulls / modules / blueprints / orphaned overlay rows) and the *last refreshed* nag for the hand-curated engineer tables (refresh those by hand if they've drifted).
+- [ ] `.venv\Scripts\python.exe check_setup.py` → the **Game data freshness** section shows no `[warn]` (nothing older than ~6 months).
+- [ ] `pytest` is green, then commit the regenerated data + manifest as part of release prep.
 
 ### 19.0 Provider bundle & default-voice self-test (issue #20)  📦 🔊 HW 🌍 NET
 > The multi-provider epic (#10) added swappable providers imported **lazily** from
