@@ -141,8 +141,15 @@ The rendering-approach spike (#46) landed these decisions (full writeup + PoCs i
   click-through. PySide/Qt (~100 MB frozen) and Dear PyGui are rejected as not earning their
   dependency weight for a companion panel.
 - **VR surface — first-party **SteamVR overlay** via `pyopenvr` (`IVROverlay`).** The one new
-  dependency **`openvr`** (BSD-3, on PyPI, bundles `openvr_api.dll`; add it *only when the VR
-  sub-issue is built*, and `collect_all("openvr")` in `covas.spec` like `av`/`onnxruntime`).
+  dependency **`openvr`** (BSD-3, on PyPI, bundles `openvr_api.dll`), in `requirements.txt` and
+  collected by `collect_all("openvr")` in `covas.spec` like `av`/`onnxruntime`.
+  **Post-mortem (v0.12.0):** the spike said to add the dep "only when the VR sub-issue is built,"
+  #48 was built without doing so, and `covas.spec` swallowed the miss in a silent `except: pass`.
+  Result: four releases shipped `[hud].vr_enabled` as **unreachable dead code**, while the docs
+  told users to `pip install openvr` into a frozen app that has no Python environment. The lesson
+  generalizes past VR: **an optional dependency that only a freeze can deliver is not optional —
+  it's required in the build env**, and a build that drops a shipped feature must fail loudly, not
+  silently. Any future `collect_all` for a user-facing surface follows the same rule.
   The enabler: `setOverlayRaw` uploads a **raw RGBA buffer from system memory — no
   DirectX/OpenGL context** — so it is pure Python. Init as `VRApplication_Overlay` (runs
   alongside the game); **fail soft** when SteamVR is not running. This matches how ED renders

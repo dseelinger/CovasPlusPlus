@@ -61,14 +61,17 @@ never alt-tab out of the headset to see it. It shows exactly the same informatio
     [Settings page](../control-panel.md), or say *"turn the VR HUD on."* It's independent of the
     2D overlay: run either, both, or neither.
 
-**Requirements.** The VR overlay needs:
+**Requirements.** The VR overlay needs one thing: **SteamVR running**, with Elite Dangerous
+rendering through it. ED natively speaks OpenVR/SteamVR, so that's the default for most PCVR
+headsets (Valve Index, HTC Vive, Windows Mixed Reality via SteamVR, and so on). Nothing to
+install — the `openvr` binding ships inside COVAS++.
 
-- **SteamVR running**, with Elite Dangerous rendering through it. ED natively speaks
-  OpenVR/SteamVR, so this is the default for most PCVR headsets (Valve Index, HTC Vive,
-  Windows Mixed Reality via SteamVR, etc.).
-- The optional **`openvr`** Python package. It isn't installed by default — run
-  `pip install openvr` (into the same environment) to enable the VR overlay. Without it, turning
-  the VR HUD on simply does nothing (no error) — it **fails soft**.
+!!! warning "Not in v0.12.0 or earlier"
+    Releases up to and including **v0.12.0** were built without the `openvr` binding, so
+    `[hud].vr_enabled` silently did nothing no matter how it was set. Earlier versions of this
+    page told you to run `pip install openvr` — that was never possible against an installed
+    COVAS++, which has no Python environment of its own. **Update to a later release** to use the
+    VR overlay.
 
 **Placement** (both configurable on the Settings page or in `config.toml`):
 
