@@ -133,6 +133,19 @@ def main() -> None:
     (_HERE / "blueprints.json").write_text(
         json.dumps(blueprints, indent=1, sort_keys=True, ensure_ascii=False) + "\n",
         encoding="utf-8")
+    # Record provenance in the shared dataset manifest (issue #101) so `check_setup.py` / the
+    # `game_data_status` capability can report how fresh the engineering tables are. Best-effort:
+    # a manifest write must never fail the regen (the JSON is already written above).
+    try:
+        from scripts import dataset_manifest
+        dataset_manifest.update("engineering_materials", source="EDCD/FDevIDs material.csv",
+                                source_ref="github.com/EDCD/FDevIDs@master", row_count=len(materials))
+        dataset_manifest.update("engineering_blueprints",
+                                source="EDCD/coriolis-data modifications/blueprints.json",
+                                source_ref="github.com/EDCD/coriolis-data@master",
+                                row_count=len(blueprints))
+    except Exception as e:  # noqa: BLE001 — manifest is a nicety; never block the regen on it
+        print(f"  [warn] manifest not updated: {e}")
     print(f"Wrote {len(materials)} materials and {len(blueprints)} blueprints.")
 
 

@@ -1,0 +1,32 @@
+{
+ "engineering_blueprints": {
+  "generated_at": "2026-07-16",
+  "row_count": 80,
+  "source": "EDCD/coriolis-data modifications/blueprints.json",
+  "source_ref": "github.com/EDCD/coriolis-data@master"
+ },
+ "engineering_materials": {
+  "generated_at": "2026-07-16",
+  "row_count": 137,
+  "source": "EDCD/FDevIDs material.csv",
+  "source_ref": "github.com/EDCD/FDevIDs@master"
+ },
+ "module_taxonomy": {
+  "generated_at": "2026-07-16",
+  "row_count": 134,
+  "source": "EDCD/FDevIDs outfitting.csv",
+  "source_ref": "tests/fixtures/fdevids_outfitting.csv"
+ },
+ "ship_roster": {
+  "generated_at": "2026-07-16",
+  "row_count": 48,
+  "source": "Spansh shipyard harvest (name + FDev ed_symbol)",
+  "source_ref": "tests/fixtures/spansh_ship_harvest.json"
+ },
+ "ship_specs": {
+  "generated_at": "2026-07-16",
+  "row_count": 47,
+  "source": "EDCD/coriolis-data ships/*.json",
+  "source_ref": "github.com/EDCD/coriolis-data@master"
+ }
+}
