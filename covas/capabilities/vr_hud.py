@@ -165,30 +165,119 @@ def _draw_text(buf: "np.ndarray", text: str, x: int, y: int, color, scale: int,
         _draw_char(buf, ch, x + i * cell, y, color, scale)
 
 
-def _snapshot_lines(snap: HudSnapshot) -> List[tuple]:
-    """The (text, color) rows to paint, in order. Mirrors the 2D view's rows: the voice-loop
-    state is always shown as the headline; the checklist / route / callout rows appear only
-    when populated, each prefixed so it reads without the 2D glyphs."""
-    lines: List[tuple] = [(f"COVAS  {snap.voice_state}", _C_STATE)]
+# ---- proportional text via Pillow / Segoe UI (crisp) + bitmap fallback (zero-dep) ---------
+#
+# The 5x7 bitmap above reads "1980s" in a headset — it's block-scaled and uppercase-only. The
+# preferred path renders real anti-aliased **Segoe UI**, the same family the 2D HUD uses, so the
+# two surfaces match and mixed-case human text reads naturally. Segoe UI ships on every Windows
+# box (the only platform this app targets); if Pillow or the font is somehow absent we fall back
+# to the bitmap, so the overlay never fails to draw.
+
+_HEAD_SIZE, _DETAIL_SIZE, _CALLOUT_SIZE = 34, 26, 24  # per-row font size (px)
+_PAD_PX = 14        # inner margin
+_ACCENT_PX = 6      # top accent-bar height
+_ROW_GAP_PX = 10    # gap between rows
+
+_font_cache: dict = {}
+_pil_ok: Optional[bool] = None  # tri-state: None untried, then True/False (avoid re-probing)
+
+
+def _load_font(size: int, bold: bool):
+    """A Pillow ImageFont for Segoe UI at ``size`` (bold optional), or ``None`` when Pillow or
+    the font isn't available — the caller then uses the bitmap fallback. Cached; never raises."""
+    global _pil_ok
+    key = (size, bold)
+    if key in _font_cache:
+        return _font_cache[key]
+    try:
+        from PIL import ImageFont
+    except Exception:  # noqa: BLE001 — no Pillow -> bitmap fallback
+        _pil_ok = False
+        return None
+    import os
+    fonts = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
+    names = (["segoeuib.ttf", "seguisb.ttf"] if bold else []) + ["segoeui.ttf"]
+    for name in names:
+        try:
+            f = ImageFont.truetype(os.path.join(fonts, name), size)
+            _font_cache[key] = f
+            _pil_ok = True
+            return f
+        except Exception:  # noqa: BLE001 — try the next candidate font
+            continue
+    _pil_ok = False
+    _font_cache[key] = None
+    return None
+
+
+def _snapshot_rows(snap: HudSnapshot) -> List[tuple]:
+    """The rows to paint as ``(text, rgba, size_px, bold)``, in order — the SINGLE source shared
+    by both renderers so they can't drift. State is always the headline; checklist / route /
+    callout appear only when populated. Mixed-case human text (the bitmap path folds to caps)."""
+    rows: List[tuple] = [(f"COVAS  {snap.voice_state}", _C_STATE, _HEAD_SIZE, True)]
     if snap.checklist:
-        lines.append((f"STEP  {snap.checklist}", _C_CHECK))
+        rows.append((f"STEP   {snap.checklist}", _C_CHECK, _DETAIL_SIZE, False))
     if snap.route:
-        lines.append((f"ROUTE  {snap.route}", _C_ROUTE))
+        rows.append((f"ROUTE  {snap.route}", _C_ROUTE, _DETAIL_SIZE, False))
     if snap.callout:
-        lines.append((f'"{snap.callout}"', _C_CALL))
-    return lines
+        rows.append((f"“{snap.callout}”", _C_CALL, _CALLOUT_SIZE, False))
+    return rows
 
 
-def render_snapshot_rgba(snap: HudSnapshot, *, width: int = 768, height: int = 384,
-                         scale: int = 3) -> "np.ndarray":
-    """Rasterize a ``HudSnapshot`` to an HxWx4 uint8 **RGBA** buffer — the exact surface
-    ``IVROverlay.setOverlayRaw`` uploads (RGBA from system memory, no DirectX context).
+def _fit_width(draw, text: str, font, max_px: int) -> str:
+    """Trim ``text`` with a trailing ellipsis until it fits ``max_px`` so a long system name or
+    callout can't overrun the panel. Proportional text fits far more than the old fixed-width
+    bitmap, so this rarely fires."""
+    if draw.textlength(text, font=font) <= max_px:
+        return text
+    ell = "…"
+    while text and draw.textlength(text + ell, font=font) > max_px:
+        text = text[:-1]
+    return (text + ell) if text else ell
 
-    Pure and deterministic: same snapshot in, same pixels out, with only numpy involved — so
-    the default suite covers it offline (shape, background, and that lit text pixels appear).
-    The 2D tkinter sink and this VR sink are two views over the same ``HudSnapshot``; this is
-    simply the pixel view of it.
-    """
+
+def content_height(snap: HudSnapshot, *, width: int = 768) -> int:
+    """Panel height (px) that exactly fits the current rows, so the VR sink can size the overlay
+    to its content instead of a fixed box that's mostly empty. Uses Pillow font metrics when
+    available, else a bitmap-based estimate."""
+    rows = _snapshot_rows(snap)
+    total = _ACCENT_PX + _PAD_PX // 2
+    for _text, _rgba, size, bold in rows:
+        f = _load_font(size, bold)
+        if f is None:  # bitmap fallback: fixed 5x7 glyphs at scale 3
+            return _ACCENT_PX + _PAD_PX + len(rows) * ((_GLYPH_H + 2) * 3) + _PAD_PX
+        asc, desc = f.getmetrics()
+        total += asc + desc + _ROW_GAP_PX
+    return total + _PAD_PX // 2
+
+
+def _render_pillow(snap: HudSnapshot, width: int, height: int):
+    """Render the rows with anti-aliased Segoe UI onto a fixed HxWx4 RGBA canvas, or ``None``
+    when Pillow / the font is unavailable (caller falls back to the bitmap renderer)."""
+    if _load_font(_DETAIL_SIZE, False) is None:
+        return None
+    from PIL import Image, ImageDraw
+    img = Image.new("RGBA", (width, height), _BG)
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, width, _ACCENT_PX], fill=_ACCENT)
+    y = _ACCENT_PX + _PAD_PX // 2
+    for text, rgba, size, bold in _snapshot_rows(snap):
+        font = _load_font(size, bold)
+        if font is None:
+            return None
+        asc, desc = font.getmetrics()
+        if y + asc + desc > height:
+            break  # out of vertical room on this canvas
+        d.text((_PAD_PX, y), _fit_width(d, text, font, width - 2 * _PAD_PX), font=font, fill=rgba)
+        y += asc + desc + _ROW_GAP_PX
+    # np.array (not asarray) -> a WRITABLE, C-contiguous copy, which as_overlay_buffer's
+    # from_buffer() requires. asarray can hand back a read-only view that from_buffer rejects.
+    return np.array(img, dtype=np.uint8)
+
+
+def _render_bitmap(snap: HudSnapshot, width: int, height: int, scale: int) -> "np.ndarray":
+    """Fail-soft fallback: the original 5x7 bitmap renderer, used only when Pillow / Segoe UI is
+    absent. Uppercase, fixed-width, chunky — but zero-dependency, so the overlay still draws."""
     buf = np.zeros((height, width, 4), dtype=np.uint8)
     buf[:, :] = _BG
     accent = min(6 * scale // 3 or 4, height)  # thin top accent bar, scaled a little
@@ -200,12 +289,28 @@ def render_snapshot_rgba(snap: HudSnapshot, *, width: int = 768, height: int = 3
     max_chars = max(1, (width - 2 * pad) // cell_w)  # glyph cells that fit across the panel
 
     y = accent + pad
-    for text, color in _snapshot_lines(snap):
+    for text, color, _size, _bold in _snapshot_rows(snap):
         if y + _GLYPH_H * scale > height:
             break                                    # ran out of vertical room; drop extras
         _draw_text(buf, _fold_ascii(text), pad, y, color, scale, max_chars)
         y += line_h
     return buf
+
+
+def render_snapshot_rgba(snap: HudSnapshot, *, width: int = 768, height: int = 384,
+                         scale: int = 3) -> "np.ndarray":
+    """Rasterize a ``HudSnapshot`` to an HxWx4 uint8 **RGBA** buffer — the exact surface
+    ``IVROverlay.setOverlayRaw`` uploads (RGBA from system memory, no DirectX context).
+
+    Prefers crisp anti-aliased Segoe UI (``_render_pillow``); falls back to the zero-dependency
+    5x7 bitmap (``_render_bitmap``) when Pillow / the font is absent. Either path returns exactly
+    ``(height, width, 4)`` and is deterministic, so the default suite covers it offline. The 2D
+    tkinter sink and this VR sink are two views over the same ``HudSnapshot``.
+    """
+    out = _render_pillow(snap, width, height)
+    if out is not None:
+        return out
+    return _render_bitmap(snap, width, height, scale)
 
 
 def as_overlay_buffer(buf: "np.ndarray") -> "ctypes.Array":
@@ -400,14 +505,17 @@ class VrHudView:
                         shown = True
                     snap = self._provider()
                     if snap != last:
-                        buf = render_snapshot_rgba(
-                            snap, width=self.WIDTH_PX, height=self.HEIGHT_PX)
+                        # Size the texture to the rows so the panel hugs its content instead of
+                        # floating in a fixed box that's ~70% empty. Width is fixed (physical
+                        # metres are set once); height follows, so the overlay's physical height
+                        # tracks the row count via the texture aspect.
+                        h = content_height(snap, width=self.WIDTH_PX)
+                        buf = render_snapshot_rgba(snap, width=self.WIDTH_PX, height=h)
                         raw = as_overlay_buffer(buf)
                         # Hold BOTH across the upload: `raw` aliases `buf`'s memory, so letting
                         # either go while SteamVR reads would free the pixels underneath it.
                         self._buf, self._raw = buf, raw
-                        overlay.setOverlayRaw(
-                            handle, raw, self.WIDTH_PX, self.HEIGHT_PX, 4)
+                        overlay.setOverlayRaw(handle, raw, self.WIDTH_PX, h, 4)
                         last = snap
                 elif shown:
                     overlay.hideOverlay(handle)

@@ -219,9 +219,13 @@ renderer, two sinks" design called for — it **reuses the same `HudModel`/`HudS
 the rendering surface differs:
 
 - **`render_snapshot_rgba` — the pure rasterizer (unit-tested, no runtime).** It paints a
-  `HudSnapshot` onto an HxWx4 uint8 **RGBA** buffer with a **built-in 5x7 bitmap font — zero new
-  runtime dependency** (only numpy, already required); text folds to ASCII/caps so arbitrary
-  game text degrades gracefully. Same four rows as the 2D panel, from the same snapshot.
+  `HudSnapshot` onto an HxWx4 uint8 **RGBA** buffer using anti-aliased **Segoe UI via Pillow** —
+  the same family the 2D HUD uses, so the surfaces match and mixed-case text reads naturally.
+  Falls back to the original **built-in 5x7 bitmap font** (numpy-only) if Pillow/the font is
+  absent, so the overlay always draws. The panel is sized to its rows (`content_height`) rather
+  than a fixed box, so it hugs its content. Same four rows as the 2D panel, from the same
+  snapshot. (The original bitmap was zero-dep but read "1980s" in a headset; Pillow is Windows-
+  guaranteed and small, so it earns its place — see the `openvr`/Pillow build-env note in §3.8.)
 - **`VrPlacement` / `resolve_transform` — pure placement math.** A placement mode
   (`world` cockpit-fixed / `head` view-locked) + a physical width become an OpenVR 3x4
   transform; the mode picks the binding (`setOverlayTransformAbsolute` vs

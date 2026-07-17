@@ -52,6 +52,22 @@ for _pkg in ("ctranslate2", "sounddevice", "soundfile", "faster_whisper", "onnxr
 # them even though nothing imports them at module top level.
 hiddenimports += ["onnxruntime", "faster_whisper.vad"]
 
+# Pillow renders the VR HUD's Segoe UI text (issue #48). It's imported lazily inside the renderer
+# and falls back to a bitmap font if absent — so a freeze that missed it would SILENTLY ship the
+# ugly 1980s font with no error, the same silent-degradation trap as openvr. It's required in the
+# build env (requirements.txt); collect it explicitly and fail LOUD if it's missing.
+try:
+    _d, _b, _h = collect_all("PIL")
+    datas += _d
+    binaries += _b
+    hiddenimports += _h
+except Exception as _e:
+    print("=" * 78, file=sys.stderr)
+    print("WARNING: Pillow (PIL) NOT FOUND — the VR HUD will fall back to the bitmap font.", file=sys.stderr)
+    print(f"         ({_e})", file=sys.stderr)
+    print("         Fix:  .venv\\Scripts\\python.exe -m pip install -r requirements.txt", file=sys.stderr)
+    print("=" * 78, file=sys.stderr)
+
 # openvr (the VR HUD's SteamVR overlay, issue #48) bundles openvr_api.dll via collect_all. It is
 # in requirements.txt, so a correct build env HAS it and the freeze ships the VR overlay.
 #

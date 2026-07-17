@@ -5,6 +5,10 @@ faster-whisper>=1.1       # local speech-to-text
 sounddevice>=0.4.6        # mic capture + low-latency PCM playback
 soundfile>=0.12           # read wav/mp3/flac cue files (libsndfile)
 numpy>=1.26               # audio buffers
+pillow>=10.0              # anti-aliased Segoe UI text for the VR HUD overlay (issue #48). Only
+                          #   the VR font path imports it, and it falls back to a bitmap font if
+                          #   absent — but a frozen build is the only way a user gets it, so like
+                          #   openvr it must be in the build env (see requirements note below).
 keyboard>=0.13.5          # global push-to-talk / cancel hotkeys (press+release, combos)
 requests>=2.31            # ElevenLabs REST calls (voices, models, TTS stream)
 edge-tts>=7.0             # OPTIONAL free neural TTS (Edge Read-Aloud); no SLA — Piper is the floor
