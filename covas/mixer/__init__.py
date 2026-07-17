@@ -58,6 +58,7 @@ from .chatter import (
     chatter_interval,
     is_flavor_safe,
     register_chatter,
+    situation_context,
 )
 from .cues import Cue, CueRegistry, cue_problems, validate_cue
 from .driver import CueDriver
@@ -154,6 +155,7 @@ __all__ = [
     "chatter_interval",
     "is_flavor_safe",
     "register_chatter",
+    "situation_context",
     "CarrierConfig",
     "CarrierPlayer",
     "CarrierRole",

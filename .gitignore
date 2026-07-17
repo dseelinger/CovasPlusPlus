@@ -23,6 +23,9 @@ personality.txt
 campaign.txt
 # custom personas saved from the Personality tab (may contain personal flavor)
 personalities/custom/
+# auto-generated per-account persona->voice pairing cache (issue #96): built from YOUR
+# ElevenLabs voice list, recomputed when personas or that list change — never committed.
+personalities/voice_pairings.json
 # local UI / runtime settings
 overrides.json
 # per-session conversation transcripts (personal)

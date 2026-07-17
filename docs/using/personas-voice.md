@@ -25,6 +25,29 @@ You can also edit the persona box and **Save as custom** to create your own pers
 git-ignored folder so it stays private and never gets committed). Custom personas appear in the
 list alongside the presets.
 
+### Auto-paired voices per persona
+
+Switching persona should *sound* like a different character, not just read differently. So at
+startup — if you're on **ElevenLabs** — COVAS++ quietly asks the LLM, **once**, to pair a fitting
+default voice with each shipped persona, matching the persona's character against your voice
+library's metadata (gender, age, accent, description). Then, whenever you pick a persona you
+**haven't** set a voice for, it arrives already wearing that paired voice.
+
+- **Your choice always wins.** Set a voice for a persona yourself (Settings → Text-to-speech, or
+  *"use the George voice"*) and that's remembered as *your* pick for that persona — it's never
+  overwritten by the auto-pairing.
+- **It never slows startup.** The pairing runs on a background thread; until it lands (or if it
+  can't — no key, offline, LLM off), the app is fully usable on your current voice.
+- **It's computed once and cached.** The result is written to a git-ignored per-account file
+  (`personalities/voice_pairings.json`) keyed to your persona set + voice list, so it only
+  recomputes when one of those actually changes — not every launch.
+- **Cost-aware.** It's a single cheap-tier call, gated by the [optimization
+  level](../elite/proactive-callouts.md): skipped on lean/constrained setups. Turn the whole thing
+  off with `[personality].auto_voice_pairing = false`.
+
+Only ElevenLabs is auto-paired today (its catalog carries the richest metadata); the design leaves
+room for other providers to plug in later.
+
 ### Writing a persona that actually stays in character
 
 The strongest personas give the model something to **imitate**, not just adjectives to admire. When

@@ -254,7 +254,11 @@ min_interval     = 8.0    # seconds between ANY two cues (a hard gap so nothing 
 max_per_minute   = 6      # global cap: at most this many cues in any rolling 60 seconds
 default_cooldown = 30.0   # a cue won't repeat within this many seconds unless it sets its own
 # Let the LLM generate flavor chatter musings (fact_bearing=false lines only, validated to assert
-# nothing checkable — C6). OFF by default (cost); when off, chatter is curated pool lines only.
+# nothing checkable — C6). When on, each musing is GROUNDED in your live situation (issue #85) —
+# inhabited vs. the empty black, what you're doing, recent beats like an interdiction or low fuel —
+# so lines vary with the moment while staying fact-safe; repeats are filtered and any LLM
+# error/off falls back to the curated pool. OFF by default (cost) and gated by the optimization
+# level (only active at "Full"); when off, chatter is curated pool lines only.
 flavor           = false
 
 
@@ -429,6 +433,17 @@ persona = "Classic"
 presets_file = "personalities/presets.md"
 # Custom personas you save (git-ignored). One file per persona.
 custom_dir = "personalities/custom"
+# Auto-voice-pairing (issue #96). When ON, at startup the app pairs a sensible default ElevenLabs
+# voice with EACH shipped persona (LLM-decided, in the BACKGROUND — startup is never blocked), so
+# selecting a persona brings a fitting voice instead of everyone using the one configured voice.
+# An explicit voice you set for a persona ALWAYS wins and is never overwritten. Needs the active
+# TTS provider to be ElevenLabs with a key + catalog; it's ONE cheap-tier, one-time (cached) call,
+# gated by the optimization level (#84) — skipped on lean/constrained levels. Off -> no pairing,
+# the current default voice is kept.
+auto_voice_pairing = true
+# Where the generated pairing cache is written (git-ignored, per-account). Keyed by a hash of the
+# persona set + your available voice ids, so it recomputes ONLY when those change — not every launch.
+voice_pairings_file = "personalities/voice_pairings.json"
 # Your CAMPAIGN — personal facts about your Commander (name, ranks, holdings, ongoing goals).
 # Git-ignored, kept SEPARATE from the persona so switching voice never wipes it.
 campaign_file = "campaign.txt"

@@ -80,6 +80,7 @@ _DATA_PATH_FIELDS = (
     ("personality", "file"),
     ("personality", "campaign_file"),
     ("personality", "custom_dir"),
+    ("personality", "voice_pairings_file"),  # generated per-account voice-pairing cache (#96)
     ("anthropic", "api_key_file"),
     ("elevenlabs", "api_key_file"),
     ("azure", "api_key_file"),

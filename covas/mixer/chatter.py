@@ -22,6 +22,7 @@ from __future__ import annotations
 import math
 import re
 import time
+from collections import deque
 from typing import Callable, Optional
 
 from .buses import COMMS, COVAS
@@ -30,6 +31,15 @@ from .eligibility import POPULATED
 
 _WORD = re.compile(r"[A-Za-z']+")
 _SENTENCE = re.compile(r"[.!?]+")
+
+# How many recently-spoken lines to remember for the de-dupe window (issue #85). A flavor
+# candidate that repeats (or nearly repeats) one of these is rejected so the LLM path doesn't
+# fall into a rut of the same musing; the deterministic POOL rotation is never de-duped (it's
+# already spread by construction).
+_DEDUPE_WINDOW = 8
+# Token-overlap (Jaccard) at/above which two lines count as "near-repeats" — high enough that a
+# genuinely different musing passes, low enough to catch a reworded duplicate.
+_NEAR_REPEAT_JACCARD = 0.6
 
 
 def chatter_interval(min_s: float, max_s: float, population: Optional[float],
@@ -74,17 +84,111 @@ def is_flavor_safe(text: str) -> bool:
     return not _has_proper_noun(t)
 
 
-def build_chatter_prompt(cue: Cue) -> str:
+# The STATIC prefix of the flavor prompt: the role + the hard rules. Kept first and BYTE-STABLE
+# (issue #85) so a prompt-caching provider can reuse it across calls — only the small per-turn
+# situation slice + tone examples that follow it vary. Never fold live state into this string.
+_CHATTER_PREFIX = (
+    "You voice a brief, ambient in-character musing for an Elite Dangerous companion. Say ONE "
+    "short line of pure atmosphere. Let the Commander's CURRENT SITUATION set the MOOD of the "
+    "line — sound like it has a real reason behind it — but assert NOTHING checkable: NO names, "
+    "NO numbers, NO places, nothing to verify. Do not name or quote the situation; just let it "
+    "colour the tone. Stay in character; never sound like an AI or narrator."
+)
+
+
+def situation_context(snapshot: dict, recent: Optional[list] = None,
+                      population: Optional[float] = None) -> str:
+    """A COMPACT, cheap situation slice for grounding a flavor musing (issue #85), derived purely
+    from an EDContext snapshot (+ its recent-events feed + the live system population). It shapes
+    only the MOOD — the output validator (`is_flavor_safe`) still strips any name/number that leaks
+    through — so this may freely mention specifics the line itself must not.
+
+    Pure + testable: pass the snapshot dict, the recent-events list (newest last), and population.
+    Returns "" when nothing is known yet (so the prompt simply carries no situation clause)."""
+    snap = snapshot or {}
+    bits: list[str] = []
+
+    # Where: inhabited vs the empty black, coarsely scaled by population (mood, not a readout).
+    if population is not None:
+        if population <= 0:
+            bits.append("far out in unpopulated space, no settlements around")
+        elif population < 100_000:
+            bits.append("in a sparse, remote inhabited system")
+        elif population < 100_000_000:
+            bits.append("in a moderately busy inhabited system")
+        else:
+            bits.append("in a bustling, densely populated system")
+
+    # What they're doing right now (mode + coarse flight state).
+    mode = snap.get("game_mode")
+    if mode == "on_foot":
+        bits.append("on foot, out of the ship")
+    elif mode == "srv":
+        bits.append("driving the SRV across a planet surface")
+    elif snap.get("docked"):
+        bits.append("docked at a station")
+    elif snap.get("supercruise"):
+        bits.append("travelling in supercruise")
+    elif snap.get("hardpoints"):
+        bits.append("running with hardpoints deployed")
+    if snap.get("ship") and mode not in ("on_foot", "srv"):
+        bits.append(f"flying a {snap['ship']}")
+
+    # Notable, mood-bearing moments — recent danger reads very differently from a quiet cruise.
+    if snap.get("being_interdicted"):
+        bits.append("just yanked out of the sky by an interdiction")
+    if snap.get("in_danger"):
+        bits.append("under threat, hostiles close")
+    if snap.get("overheating"):
+        bits.append("the ship is running dangerously hot")
+    if snap.get("low_fuel"):
+        bits.append("fuel is running low")
+
+    # A couple of the freshest journal beats (their raw text may carry names/numbers — that's fine
+    # here, it only tints the mood; the output guard keeps them out of the spoken line).
+    for it in list(recent or [])[-2:]:
+        desc = (it or {}).get("desc") if isinstance(it, dict) else None
+        if desc:
+            bits.append(f"recently: {desc}")
+
+    return "; ".join(bits)
+
+
+def build_chatter_prompt(cue: Cue, context: str = "") -> str:
     """Prompt for a flavor (fact_bearing=False) musing. The validator is the real guard, but the
-    prompt still states the rules and offers the pool as tone examples."""
+    prompt still states the rules and offers the pool as tone examples. `context` is the optional
+    situation slice from `situation_context` — appended AFTER the static prefix (issue #85) so the
+    cacheable head stays byte-stable and only the small live slice varies."""
     examples = " / ".join(cue.phrasings[:3]) if cue.phrasings else "(quiet, atmospheric)"
-    return (
-        "You voice a brief, ambient in-character musing for an Elite Dangerous companion. Say ONE "
-        "short line of pure atmosphere — NO specific facts, NO names, NO numbers, nothing "
-        "checkable. Just mood.\n"
-        f"Tone examples: {examples}\n"
-        "Reply with ONLY the line."
-    )
+    parts = [_CHATTER_PREFIX, f"Tone examples: {examples}"]
+    if context.strip():
+        parts.append(f"The Commander is {context.strip()}.")
+    parts.append("Reply with ONLY the line.")
+    return "\n".join(parts)
+
+
+def _normalize_line(text: str) -> str:
+    """Lower-cased, punctuation-stripped, whitespace-collapsed form for de-dupe comparison."""
+    return " ".join(_WORD.findall((text or "").lower()))
+
+
+def _near_repeat(candidate: str, recent: "deque[str]") -> bool:
+    """True when `candidate` exactly matches, or heavily overlaps (token Jaccard), any of the
+    recently-spoken normalized lines — so the flavor path won't repeat itself (issue #85)."""
+    norm = _normalize_line(candidate)
+    if not norm:
+        return False
+    toks = set(norm.split())
+    for prev in recent:
+        if norm == prev:
+            return True
+        ptoks = set(prev.split())
+        if not toks or not ptoks:
+            continue
+        overlap = len(toks & ptoks) / len(toks | ptoks)
+        if overlap >= _NEAR_REPEAT_JACCARD:
+            return True
+    return False
 
 
 class ChatterPlayer:
@@ -96,6 +200,9 @@ class ChatterPlayer:
         returning True only if playback started;
       * `generate(prompt) -> str` — the LLM flavor generator (None => pool-only). Used ONLY for
         fact_bearing=False cues, and only if the result passes `is_flavor_safe`.
+      * `context() -> str` — the live situation slice (issue #85) grounding a flavor musing (see
+        `situation_context`); None/"" => an ungrounded musing, exactly as before. Only consulted
+        for flavor cues with a generator wired, so it costs nothing on the pool path.
       * `min_interval() -> float | None` — the current required seconds between chatter lines
         (see `chatter_interval`); None => no extra gate. This is the FREQUENCY control on top of
         the C3 governor: a line is suppressed (and, crucially, does NOT burn the governor budget,
@@ -108,17 +215,21 @@ class ChatterPlayer:
         speak: Callable[[str, str], bool],
         *,
         generate: Optional[Callable[[str], str]] = None,
+        context: Optional[Callable[[], str]] = None,
         min_interval: Optional[Callable[[], Optional[float]]] = None,
         clock: Callable[[], float] = time.monotonic,
         log: Optional[Callable[[str], None]] = None,
     ) -> None:
         self._speak = speak
         self._generate = generate
+        self._context = context
         self._min_interval = min_interval
         self._clock = clock
         self._log = log
         self._rot: dict[str, int] = {}   # per-cue pool rotation pointer
         self._last_spoken: float = float("-inf")  # monotonic time of the last chatter line
+        # De-dupe window (issue #85): normalized recently-spoken flavor lines, newest last.
+        self._recent: deque[str] = deque(maxlen=_DEDUPE_WINDOW)
 
     def set_generate(self, generate: Optional[Callable[[str], str]]) -> None:
         """Swap the LLM flavor generator after a live provider hot-swap (issue #90). None =>
@@ -127,16 +238,28 @@ class ChatterPlayer:
 
     def line_for(self, cue: Cue) -> tuple[str, str]:
         """(text, source) where source is 'flavor' (validated LLM) or 'pool' (deterministic
-        rotation). A fact_bearing cue NEVER reaches the generator."""
+        rotation). A fact_bearing cue NEVER reaches the generator. A flavor candidate that is
+        unsafe OR a near-repeat of a recent line (issue #85) is rejected -> pool fallback."""
         if not cue.fact_bearing and self._generate is not None:
             try:
-                candidate = (self._generate(build_chatter_prompt(cue)) or "").strip()
+                prompt = build_chatter_prompt(cue, self._situation())
+                candidate = (self._generate(prompt) or "").strip()
             except Exception:  # noqa: BLE001 — a generator failure degrades to the pool
                 candidate = ""
-            if candidate and is_flavor_safe(candidate):
+            if candidate and is_flavor_safe(candidate) and not _near_repeat(candidate, self._recent):
                 return candidate, "flavor"
         # fact-bearing, no generator, or rejected flavor -> the curated pool, rotated.
         return cue.phrasing_at(self._rot.get(cue.name, 0)), "pool"
+
+    def _situation(self) -> str:
+        """The current situation slice for the flavor prompt, or "" (ungrounded / no provider /
+        error). Fail-soft — grounding must never break a musing."""
+        if self._context is None:
+            return ""
+        try:
+            return self._context() or ""
+        except Exception:  # noqa: BLE001 — a context glitch just yields an ungrounded musing
+            return ""
 
     def _frequency_ok(self, now: float) -> bool:
         """The population-scaled frequency gate: True unless a chatter line spoke too recently.
@@ -160,6 +283,8 @@ class ChatterPlayer:
             self._last_spoken = now
             if source == "pool":
                 self._rot[cue.name] = self._rot.get(cue.name, 0) + 1
+            # Remember every spoken line so the flavor path can avoid repeating it (issue #85).
+            self._recent.append(_normalize_line(text))
             if self._log is not None:
                 self._log(f"chatter[{source}] {cue.name} -> {cue.bus}: {text}")
         return started
