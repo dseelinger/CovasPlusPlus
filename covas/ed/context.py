@@ -11,6 +11,8 @@ from __future__ import annotations
 import threading
 from collections import deque
 
+from . import currencies
+
 # How many recent notable events to retain by default (a rolling "what just happened"
 # feed for 'check my logs'-style questions). Overridable per EDContext.
 DEFAULT_RECENT_KEPT = 25
@@ -108,6 +110,12 @@ class EDContext:
         # the cached line); read on demand by the on-foot/SRV read tools. Single-writer (the
         # journal thread) so a plain dict under the shared lock is enough. None until first scan.
         self._bio: dict | None = None
+        # Grounded wallet (issue #101): {currency-key: int amount} for the KNOWN currencies in
+        # `currencies.REGISTRY` (credits from LoadGame, carrier balance from CarrierStats). Kept
+        # OFF _FIELDS as its own dict so adding a future currency is a one-row registry edit, not a
+        # new context field. Login-only values (see the hedged phrasing) — never invented, so an
+        # unknown currency simply never lands here. Single-writer (journal thread) under the lock.
+        self._wallet: dict = {}
         # Fleet-carrier state (see _CARRIER_FIELDS).
         self.carrier_id: int | None = None
         self.carrier_name: str | None = None
@@ -277,6 +285,24 @@ class EDContext:
         with self._lock:
             return dict(self._bio) if self._bio is not None else None
 
+    # -- grounded wallet (#101) ----------------------------------------------------------
+    def update_wallet(self, **balances) -> None:
+        """Merge one or more known-currency balances ({currency-key: amount}) into the wallet.
+        Merging (not replacing) keeps credits set at login while a later CarrierStats adds the
+        carrier balance. A falsy/empty patch is a no-op. Keys are registry ids (not validated
+        here — extraction only ever produces registry keys); the wallet_line reader ignores any
+        that lack a registry row, so a stray key can never be voiced as a bogus currency."""
+        if not balances:
+            return
+        with self._lock:
+            self._wallet.update(balances)
+
+    def wallet_snapshot(self) -> dict:
+        """A plain-dict copy of the known-currency balances ({key: amount}), taken under lock.
+        Empty until a balance-bearing event (LoadGame / CarrierStats) has been seen."""
+        with self._lock:
+            return dict(self._wallet)
+
     def fuel_pct(self) -> float | None:
         with self._lock:
             return _fuel_pct(self.fuel_main, self.fuel_capacity)
@@ -327,8 +353,9 @@ class EDContext:
         """One short natural-language line for the system prompt, or None when nothing is
         known yet. Kept terse — it's spoken/cached, not a report."""
         s = self.snapshot()
-        # "Nothing known" = every field still at its default (None / False).
-        if not any(s[k] not in (None, False) for k in _FIELDS):
+        wallet = currencies.wallet_line(self.wallet_snapshot())
+        # "Nothing known" = every field still at its default (None / False) AND no wallet balance.
+        if not any(s[k] not in (None, False) for k in _FIELDS) and not wallet:
             return None
 
         parts: list[str] = []
@@ -379,6 +406,12 @@ class EDContext:
         elif mode == "srv":
             if s["srv_hull"] is not None:
                 parts.append(f"SRV hull {s['srv_hull'] * 100:.0f}%")
+
+        # Grounded wallet (#101): a hedged balance clause ("as of login you had X credits") so
+        # money questions answer from the journal, not the model's imagination. The phrasing
+        # itself carries the staleness hedge (balances only arrive at login).
+        if wallet:
+            parts.append(wallet)
 
         if not parts:
             return None

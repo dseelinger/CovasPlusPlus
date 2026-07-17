@@ -31,9 +31,11 @@ ED_CONTEXT_TOOLS = [
         "name": "ship_status",
         "description": (
             "Return the Commander's current ship state from live game telemetry: ship "
-            "type and name, fuel level and percentage, cargo aboard, and flight flags "
-            "(docked, landing gear, supercruise, hardpoints, low fuel). Use for 'how's "
-            "my fuel' / 'what's my ship doing'. A free local read."
+            "type and name, fuel level and percentage, cargo aboard, flight flags "
+            "(docked, landing gear, supercruise, hardpoints, low fuel), and the grounded "
+            "wallet (credits and fleet carrier balance, as of last login). Use for 'how's "
+            "my fuel' / 'how many credits do I have'. A free local read — the ONLY source "
+            "for balances; never invent a currency amount."
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
@@ -76,8 +78,8 @@ class EDContextCapability:
             category="ship status",
             group="your ship",
             one_liner=("I answer from live game telemetry — where you are, your fuel and ship, "
-                       "and what you've been doing."),
-            example="where am I",
+                       "your credits, and what you've been doing."),
+            example="how many credits do I have",
         )
 
     def system_context(self) -> str | None:
@@ -130,6 +132,13 @@ class EDContextCapability:
             parts.append(fuel)
         if s["cargo"] is not None:
             parts.append(f"Cargo: {s['cargo']:.0f}t")
+        # Grounded wallet (#101): the login-only balances, hedged. The ONLY source for a currency
+        # amount — an unknown currency simply isn't here, so the model must degrade honestly.
+        wallet = self.ctx.wallet_snapshot()
+        if wallet.get("credits") is not None:
+            parts.append(f"Credits: {int(wallet['credits']):,} (as of login)")
+        if wallet.get("carrier_balance") is not None:
+            parts.append(f"Carrier balance: {int(wallet['carrier_balance']):,} (as of login)")
         active = [label for flag, label in (
             ("docked", "docked"), ("landing_gear", "landing gear down"),
             ("supercruise", "supercruise"), ("hardpoints", "hardpoints deployed"),

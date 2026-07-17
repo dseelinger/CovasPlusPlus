@@ -553,6 +553,39 @@ tool + prompt, not a model swap:
   provider calls (`build_system`), rides the cached prompt prefix (static → cache-safe), and applies
   even with personality OFF.
 
+### Implemented — grounded wallet + currency registry (issue #101, Lane B)
+The ship-spec pattern above, applied to money: never let the model invent a balance. Same three
+levers — data + context + prompt:
+
+- **Currency registry (`ed/currencies.py`) — the unit of update is a data row.** A frozen
+  `Currency` table maps `(journal event + dotted field) -> (display name, hedged phrasing, the
+  spoken names a Commander uses)`. Two rows ship day one: **credits** (`LoadGame.Credits`) and the
+  **fleet carrier balance** (`CarrierStats.Finance.CarrierBalance`) — enough to exercise the
+  multi-currency design, not just credits. Adding a future currency FDev documents is a **one-row
+  edit**: no new journal handler, no new `EDContext` field, no detector change. The registry drives
+  three consumers — journal extraction (`extract_balances`), the status line (`wallet_line`), and
+  the context detector's money phrases (`known_names`) — so they can't drift.
+- **Grounded wallet on `EDContext`.** A `_wallet` dict ({key: amount}), kept **off** `_FIELDS` (its
+  own store, so a new currency doesn't touch the field schema), folded in `apply_journal_event` via
+  the registry. Surfaced in `summary()` (the injected status block) and the `ship_status` read tool,
+  always **hedged "as of login"** — balances only arrive on `LoadGame`/`CarrierStats`, so intra-
+  session credit-delta summing is deliberately out of scope (a possible follow-up). Cache-safe: like
+  all live telemetry it rides the uncached user-message context block, never the cached prefix.
+- **Honest-degradation contract for unknown currencies (the "merc coins" case).** A currency with no
+  registry row is never extracted, so the wallet can't voice a bogus number — the degradation is
+  structural. The honesty half is a **static always-on `_CURRENCY_GUARDRAIL` in `llm.build_system`**
+  (same mechanism + cache properties as `_SHIP_SPEC_GUARDRAIL`): currencies come only from the
+  wallet/tools, and for anything unknown the model says it has no data yet (its game knowledge may
+  predate it) and offers web search rather than inventing an amount.
+- **Journal `*Balance`/`*Count` sniffer: designed, NOT built (v1).** An open-question heuristic that
+  would notice an unrecognised event carrying a balance-like integer and repeat it verbatim. Rejected
+  for v1 because the existing `Cargo` handler already keys on an integer named `Count`, so a naive
+  sniffer misfires immediately; the prompt guardrail alone meets the "honest, not invented" bar. Left
+  as a data-row-plus-heuristic follow-up if a real FDev currency proves the need.
+
+This is the documented convention for game currencies: **registry row for the known, prompt guardrail
+for the unknown** — the wallet counterpart of the ship-spec "bundled data + tool + guardrail" rule.
+
 ### Implemented — search data freshness + local shipyard ground truth
 Born from a live bug (2026-07): COVAS recommended a Type-8 at the very station the Commander was
 docked at, while the vendor showed "does not currently stock this ship." Two findings, two layers

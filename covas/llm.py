@@ -29,19 +29,36 @@ _SHIP_SPEC_GUARDRAIL = (
 )
 
 
+# Currency grounding guardrail (issue #101), always on — the wallet's honesty half. Game
+# currencies come ONLY from the live telemetry wallet and tools; the model must never invent a
+# balance, and for a currency it doesn't know (a new one added after its training cutoff, e.g.
+# "merc coins") it must say so plainly and offer to look it up rather than guess an amount. Static
+# text, so it rides the cached prompt prefix and never busts the cache turn-to-turn (same move as
+# _SHIP_SPEC_GUARDRAIL). Terse — it's spoken aloud.
+_CURRENCY_GUARDRAIL = (
+    "Game currencies and balances come ONLY from the live telemetry wallet and your tools, never "
+    "from memory. The balances you can know are credits and the fleet carrier balance, and both "
+    "are as of the Commander's last login, so hedge on staleness. Never invent an amount. If asked "
+    "about any other currency — anything not in the wallet, such as one added after your training "
+    "cutoff — say plainly you don't have details on that currency yet as your game data may predate "
+    "it, and offer to web-search it."
+)
+
+
 def build_system(cfg: dict) -> str | None:
     """The composed system prompt: `personality.compose_system` (Base + Persona + Campaign)
-    when personality is ON (N7), plus two STATIC always-on fragments — the ship-spec grounding
-    guardrail (issue #83) and, when CREW voicing is on ([crew].enabled, issue #69), the crew
-    line-prefix instruction.
+    when personality is ON (N7), plus STATIC always-on fragments — the ship-spec grounding
+    guardrail (issue #83), the currency grounding guardrail (issue #101), and, when CREW voicing
+    is on ([crew].enabled, issue #69), the crew line-prefix instruction.
 
-    Both static fragments apply even with personality OFF (otherwise there'd be no system prompt
-    to carry the guardrail) and are constant for a given config, so they ride the cached prefix
-    and never bust the prompt cache turn-to-turn (only the once when a setting/roster changes)."""
+    The static fragments apply even with personality OFF (otherwise there'd be no system prompt to
+    carry the guardrails) and are constant for a given config, so they ride the cached prefix and
+    never bust the prompt cache turn-to-turn (only the once when a setting/roster changes)."""
     from .crew import system_instruction
     from .personality import compose_system
 
-    parts = [compose_system(cfg), _SHIP_SPEC_GUARDRAIL, system_instruction(cfg)]
+    parts = [compose_system(cfg), _SHIP_SPEC_GUARDRAIL, _CURRENCY_GUARDRAIL,
+             system_instruction(cfg)]
     joined = "\n\n".join(p for p in parts if p)
     return joined or None
 

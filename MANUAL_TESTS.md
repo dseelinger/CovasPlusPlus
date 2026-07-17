@@ -347,6 +347,15 @@ Notes:
 
 Notes:
 
+### 5.1a Credits & currencies — grounded wallet + honest degradation (issue #101)
+> Requires `[elite].enabled = true` and ED launched this session (balances come from the journal's `LoadGame` / `CarrierStats`, which only arrive at login).
+- [ ] *"How many credits do I have?"* / *"What's my balance?"* → reports your **real credit balance** from the journal, **hedged** ("as of login…"), not an invented or round number.
+- [ ] *"How much is on my fleet carrier?"* (if you own one) → reports the **carrier balance**, same login hedge.
+- [ ] **Honest degradation:** *"How many merc coins do I have?"* (a currency COVAS doesn't track) → it says plainly it **doesn't have data on that currency** (its game knowledge may predate it) and offers to **web-search** — it must **never** invent an amount.
+- [ ] Ask about credits **out of the game** (ED not launched) → it says it has no balance yet, rather than guessing.
+
+Notes:
+
 ### 5.2 Proactive callouts (`[proactive].enabled = true`)
 - [ ] **Arrival:** **FSD jump** to a new system → within a few seconds COVAS speaks a short in-character callout **without** any PTT press (fires only when idle).
 - [ ] **Dock** at a station → a `Docked` callout fires (at most one line amid a jump→supercruise→dock burst — min-interval throttle).

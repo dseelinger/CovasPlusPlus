@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..events import EventBus
+from . import currencies
 from .context import EDContext
 from .engineers import parse_engineer_progress
 from .loadout import parse_loadout
@@ -76,6 +77,9 @@ def parse_journal_line(line: str) -> dict | None:
 # the bus but leaves the rolling state untouched.
 
 def _load_game(e: dict) -> dict:
+    # LoadGame also carries `Credits` — that balance is folded into the grounded wallet by the
+    # registry-driven `currencies.extract_balances` in apply_journal_event (#101), not here, so
+    # this stays a pure "current context" patch (ship/fuel).
     patch: dict = {}
     ship = e.get("Ship_Localised") or e.get("Ship")
     if ship:
@@ -242,6 +246,11 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     # Exobiology sampling (#54) is structured state off the flat _FIELDS patch — fold it apart,
     # like materials, so ScanOrganic tracks genus + sample count without a context field.
     apply_scan_organic(ctx, event)
+    # Grounded wallet (#101): fold any KNOWN currency balance this event carries into the wallet.
+    # Registry-driven, so LoadGame's `Credits` and CarrierStats' `Finance.CarrierBalance` are read
+    # without an event-specific handler — and a NEW currency (no registry row) yields nothing here,
+    # which is the honest-degradation contract (the model's guardrail handles the rest).
+    ctx.update_wallet(**currencies.extract_balances(event))
     handler = _HANDLERS.get(name)
     patch = handler(event) if handler is not None else {}
     # HullDamage carries the hull of whatever the Commander is piloting (ship/fighter/SRV) with
