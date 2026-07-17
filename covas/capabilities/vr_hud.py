@@ -605,6 +605,11 @@ class VrHudView:
             overlay.setOverlayCurvature(handle, float(p.curvature))
         except Exception as e:  # noqa: BLE001 — old runtime w/o curvature -> flat, not fatal
             self._logline(f"VR curvature unavailable (flat): {e}")
+        # Diagnostic (issue #48 retest): confirm the live overlay actually received the new size/
+        # pose on the OpenVR thread, so a "nothing changed" report can be pinned to render vs tool.
+        self._logline(f"placement applied: width={p.width_m:.2f}m dist={p.forward_m:.2f}m "
+                      f"x={p.offset_x_m:.2f} y={p.up_m:.2f} pitch={p.pitch_deg:.0f} "
+                      f"curve={p.curvature:.2f} mode={p.mode}")
 
     def _pin_to_gaze(self, openvr, overlay, handle) -> Optional["VrPlacement"]:
         """Read the HMD pose and swing the panel to that heading, centred on the gaze. Returns

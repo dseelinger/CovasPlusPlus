@@ -74,6 +74,37 @@ def test_tilt_curve_size_nudges():
     assert round(hud["vr_width_m"], 3) == 0.60
 
 
+def test_smaller_reduces_width():
+    # The "smaller" direction was untested (only "bigger" was) — a VR retest reported it not
+    # shrinking, so pin the symmetric arithmetic down here (issue #48 retest).
+    cap, hud, _ = _cap()
+    _run(cap, "smaller")
+    assert round(hud["vr_width_m"], 3) == 0.50   # 0.55 − 0.05
+    _run(cap, "bigger")
+    assert round(hud["vr_width_m"], 3) == 0.55   # back up, same step
+
+
+def test_width_clamps_at_floor():
+    cap, hud, _ = _cap()
+    for _ in range(50):
+        _run(cap, "smaller")
+    assert hud["vr_width_m"] == 0.15   # never below the clamp floor
+
+
+def test_on_off_toggle_vr_enabled():
+    # The model reaches for this VR-HUD tool for "turn the VR HUD on/off"; the toggle must write
+    # [hud].vr_enabled through the same apply path, not confabulate an in-game switch.
+    cap, hud, applied = _cap()
+    msg = _run(cap, "on")
+    assert "on" in msg.lower()
+    assert applied[-1] == {"hud": {"vr_enabled": True}}
+    assert hud["vr_enabled"] is True
+    msg = _run(cap, "off")
+    assert "off" in msg.lower()
+    assert applied[-1] == {"hud": {"vr_enabled": False}}
+    assert hud["vr_enabled"] is False
+
+
 def test_distance_clamps_at_floor():
     cap, hud, _ = _cap()
     for _ in range(50):
@@ -118,3 +149,4 @@ def test_the_single_tool_is_advertised_with_an_action_enum():
     assert len(tools) == 1 and tools[0]["name"] == "adjust_vr_hud"
     enum = tools[0]["input_schema"]["properties"]["action"]["enum"]
     assert "pin_here" in enum and "left" in enum and "closer" in enum
+    assert "on" in enum and "off" in enum   # the on/off toggle lives on this tool too

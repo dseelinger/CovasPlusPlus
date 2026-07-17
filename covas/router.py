@@ -111,6 +111,23 @@ class RouterConfig:
         "full breakdown", "give me everything", "long version",
         "complete breakdown", "the whole rundown",
     ])
+    # HUD/overlay voice control (issue #48 retest): the cheap tier (Haiku) reliably fires the
+    # adjust_vr_hud tool on the FIRST request, then tends to confabulate a refusal ("no on/off
+    # switch", "the overlay is dark") on follow-ups instead of calling it again. These commands
+    # are rare and deterministic, so escalate them to the standard tier, which calls the tool
+    # reliably. `hud_control_phrases` are HUD-qualified (safe to match anytime); `hud_nudge_phrases`
+    # are the BARE verbs ("bigger", "move it left") that collide with ordinary chat, so they only
+    # escalate when the HUD is actually on (context {"hud_active": True}). Kept OUT of the
+    # escalate/premium lists so strip_control never removes them — the tool needs the real words.
+    hud_control_phrases: list[str] = field(default_factory=lambda: [
+        "vr hud", "the hud", "hud overlay", "vr overlay", "the overlay", "headset hud",
+    ])
+    hud_nudge_phrases: list[str] = field(default_factory=lambda: [
+        "bigger", "smaller", "closer", "farther", "further",
+        "move it", "move up", "move down", "move left", "move right",
+        "tilt it", "tilt up", "tilt down", "flatter", "more curved",
+        "pin it", "pin here", "reset the position",
+    ])
 
     @classmethod
     def from_cfg(cls, cfg: dict) -> "RouterConfig":
@@ -143,6 +160,8 @@ class RouterConfig:
             depth_phrases=phrases("depth_phrases", d.depth_phrases),
             web_phrases=phrases("web_phrases", d.web_phrases),
             full_breakdown_phrases=phrases("full_breakdown_phrases", d.full_breakdown_phrases),
+            hud_control_phrases=phrases("hud_control_phrases", d.hud_control_phrases),
+            hud_nudge_phrases=phrases("hud_nudge_phrases", d.hud_nudge_phrases),
         )
 
     @property
@@ -272,6 +291,12 @@ class Router:
         reasons: list[str] = []
         if (m := _matched(t, c.escalate_phrases)):
             reasons.append(f"wake phrase '{m}'")
+        # HUD/overlay control -> standard tier so the tool actually fires (see the phrase lists).
+        # Qualified phrases match anytime; bare nudges only when the caller says the HUD is active.
+        if (m := _matched(t, c.hud_control_phrases)):
+            reasons.append(f"HUD control '{m}'")
+        elif context.get("hud_active") and (m := _matched(t, c.hud_nudge_phrases)):
+            reasons.append(f"HUD nudge '{m}' (HUD active)")
         if (m := _matched(t, c.depth_phrases)):
             reasons.append(f"depth/analysis '{m}'")
         if context.get("needs_web"):

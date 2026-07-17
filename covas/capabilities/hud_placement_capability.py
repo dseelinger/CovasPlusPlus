@@ -6,6 +6,11 @@ that path can't express: **relative nudges** ("move the HUD left", "closer", "ti
 **look-to-place** ("pin the HUD here" — swing it to the direction you're facing). Both are the
 natural way to place a panel you're looking at in a headset, hands still on the stick.
 
+It also owns the on/off toggle ("turn the VR HUD on"/"off"): the model reaches for this one VR-HUD
+tool for any VR-HUD request, so the enable switch lives here too (writing `[hud].vr_enabled`) —
+without it the model tended to confabulate a non-existent in-game switch instead of flipping the
+setting (issue #48 retest).
+
 One tool, `adjust_vr_hud(action, amount?)`, keeps the per-turn token cost to a single schema. It
 reads the current `[hud]` values, computes the new one, clamps it, and applies it through the
 same `update_settings` path the Settings page uses — so a nudge PERSISTS and applies **live**
@@ -39,20 +44,23 @@ _DEFAULTS = {  # config defaults, for reading current values and for "reset"
 _STEP_M, _STEP_DEG, _STEP_CURVE, _STEP_W = 0.10, 5.0, 0.02, 0.05  # default nudge sizes
 
 _ACTIONS = (
+    "on", "off",
     "left", "right", "up", "down", "closer", "farther", "forward", "back",
     "tilt_up", "tilt_down", "flatter", "rounder", "bigger", "smaller",
     "center", "pin_here", "reset",
 )
 
 _DESC = (
-    "Reposition the in-headset VR HUD overlay by a relative nudge or by look-to-place. Use for "
-    "'move the HUD left/right/up/down', 'closer'/'farther' (or 'forward'/'back'), 'tilt it "
-    "up/down', 'flatter'/'more curved', 'bigger'/'smaller', 'centre the HUD', 'reset the HUD "
-    "position', and 'pin the HUD here' (swing it to where I'm looking). ALWAYS call this for "
-    "those — it applies live and remembers the new position. It affects only the VR overlay, "
-    "not the 2D window. For an exact value ('set the distance to 1.5') use the settings command "
-    "instead. `action` is the direction/verb; optional `amount` is centimetres for moves or "
-    "degrees for tilt (omit for a comfortable default step)."
+    "Turn the in-headset VR HUD overlay ON or OFF, or reposition it by a relative nudge or by "
+    "look-to-place. ALWAYS call this — NOT any other tool — for 'turn the VR HUD on'/'off' "
+    "(there is no separate in-game switch; this is the on/off control), 'move the HUD "
+    "left/right/up/down', 'closer'/'farther' (or 'forward'/'back'), 'tilt it up/down', "
+    "'flatter'/'more curved', 'bigger'/'smaller', 'centre the HUD', 'reset the HUD position', "
+    "and 'pin the HUD here' (swing it to where I'm looking). It applies live and remembers the "
+    "new state/position. It affects only the VR overlay, not the 2D window. For an exact "
+    "placement value ('set the distance to 1.5') use the settings command instead. `action` is "
+    "the direction/verb; optional `amount` is centimetres for moves or degrees for tilt (omit "
+    "for a comfortable default step)."
 )
 
 
@@ -88,8 +96,9 @@ class HudPlacementCapability:
         return HelpMeta(
             category="VR HUD placement",
             group="companion HUD",
-            one_liner=("I move the in-headset VR HUD when you say things like 'move it left', "
-                       "'closer', 'tilt it up', or 'pin the HUD here'."),
+            one_liner=("I turn the in-headset VR HUD on and off and move it when you say things "
+                       "like 'turn the VR HUD on', 'move it left', 'closer', 'tilt it up', or "
+                       "'pin the HUD here'."),
             example="pin the HUD here",
         )
 
@@ -118,6 +127,16 @@ class HudPlacementCapability:
         pos = isinstance(amount, (int, float)) and amount > 0
         step_m = (amount / 100.0) if pos else _STEP_M   # amount is centimetres for moves
         step_deg = float(amount) if pos else _STEP_DEG  # amount is degrees for tilt
+
+        # On/off toggle — the model reaches for THIS tool for any "VR HUD" request, so the
+        # enable switch lives here too (writing [hud].vr_enabled through the same live-apply
+        # path). Without it the model tended to confabulate an in-game switch (issue #48 retest).
+        if action in ("on", "enable", "show"):
+            self._apply({"hud": {"vr_enabled": True}})
+            return "Turned the VR HUD on."
+        if action in ("off", "disable", "hide"):
+            self._apply({"hud": {"vr_enabled": False}})
+            return "Turned the VR HUD off."
 
         hud = self._get_hud() or {}
         cur = {k: _num(hud.get(k), d) for k, d in _DEFAULTS.items()}
@@ -168,4 +187,6 @@ class HudPlacementCapability:
                     f"reset, or pin here.")
 
         self._apply({"hud": patch})
+        if self._log is not None:
+            self._log(f"nudge '{action}' -> {patch}")
         return say

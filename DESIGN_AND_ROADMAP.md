@@ -366,6 +366,7 @@ Local LLMs are off the table (see the decision note up top): a useful model comp
 The Router (§3.2) decides per turn. Keep it rules-based and explainable to start:
 
 - Escalate to Sonnet when the request needs current/web data, asks for depth/analysis, or matches a wake phrase ("think hard", "ask the big brain").
+- Escalate to Sonnet for **HUD/overlay voice control** ("turn the VR HUD on", "move the HUD left", "bigger"). Haiku fires `adjust_vr_hud` on the first request but tends to confabulate a refusal on follow-ups instead of calling it again; these commands are rare and deterministic, so the reliability is worth the tier. HUD-*qualified* phrases (`hud_control_phrases`) escalate anytime; bare nudges (`hud_nudge_phrases`: "bigger", "move it left") escalate only when the caller passes `context={"hud_active": True}`, so ordinary chat is never over-escalated when the HUD is off.
 - Otherwise stay on Haiku.
 - Always allow a manual override (wake phrase / UI toggle) to pin a tier.
 
