@@ -934,9 +934,11 @@ Notes:
 ### 14.2a Settings apply LIVE — hot-swap providers & keys (issue #90)  🔊 HW 🌐 PANEL 🌍 NET
 > #90 makes almost every Settings change take effect **without a restart**.
 - [ ] **Switch the LLM provider live:** on the Settings page change **LLM provider** (e.g. anthropic → gemini, with that provider's key set) and **SAVE CHANGES**. The log shows `LLM now: <provider> / <model>`. Speak a turn → the **next** turn is answered by the new provider (check the router/usage line), **no restart**. A turn already in flight when you saved finishes on the old provider.
-- [ ] **Switch the TTS provider/voice live:** change **TTS provider** (e.g. edge → elevenlabs, or just a different voice) and SAVE → the log shows `Voice now: <provider>` and the next spoken reply uses the new voice. Confirm ambient audio (if the bus mixer is on) keeps working — the mixer is **not** rebuilt.
+- [ ] **Switch the TTS provider/voice live:** change **TTS provider** (e.g. edge → elevenlabs, or just a different voice) and SAVE → the log shows `Voice now: <provider>` and the next spoken reply uses the new voice. The mixer is **not** rebuilt.
+- [ ] **Ambient audio follows the swap (issue #90 review):** with the **bus mixer + audio layer ON**, switch the TTS voice/provider and SAVE, then trigger an ambient/comms line (or a persona musing) → it speaks in the **new** voice, not the old one (no half-swap). Likewise, switching the **LLM** keeps opt-in chatter-flavor / comms-variants generating on the new provider (canned/verbatim lines are unaffected).
 - [ ] **Failed switch is fail-soft:** switch to a provider whose key is missing/bad and SAVE → the log shows `Couldn't switch … keeping the previous one`, and the next turn **still works** on the previous provider (no dead loop).
 - [ ] **Hotkeys live:** change the **push-to-talk key** (and/or cancel/reflex key) and SAVE → the log notes the hotkeys updated; the **new** key holds-to-talk immediately and the **old** key no longer does — **no restart, no re-hook**.
+- [ ] **Mic change is safe mid-press (issue #90 review):** while **holding PTT and talking**, change the **input device** in Settings and SAVE → the log notes the change is **deferred** until the capture ends; the utterance you were speaking still transcribes (not dropped), and the **next** press uses the new mic.
 
 ### 14.3 Personality tab (N7)
 - [ ] **Persona picker:** the Personality tab lists personas; selecting one shows a **preview**. Pick a different persona → the next reply's **voice/register changes**.

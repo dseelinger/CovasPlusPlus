@@ -502,6 +502,31 @@ class AudioLayer:
         for mem in (self._comms_voices, self._player_voices, self._chatter_voices):
             mem.set_pool(self._cast.pool, fallback=persona)
 
+    def set_providers(self, *, tts=None, cast_synth=None, llm=None,  # noqa: ANN001
+                      cheap_model: Optional[str] = None) -> None:
+        """Re-point the ambient layer's TTS/LLM after a live provider hot-swap (issue #90 review).
+        Without this, the layer keeps the TTS/LLM it captured at construction, so a Settings-page
+        voice/model switch would leave ambient musings, interdiction/comms lines and the cast synth
+        on the OLD provider (a half-swap). Voice lines pick up the new TTS (and a rebuilt cast synth);
+        the opt-in LLM-generated chatter-flavor + comms-variants generators are rebuilt from the new
+        LLM, honoring the same [audio.cues].flavor / [audio.comms].variants flags as __init__. Pool/
+        verbatim chatter+comms never used the LLM, so they're untouched. Fail-soft: pass only what
+        changed; a None arg leaves that seam as-is."""
+        if tts is not None:
+            self.tts = tts
+        if cast_synth is not None:
+            self._cast_synth = cast_synth
+            self.rebuild_cast()
+        if llm is not None:
+            audio = self.cfg.get("audio", {}) or {}
+            chatter_flavor = bool((audio.get("cues", {}) or {}).get("flavor", False))
+            comms_variants = bool((audio.get("comms", {}) or {}).get("variants", False))
+            chatter_gen = _text_generator(llm, cheap_model) if chatter_flavor else None
+            comms_gen = make_variant_generator(llm, model=cheap_model) if comms_variants else None
+            self._chatter.set_generate(chatter_gen)
+            self._persona_chatter.set_generate(chatter_gen)
+            self._comms.set_generate(comms_gen)
+
     def apply_settings(self) -> None:
         """Re-read config after a settings change: bus volumes/treatment, enable toggles, and the
         voice cast (cast provider / pool / player voice), reusing the existing synth backends."""

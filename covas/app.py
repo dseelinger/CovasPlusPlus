@@ -311,6 +311,10 @@ class App:
         self._ptt_codes: set[int] = set()
         self._cancel_codes: set[int] = set()
         self._reflex_codes: set[int] = set()
+        # An [audio].input_device change that arrives WHILE a PTT/reflex capture is in flight is
+        # deferred (issue #90 review): rebuilding the Recorder mid-capture would strand the open
+        # input stream and drop the utterance. This flag defers the rebuild to the capture boundary.
+        self._recorder_dirty = False
         self.state = "Idle"
         # Armed for the duration of a USER (PTT) turn, so the "thinking" bed (issue #5) fills the
         # wait for those turns only — never a proactive callout (which has no "did it hear me" gap).
@@ -802,9 +806,10 @@ class App:
                           cancel: threading.Event) -> None:
         from .capabilities.proactive_capability import build_prompt
         # Turn-local provider binding (issue #90): one callout runs on one consistent LLM+TTS pair
-        # even if a hot-swap rebinds self.llm/self.tts mid-callout (decision #2).
+        # (and text-only state) even if a hot-swap rebinds self.llm/self.tts mid-callout (decision #2).
         llm = self.llm
         tts = self.tts
+        text_only = self.text_only
         try:
             if cancel.is_set():
                 self.set_state("Idle")
@@ -839,7 +844,7 @@ class App:
             self._log("COVAS", f"(proactive) {reply}")
             print(f"\n>> [proactive] {reply}")
             self.set_state("Speaking", "proactive")
-            self._speak(reply, cancel, tts=tts)
+            self._speak(reply, cancel, tts=tts, text_only=text_only)
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — a proactive failure must never crash the app
             self.set_state("Idle", f"proactive error: {e}")
@@ -1707,6 +1712,7 @@ class App:
 
     def on_ptt_up(self) -> None:
         audio = self.recorder.stop()
+        self._apply_pending_recorder()  # apply a mic change that arrived during the hold (issue #90)
         held_ms = (time.monotonic() - self._ptt_t0) * 1000.0
         tap_ms = float(self.cfg["keys"].get("tap_cancel_ms", 400))
         if held_ms < tap_ms:
@@ -1778,6 +1784,7 @@ class App:
     def on_reflex_ptt_up(self) -> None:
         """Reflex second-PTT released — dispatch the capture down the fast path."""
         audio = self.recorder.stop()
+        self._apply_pending_recorder()  # apply a mic change that arrived during the hold (issue #90)
         self._dispatch_reflex(audio)
 
     def _dispatch_reflex(self, audio) -> None:
@@ -2021,6 +2028,15 @@ class App:
                               "text": f"Couldn't switch the LLM: {e}; keeping the previous one."})
             return
         self.llm = new
+        # Re-point the ambient audio layer's LLM too (issue #90 review): it captured the LLM at
+        # construction for opt-in chatter-flavor / comms-variants, so without this a swap would
+        # half-apply (main turns switch, ambient generation stays on the old provider). Fail-soft.
+        if self.audio is not None:
+            try:
+                cheap = Router.from_cfg(self.cfg).cheap_route(None).model
+                self.audio.set_providers(llm=new, cheap_model=cheap)
+            except Exception as e:  # noqa: BLE001 — a generator refresh glitch must not fail the swap
+                self._log("system", f"audio layer LLM refresh failed: {e}")
         prov = str(self.cfg.get("llm", {}).get("provider", "anthropic"))
         model = str(self.cfg.get(prov, {}).get("model", "") or "default")
         self.bus.publish({"type": "log", "who": "system", "text": f"LLM now: {prov} / {model}."})
@@ -2039,6 +2055,15 @@ class App:
         self.tts = new
         from .firstrun import text_only_mode
         self.text_only = text_only_mode(self.cfg, mock=self.mock, tts_injected=False)
+        # Re-point the ambient audio layer's voice too (issue #90 review): it holds its own TTS
+        # (persona/interdiction/comms lines) and a cast synth closed over the OLD provider, so
+        # without this the swap half-applies (main replies switch, ambient/comms/crew stay old).
+        # _build_cast_synth() reads self.tts, which is already the new provider here. Fail-soft.
+        if self.audio is not None:
+            try:
+                self.audio.set_providers(tts=new, cast_synth=self._build_cast_synth())
+            except Exception as e:  # noqa: BLE001 — a cast refresh glitch must not fail the swap
+                self._log("system", f"audio layer voice refresh failed: {e}")
         prov = str(self.cfg.get("tts", {}).get("provider", "elevenlabs"))
         self.bus.publish({"type": "log", "who": "system", "text": f"Voice now: {prov}."})
 
@@ -2046,7 +2071,16 @@ class App:
         """Rebuild the Recorder for a new [audio].input_device and restart the VAD listener if it's
         running so the change (device resolved at construction) applies live (issue #89). Fail-soft
         — a bad device just logs; the loop keeps the previous recorder. Mirrors _reconcile_listener,
-        so a mic change and a listen-mode change ride the same reconcile path (decision #7)."""
+        so a mic change and a listen-mode change ride the same reconcile path (decision #7).
+
+        Deferral (issue #90 review): if a PTT/reflex capture is in flight, rebuilding now would
+        strand the OLD recorder's open input stream and make the pending stop() read an unstarted
+        NEW recorder (dropping the utterance). Defer to the capture boundary instead — on_ptt_up /
+        on_reflex_ptt_up call _apply_pending_recorder() right after stop() closes the old stream."""
+        if self.ptt_held or self.reflex_held:
+            self._recorder_dirty = True
+            self._log("system", "Microphone change deferred until the current capture ends.")
+            return
         try:
             self.recorder = Recorder(self.cfg)
             # If continuous listening is on, the VAD listener holds its own device stream — bounce
@@ -2058,6 +2092,14 @@ class App:
             self._log("system", "Microphone changed; recorder rebuilt.")
         except Exception as e:  # noqa: BLE001 — a bad mic must not crash the loop
             self._log("system", f"microphone reconcile failed: {e}")
+
+    def _apply_pending_recorder(self) -> None:
+        """Rebuild a mic that was changed mid-capture (issue #90 review), now that stop() has closed
+        the old input stream and on_key has already cleared ptt_held/reflex_held — so _reconcile_
+        recorder rebuilds instead of re-deferring. No-op when nothing was deferred."""
+        if self._recorder_dirty:
+            self._recorder_dirty = False
+            self._reconcile_recorder()
 
     def _resolve_hotkeys(self) -> None:
         """(Re)resolve the PTT/cancel/reflex scan-code SETS from the live [keys]/[reflex] config
@@ -2130,10 +2172,15 @@ class App:
         }
 
     # ---- local voice commands --------------------------------------------
-    def _speak(self, text: str, cancel: threading.Event, *, tts=None) -> None:  # noqa: ANN001
+    def _speak(self, text: str, cancel: threading.Event, *, tts=None,  # noqa: ANN001
+               text_only=None) -> None:
         """Play `text` through the TTS provider (real, mock, or fake). `tts` is the turn-local
         provider captured at the start of a turn (issue #90) so a mid-turn hot-swap can't change the
         voice underneath a reply; callers outside a turn omit it and get the live `self.tts`.
+        `text_only` is the turn-local text-only flag, captured with `tts` (issue #90 review): a
+        mid-turn swap to a keyless provider flips the LIVE `self.text_only`, so a turn that started
+        with a working voice must gate on the flag it CAPTURED, not the live one — otherwise its
+        reply is silently dropped. None => use the live `self.text_only` (callers outside a turn).
         On failure, log LOUDLY (session log + stderr) before re-raising — a dead TTS must be
         diagnosable, not a silent no-op (e.g. a 401 famous_voice_not_permitted). Callers keep
         their broad guards and still degrade to text/Idle. In text-only mode (no ElevenLabs key)
@@ -2144,7 +2191,7 @@ class App:
         `[Name]`-prefixed segments: persona lines keep the direct TTS path below, crew lines are
         voiced in their own deterministic cast voice on the radio-treated comms bus. When it's off
         (the default) the reply is spoken verbatim, exactly as before — the parser isn't invoked."""
-        if self.text_only:
+        if self.text_only if text_only is None else text_only:
             return
         if not crew_mod.is_enabled(self.cfg):
             self._speak_persona(text, cancel, tts=tts)
@@ -2272,9 +2319,12 @@ class App:
         # Turn-local provider binding (issue #90): capture the LLM + TTS ONCE at the top so a
         # mid-turn hot-swap (self.llm/self.tts rebound by _reload_llm/_reload_tts) can't split a
         # single turn across two provider sets — it runs to completion on the pair it started with;
-        # the swap takes effect on the next turn (decision #2).
+        # the swap takes effect on the next turn (decision #2). Capture text_only too (issue #90
+        # review) so every speak path in this turn — reply, the watchdog "still trying" line, and
+        # the degraded apology — gates on the turn's OWN text-only state, not a mid-turn flip.
         llm = self.llm
         tts = self.tts
+        text_only = self.text_only
         watchdog = None
         try:
             if cancel.is_set():
@@ -2407,7 +2457,7 @@ class App:
             # retry/backoff, or a hung connection all live here. It speaks a plain-language "still
             # trying" line once past the threshold; disarmed the instant the reply is in hand (the
             # finally), which is just before any reply audio plays.
-            watchdog = self._arm_latency_watchdog(cancel)
+            watchdog = self._arm_latency_watchdog(cancel, tts=tts, text_only=text_only)
             try:
                 stream = llm.stream_reply(
                     messages, cancel, on_event,
@@ -2453,7 +2503,7 @@ class App:
                 return
 
             self.set_state("Speaking")
-            self._speak(reply, cancel, tts=tts)
+            self._speak(reply, cancel, tts=tts, text_only=text_only)
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — keep the loop alive on any failure
             if watchdog is not None:
@@ -2465,24 +2515,27 @@ class App:
             # down. History is untouched here (the commit is after a successful reply), so a failed
             # turn leaves NO orphan.
             if _retry.is_degraded_error(e):
-                self._speak_degraded(e, cancel)
+                self._speak_degraded(e, cancel, tts=tts, text_only=text_only)
             self.set_state("Idle", f"error: {e}")
 
     # ---- provider reliability (issue #97) ---------------------------------
-    def _arm_latency_watchdog(self, cancel: threading.Event) -> "_LatencyWatchdog":
+    def _arm_latency_watchdog(self, cancel: threading.Event, *, tts=None,  # noqa: ANN001
+                              text_only=None) -> "_LatencyWatchdog":
         """Arm the >Ns latency watchdog for a turn (issue #97). Threshold from
         ``[llm].slow_warning_seconds`` (default 30; <=0 disables). When it fires it speaks a canned,
         plain-language "the AI service is being slow, still trying" line in the CURRENT voice via
         the normal `_speak` path (degrading to a logged line in text-only mode) — never another LLM
-        call. Always returns a watchdog object (disabled ones no-op) so callers can disarm blindly."""
+        call. Always returns a watchdog object (disabled ones no-op) so callers can disarm blindly.
+        `tts`/`text_only` are the turn-locals (issue #90 review) so this interim line stays on the
+        turn's own provider + text-only state, never split across a mid-turn hot-swap."""
         seconds = float((self.cfg.get("llm", {}) or {}).get("slow_warning_seconds", 30) or 0)
         line = "Sorry, Commander — the AI service is being slow to respond. I'm still trying."
 
         def _interim() -> None:
-            if self.text_only:
+            if self.text_only if text_only is None else text_only:
                 self._log("COVAS", line)  # no voice — surface it as text so it's never silent
             else:
-                self._speak(line, cancel)
+                self._speak(line, cancel, tts=tts, text_only=text_only)
 
         return _LatencyWatchdog(
             seconds, speak=_interim, cancel=cancel,
@@ -2496,19 +2549,21 @@ class App:
         return {"anthropic": "Claude", "gemini": "Gemini",
                 "openai": "The AI service", "ollama": "The local model"}.get(name, "The AI service")
 
-    def _speak_degraded(self, err: Exception, cancel: threading.Event) -> None:
+    def _speak_degraded(self, err: Exception, cancel: threading.Event, *, tts=None,  # noqa: ANN001
+                        text_only=None) -> None:
         """Tell the Commander, in character, that the provider is overloaded (issue #97) and log
         the precise reason. Canned/verbatim — the LLM is the thing that's down, so we NEVER call it
         to narrate its own outage. Fail soft: degrade to a logged line when TTS is unavailable and
-        never raise."""
+        never raise. `tts`/`text_only` are the turn-locals (issue #90 review) so the apology stays
+        on the turn's own provider + text-only state through a mid-turn hot-swap."""
         name = self._provider_display_name()
         line = f"{name} is overloaded right now, Commander — give it a moment and try again."
         self._log("system", f"provider degraded: {_retry.degraded_reason(err)}")
-        if self.text_only:
+        if self.text_only if text_only is None else text_only:
             self._log("COVAS", line)
             return
         try:
-            self._speak(line, cancel)
+            self._speak(line, cancel, tts=tts, text_only=text_only)
         except Exception:  # noqa: BLE001 — _speak already logged loudly; degrade to text
             self._log("COVAS", line)
 

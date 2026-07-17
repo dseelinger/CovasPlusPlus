@@ -280,9 +280,17 @@ takes effect **without a restart**. The model:
   unrelated key rebuilds neither. The Router is already `Router.from_cfg(self.cfg)` **per turn**, so
   tiers are always live with no work.
 - **Next-turn semantics + turn-local binding.** An in-flight turn finishes on the instances it
-  started with — `_process`/`_run_turn`/`_proactive_worker` bind `llm`/`tts`/`stt` locals at the top,
-  so a mid-turn hot-swap can't split one turn across two provider sets. The swap lands on the next
-  turn; there is no cancellation-to-apply (v1).
+  started with — `_process`/`_run_turn`/`_proactive_worker` bind `llm`/`tts`/`stt` (and the
+  `text_only` flag) as locals at the top, so a mid-turn hot-swap can't split one turn across two
+  provider sets — including the secondary voice lines (the latency-watchdog "still trying" line and
+  the degraded-provider apology both take the turn-local `tts`/`text_only`). The swap lands on the
+  next turn; there is no cancellation-to-apply (v1).
+- **The ambient audio layer swaps too.** The C9 `AudioLayer` captured its own `tts` (persona/
+  interdiction/comms voice + cast synth) and `llm` (opt-in chatter-flavor / comms-variants) at
+  construction, so a provider swap re-points it via `AudioLayer.set_providers(...)` from
+  `_reload_tts`/`_reload_llm` — otherwise a voice/model change would half-apply (main turns switch,
+  ambient stays on the old provider). Pool/verbatim chatter+comms never used the LLM and are
+  untouched.
 - **Fail-soft (principle #6).** The rebuild runs inside try/except on the background thread; on
   failure it does **not** rebind — it keeps the working provider and publishes a "couldn't switch …;
   keeping the previous one" bus event (a UI toast). On success it publishes "LLM now: …" / "Voice
@@ -292,7 +300,10 @@ takes effect **without a restart**. The model:
   `_reconcile_hotkeys()` re-resolves on a `[keys].*`/`[reflex].ptt` change with **no re-hook** (the
   hook stays installed, only the sets change). A `[audio].input_device` change rebuilds the
   `Recorder` and bounces the VAD listener via `_reconcile_recorder()`, riding the same reconcile path
-  as the listen-mode switch (issue #89).
+  as the listen-mode switch (issue #89). A mic change that arrives *while a PTT/reflex capture is
+  held* is deferred (`_recorder_dirty`) and applied at the capture boundary in `on_ptt_up`/
+  `on_reflex_ptt_up` (after `stop()` closes the old stream), so it never strands an open input
+  stream or drops the utterance.
 - **`RESTART_REQUIRED` — the true minimum.** Encoded next to the apply logic as a `frozenset` of
   schema keys: `audio.enabled` and `audio.mix_sample_rate` (the bus-mixer graph is cross-wired and
   the shared device opened at init/start), `ui.host`/`ui.port` (Flask binds at launch), and

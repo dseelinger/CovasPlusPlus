@@ -151,6 +151,86 @@ def test_input_device_change_routes_through_recorder_reconcile(tmp_path, monkeyp
     assert calls == [True]
 
 
+def test_speak_honors_turn_local_text_only(tmp_path):
+    """_speak gates on the TURN-LOCAL text_only when given one, not the live flag (issue #90
+    review): a mid-turn swap to a keyless provider must not silently drop a reply the turn
+    started able to voice, and a turn that started keyless must not suddenly speak."""
+    app = _make_app(tmp_path)
+
+    app.text_only = True             # live: keyless NOW...
+    voiced = FakeTTS()
+    app._speak("hi", threading.Event(), tts=voiced, text_only=False)   # ...but the turn wasn't
+    assert voiced.spoken == ["hi"]   # spoke on the captured provider despite the live flip
+
+    app.text_only = False            # live: has a voice NOW...
+    silent = FakeTTS()
+    app._speak("hi", threading.Event(), tts=silent, text_only=True)    # ...but the turn started keyless
+    assert silent.spoken == []       # stayed silent per the turn's OWN state
+
+
+def test_reload_tts_refreshes_audio_layer_voice(tmp_path, monkeypatch):
+    """A live TTS swap re-points the ambient audio layer too (issue #90 review half-swap fix):
+    without this the layer keeps voicing ambient/comms/crew on the OLD provider."""
+    app = _make_app(tmp_path)
+    seen: dict = {}
+
+    class _AudioStub:
+        def set_providers(self, **kw):
+            seen.update(kw)
+
+    app.audio = _AudioStub()
+    sentinel = FakeTTS()
+    monkeypatch.setattr(app_mod, "make_tts", lambda cfg, mixer=None: sentinel)
+    monkeypatch.setattr(app, "_build_cast_synth", lambda: "CAST")
+    monkeypatch.setattr(app_mod, "make_llm", lambda cfg: pytest.fail("LLM rebuilt"))
+
+    app.update_settings({"elevenlabs": {"voice_id": "xyz"}})
+    _join_reloads()
+
+    assert app.tts is sentinel
+    assert seen.get("tts") is sentinel and seen.get("cast_synth") == "CAST"
+
+
+def test_reload_llm_refreshes_audio_layer_generators(tmp_path, monkeypatch):
+    """A live LLM swap re-points the ambient layer's chatter-flavor / comms-variant generators too
+    (issue #90 review half-swap fix)."""
+    app = _make_app(tmp_path)
+    seen: dict = {}
+
+    class _AudioStub:
+        def set_providers(self, **kw):
+            seen.update(kw)
+
+    app.audio = _AudioStub()
+    sentinel = FakeLLM()
+    monkeypatch.setattr(app_mod, "make_llm", lambda cfg: sentinel)
+    monkeypatch.setattr(app_mod, "make_tts", lambda cfg, mixer=None: pytest.fail("TTS rebuilt"))
+
+    app.update_settings({"anthropic": {"model": "claude-opus-5"}})
+    _join_reloads()
+
+    assert app.llm is sentinel
+    assert seen.get("llm") is sentinel and "cheap_model" in seen
+
+
+def test_input_device_change_deferred_during_capture(tmp_path, monkeypatch):
+    """A mic change that lands while PTT is held is DEFERRED, not applied mid-capture (issue #90
+    review): rebuilding the Recorder under an open stream would drop the utterance + leak the
+    stream. It applies at the capture boundary via _apply_pending_recorder (after stop() closes
+    the old stream and on_key has cleared ptt_held)."""
+    app = _make_app(tmp_path)
+    builds: list = []
+    monkeypatch.setattr(app_mod, "Recorder", lambda cfg: builds.append(True))
+
+    app.ptt_held = True
+    app._reconcile_recorder()                                # arrives mid-capture
+    assert builds == [] and app._recorder_dirty is True      # deferred, not rebuilt
+
+    app.ptt_held = False                                     # on_key clears this before on_ptt_up
+    app._apply_pending_recorder()                            # capture boundary
+    assert builds == [True] and app._recorder_dirty is False
+
+
 def test_drift_guard_every_schema_key_is_classified():
     """Every settings key must fall under LIVE_SECTIONS ∪ RESTART_REQUIRED — a new, unclassified
     setting fails here until it's explicitly placed (single source of truth, decision #8)."""

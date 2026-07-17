@@ -120,6 +120,11 @@ class ChatterPlayer:
         self._rot: dict[str, int] = {}   # per-cue pool rotation pointer
         self._last_spoken: float = float("-inf")  # monotonic time of the last chatter line
 
+    def set_generate(self, generate: Optional[Callable[[str], str]]) -> None:
+        """Swap the LLM flavor generator after a live provider hot-swap (issue #90). None =>
+        pool-only, exactly as construction with no LLM — the layer never keeps a stale provider."""
+        self._generate = generate
+
     def line_for(self, cue: Cue) -> tuple[str, str]:
         """(text, source) where source is 'flavor' (validated LLM) or 'pool' (deterministic
         rotation). A fact_bearing cue NEVER reaches the generator."""
