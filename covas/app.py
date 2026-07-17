@@ -1150,7 +1150,7 @@ class App:
             up_m=hud.get("vr_offset_y_m", -0.12),
             offset_x_m=hud.get("vr_offset_x_m", 0.0),
             pitch_deg=hud.get("vr_pitch_deg", 0.0),
-            curvature=hud.get("vr_curvature", 0.06),
+            curvature=hud.get("vr_curvature", 0.1),
             yaw_deg=hud.get("vr_yaw_deg", 0.0))
 
     def _reconcile_hud(self) -> None:

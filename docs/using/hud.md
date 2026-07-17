@@ -98,7 +98,7 @@ the VR HUD curvature to 0.1."*
 | **`[hud].vr_offset_x_m`** | Left/right offset in metres (default `0.0`; `+` = right, `−` = left) |
 | **`[hud].vr_offset_y_m`** | Up/down offset in metres (default `−0.12`, slightly below eye-line; `+` = up) |
 | **`[hud].vr_pitch_deg`** | Tilt in degrees (default `0`; **positive leans the top toward you**, so a low panel angles up to face you) |
-| **`[hud].vr_curvature`** | Curve of the panel: `0` flat … `1` a full cylinder. Default `0.06` — a gentle ED-style wrap |
+| **`[hud].vr_curvature`** | Curve of the panel: `0` flat … `1` a full cylinder. Default `0.1` — a gentle ED-style wrap |
 
 !!! note "Meta Quest"
     A Quest reaches this overlay **when it runs ED through SteamVR** — Quest Link / Air Link with

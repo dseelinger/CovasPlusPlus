@@ -952,8 +952,8 @@ SCHEMA: list[Setting] = [
     Setting("hud.vr_curvature", ("hud", "vr_curvature"), "float",
             "VR HUD curvature", "Companion HUD",
             "Curve of the VR panel: 0 is flat, 1 is a full cylinder. A gentle ED-style wrap is "
-            "~0.05–0.1. Applies live.",
-            default=0.06, min=0.0, max=1.0,
+            "~0.1. Applies live.",
+            default=0.1, min=0.0, max=1.0,
             phrasings=("vr hud curve", "vr overlay curvature")),
 
     # --- Control panel -----------------------------------------------------

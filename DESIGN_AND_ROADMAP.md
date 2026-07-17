@@ -230,7 +230,7 @@ the rendering surface differs:
   (`world` cockpit-fixed / `head` view-locked) plus width, distance, lateral/vertical offset,
   and pitch become an OpenVR 3x4 transform (X-axis pitch + translation); the mode picks the
   binding (`setOverlayTransformAbsolute` vs `…TrackedDeviceRelative`). A `curvature` field maps
-  to `setOverlayCurvature` (0 flat … 1 cylinder; ~0.06 by default for a gentle ED-style wrap).
+  to `setOverlayCurvature` (0 flat … 1 cylinder; ~0.1 by default for a gentle ED-style wrap).
   All fields clamp and are unit-tested — a bad setting can't place it unusably. **Every field is
   live-adjustable:** `VrHudView.set_placement` hands a new `VrPlacement` to the OpenVR thread,
   which re-applies width/transform/curvature on its next poll — so voice/Settings reposition a
