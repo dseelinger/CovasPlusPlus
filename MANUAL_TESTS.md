@@ -995,6 +995,7 @@ Notes:
 
 ### 14.2 Settings page (N1) — http://127.0.0.1:8765/settings
 - [ ] The page renders **grouped sections** with the **right control per type** (toggles, dropdowns, number/sliders, text/path) and inline help.
+- [ ] **Frequency-first ordering (issue #80):** the grouped sections/cards are ordered **most-used first** — provider, voice, and speed near the top; rarely-touched advanced/dev options lower — so common controls are reachable without scrolling past niche settings.
 - [ ] **Filter box (issue #7):** type 3+ chars → the list narrows to settings whose **section, title, or description** contains the text (case-insensitive); sections with no matches hide entirely. Typing **1–2 chars** filters nothing (everything stays shown); **clearing** the box restores the full list. Verify a **section-name-only** match (e.g. type a group name that isn't in any title/help) still surfaces that section's settings.
 - [ ] **Change + save:** change a value → the **save bar** appears with a count; **SAVE CHANGES** → 📋 written to `overrides.json` (config.toml stays pristine).
 - [ ] **Per-setting reset:** a changed (overridden) setting shows **RESET** → click it → reverts to default and drops from `overrides.json`.
@@ -1017,6 +1018,12 @@ Notes:
 - [ ] **Pick + apply live:** choose a **different** mic and **SAVE CHANGES** → the log notes the recorder was rebuilt (no restart). Hold PTT and speak → the turn transcribes from the **newly selected** mic. Pick the full-name entry that used to be silent → capture now has audio.
 - [ ] **Continuous mode too:** with `[listen].mode = continuous`, changing the mic restarts the VAD listener on the new device (a subsequent hands-free utterance is captured from it).
 - [ ] **Survives a saved-but-absent device:** the combobox keeps a saved mic name even if that device isn't currently connected (it's an editable combobox — the value is never silently wiped); blank falls back to the default.
+
+### 14.2c Settings search highlights the match (issue #95)  🌐 PANEL
+> Rides the §14.2 filter box (#7): matched text in the filtered rows gets a **yellow background** so you can see *why* each row matched.
+- [ ] Type **3+ chars** in the Settings search box → matching settings stay visible and the matched substring is wrapped in a **yellow highlight** within the setting's title/description.
+- [ ] **Refine** the query → the highlight tracks the new match; a query matching only a **section name** still surfaces that section's settings.
+- [ ] **Clear** the search box → all highlights are removed and the full list is restored.
 
 ### 14.3 Personality tab (N7)
 - [ ] **Persona picker:** the Personality tab lists personas; selecting one shows a **preview**. Pick a different persona → the next reply's **voice/register changes**.
@@ -1463,6 +1470,17 @@ Notes:
 - [ ] Before updating: change the **voice**, **mic**, and a couple of settings (panel or voice); 📋 note them in `%APPDATA%\COVAS++\overrides.json`.
 - [ ] Run the update (§19.5) → after relaunch, **every changed setting is exactly as you left it** (defaults are NOT re-applied over your choices); `overrides.json` is unchanged.
 - [ ] A setting **added** by the new version appears at its default **without** resetting your existing values.
+
+Notes:
+
+### 19.6a Config migration on upgrade (issue #79)  📦 🖥️ 📋 FILE
+> On upgrading an existing install, `load_config` loads the **shipped** `config.toml` as the base then
+> layers the user's data-dir `config.toml` + `overrides.json` on top — so an upgraded install **gains**
+> new config sections/defaults (e.g. a new `[openai]` section) instead of keeping a stale config forever.
+- [ ] On an install seeded by an **older** build (its data-dir `config.toml` missing a newer section such as `[openai]`), note the stale config lacks that section.
+- [ ] Install the new build **over** it and launch.
+- [ ] Open Settings → the **API keys card** for the newer provider (e.g. OpenAI) works — the new section is now present — rather than erroring *"no api_key_file configured for this provider"*.
+- [ ] Confirm your **prior settings / overrides** (voice, mic, keys, etc.) are preserved, **not** reset to defaults.
 
 Notes:
 
