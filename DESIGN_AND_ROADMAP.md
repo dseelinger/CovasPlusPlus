@@ -762,6 +762,19 @@ proving toggle-landing-gear end-to-end before any generalization:
   plain virtual-key events — with press / hold(duration) / release + a `release_all()` used by
   the hard abort. The `SendInput` call sits behind an injectable backend so the whole path is
   unit-tested with a recording fake; `scancodes.py` is a pure ED-token→scancode map.
+- **Injection targets the OS foreground — so we make it deterministic (`focus.py`, #105).**
+  `SendInput`/the comms clipboard-paste hit *whatever window has focus*; nothing used to check
+  that ED was frontmost, a latent targeting bug. `covas/keybinds/focus.py` adds a shared
+  `WindowFocuser` (built alongside the shared executor in `app.py`) that finds ED **by process
+  image name** (`EliteDangerous64.exe`, title as fallback) and foregrounds it through the Windows
+  **AttachThreadInput** foreground-lock unlock — behind an injectable backend, like the executor,
+  so tests never touch a real window. Its `is_foreground()` **hot path** resolves only the
+  foreground window's PID and must not enumerate, so auto-focus is free when ED is already front.
+  The contract: *before* a deliberate macro (`KeybindCapability._execute`) and *before* a comms
+  send (`comms/injector.py`) COVAS ensures ED is frontmost, gated on `[keybinds].focus_before_inject`
+  (default on). It is wired into exactly those two injection sites — **not** a global pre-hook, and
+  deliberately **not** on combat reflexes (latency) or non-injecting capabilities. An explicit
+  `focus_game` tool foregrounds ED on command and is ungated (foregrounding is always safe).
 - **`KeybindCapability`** exposes exactly one macro (`toggle_landing_gear`) behind the safety
   layer: **allowlist** (only `[keybinds].allowlist` macros are advertised/run), **explicit
   confirmation** (arming never fires; the Commander confirms via `confirm_keybind` on a

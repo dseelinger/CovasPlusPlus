@@ -668,6 +668,13 @@ SCHEMA: list[Setting] = [
             "Combat guard", "Keybinds",
             "Refuse to touch controls during danger/interdiction (or unknown status). Leave ON.",
             default=True, phrasings=("combat guard",)),
+    Setting("keybinds.focus_before_inject", ("keybinds", "focus_before_inject"), "bool",
+            "Focus Elite before injecting", "Keybinds",
+            "Bring the Elite Dangerous window to the front right before pressing a ship control or "
+            "sending a comms message, so the keypress can't misfire into another window. A no-op "
+            "when Elite is already focused. Leave ON.",
+            default=True, phrasings=("focus before injecting", "auto focus elite",
+                                     "auto focus game")),
     Setting("keybinds.confirm_window", ("keybinds", "confirm_window"), "int",
             "Confirm window", "Keybinds",
             "Seconds an armed action stays confirmable before it expires.",

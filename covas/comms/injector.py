@@ -65,16 +65,35 @@ class ClipboardTextInjector:
         copy: Optional[Callable[[str], None]] = None,
         sleep: Callable[[float], None] = time.sleep,
         settle: float = DEFAULT_SETTLE_SECONDS,
+        focuser: object | None = None,
     ) -> None:
         self._executor = executor
         self._copy = copy or clipboard.copy
         self._sleep = sleep
         self._settle = max(0.0, float(settle))
+        # Optional window focuser (#105): when present, pull ED to the front before pasting so the
+        # message can't land in the wrong window. Passed only when [keybinds].focus_before_inject
+        # is on (app wires it that way); None restores the old ambient-focus behaviour. Every use
+        # is guarded and best-effort — a focus fault never blocks the send.
+        self._focuser = focuser
+
+    def _maybe_focus(self) -> None:
+        """Best-effort auto-focus before injection (#105). No-op without a focuser; a fast no-op
+        when ED is already frontmost (the focuser's hot path — no enumeration). Never raises: a
+        focus failure is swallowed and the paste is attempted anyway (old ambient behaviour)."""
+        if self._focuser is None:
+            return
+        try:
+            self._focuser.ensure_foreground()
+        except Exception:  # noqa: BLE001 — focus is best-effort; the send must still proceed
+            pass
 
     def inject(self, text: str) -> None:
         """Put `text` on the clipboard and paste it (Ctrl+V) into the focused chat box. Raises
         `InjectorError` on a clipboard or key-injection failure so the capability can fail soft
-        (it must never leave a half-typed message and never crash the loop)."""
+        (it must never leave a half-typed message and never crash the loop). Foregrounds ED first
+        when a focuser is wired (#105) — `send()` follows immediately, so one focus covers both."""
+        self._maybe_focus()
         try:
             self._copy(str(text))
         except Exception as e:  # noqa: BLE001 — ClipboardError or any writer fault -> normalize

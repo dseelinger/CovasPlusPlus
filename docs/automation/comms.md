@@ -49,6 +49,12 @@ Enter.**
 The composed text is normalised to a single line first (newlines collapsed, length capped), so it
 can't commit early or run away.
 
+Because the paste goes into **whatever window has focus**, COVAS brings the Elite Dangerous
+window to the front first, so a message can't misfire into a browser or the control panel. This
+is a no-op when ED is already focused, and it's governed by the shared
+[`[keybinds].focus_before_inject`](keybinds.md#focus-the-game-window-105) setting (on by default);
+turn it off to paste into whatever window currently has focus.
+
 ## Set up your binds
 
 COVAS presses **keyboard** keys, so the controls it needs must be bound to a **key** in Elite

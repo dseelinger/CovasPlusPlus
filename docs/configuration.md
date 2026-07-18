@@ -344,6 +344,7 @@ See [Keybind automation](automation/keybinds.md). **Off by default** — it send
 | `keybinds.enabled` | `false` | Master switch |
 | `keybinds.require_confirmation` | `true` | Require a separate spoken confirm before firing (leave on) |
 | `keybinds.combat_guard` | `true` | Refuse during danger/interdiction or unknown status (leave on) |
+| `keybinds.focus_before_inject` | `true` | Bring Elite to the front before a ship control or comms send so the key can't misfire into another window (no-op if already focused; leave on) — see [Focus the game window](automation/keybinds.md#focus-the-game-window-105) |
 | `keybinds.mode_guard` | `true` | Only offer/run actions valid for your current mode (mainship/fighter/SRV/on-foot; leave on) |
 | `keybinds.binding_preference` | `"primary"` | Which `.binds` slot to read the key from: `primary` or `secondary` |
 | `keybinds.confirm_window` | `60` | Seconds an armed action stays confirmable |

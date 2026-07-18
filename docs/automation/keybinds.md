@@ -51,6 +51,34 @@ Three voice commands are involved:
 | `toggle_landing_gear` | Arms the landing-gear toggle (doesn't fire) |
 | `confirm_keybind` | Confirms and executes the armed action (refused in the same turn it was armed) |
 | `abort_keybinds` | Hard abort — cancels anything armed and releases every held key |
+| `focus_game` | Bring the Elite Dangerous window to the front (see below) — fires immediately, no confirm |
+
+## Focus the game window (#105)
+
+COVAS presses keys into **whatever window currently has focus.** If focus has drifted — you
+glanced at the control panel, a browser stole foreground, or you alt-tabbed — a spoken "landing
+gear" would land in the wrong window. Two features make injection **deterministic**:
+
+- **Say _"focus Elite"_ / _"set focus on the game"_** and COVAS brings the ED window to the
+  front on demand. It even **un-minimises** ED if it's minimised. If the game isn't running,
+  COVAS says so rather than pretending it worked. This command is always available (no allowlist,
+  mode, or combat gate — foregrounding a window is always safe) whenever keybinds are enabled.
+- **Auto-focus before injection** (on by default): right before a ship control fires — or a
+  comms message is sent — COVAS pulls ED to the front first, so the keypress can't misfire into
+  another window. When ED is *already* the active window (the normal case while you're flying)
+  this is a **free no-op** — it costs one quick check, nothing more. It is deliberately **not**
+  applied to combat reflexes (they must fire instantly, and in combat you're already focused on
+  the game) or to any command that doesn't press a key into ED (HUD placement, settings,
+  checklist, nav lookups).
+
+Turn auto-focus off with `[keybinds].focus_before_inject = false` if you'd rather injection use
+whatever window currently has focus. The explicit *"focus Elite"* command still works regardless.
+
+!!! note "VR (VDXR / Virtual Desktop)"
+    Even in the headset, ED runs as an ordinary desktop process, and injected input targets the
+    desktop foreground — so focusing ED matters on the VR rig too. Whether Virtual Desktop's
+    streaming does anything unusual to desktop focus is the one thing only the real rig can settle
+    (see the manual test).
 
 ## Tier-1 ship-systems actions (#31)
 
@@ -275,6 +303,7 @@ other slot, so a keyboard bind on either one is found.
 | `keybinds.enabled` | Master switch (off by default) |
 | `keybinds.require_confirmation` | Require a separate spoken confirm before firing (leave on) |
 | `keybinds.combat_guard` | Refuse during danger/interdiction or unknown status (leave on) |
+| `keybinds.focus_before_inject` | Bring Elite to the front before a ship control or comms send (no-op if already focused; leave on) |
 | `keybinds.mode_guard` | Only offer/run actions valid for your current mode (ship/fighter/SRV/foot; leave on) |
 | `keybinds.binding_preference` | Which `.binds` slot to read the key from: `primary` (default) or `secondary` |
 | `keybinds.confirm_window` | Seconds an armed action stays confirmable |

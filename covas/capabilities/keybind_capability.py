@@ -64,6 +64,10 @@ class KeybindConfig:
     mode_guard: bool = True                  # gate actions to the current game mode (#29)
     confirm_window: float = 60.0            # seconds an armed action stays confirmable
     allowlist: tuple[str, ...] = ("landing_gear",)
+    # Foreground ED right before a deliberate macro fires so the keypress can't misfire into a
+    # window that stole focus (#105). Default ON: if the Commander asks for a ship control, they
+    # want the key to reach ED. The `focus_game` tool ships regardless of this toggle.
+    focus_before_inject: bool = True
 
     @classmethod
     def from_cfg(cls, cfg: dict) -> "KeybindConfig":
@@ -81,6 +85,7 @@ class KeybindConfig:
             mode_guard=bool(k.get("mode_guard", True)),
             confirm_window=float(k.get("confirm_window", d.confirm_window)),
             allowlist=allow,
+            focus_before_inject=bool(k.get("focus_before_inject", d.focus_before_inject)),
         )
 
 
@@ -137,6 +142,21 @@ _ABORT_TOOL = {
     "input_schema": {"type": "object", "properties": {}, "required": []},
 }
 
+# Bringing a window to the front is always safe — no allowlist/mode/combat gate — so this tool is
+# advertised whenever keybinds are enabled (#105). It fires immediately (no arm/confirm): the
+# Commander explicitly asked to focus the game.
+_FOCUS_TOOL = {
+    "name": "focus_game",
+    "description": (
+        "Bring the Elite Dangerous window to the foreground (make it the active window). Call this "
+        "when the Commander asks to focus / switch to / bring up the game (e.g. 'focus Elite', "
+        "'set focus on the game', 'bring Elite to the front'). Safe to run any time — it only "
+        "changes which window is in front, it doesn't touch ship controls. If the game isn't "
+        "running, say so."
+    ),
+    "input_schema": {"type": "object", "properties": {}, "required": []},
+}
+
 
 def _arm_tool(macro: Macro) -> dict:
     return {
@@ -173,6 +193,7 @@ class KeybindCapability:
         config: KeybindConfig,
         macros: dict[str, Macro] | None = None,
         status_snapshot: Callable[[], dict | None] | None = None,
+        focuser: object | None = None,
         abort_event: threading.Event | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
@@ -180,6 +201,10 @@ class KeybindCapability:
     ) -> None:
         self._binds = binds or {}
         self._executor = executor
+        # Window focuser (#105): powers the explicit `focus_game` tool and the auto-focus pre-step
+        # before a macro fires. None off-Windows (or when focus couldn't be built) — every use is
+        # guarded, so the capability degrades to the old ambient-focus behaviour, never crashes.
+        self._focuser = focuser
         self._cfg = config
         self._macros = macros or dict(DEFAULT_MACROS)
         self._status = status_snapshot
@@ -206,6 +231,11 @@ class KeybindCapability:
         out = [_arm_tool(m) for m in self._advertised_macros()]
         out.append(_CONFIRM_TOOL)
         out.append(_ABORT_TOOL)
+        # `focus_game` is NOT allowlist/mode/combat-gated — foregrounding a window is always safe —
+        # so advertise it whenever keybinds are enabled, even with an empty macro allowlist. Only
+        # offered when a focuser exists (absent off-Windows), so the tool never dead-ends (#105).
+        if self._focuser is not None:
+            out.append(_FOCUS_TOOL)
         return out
 
     def help_meta(self) -> HelpMeta:
@@ -217,7 +247,10 @@ class KeybindCapability:
                        "controls — and run multi-step sequences (like a pad launch) that check "
                        "your game status between steps instead of firing blind. Always mode-aware "
                        "and behind a combat safety check; disruptive actions need a separate "
-                       "spoken confirmation, and 'abort' stops everything and releases held keys."),
+                       "spoken confirmation, and 'abort' stops everything and releases held keys. "
+                       "I can also bring the Elite window to the front on command ('focus Elite'), "
+                       "and I pull it forward before pressing a control so the key can't land in "
+                       "the wrong window."),
             example="toggle my landing gear",
         )
 
@@ -225,6 +258,8 @@ class KeybindCapability:
         try:
             if name == "abort_keybinds":
                 return self._abort()
+            if name == "focus_game":
+                return self._focus_game()
             if name == "confirm_keybind":
                 return self._confirm()
             for m in self._allowed_macros():
@@ -317,11 +352,45 @@ class KeybindCapability:
         self._logline("aborted — cleared pending, released keys")
         return "Aborted — cleared any armed action and released all keys."
 
+    # -- focus (#105) -----------------------------------------------------------------
+    def _focus_game(self) -> str:
+        """Explicit `focus_game` tool: bring ED to the front on command. Not allowlist/mode/combat
+        gated — foregrounding is always safe. Fail-soft Commander-facing returns; never raises
+        (run_tool wraps it too, but keep the message clean)."""
+        if self._focuser is None:
+            return "I can't focus the Elite window on this system."
+        try:
+            if self._focuser.find_ed_window() is None:
+                return "I can't find the Elite window — is the game running?"
+            if self._focuser.ensure_foreground():
+                self._logline("focused ED window")
+                return "Brought Elite Dangerous to the front."
+            return ("I found Elite but couldn't bring it to the front — try alt-tabbing to it "
+                    "once, then ask again.")
+        except Exception as e:  # noqa: BLE001 — focus is best-effort; never crash the loop
+            self._logline(f"focus_game error: {e}")
+            return "I couldn't focus the Elite window just now."
+
+    def _maybe_focus(self) -> None:
+        """Auto-focus pre-step (#105): pull ED to the front right before a deliberate macro fires,
+        so the keypress can't misfire into a window that stole focus. Gated on
+        `focus_before_inject` and a fast no-op when ED is already frontmost (the hot path — no
+        enumeration). Best-effort: a focus failure is logged and we still attempt the press, which
+        preserves the old ambient-focus behaviour rather than refusing the command. Wired ONLY
+        here and in the comms send path — never a global pre-hook, never on combat reflexes."""
+        if self._focuser is None or not self._cfg.focus_before_inject:
+            return
+        try:
+            self._focuser.ensure_foreground()
+        except Exception as e:  # noqa: BLE001 — never let a focus fault block the macro
+            self._logline(f"auto-focus before macro failed: {e}")
+
     # -- execution + guard ------------------------------------------------------------
     def _execute(self, macro: Macro) -> str:
         """Run the macro — a status-checked SEQUENCE (issue #33) or a single press/hold. The
         allowlist/combat/mode guards and (for consequential macros) confirmation have already
         passed by the time we get here."""
+        self._maybe_focus()   # pull ED forward first so the key lands in the game (#105)
         if macro.steps:
             return self._execute_sequence(macro)
         binding = self._binds.get(macro.action)
