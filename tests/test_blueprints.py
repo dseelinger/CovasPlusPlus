@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from types import MappingProxyType
 
-from covas.ed.blueprints import BlueprintLibrary, parse_grade
+from covas.ed.blueprints import BlueprintLibrary, cap_for_grade, parse_grade
 from covas.ed.materials import MaterialsSnapshot
 
 # A tiny, self-contained library so the resolver/shortfall logic is tested independent of the
@@ -103,6 +103,34 @@ def test_recipe_falls_back_to_nearest_lower_grade():
     bp = _lib().blueprint("FSD_FastBoot")
     assert bp.recipe(3) == (("iron", 8),)
     assert bp.max_grade == 5
+
+
+# --- material resolution + grade caps (#132) -------------------------------------------------
+
+def test_resolve_material_matches_by_name_and_symbol():
+    lib = _lib()
+    assert lib.resolve_material("chemical manipulators").symbol == "chemicalmanipulators"
+    assert lib.resolve_material("arsenic").symbol == "arsenic"
+    assert lib.resolve_material("iron").symbol == "iron"
+
+
+def test_resolve_material_no_match_returns_none():
+    assert _lib().resolve_material("flux capacitor") is None
+
+
+def test_materials_by_category_filters_and_sorts_by_grade_then_name():
+    lib = _lib()
+    raws = lib.materials_by_category("raw")            # case-insensitive
+    assert [m.symbol for m in raws] == ["iron", "arsenic"]   # grade 1 before grade 2
+    assert [m.symbol for m in lib.materials_by_category("Manufactured")] == ["chemicalmanipulators"]
+    assert lib.materials_by_category("encoded") == []        # none in this tiny fixture
+
+
+def test_cap_for_grade_is_the_fixed_ed_table():
+    assert cap_for_grade(1) == 300
+    assert cap_for_grade(5) == 100
+    assert cap_for_grade(0) is None
+    assert cap_for_grade(None) is None
 
 
 # --- committed bundled data ------------------------------------------------------------------

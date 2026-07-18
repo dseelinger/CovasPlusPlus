@@ -492,6 +492,26 @@ Notes:
 
 Notes:
 
+### 5.4a Materials inventory (#132)  🎮 ED
+> Requires `[elite].enabled = true`, same live `Materials` inventory as §5.4 — launch ED (any
+> ship) before testing. Cross-check counts against your in-game Right Panel → Inventory.
+- [ ] **Single-material count:** *"How many arsenic do I have?"* → the exact count, its grade, and
+      its cap; matches the in-game figure.
+- [ ] **Fuzzy naming:** ask for a material by a shortened/spoken name (e.g. *"wake solutions"* for
+      "Strange Wake Solutions") → resolves to the right material, not a different one.
+- [ ] **Bucket listing:** *"List my raw materials."* → only materials you're actually **holding**
+      are named (no zero-count ones recited), kept short.
+- [ ] **Near-cap filter:** *"What raw materials am I near-capped on?"* → same listing, narrowed to
+      ones at/close to their grade cap only (or an honest "nothing near-capped" if none qualify).
+- [ ] **What am I capped on:** *"What am I capped on?"* → materials at or close to their grade cap
+      across raw/manufactured/encoded; cross-check one against the in-game "MAX" indicator.
+- [ ] **Unrecognized material:** ask about a made-up material name → says it doesn't recognize it,
+      never invents a count.
+- [ ] **Honest when blind:** with ED not yet loaded (no `Materials` seen), any of the above says it
+      hasn't read your materials yet — no count, listing, or cap claim.
+
+Notes:
+
 ## 6. Ship controls — keybinds, auto-honk & comms  🎮 ED ⌨️ INJECT 🔊 HW
 > These send **real keypresses** into ED. Keybinds/auto-honk need `[elite].enabled = true` (combat guard) — do them **parked/docked and safe**. Comms send (§6.4) needs no ED monitoring but is **outward-facing**, so test it in a quiet/solo instance.
 

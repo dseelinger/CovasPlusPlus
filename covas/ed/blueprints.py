@@ -11,6 +11,11 @@ are regenerated from EDCD/coriolis-data + EDCD/FDevIDs) and turns them into answ
                     inventory (a `MaterialsSnapshot`): per material, how many are NEEDED vs HELD,
                     so "missing" is computed, never invented.
   * `MaterialInfo.source` — where to source a material (trader group + evergreen farm hint).
+  * `resolve_material()` / `materials_by_category()` — the material-side lookups (#132) behind the
+                    DIRECT "how many X do I have" / bucket-listing queries in
+                    `capabilities/materials_capability.py`, reusing this same catalogue.
+  * `cap_for_grade()` — the fixed ED grade->storage-cap table (300/250/200/150/100), used to say
+                    what a Commander is capped or close to capped on.
 
 Pure + offline: the JSON is read once and cached; nothing here touches the network. Everything
 spoken is derived from these tables plus the journal's own counts.
@@ -34,6 +39,21 @@ _STOP = {"grade", "the", "a", "an", "my", "for", "to", "of", "on", "blueprint", 
          "level", "tier", "please", "get", "need", "want", "make", "roll", "rolls"}
 _GRADE_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
+
+# ED's storage cap per material grade — the SAME table for Raw / Manufactured / Encoded (#132).
+# Not part of the bundled JSON (it's a fixed game rule, not per-material data), so it lives here
+# next to the other engineering-domain constants rather than as a second material table.
+GRADE_CAPS: dict[int, int] = {1: 300, 2: 250, 3: 200, 4: 150, 5: 100}
+
+
+def cap_for_grade(grade: int) -> int | None:
+    """The storage cap ED enforces for `grade` (1-5), or None when the grade is unknown/0 — a
+    cap is never invented for a material we don't have grade data for."""
+    try:
+        g = int(grade)
+    except (TypeError, ValueError):
+        return None
+    return GRADE_CAPS.get(g)
 
 
 def _tokens(text: str) -> set[str]:
@@ -131,6 +151,44 @@ class BlueprintLibrary:
 
     def blueprint(self, key: str) -> Blueprint | None:
         return self._blueprints.get(key)
+
+    def all_materials(self) -> list[MaterialInfo]:
+        """Every known material, unordered — the bundled catalogue's own entries, nothing added."""
+        return list(self._materials.values())
+
+    def materials_by_category(self, category: str) -> list[MaterialInfo]:
+        """Every known material in `category` ("Raw"/"Manufactured"/"Encoded", case-insensitive),
+        sorted by grade then name. The bucket comes straight from the bundled table (#132) — never
+        a second, hand-maintained material list."""
+        want = str(category or "").strip().lower()
+        out = [m for m in self._materials.values() if m.category.strip().lower() == want]
+        return sorted(out, key=lambda m: (m.grade, m.name))
+
+    def resolve_material_scored(self, query: str) -> list[tuple[int, MaterialInfo]]:
+        """Rank materials matching a spoken request as `(score, MaterialInfo)`, best first —
+        the material-side twin of `resolve_scored` (#132). Materials don't carry aliases, so this
+        matches on the material's spoken NAME and its journal symbol. Empty list means no match."""
+        q = _tokens(query) - _STOP
+        if not q:
+            return []
+        scored: list[tuple[int, int, MaterialInfo]] = []
+        for i, info in enumerate(self._materials.values()):
+            name_tok = _tokens(info.name)
+            symbol_tok = _tokens(info.symbol)
+            name_hits = len(q & name_tok)
+            exact_name = 40 if name_tok and name_tok <= q else 0
+            exact_symbol = 30 if symbol_tok and symbol_tok <= q else 0
+            score = exact_name + exact_symbol + name_hits * 10
+            if score > 0:
+                scored.append((-score, i, info))
+        scored.sort(key=lambda t: (t[0], t[1]))
+        return [(-neg, info) for neg, _i, info in scored]
+
+    def resolve_material(self, query: str) -> MaterialInfo | None:
+        """The single best material match for a spoken request, or None (see
+        `resolve_material_scored`)."""
+        scored = self.resolve_material_scored(query)
+        return scored[0][1] if scored else None
 
     def resolve_scored(self, query: str) -> list[tuple[int, Blueprint]]:
         """Rank blueprints matching a spoken request as `(score, blueprint)`, best first. A
