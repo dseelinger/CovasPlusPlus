@@ -1680,6 +1680,48 @@ The original seven-phase plan is done and tested:
     beats reciting them one at a time by voice, and beats EDCoPilot/COVAS:NEXT, which offer no grounded
     local engineer-unlock dashboard at all.**
 
+NN. **Per-ship config memory + engineering planning, bridged to the checklist** (issue #135, the
+    engineering-epic capstone; `covas/ed/ship_loadouts.py` (new), `covas/ed/context.py`,
+    `covas/ed/journal.py`, `covas/config.py`, `config.toml`, `.gitignore`, `covas/bootstrap.py`,
+    `covas/capabilities/ship_engineering_plan_capability.py` (new)) — Elite only ever describes the
+    ship you're **currently** flying (`Loadout`), replacing `EDContext._loadout` wholesale on each
+    board, so switching ships lost the prior one's build. This adds the **persistent per-ship config
+    memory** that fixes it and the conversational **engineering planner** it unlocks. A new
+    **`ShipLoadoutStore`** (mirroring `owned_ships`/`npc_crew`: atomic temp-then-replace save,
+    fail-soft `load`, git-ignored `ship_loadouts.json` via a new `[ships].loadouts_file` path field)
+    persists a **serialized `LoadoutSnapshot` per journal ShipID** — the SAME identity spine the #134
+    owned-ships registry keys on — so each owned ship's modules + applied engineering (blueprint,
+    grade, quality, experimental, modifiers) survive **ship switches AND restarts**. `snapshot_to_dict`
+    / `snapshot_from_dict` round-trip the frozen `LoadoutSnapshot`/`ShipModule`/`Engineering`/`Modifier`
+    graph; `from_dict` is **total** (a bad module drops, a garbled engineering block becomes None) so a
+    hand-edited/older file still loads. Capture hooks the existing `Loadout` path in `journal.py`
+    (alongside `set_loadout` + `reconcile_owned_from_loadout`) via a lock-protected `EDContext`
+    accessor (`capture_loadout` / `ship_loadout(ship_id)` / `remembered_ship_ids`), single-writer on
+    the journal thread. The new **`ShipEngineeringPlanCapability`** is the payoff: `remembered_ship_build`
+    recalls any owned ship's build (resolving a spoken name → ShipID through the #134 registry, then
+    the store — so it works for a ship you're NOT flying), and `plan_engineering_upgrade` grounds a
+    plan on FOUR real sources with **no duplicated data** — the remembered module's current blueprint +
+    grade, the bundled blueprint recipe crossed with **live materials** (reusing `BlueprintLibrary.line_items`
+    #66) for the shortfall, and **live `EngineerProgress`** (#65 `find_by_specialty`/`status_for`) for
+    who applies it + unlock status. It **never fabricates**: a ship with no remembered loadout is told
+    so, a still-stock module is asked-which-blueprint rather than guessed, a shortfall is real math over
+    real counts. The **checklist bridge** is the LLM-native seam the sibling capabilities already use —
+    the tool descriptions invite the model to record the plan through the EXISTING `add_objective`
+    (and complete/remove via the same checklist CRUD), so an engineering plan is just ordinary,
+    trackable checklist items; no parallel checklist. All getters are injected (offline-testable).
+    Offline-unit-tested: the snapshot (de)serialization round-trip + total fail-soft `from_dict`, the
+    store capture/get/switch-retains-prior/corrupt-file degradation, the journal wiring (switching
+    ships keeps the prior build), the grounded plan (current grade + material shortfall + engineer
+    status), the honest paths (no build / stock-not-guessed / unknown module), and a plan → checklist
+    round-trip through the REAL `ChecklistCapability` CRUD (`tests/test_ship_loadouts.py`,
+    `tests/test_ship_engineering_plan_capability.py`); the per-ship-survives-switch/restart + grounded
+    plan + checklist round-trip on-hardware checks are `MANUAL_TESTS.md` §9a-3. Docs:
+    `docs/elite/engineering-planning.md` (+ `mkdocs.yml` nav). **Improvement thesis (Assist): a
+    companion that remembers how EACH of your ships is built and plans engineering against its real
+    loadout + your real materials + your real engineer progress, then tracks the plan on your
+    checklist — where EDCoPilot/COVAS:NEXT have no persistent per-ship build memory or grounded,
+    checklist-integrated engineering planner at all.**
+
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 

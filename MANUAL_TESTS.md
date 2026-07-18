@@ -893,6 +893,19 @@ Notes:
 - [ ] **Voice remove + disambiguation:** *"remove the Cobra"* → removed; if you own **two** Cobras it **asks which one** rather than guessing.
 - [ ] **Corrections survive:** add a ship (or rename one) by voice, then dock somewhere with a shipyard (fires `StoredShips` / `Loadout`) → your manual entry / custom name is **still there**, not clobbered.
 - [ ] **Fail-soft before data:** ask *"what ships do I own?"* on a brand-new install with no journal history → it says it hasn't recorded any yet (no crash).
+## 9a-3. Per-ship engineering planning (issue #135)  🎮 ED 🔊 HW 📋 FILE
+> `[elite].enabled = true`. Each owned ship's **build** (modules + applied engineering) is remembered
+> per journal ShipID and persisted git-ignored to `ship_loadouts.json`, so it survives ship switches
+> and restarts. Planning is grounded on that remembered build crossed with your live materials (#66)
+> and engineer unlock status (#65); the plan writes to the **checklist** via the existing CRUD. Board
+> your ships at least once this session so their loadouts are captured.
+- [ ] **Remembered build of the active ship:** *"What's the engineering on my ship?"* → lists your engineered modules (blueprint + grade) and which core modules are still stock. Cross-check against the in-game outfitting/engineering panel.
+- [ ] **Config remembered per ship — survives a switch:** note the build of ship A, switch to ship B in the shipyard (fires a new `Loadout`), then ask *"what's the engineering on my <ship A>?"* (naming ship A, which you're **not** flying) → it recalls **ship A's** build, not ship B's.
+- [ ] **Survives a restart:** quit COVAS++, relaunch, and **before boarding anything** ask *"what should I engineer next on my <ship>?"* → the remembered build is still there (loaded from `ship_loadouts.json`).
+- [ ] **Grounded upgrade plan:** *"What's left to grade 5 my FSD?"* → reports the FSD's **current** grade (from memory), the material **shortfall** for grade 5 (matching your real inventory), and **which engineer** applies it with your unlock status. Confirm the shortfall against the in-game materials count.
+- [ ] **No remembered build → honest:** ask about a ship COVAS++ hasn't seen a `Loadout` for this install → it says it has no remembered build for that ship and to board it, rather than inventing modules.
+- [ ] **Stock module isn't guessed:** *"Plan grade 5 on my <a stock module>"* → it says the module is stock and **asks which blueprint** (offering real options), rather than assuming one.
+- [ ] **Plan → checklist round-trip:** *"Add engineering my FSD to grade 5 to my checklist"* → it adds a checklist objective naming the module/grade/engineer/shortfall; *"what's next?"* shows it; *"mark engineering the FSD done"* completes it. Confirm the line appears/updates on the Checklist page too.
 ## 9a. Engineers finder (#65)  🎮 ED 🔊 HW 📋 clipboard
 > `[elite].enabled = true`. Unlock **status** is read live from the journal's `EngineerProgress`
 > event (written at login); locations/requirements come from a bundled offline table. Log into the

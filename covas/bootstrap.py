@@ -296,6 +296,15 @@ def build_ed_monitoring(app: "App") -> None:
         _ships_reg_path = str((app.cfg.get("ships", {}) or {}).get("registry_file", "") or "").strip()
         if _ships_reg_path:
             app.ed_ctx.set_owned_ships_registry(OwnedShipsRegistry.load(_ships_reg_path))
+        # Per-ship config memory (issue #135): load the persisted per-ship loadout+engineering store
+        # (path resolved under the data dir by config) so the journal watcher captures each Loadout
+        # by ShipID and the engineering-planning capability can recall a ship's build. Fail-soft: a
+        # missing file loads empty.
+        from .ed.ship_loadouts import ShipLoadoutStore
+        from .capabilities.ship_engineering_plan_capability import ShipEngineeringPlanCapability
+        _ships_loadouts_path = str((app.cfg.get("ships", {}) or {}).get("loadouts_file", "") or "").strip()
+        if _ships_loadouts_path:
+            app.ed_ctx.set_ship_loadout_store(ShipLoadoutStore.load(_ships_loadouts_path))
         app.registry.register(EDContextCapability(app.ed_ctx))
         # Owned-ships list + voice CRUD (#134): the conversational surface over the fleet identity.
         # All mutations go through the lock-protected EDContext methods (serialised vs the journal
@@ -341,6 +350,20 @@ def build_ed_monitoring(app: "App") -> None:
             get_current_system=lambda: app.ed_ctx.snapshot().get("system"),
             clipboard=_nav_copy,
             log=lambda m: app._log("engineers", m)))
+        # Per-ship engineering planning (#135): the conversational payoff — "what should I engineer
+        # next on my Python", "what's left to G5 my FSD" — grounded on the per-ship loadout memory
+        # (ed/ship_loadouts.py) crossed with the bundled blueprints (#66), live materials, and
+        # engineer unlock status (#65). Resolves a spoken ship name via the owned-ships registry
+        # (#134) to a ShipID, then recalls that ship's remembered build. All getters are the live
+        # lock-protected EDContext accessors; the checklist bridge is the LLM-native add_objective
+        # seam (in the tool descriptions), reusing the existing checklist CRUD.
+        app.registry.register(ShipEngineeringPlanCapability(
+            get_owned=app.ed_ctx.owned_ships,
+            get_ship_loadout=app.ed_ctx.ship_loadout,
+            get_active_loadout=app.ed_ctx.loadout_snapshot,
+            get_materials=app.ed_ctx.materials_snapshot,
+            get_progress=app.ed_ctx.engineer_progress,
+            log=lambda m: app._log("engineering_plan", m)))
         # On-foot (Odyssey suit/weapon) engineering (#73): bundled reference for suits,
         # weapons, modifications and the 13 on-foot engineers. Joins the SAME live
         # EngineerProgress event (on-foot engineers share it) for grounded unlock status.
