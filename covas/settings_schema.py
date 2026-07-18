@@ -805,6 +805,32 @@ SCHEMA: list[Setting] = [
             "Open-comms bind", "Comms",
             "ED action token that opens the chat text box (bind it to a KEY in-game).",
             default="QuickCommsPanel", phrasings=("comms open bind",)),
+    Setting("comms_send.channel_local", ("comms_send", "channel_local"), "string",
+            "Local chat bind", "Comms",
+            "ED action token that selects the local chat channel before sending. Blank = send on "
+            "your currently-selected channel. Bind it to a key in Elite Dangerous.",
+            default="", phrasings=("local chat bind", "local comms bind")),
+    Setting("comms_send.channel_wing", ("comms_send", "channel_wing"), "string",
+            "Wing chat bind", "Comms",
+            "ED action token that selects the wing chat channel before sending. Blank = send on "
+            "your currently-selected channel. Bind it to a key in Elite Dangerous.",
+            default="", phrasings=("wing chat bind", "wing comms bind")),
+    Setting("comms_send.channel_squadron", ("comms_send", "channel_squadron"), "string",
+            "Squadron chat bind", "Comms",
+            "ED action token that selects the squadron chat channel before sending. Blank = send on "
+            "your currently-selected channel. Bind it to a key in Elite Dangerous.",
+            default="", phrasings=("squadron chat bind", "squadron comms bind")),
+    Setting("comms_send.channel_direct", ("comms_send", "channel_direct"), "string",
+            "Direct-message bind", "Comms",
+            "ED action token that selects the direct-message chat channel before sending. Blank = send "
+            "on your currently-selected channel. Bind it to a key in Elite Dangerous.",
+            default="", phrasings=("direct message bind", "direct chat bind", "dm bind")),
+    Setting("comms_send.settle_seconds", ("comms_send", "settle_seconds"), "float",
+            "Comms settle delay", "Comms",
+            "Pause after focusing the chat box, selecting a channel, or pasting, so the field keeps up "
+            "before the next keystroke. Raise it if messages come out garbled.",
+            default=0.15, min=0.0, max=2.0, unit="s",
+            phrasings=("comms settle delay", "comms settle seconds")),
 
     # --- Sound cues --------------------------------------------------------
     Setting("audio.thinking_bed", ("audio", "thinking_bed"), "bool",

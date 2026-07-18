@@ -640,6 +640,7 @@ Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_
 - [ ] **Longer message + channel:** *"Message my wing: forming up at the nav beacon."* → reads it back as wing chat; confirm → it sends. (If you set `channel_wing`, verify it switches to the wing tab first.)
 - [ ] **Multi-line / dictation artefacts:** a message that transcribes with a line break sends as a **single line** (no early send).
 - [ ] **Unbound open key:** with **Quick Comms Panel** NOT bound to a key, ask to send → spoken *"bind QuickCommsPanel to a key…"*; nothing sends.
+- [ ] **Channel binds on the Settings page (issue #129):** Settings → **Comms** shows **Local / Wing / Squadron / Direct-message chat bind** fields (plus **Comms settle delay**). Set **Squadron chat bind** to your ED squadron-chat action token and SAVE → *"message my squadron: forming up"* → read-back → *"send it"* lands in **squadron** chat, no restart. Also voice-settable: *"set the squadron chat bind to &lt;token&gt;"*. Leaving a field blank sends on the current channel (unchanged).
 - [ ] **Configured-but-unbound channel key:** set `channel_wing` to a token you haven't bound → asking to message the wing is refused with a *"bind it in-game"* message; nothing sends.
 - [ ] **Expiry:** compose, wait past `confirm_window` (default 60 s), say "confirm" → *"that message expired for safety"*; nothing sends.
 - [ ] **Hard abort:** say *"abort"* → releases any held key (shared executor with keybinds/honk).
