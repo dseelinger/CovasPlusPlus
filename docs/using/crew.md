@@ -142,6 +142,57 @@ doesn't just *sound* the same each turn — she *acts* the same. The model reach
 defined instead of inventing new names, and voices each in character. Leave the roster empty to let
 the companion pick names that fit the moment (each still gets a stable voice).
 
+## Speaking to your crew
+
+You can address a crew member directly and they'll answer for themselves. Say *"Nyx, how are we
+looking?"* and the reply comes back prefixed `[Nyx]`, in Nyx's voice, in character for her role and
+personality — the companion may add its own line before or after. Address the whole crew (*"all
+hands, sound off"*) and each member gives a short line in turn.
+
+This is delivered entirely at the prompt level: the same `[Name]` machinery above carries it, so
+there's nothing new to configure — turning crew on is enough. Keep in mind the model *chooses* to
+answer in-character; it's guidance, not a hard routing rule.
+
+!!! note "Pronounceable names travel better"
+    Addressing rides on speech-to-text, and STT can mangle exotic spellings — a name like *"Xy'thra"*
+    may not survive the trip from microphone to text, so the model never sees it to answer as that
+    member. Prefer **short, pronounceable** roster names (Nyx, Vela, Rho) for crew you plan to talk
+    to. There's no fuzzy name-matching layer; what STT hears is what the model gets.
+
+## Crew chatter (ambient)
+
+With crew on, roster members also speak up on their own now and then — a brief, in-character
+**ambient** line in their own voice on the comms channel, coloured by their **role** and whatever's
+happening right now. The fighter pilot mutters through an interdiction; the quartermaster grumbles
+as the hold fills. Nobody's reading a script: each line is **improvised** from the character's role +
+personality + the live situation, so a sensor officer and a cook sound like different people doing
+different jobs.
+
+Crew chatter follows the same **honesty discipline** as the rest of the ambient layer — a line
+asserts nothing checkable (no names, numbers, or places), it's pure personality. It's **generated or
+nothing**: there's no canned pool, so if a line can't be produced (or doesn't pass the fact-safe
+check) the crew member simply stays quiet that turn.
+
+**What it needs:**
+
+- `[crew].enabled = true` with at least one roster member (a member's **role** is what makes the
+  line role-aware — give your crew roles),
+- the ambient audio layer on (`[audio].enabled`, `[audio.cues].enabled`) **with flavor generation**
+  (`[audio.cues].flavor = true`) — crew chatter is LLM-only, so with flavor off it's silent,
+- you're **in your ship** (crew are aboard — this is *not* population-gated the way station chatter
+  is; it plays out in empty space too).
+
+**Pacing** is deliberately sparse — seasoning, not a podcast. The gap between crew lines is drawn
+from a window you can set, on top of the global ambient rate cap:
+
+```toml
+[crew]
+chatter_min_seconds = 180.0   # fastest gap between crew lines
+chatter_max_seconds = 600.0   # slowest gap
+```
+
+Say *"mute the chatter"* to silence the whole ambient layer (crew lines included) at runtime.
+
 ## Attribution
 
 Crew closes an attribution gap: something the ship *notices on your behalf* can now be voiced by a

@@ -1508,6 +1508,52 @@ The original seven-phase plan is done and tested:
     EDCoPilot/COVAS:NEXT: their crew are invented characters reading scripted lines; COVAS++ turns the
     game's OWN hired NPC — the pilot who actually flies your fighter — into a speaking, role-playing
     character grounded in the Commander's journal.**
+58. **Crew presence — ambient chatter + spoken-to addressing** (issue #126, `covas/mixer/cues.py`,
+    `covas/mixer/chatter.py`, `covas/mixer/runtime.py`, `covas/crew.py`, `covas/settings_schema.py`,
+    `config.toml`) — the payoff on the crew substrate (entries 45/57): crew stop being *quotable* and
+    become *present*, two ways. **(A) Ambient crew chatter.** A new `voice_role=CREW` cue category
+    (`cues.CREW`, alongside `PERSONA`/carrier roles) and a dedicated **`CrewChatterPlayer`** let a
+    roster member occasionally speak a brief, in-character line **in their OWN cast voice** on the
+    comms bus, generated from their **role + persona + the live `situation_context` slice** (the
+    fighter pilot mutters through an interdiction, the quartermaster grumbles as the hold fills). It
+    reuses the entry-51 honesty machinery verbatim — a byte-stable `_CREW_CHATTER_PREFIX` (prompt-cache
+    rule), `is_flavor_safe` (no numbers/proper-nouns) + the `_DEDUPE_WINDOW` near-repeat guard — but is
+    **LLM-or-nothing**: there is NO curated pool, so a generation failure or a rejected line is
+    **silence**, never a fallback. The single `crew_chatter` cue is eligible on `IN_SHIP` only
+    (**NOT** population-gated — crew are aboard your ship regardless of the local system, the
+    deliberate contrast with station chatter); the **crew-enabled + roster-non-empty** gate lives in
+    the player (an empty `roster()` seam → skip) and the `[audio.cues].flavor` gate rides the
+    generator seam (no flavor gen → silence), so those non-game-state conditions stay OUT of the cue's
+    `eligible_states`. Speaker pick is a **deterministic rotation** through the enabled roster (stable
+    order → pure tests); pacing is a CREW-specific **sparse, NOT population-scaled** interval
+    (`[crew].chatter_min/max_seconds`, a randomized gap in-window) on top of the C3 governor. The
+    critical wiring detail: crew chatter runs on the audio **event-pump thread** (via
+    `_dispatch_play`), so it voices **fire-and-forget** through a new `_speak_crew_ambient` (resolve
+    the voice with the SAME precedence as `speak_crew` — explicit `voice_ref` > #124 pairing >
+    deterministic assign — then `_submit_voice` on COMMS and return immediately) — it must NOT use the
+    **blocking** conversation-path `speak_crew` (which `cancel.wait`s the clip duration to order reply
+    segments) or it would stall the pump. `set_generate` re-points the crew player too, so a live
+    provider hot-swap (#90) keeps the tier gate. **(B) Addressing.** Purely prompt-level: a **static**
+    clause appended to `crew.system_instruction` tells the model that when the Commander addresses a
+    member by name it should answer AS that member via a `[Name]` line (short, in character), and that
+    "everyone, sound off" yields a `[Name]` line per member — the conversation path is now
+    **multi-party-addressable**. NO parser/routing change: the existing `parse_segments` →
+    `speak_segments` → `speak_crew` machinery (entry 45) already voices every `[Name]` segment; the
+    clause is constant text present only when crew is enabled, so the cached prefix is unchanged
+    turn-to-turn. STT mangling exotic names is a **documented** limitation (recommend pronounceable
+    roster names) — no fuzzy name-matching was built. Non-goals held: no crew-initiated conversation
+    (one-liners only), no fact-bearing crew ambient speech, no per-member pools, no cross-talk (one
+    speaker per firing). Offline-unit-tested: the cue is contract-clean + IN_SHIP-not-population gated,
+    the prompt's byte-stable prefix carries role/persona/situation, speaker rotation is stable and
+    skips a disabled/empty roster, validated lines route while unsafe/near-repeat/failed/no-generator
+    ones fall to silence, the interval gate throttles (incl. a rejected line NOT re-hitting the
+    generator), and the addressing clause is present-only-when-enabled + static + voices each
+    multi-member segment (`tests/test_crew_chatter.py`, 19 tests). On-hardware crew-voiced chatter,
+    in-voice addressing, and barge-in are `MANUAL_TESTS.md` §18.5f (HW-gated). Docs: `docs/using/
+    crew.md`; help: the `crew.enabled` schema row. **Improvement thesis vs EDCoPilot/COVAS:NEXT: their
+    crew read scripted line packs; COVAS++ crew **improvise** — role-aware, situation-grounded,
+    personality-consistent ambient lines — and can be spoken TO and answer back in their own voice.
+    Generative presence, not a soundboard.**
 
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
