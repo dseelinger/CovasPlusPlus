@@ -59,10 +59,9 @@ def build_family_surface() -> list[dict]:
     from covas.capabilities.route_plan_capability import (NeutronPlanCapability, NeutronPlanConfig,
                                                           RichesPlanCapability, RichesPlanConfig,
                                                           RoutePlanCapability, RoutePlanConfig)
-    from covas.capabilities.search_family import (BodySearchCapability,
-                                                  MinorFactionSearchCapability, MiscSearchCapability,
-                                                  SignalSearchCapability, StationSearchCapability,
-                                                  SystemSearchCapability)
+    from covas.capabilities.search_family import (FACTION_STATES_CATEGORY, MINOR_FACTIONS,
+                                                  SIGNALS, STATIONS, BodySearchCapability,
+                                                  SpecSearchCapability, SystemSearchCapability)
 
     http, clip = _NoHttp(), _noop_copy
     common = dict(http=http, get_current_system=_current_system, clipboard=clip)
@@ -73,11 +72,12 @@ def build_family_surface() -> list[dict]:
         ("find_closest_ship", FindClosestShipCapability(NavConfig(), **common)),
         ("search_star_systems",
          SystemSearchCapability(SearchConfig(), **common)),
-        ("search_stations", StationSearchCapability(SearchConfig(), **search_common)),
+        ("search_stations", SpecSearchCapability(STATIONS, SearchConfig(), **search_common)),
         ("search_minor_factions",
-         MinorFactionSearchCapability(SearchConfig(), **search_common)),
-        ("search_signals", SignalSearchCapability(SearchConfig(), **search_common)),
-        ("search_faction_states", MiscSearchCapability(SearchConfig(), **search_common)),
+         SpecSearchCapability(MINOR_FACTIONS, SearchConfig(), **search_common)),
+        ("search_signals", SpecSearchCapability(SIGNALS, SearchConfig(), **search_common)),
+        ("search_faction_states",
+         SpecSearchCapability(FACTION_STATES_CATEGORY, SearchConfig(), **search_common)),
         ("search_bodies", BodySearchCapability(SearchConfig(), **common)),
         ("plan_trade_route", RoutePlanCapability(RoutePlanConfig(), **common)),
         ("plot_neutron_route", NeutronPlanCapability(NeutronPlanConfig(), **common)),

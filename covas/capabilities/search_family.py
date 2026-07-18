@@ -76,7 +76,7 @@ class SpecSearchCapability:
 
     Injected seams keep the default test run offline: `http` (Spansh poster), `get_current_system`
     (Callable[[], str|None]), `clipboard`, and `factions` (the shared faction-name index, used only
-    by the faction-taking categories). `now` is injectable for the bodies age caveat."""
+    by the faction-taking categories)."""
     # Tiering group (issue #84): the token-budget cluster this capability's tools belong to; the
     # level filter (covas/tiering.py) keeps or drops the whole group as a unit.
     TIERING_GROUP = "search"
@@ -90,8 +90,7 @@ class SpecSearchCapability:
                  get_current_system: Callable[[], str | None] | None = None,
                  clipboard: Callable[[str], None] = _default_copy,
                  factions: FactionIndex | None = None,
-                 log: Callable[[str], None] | None = None,
-                 now: Callable[[], datetime] | None = None) -> None:
+                 log: Callable[[str], None] | None = None) -> None:
         self._d = descriptor
         self._cfg = config
         self._http = http if http is not None else RequestsHttp()
@@ -99,15 +98,17 @@ class SpecSearchCapability:
         self._clipboard = clipboard
         self._factions = factions if factions is not None else FactionIndex()
         self._log = log
-        self._now = now if now is not None else (lambda: datetime.now(timezone.utc))
         self._spec = category(descriptor.category_key)
+        # Built once: tools_for_level() re-reads this every LLM turn, and the schema is
+        # immutable per instance (the find-closest pattern).
+        self._tool = {"name": descriptor.tool_name, "description": descriptor.description,
+                      "input_schema": {"type": "object",
+                                       "properties": dict(descriptor.schema_props),
+                                       "required": list(descriptor.required)}}
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:
-        return [{"name": self._d.tool_name, "description": self._d.description,
-                 "input_schema": {"type": "object",
-                                  "properties": dict(self._d.schema_props),
-                                  "required": list(self._d.required)}}]
+        return [self._tool]
 
     def help_meta(self) -> HelpMeta:
         return self._d.help_meta
@@ -147,9 +148,59 @@ class SpecSearchCapability:
         already-here rule). Returns `(copied, already_here)`."""
         return sup.deliver_system(self._clipboard, name, distance_ly, self._log)
 
+    def deliver_logged(self, name: str, distance_ly: float, detail: str) -> tuple[bool, bool]:
+        """`deliver` plus the standard result log line — `<detail>, clipboard=<here|ok|failed>`.
+        `detail` carries the per-category prefix (match name, distance, filters)."""
+        copied, here = self.deliver(name, distance_ly)
+        self.logline(f"{detail}, "
+                     f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+        return copied, here
+
+    def run_search(self, inp: dict, slots: dict, parse: Callable[[list[dict]], list], *,
+                   empty: str, fresh_field: str | None = None) -> str | tuple[list, float | None]:
+        """The invariant tail every category's run() shares once its slots are validated:
+        resolve the reference system (or speak the NO_SYSTEM line), run the query fail-soft
+        (a `NavError` is spoken, never raised), parse, and speak `empty` when nothing matched.
+        Returns the spoken early-exit string, or `(records, stale_age_days)` on a hit —
+        `stale_age_days` is None unless a `fresh_field` search answered from the stale fallback."""
+        system = self.reference(inp)
+        if not system:
+            return self.NO_SYSTEM
+        try:
+            if fresh_field is not None:
+                results, stale_age = self.query_fresh(slots, system, fresh_field)
+            else:
+                results, stale_age = self.query(slots, system), None
+        except NavError as e:
+            self.logline(f"search failed: {e}")
+            return str(e)
+        records = parse(results)
+        if not records:
+            return empty
+        return records, stale_age
+
     def logline(self, msg: str) -> None:
         if self._log is not None:
             self._log(msg)
+
+
+def _fill_enum_slots(inp: dict, slots: dict, caught: list[str], rows) -> str | None:
+    """Resolve a table of validated slots in order. Each row is `(arg, slot_key, resolve,
+    nearest, spoken_kind, caught_fmt)`; the first unresolvable value returns the shared
+    recovery line (echoing what WAS caught — no search on an unvalidated value), None means
+    every provided value resolved. `caught_fmt` is a `{val}` format for the caught-so-far
+    echo, or None to leave the slot out of it."""
+    for arg, slot_key, resolve, nearest, kind, fmt in rows:
+        raw = inp.get(arg)
+        if raw in (None, ""):
+            continue
+        val = resolve(raw)
+        if val is None:
+            return sup.recovery(raw, kind, nearest(raw), caught=caught)
+        slots[slot_key] = val
+        if fmt is not None:
+            caught.append(fmt.format(val=val))
+    return None
 
 
 # ======================================================================================
@@ -344,24 +395,16 @@ def _run_star_systems(cap: SpecSearchCapability, inp: dict) -> str:
         return ("Tell me what kind of system to look for — an allegiance, economy, "
                 "security level, Powerplay power, and so on.")
 
-    system = cap.reference(inp)
-    if not system:
-        return cap.NO_SYSTEM
-    try:
-        results = cap.query(slots, system)
-    except NavError as e:
-        cap.logline(f"search failed: {e}")
-        return str(e)
-
-    records = parse_systems(results)
-    if not records:
-        return ("I couldn't find a system matching that near you — try relaxing one of the "
-                "filters.")
+    got = cap.run_search(inp, slots, parse_systems,
+                         empty=("I couldn't find a system matching that near you — try "
+                                "relaxing one of the filters."))
+    if isinstance(got, str):
+        return got
+    records, _ = got
     best = records[0]
-    copied, here = cap.deliver(best.name, best.distance_ly)
-    cap.logline(f"nearest match: {best.name} ({best.distance_ly:.1f} ly), "
-                f"filters={sorted(slots)}, "
-                f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+    copied, here = cap.deliver_logged(best.name, best.distance_ly,
+                                      f"nearest match: {best.name} ({best.distance_ly:.1f} ly), "
+                                      f"filters={sorted(slots)}")
     traits: list[str] = []
     if best.allegiance:
         traits.append(best.allegiance)
@@ -515,26 +558,19 @@ def _run_stations(cap: SpecSearchCapability, inp: dict) -> str:
                 "type, a landing-pad size, or how close to the star. (Say 'never mind' to "
                 "drop it.)")
 
-    system = cap.reference(inp)
-    if not system:
-        return cap.NO_SYSTEM
-    try:
-        results = cap.query(slots, system)
-    except NavError as e:
-        cap.logline(f"search failed: {e}")
-        return str(e)
-
     include_carriers = not bool(inp.get("no_carriers"))
-    stations = parse_stations(results, include_carriers=include_carriers)
-    if not stations:
-        return ("I couldn't find a station matching that near you — try relaxing a "
-                "filter, or allowing fleet carriers.")
+    got = cap.run_search(inp, slots,
+                         lambda results: parse_stations(results, include_carriers=include_carriers),
+                         empty=("I couldn't find a station matching that near you — try relaxing "
+                                "a filter, or allowing fleet carriers."))
+    if isinstance(got, str):
+        return got
+    stations, _ = got
     best = stations[0]
-    copied, here = cap.deliver(best.system, best.distance_ly)
-    cap.logline(f"nearest station: {best.station} in {best.system} "
-                f"({best.distance_ly:.1f} ly), filters={sorted(slots)}, "
-                f"carriers={'in' if include_carriers else 'out'}, "
-                f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+    copied, here = cap.deliver_logged(best.system, best.distance_ly,
+                                      f"nearest station: {best.station} in {best.system} "
+                                      f"({best.distance_ly:.1f} ly), filters={sorted(slots)}, "
+                                      f"carriers={'in' if include_carriers else 'out'}")
     line = f"Closest station: {best.station} in {best.system}, {sup.distance_phrase(best.distance_ly)}."
     if best.pad:
         line += f" Largest pad {best.pad}."
@@ -628,6 +664,19 @@ _FACTION_VOCAB = {"allegiance": list(VOCAB["allegiance"]),
                   "faction state": list(FACTION_STATES)}
 
 
+# The validated slots after the faction name, in spoken-echo order: allegiance and government
+# are generic enums; the state resolves through the BGS vocabulary and is left out of the
+# caught-so-far echo (it was never echoed pre-collapse).
+_MF_ENUM_ROWS = (
+    ("allegiance", "allegiance", lambda v: resolve_enum("allegiance", v),
+     lambda v: nearest_enum("allegiance", v), "allegiance", "{val} allegiance"),
+    ("government", "government", lambda v: resolve_enum("government", v),
+     lambda v: nearest_enum("government", v), "government", "{val} government"),
+    ("state", "controlling_minor_faction_state", resolve_state, nearest_state,
+     "faction state", None),
+)
+
+
 def _run_minor_factions(cap: SpecSearchCapability, inp: dict) -> str:
     slots: dict[str, object] = {}
     caught: list[str] = []          # values understood so far, echoed on a later bad slot
@@ -646,50 +695,28 @@ def _run_minor_factions(cap: SpecSearchCapability, inp: dict) -> str:
         slots["controlling_minor_faction" if controls else "minor_faction_presences"] = canon
         caught.append(f"{canon} ({'controls' if controls else 'present'})")
 
-    for arg in ("allegiance", "government"):
-        raw = inp.get(arg)
-        if raw not in (None, ""):
-            val = resolve_enum(arg, raw)
-            if val is None:
-                return sup.recovery(raw, arg, nearest_enum(arg, raw), caught=caught)
-            slots[arg] = val
-            caught.append(f"{val} {arg}")
-
-    state = inp.get("state")
-    if state not in (None, ""):
-        val = resolve_state(state)
-        if val is None:
-            return sup.recovery(state, "faction state", nearest_state(state), caught=caught)
-        slots["controlling_minor_faction_state"] = val
+    recover_msg = _fill_enum_slots(inp, slots, caught, _MF_ENUM_ROWS)
+    if recover_msg:
+        return recover_msg
 
     if not slots:
         return ("Name the minor faction, or give me an allegiance, government, or state to "
                 "look for. (Say 'never mind' to drop it.)")
 
-    system = cap.reference(inp)
-    if not system:
-        return cap.NO_SYSTEM
-    try:
-        # A faction's PRESENCE is stable, but its STATE ticks daily — so only a state-
-        # filtered search constrains data freshness (with a stale fallback + spoken caveat).
-        if "controlling_minor_faction_state" in slots:
-            results, stale_age = cap.query_fresh(slots, system, "updated_at")
-        else:
-            results = cap.query(slots, system)
-            stale_age = None
-    except NavError as e:
-        cap.logline(f"search failed: {e}")
-        return str(e)
-
-    systems = parse_systems(results)
-    if not systems:
-        return ("I couldn't find a system matching that near you — try relaxing one of the "
-                "filters, or check the faction name.")
+    # A faction's PRESENCE is stable, but its STATE ticks daily — so only a state-filtered
+    # search constrains data freshness (with a stale fallback + spoken caveat).
+    fresh = "updated_at" if "controlling_minor_faction_state" in slots else None
+    got = cap.run_search(inp, slots, parse_systems, fresh_field=fresh,
+                         empty=("I couldn't find a system matching that near you — try "
+                                "relaxing one of the filters, or check the faction name."))
+    if isinstance(got, str):
+        return got
+    systems, stale_age = got
     best = systems[0]
-    copied, here = cap.deliver(best.name, best.distance_ly)
-    cap.logline(f"nearest faction match: {best.name} ({best.distance_ly:.1f} ly), "
-                f"filters={sorted(slots)}, stale_age={stale_age}, "
-                f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+    copied, here = cap.deliver_logged(best.name, best.distance_ly,
+                                      f"nearest faction match: {best.name} "
+                                      f"({best.distance_ly:.1f} ly), filters={sorted(slots)}, "
+                                      f"stale_age={stale_age}")
     dist = sup.distance_phrase(best.distance_ly)
     want_faction = slots.get("controlling_minor_faction") or slots.get("minor_faction_presences")
     if want_faction:
@@ -774,23 +801,17 @@ def _run_signals(cap: SpecSearchCapability, inp: dict) -> str:
         return ("I can only find fixed structures — megaships, settlements, outposts, "
                 "starports, planetary ports, or asteroid bases. Which one?")
 
-    system = cap.reference(inp)
-    if not system:
-        return cap.NO_SYSTEM
-    try:
-        results = cap.query({"type": stype}, system)
-    except NavError as e:
-        cap.logline(f"search failed: {e}")
-        return str(e)
-
-    stations = parse_stations(results)          # carriers dropped: not a signal source
-    if not stations:
-        return f"I couldn't find {stype} near you — try a different structure or system."
+    got = cap.run_search(inp, {"type": stype},
+                         parse_stations,        # carriers dropped: not a signal source
+                         empty=f"I couldn't find {stype} near you — try a different structure "
+                               f"or system.")
+    if isinstance(got, str):
+        return got
+    stations, _ = got
     best = stations[0]
-    copied, here = cap.deliver(best.system, best.distance_ly)
-    cap.logline(f"nearest {stype}: {best.station} in {best.system} "
-                f"({best.distance_ly:.1f} ly), "
-                f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+    copied, here = cap.deliver_logged(best.system, best.distance_ly,
+                                      f"nearest {stype}: {best.station} in {best.system} "
+                                      f"({best.distance_ly:.1f} ly)")
     line = (f"Closest {stype}: {best.station} in {best.system}, "
             f"{sup.distance_phrase(best.distance_ly)}.")
     return line + sup.clipboard_note(best.system, copied, here)
@@ -872,35 +893,25 @@ _MISC_VOCAB = {"faction state": list(FACTION_STATES),
                "allegiance": list(VOCAB["allegiance"])}
 
 
+# The validated slots before the faction name, in spoken-echo order: the state resolves
+# through the BGS vocabulary and is echoed bare; the others are generic enums.
+_STATE_ENUM_ROWS = (
+    ("state", "controlling_minor_faction_state", resolve_state, nearest_state,
+     "faction state", "{val}"),
+    ("power_state", "power_state", lambda v: resolve_enum("power_state", v),
+     lambda v: nearest_enum("power_state", v), "Powerplay state", "{val} power state"),
+    ("allegiance", "allegiance", lambda v: resolve_enum("allegiance", v),
+     lambda v: nearest_enum("allegiance", v), "allegiance", "{val} allegiance"),
+)
+
+
 def _run_faction_states(cap: SpecSearchCapability, inp: dict) -> str:
     slots: dict[str, object] = {}
     caught: list[str] = []          # values understood so far, echoed on a later bad slot
 
-    state = inp.get("state")
-    if state not in (None, ""):
-        val = resolve_state(state)
-        if val is None:
-            return sup.recovery(state, "faction state", nearest_state(state), caught=caught)
-        slots["controlling_minor_faction_state"] = val
-        caught.append(val)
-
-    power_state = inp.get("power_state")
-    if power_state not in (None, ""):
-        val = resolve_enum("power_state", power_state)
-        if val is None:
-            return sup.recovery(power_state, "Powerplay state",
-                                nearest_enum("power_state", power_state), caught=caught)
-        slots["power_state"] = val
-        caught.append(f"{val} power state")
-
-    alleg = inp.get("allegiance")
-    if alleg not in (None, ""):
-        val = resolve_enum("allegiance", alleg)
-        if val is None:
-            return sup.recovery(alleg, "allegiance", nearest_enum("allegiance", alleg),
-                                caught=caught)
-        slots["allegiance"] = val
-        caught.append(f"{val} allegiance")
+    recover_msg = _fill_enum_slots(inp, slots, caught, _STATE_ENUM_ROWS)
+    if recover_msg:
+        return recover_msg
 
     faction = inp.get("faction")
     if faction and str(faction).strip():
@@ -914,31 +925,22 @@ def _run_faction_states(cap: SpecSearchCapability, inp: dict) -> str:
                 "infrastructure failure — or the kind of missions you want. (Say 'never "
                 "mind' to drop it.)")
 
-    system = cap.reference(inp)
-    if not system:
-        return cap.NO_SYSTEM
-    try:
-        # Faction and Powerplay states tick daily, so a state-filtered search constrains
-        # data freshness (with a stale fallback + spoken caveat). This category exists FOR
-        # states, so in practice that's nearly every call.
-        if "controlling_minor_faction_state" in slots or "power_state" in slots:
-            results, stale_age = cap.query_fresh(slots, system, "updated_at")
-        else:
-            results = cap.query(slots, system)
-            stale_age = None
-    except NavError as e:
-        cap.logline(f"search failed: {e}")
-        return str(e)
-
-    systems = parse_systems(results)
-    if not systems:
-        return ("I couldn't find a system in that state near you — try a different state "
-                "or relax the other filters.")
+    # Faction and Powerplay states tick daily, so a state-filtered search constrains data
+    # freshness (with a stale fallback + spoken caveat). This category exists FOR states,
+    # so in practice that's nearly every call.
+    fresh = ("updated_at" if ("controlling_minor_faction_state" in slots
+                              or "power_state" in slots) else None)
+    got = cap.run_search(inp, slots, parse_systems, fresh_field=fresh,
+                         empty=("I couldn't find a system in that state near you — try a "
+                                "different state or relax the other filters."))
+    if isinstance(got, str):
+        return got
+    systems, stale_age = got
     best = systems[0]
-    copied, here = cap.deliver(best.name, best.distance_ly)
-    cap.logline(f"nearest state match: {best.name} ({best.distance_ly:.1f} ly), "
-                f"filters={sorted(slots)}, stale_age={stale_age}, "
-                f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+    copied, here = cap.deliver_logged(best.name, best.distance_ly,
+                                      f"nearest state match: {best.name} "
+                                      f"({best.distance_ly:.1f} ly), filters={sorted(slots)}, "
+                                      f"stale_age={stale_age}")
     state_note = f" — {best.extra['state']}" if best.extra.get("state") else ""
     line = f"Closest match: {best.name}, {sup.distance_phrase(best.distance_ly)}{state_note}."
     if best.controlling_minor_faction:
@@ -1088,24 +1090,17 @@ def _run_bodies(cap: SpecSearchCapability, inp: dict) -> str:
         return ("Tell me what to look for — a body type like an Earth-like world, or a "
                 "biological signal like Bacterium. (Say 'never mind' to drop it.)")
 
-    system = cap.reference(inp)
-    if not system:
-        return cap.NO_SYSTEM
-    try:
-        results = cap.query(slots, system)
-    except NavError as e:
-        cap.logline(f"search failed: {e}")
-        return str(e)
-
-    bodies = parse_bodies(results)
-    if not bodies:
-        return ("I couldn't find a body matching that near you — try a different type, a "
-                "broader biology, or relaxing a filter.")
+    got = cap.run_search(inp, slots, parse_bodies,
+                         empty=("I couldn't find a body matching that near you — try a "
+                                "different type, a broader biology, or relaxing a filter."))
+    if isinstance(got, str):
+        return got
+    bodies, _ = got
     best = bodies[0]
-    copied, here = cap.deliver(best.system, best.distance_ly)
-    cap.logline(f"nearest body: {best.name} ({best.subtype}) in {best.system} "
-                f"({best.distance_ly:.1f} ly), filters={sorted(slots)}, "
-                f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+    copied, here = cap.deliver_logged(best.system, best.distance_ly,
+                                      f"nearest body: {best.name} ({best.subtype}) in "
+                                      f"{best.system} ({best.distance_ly:.1f} ly), "
+                                      f"filters={sorted(slots)}")
     what = best.subtype or "body"
     line = f"Closest {what}: {best.name} in {best.system}, {sup.distance_phrase(best.distance_ly)}."
     if best.distance_to_arrival_ls is not None and best.distance_to_arrival_ls >= 1:
@@ -1129,39 +1124,33 @@ BODIES = SearchDescriptor(
 
 
 # ======================================================================================
-# The declarative family + backward-compatible named constructors
+# The declarative family + the two standalone-section constructors
 # ======================================================================================
 # The four categories that share the single `[search]` toggle, in registration order (the
-# order bootstrap's build_searches registers them — part of the frozen tools() order). Each
-# pairs a descriptor with whether it takes the shared faction-name index.
-SEARCH_GROUP: tuple[tuple[SearchDescriptor, bool], ...] = (
-    (STATIONS, True),
-    (MINOR_FACTIONS, True),
-    (SIGNALS, False),
-    (FACTION_STATES_CATEGORY, True),
+# order bootstrap's build_searches registers them — part of the frozen tools() order). All
+# take the shared faction-name index unconditionally: `FactionIndex` is lazy, so a category
+# without a faction slot (signals) simply never touches it.
+SEARCH_GROUP: tuple[SearchDescriptor, ...] = (
+    STATIONS,
+    MINOR_FACTIONS,
+    SIGNALS,
+    FACTION_STATES_CATEGORY,
 )
 
 
-def StationSearchCapability(config: SearchConfig, **kw) -> SpecSearchCapability:
-    """The stations category as a `SpecSearchCapability` (issue #111 kept the name for callers)."""
-    return SpecSearchCapability(STATIONS, config, **kw)
-
-
-def MinorFactionSearchCapability(config: SearchConfig, **kw) -> SpecSearchCapability:
-    return SpecSearchCapability(MINOR_FACTIONS, config, **kw)
-
-
-def SignalSearchCapability(config: SearchConfig, **kw) -> SpecSearchCapability:
-    return SpecSearchCapability(SIGNALS, config, **kw)
-
-
-def MiscSearchCapability(config: SearchConfig, **kw) -> SpecSearchCapability:
-    return SpecSearchCapability(FACTION_STATES_CATEGORY, config, **kw)
-
-
-def BodySearchCapability(config: SearchConfig, **kw) -> SpecSearchCapability:
-    return SpecSearchCapability(BODIES, config, **kw)
-
-
 def SystemSearchCapability(config: SearchConfig, **kw) -> SpecSearchCapability:
+    """The star-systems category — its own `[star_systems]` section, so it's constructed by
+    name (bootstrap's build_system_search) rather than via the `SEARCH_GROUP` loop."""
     return SpecSearchCapability(STAR_SYSTEMS, config, **kw)
+
+
+class BodySearchCapability(SpecSearchCapability):
+    """The bodies category — its own `[bodies]` section, constructed by name (bootstrap's
+    build_bodies). A real subclass because it alone carries the `now` seam: the bio-scan age
+    caveat is the only place the family reads the clock, so the seam lives here instead of
+    widening every category's constructor."""
+
+    def __init__(self, config: SearchConfig, *,
+                 now: Callable[[], datetime] | None = None, **kw) -> None:
+        super().__init__(BODIES, config, **kw)
+        self._now = now if now is not None else (lambda: datetime.now(timezone.utc))

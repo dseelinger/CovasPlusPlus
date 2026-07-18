@@ -63,11 +63,11 @@ def test_live_faction_index_resolves_a_mistranscription():
 def test_live_minor_faction_capability_finds_a_mistranscribed_faction():
     """End-to-end: the exact failure from the bug report now returns a real system."""
     from covas.capabilities._search_support import SearchConfig
-    from covas.capabilities.search_family import MinorFactionSearchCapability
+    from covas.capabilities.search_family import MINOR_FACTIONS, SpecSearchCapability
     from covas.search.faction_index import FactionIndex
     copied: list[str] = []
-    cap = MinorFactionSearchCapability(
-        SearchConfig(enabled=True), http=RequestsHttp(),
+    cap = SpecSearchCapability(
+        MINOR_FACTIONS, SearchConfig(enabled=True), http=RequestsHttp(),
         get_current_system=lambda: "Sol", clipboard=copied.append, factions=FactionIndex())
     out = cap.run_tool("search_minor_factions", {"faction": "Formadine Greybeard Guild"})
     assert copied and copied[0] in out                   # found a system + copied it

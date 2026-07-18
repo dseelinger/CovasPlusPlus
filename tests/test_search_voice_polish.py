@@ -20,8 +20,8 @@ from covas.capabilities._search_support import SearchConfig, recovery
 from covas.capabilities.base import CapabilityRegistry
 from covas.capabilities.help_capability import HelpCapability
 from covas.capabilities.find_closest_capability import FindClosestCapability, NavConfig
-from covas.capabilities.search_family import (MinorFactionSearchCapability, MiscSearchCapability,
-                                              SignalSearchCapability, StationSearchCapability,
+from covas.capabilities.search_family import (FACTION_STATES_CATEGORY, MINOR_FACTIONS, SIGNALS,
+                                              STATIONS, SpecSearchCapability,
                                               SystemSearchCapability)
 from covas.search.factions import FACTION_STATES
 from covas.search.stations import STATION_TYPES
@@ -65,7 +65,7 @@ def _faction_index():
 
 def test_refinement_requeries_and_accumulates_constraints():
     http, clip = FakeHttp(_SYSTEMS), Clip()
-    cap = MiscSearchCapability(SearchConfig(enabled=True), http=http,
+    cap = SpecSearchCapability(FACTION_STATES_CATEGORY, SearchConfig(enabled=True), http=http,
                                get_current_system=lambda: "Sol", clipboard=clip,
                                factions=_faction_index())
     # Turn 1: one constraint.
@@ -82,9 +82,9 @@ def test_every_refinement_hits_the_network_again():
     # Three refining calls -> three queries (a new constraint can change which result is nearest,
     # so a cached set can't be reused).
     http = FakeHttp(_SYSTEMS)
-    cap = StationSearchCapability(SearchConfig(enabled=True), http=http,
-                                  get_current_system=lambda: "Sol", clipboard=Clip(),
-                                  factions=_faction_index())
+    cap = SpecSearchCapability(STATIONS, SearchConfig(enabled=True), http=http,
+                               get_current_system=lambda: "Sol", clipboard=Clip(),
+                               factions=_faction_index())
     cap.run_tool("search_stations", {"services": ["shipyard"]})
     cap.run_tool("search_stations", {"services": ["shipyard"], "pad_size": "L"})
     cap.run_tool("search_stations", {"services": ["shipyard"], "pad_size": "L",
@@ -109,9 +109,9 @@ def test_recovery_helper_without_caught_or_suggestion():
 def test_capability_recovery_echoes_a_prior_valid_slot():
     # allegiance resolves, THEN state fails -> the reply keeps the allegiance and corrects state.
     http = FakeHttp(_SYSTEMS)
-    cap = MinorFactionSearchCapability(SearchConfig(enabled=True), http=http,
-                                       get_current_system=lambda: "Sol", clipboard=Clip(),
-                                       factions=_faction_index())
+    cap = SpecSearchCapability(MINOR_FACTIONS, SearchConfig(enabled=True), http=http,
+                               get_current_system=lambda: "Sol", clipboard=Clip(),
+                               factions=_faction_index())
     out = cap.run_tool("search_minor_factions", {"allegiance": "empire", "state": "zombie"})
     assert http.calls == []                     # a single bad slot blocks the query
     assert "Empire" in out                      # but the caught allegiance is echoed back
@@ -123,11 +123,11 @@ def test_capability_recovery_echoes_a_prior_valid_slot():
 def _registry_with_search():
     reg = CapabilityRegistry()
     reg.register(HelpCapability(reg))
-    reg.register(MinorFactionSearchCapability(SearchConfig(enabled=True),
-                                              get_current_system=lambda: "Sol",
-                                              factions=_faction_index()))
-    reg.register(SignalSearchCapability(SearchConfig(enabled=True),
-                                        get_current_system=lambda: "Sol"))
+    reg.register(SpecSearchCapability(MINOR_FACTIONS, SearchConfig(enabled=True),
+                                      get_current_system=lambda: "Sol",
+                                      factions=_faction_index()))
+    reg.register(SpecSearchCapability(SIGNALS, SearchConfig(enabled=True),
+                                      get_current_system=lambda: "Sol"))
     return reg
 
 
@@ -162,10 +162,9 @@ def test_all_search_tools_carry_the_cancel_instruction():
     caps = [
         FindClosestCapability(NavConfig(enabled=True), get_current_system=lambda: "Sol"),
         SystemSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
-        StationSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
-        MinorFactionSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
-        SignalSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
-        MiscSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
+    ] + [
+        SpecSearchCapability(desc, SearchConfig(enabled=True), get_current_system=lambda: "Sol")
+        for desc in (STATIONS, MINOR_FACTIONS, SIGNALS, FACTION_STATES_CATEGORY)
     ]
     for cap in caps:
         desc = cap.tools()[0]["description"].lower()

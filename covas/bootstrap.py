@@ -1102,15 +1102,15 @@ def build_searches(app: "App") -> None:
         # from Spansh on first use, then cached) so a mistranscribed faction name resolves
         # to its exact string instead of returning zero systems.
         factions = FactionIndex()
-        common = dict(http=http, get_current_system=app._current_system,
-                      log=lambda msg: app._log("search", msg))
-        # Loop the declarative family table (issue #111): each row is (descriptor, wants_factions),
-        # in the SAME registration order as before, so the tools() ordering prompt caching keys off
-        # is unchanged. Only the faction-taking categories are handed the shared index.
+        # Loop the declarative family table (issue #111), in the SAME registration order as
+        # before, so the tools() ordering prompt caching keys off is unchanged. Every category
+        # gets the shared index — FactionIndex is lazy, so a faction-less category never
+        # touches it.
         app.searches = [
-            SpecSearchCapability(desc, scfg,
-                                 **(dict(common, factions=factions) if wants else common))
-            for desc, wants in SEARCH_GROUP
+            SpecSearchCapability(desc, scfg, http=http, factions=factions,
+                                 get_current_system=app._current_system,
+                                 log=lambda msg: app._log("search", msg))
+            for desc in SEARCH_GROUP
         ]
         for cap in app.searches:
             app.registry.register(cap)
