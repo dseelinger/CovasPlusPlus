@@ -53,9 +53,9 @@ COVAS++ is exactly **three user-facing pillars**, plus one named non-pillar:
 
 > Every new enhancement names **exactly one pillar** it strengthens, in its improvement-thesis section. A feature that fits no pillar is a **non-goal by default**; creating a fourth pillar is a deliberate roadmap decision made *here in this document first*, never implicitly via an issue. Consolidation / refactor / docs issues are **Foundation** and exempt (they serve all three).
 
-#### The classification audit (2026-07) — all 44 registered capabilities
+#### The classification audit (2026-07) — all 45 registered capabilities
 
-The empirical check on the frame: if a shipped capability fits no pillar, either the definitions are wrong (fix them) or the capability is off-thesis (mark it and decide its future). The 44 rows below are every capability registered in `covas/bootstrap.py` (registered class / builder). Every one fits exactly one pillar — the frame matches the product as built.
+The empirical check on the frame: if a shipped capability fits no pillar, either the definitions are wrong (fix them) or the capability is off-thesis (mark it and decide its future). The 45 rows below are every capability registered in `covas/bootstrap.py` (registered class / builder). Every one fits exactly one pillar — the frame matches the product as built.
 
 *Assist (36) — answer, look up, track, show; never touches the game:*
 
@@ -109,11 +109,12 @@ The empirical check on the frame: if a shipped capability fits no pillar, either
 | `HonkCapability` | auto-honk the discovery scanner on arrival |
 | `CommsSendCapability` | send in-game chat text (read-back gated) |
 
-*Immerse (1 registered surface over a large subsystem) — atmosphere, no information content:*
+*Immerse (2) — atmosphere, no information content:*
 
 | Capability | What it does |
 |---|---|
 | `AudioControlsCapability` | the ambient-audio layer: fronts the whole `covas/mixer/` subsystem — carrier chatter, music director, interdiction cues — plus the persona/voice/crew path (personas & auto voice-pairing, named crew voicing) |
+| `LongJumpCapability` | an in-character flavor line on a longer-than-normal hyperspace jump (#149) — pure atmosphere, asserts no game facts (`fact_bearing=False`) |
 
 *Foundation (1 registered surface) — infrastructure, no pillar declaration needed:*
 
@@ -129,9 +130,9 @@ The empirical check on the frame: if a shipped capability fits no pillar, either
 
 **Findings:**
 
-- **No capability is off-thesis** — all 44 fit exactly one pillar, so the frame fits the product as built (36 Assist + 6 Act + 1 Immerse + 1 Foundation = 44).
-- **Assist is dominant (36/44), by design.** COVAS++'s core identity is an information/assist companion that explicitly *does not fly the ship*; the concentration is the thesis, not drift.
-- **Immerse is one registered capability over a whole subsystem.** `AudioControlsCapability` is the sole registered Immerse surface, yet it fronts the entire `mixer/` package (~17 config sections: chatter, music, interdiction) plus the persona/voice/crew path. That asymmetry — a full product identity behind a single registered capability — is exactly the "second product identity that was never named" this subsection exists to name. Future Immerse growth is now a deliberate pillar decision, not an accretion.
+- **No capability is off-thesis** — all 45 fit exactly one pillar, so the frame fits the product as built (36 Assist + 6 Act + 2 Immerse + 1 Foundation = 45).
+- **Assist is dominant (36/45), by design.** COVAS++'s core identity is an information/assist companion that explicitly *does not fly the ship*; the concentration is the thesis, not drift.
+- **Immerse is a large subsystem behind one capability, plus small deliberate flavor additions.** `AudioControlsCapability` remains the dominant Immerse surface, fronting the entire `mixer/` package (~17 config sections: chatter, music, interdiction) plus the persona/voice/crew path — a full product identity behind a single registered capability. `LongJumpCapability` (#149) is the first small, standalone Immerse addition alongside it: a single fact-free flavor line on a long jump. Both are deliberate Immerse decisions (the pillar was declared on the issue), not accretion — the point of naming Immerse explicitly is that this growth is chosen, not drifted into.
 - **Act is small and deliberately so** (6 capabilities, every one behind the §6 allowlist / confirmation / combat-guard / hard-abort layer); it grows one on-hardware-validated action at a time.
 
 ---
@@ -1788,7 +1789,7 @@ The original seven-phase plan is done and tested:
     (+ `mkdocs.yml` nav). **Improvement thesis (Assist): grounded in YOUR live inventory — "what am I
     short of / capped on" answered from the journal, not a wiki table.**
 
-NN. **Place-aware & visit-history callouts** (issue #138, `covas/ed/visit_ledger.py` (new),
+65. **Place-aware & visit-history callouts** (issue #138, `covas/ed/visit_ledger.py` (new),
     `covas/ed/place_classifier.py` (new), `covas/capabilities/proactive_capability.py`, `covas/app.py`,
     `covas/ed/context.py`, `covas/ed/journal.py`) — the §5 proactive arrival callout (entry: DESIGN §5)
     was event-generic: it fired on ANY dock/jump with no idea the station was an engineer's base, your
@@ -1828,7 +1829,7 @@ NN. **Place-aware & visit-history callouts** (issue #138, `covas/ed/visit_ledger
     workshop and you've been here ten times today is context- and memory-aware in a way a stock event
     announcer isn't — and every place name and count is a grounded fact, never invented.**
 
-NN. **Creative long-hyperspace flavor remark** (issue #149, `covas/capabilities/long_jump_capability.py`
+66. **Creative long-hyperspace flavor remark** (issue #149, `covas/capabilities/long_jump_capability.py`
     (new), `covas/ed/route.py`, `covas/capabilities/proactive_capability.py`, `covas/app.py`) —
     hyperspace is dead air, and a longer-than-normal jump is one of the few moments talking during the
     tunnel is welcome, so COVAS fills it with ONE short, LLM-varied, in-character remark (the reporter's
