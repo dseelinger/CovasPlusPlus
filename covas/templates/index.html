@@ -160,6 +160,7 @@
       <div class="row"><label>Personality</label><div class="toggle" id="personality"><div class="knob"></div></div></div>
       <button class="cancel" id="cancelBtn">■ CANCEL / STOP</button>
       <div class="prow"><button id="openCues">OPEN CUES FOLDER</button><span class="pmsg" id="cuesMsg"></span></div>
+      <div class="prow"><button id="reloadCues">RELOAD CUES</button><span class="pmsg" id="cuesReloadMsg"></span></div>
       <div class="keys" id="keys"></div>
     </div>
 
@@ -392,6 +393,17 @@ async function init(){
       const r = await (await fetch("/api/cues/open",{method:"POST"})).json();
       msg.textContent = r.opened ? "opened" : (r.path || "couldn't open");
     } catch(e){ msg.textContent = "couldn't open cues folder"; }
+  };
+  // #109: re-scan the cue folders and hot-swap, no restart — pairs with OPEN CUES FOLDER
+  // (open -> drop/remove files -> reload). Reports per-type counts so a drop actually landed.
+  $("reloadCues").onclick = async () => {
+    const msg = $("cuesReloadMsg");
+    try {
+      const r = await (await fetch("/api/cues/reload",{method:"POST"})).json();
+      const counts = r.counts || {};
+      const parts = Object.keys(counts).map(k => `${counts[k]} ${k}`);
+      msg.textContent = "reloaded — " + (parts.length ? parts.join(", ") : "no cue types found");
+    } catch(e){ msg.textContent = "couldn't reload cues"; }
   };
 
   initPersonality();

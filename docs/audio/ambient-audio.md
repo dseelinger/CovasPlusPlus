@@ -202,6 +202,17 @@ is silent — no error. COVAS++ creates the folder skeleton (with a README in ea
 logs a content-status summary showing what's populated and what's still silent. These folders are
 git-ignored — the assets are yours to supply.
 
+!!! note "Still restart-only (unlike the turn cues)"
+    The five **turn-stage cues** (`listen`/`processing`/`completed`/`failure`/`thinking`, see [The
+    voice loop](../getting-started/voice-loop.md#sound-cues)) reload **live** via the control
+    panel's **Reload cues** button (issue #109) — no restart needed after dropping in a file. This
+    ambient drop-in content (SFX/music/chatter/threat lines above) does **not** yet — it's scanned
+    once at startup and woven into the cue registry, music library, and interdiction cue as they're
+    built, so a live reload would mean rebuilding those composed objects in place (governor
+    cooldowns, an in-progress music crossfade, a running chatter loop) rather than a simple
+    reference swap. Deferred as a named follow-up (issue #109 explicitly calls this out rather than
+    leaving it silently restart-only) rather than folded into the same change.
+
 !!! note "Voice control"
     You can steer the layer by voice: *"mute the chatter," "quiet the comms," "silence the carrier,"
     "turn the music down," "stop the music," "silence all the background audio," "turn the ambient
