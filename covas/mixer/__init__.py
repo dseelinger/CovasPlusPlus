@@ -43,12 +43,15 @@ from .comms import (
     message_template,
 )
 from .carrier import (
+    CaptainDedup,
     CarrierConfig,
+    CarrierEventResponder,
     CarrierPlayer,
     CarrierRole,
     apply_names,
     build_carrier_config,
     carrier_cues,
+    carrier_event_cues,
     register_carrier,
 )
 from .chatter import (
@@ -164,12 +167,15 @@ __all__ = [
     "is_flavor_safe",
     "register_chatter",
     "situation_context",
+    "CaptainDedup",
     "CarrierConfig",
+    "CarrierEventResponder",
     "CarrierPlayer",
     "CarrierRole",
     "apply_names",
     "build_carrier_config",
     "carrier_cues",
+    "carrier_event_cues",
     "register_carrier",
     "MUSIC_CONTEXTS",
     "MusicDirector",
