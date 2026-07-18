@@ -1618,6 +1618,18 @@ Notes:
 
 Notes:
 
+### 19.3a Control-panel zoom (issue #116)  📦 🖥️
+> The **packaged window** is the surface that lacked zoom — a real browser already has Ctrl+±/scroll.
+- [ ] In the native window, press **Ctrl+`+`** a few times → panel content scales up and reflows; **Ctrl+`-`** shrinks it; **Ctrl+`0`** returns to 100%. Clamped 50%–200% (mashing past the ends stops there, doesn't error).
+- [ ] **Ctrl+scroll** up/down over the panel zooms in/out the same way.
+- [ ] The header's **`− 100% +`** cluster mirrors the shortcuts; clicking the `%` resets to 100%.
+- [ ] Set zoom to **130%**, **close and relaunch** the app → panel reopens at 130% with **no flash** of 100% before it snaps to 130%.
+- [ ] Navigate between pages (panel ↔ settings ↔ checklist ↔ crew ↔ macros ↔ memory) → zoom stays applied on every page.
+- [ ] Trackpad/touch **pinch-zoom** also works in the packaged window (`zoomable=True`).
+- [ ] Sanity: `run_covas_ui.py` in a real browser still zooms natively (Ctrl+±/scroll), and the in-page `− % +` control also works there.
+
+Notes:
+
 ### 19.4 ED files readable from the sandboxless install  📦 🎮 ED
 > The reason MSIX was rejected — the install must read ED's journal + bindings with no container in the way.
 - [ ] With ED running: *"Where am I?"* → names your **current system** (journal is readable from the installed app).
