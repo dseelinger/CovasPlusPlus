@@ -1507,6 +1507,32 @@ on in config (or the Settings page) before testing.
   traffic / patrol / market** ambient lines come from a **random radioed cast voice** on the
   comms bus. Confirm the perspective always matches the source.
 
+### 18.5c Persona speech arbiter — queue, preempt, flush (issue #146)  🎮 ED 🔊 HW
+> The Ship's-AI (persona) voice now plays **one line at a time** through a single arbiter, so a
+> proactive/route callout and an ambient musing can't talk over each other on the COVAS bus.
+> Needs `[audio].enabled`, `[audio.cues].enabled` (ambient PERSONA musings), and `[proactive]`/
+> route callouts on, with `[elite].enabled` driving events. Persona voice ONLY — radioed cast/comms
+> voices are separate and may still overlap the persona voice (that's intended).
+- [ ] 🔊 **Queue, don't overlap:** in a **populated** system with ambient chatter on, arrange for an
+  ambient PERSONA musing and a **proactive/route callout** to come due around the same time (e.g.
+  jump into a populated system) → you hear them **one after the other in the companion's voice, never
+  mixed on top of each other**. (Before #146 they could play simultaneously and garble.)
+- [ ] 🔊 **Preempt — cut short when superseded:** while an ambient **musing** is being read, trigger a
+  **route/status callout** on the same subject (or a hazard-style warning) → the musing **cuts off
+  mid-word** and the newer line is spoken **immediately**, not after the stale one finishes. An
+  updated **route** callout arriving while an older route line is still being read likewise replaces
+  it mid-word.
+- [ ] 🔊 **PTT flushes stale ambient:** while a persona line (or a queued musing) is speaking, **press
+  push-to-talk** → speech stops instantly **and nothing stale plays after your turn** (the queue is
+  flushed — you don't hear a musing resume once you've finished speaking).
+- [ ] 🔊 **Stale musing dropped, not spoken late:** queue up a musing behind a longer reply/callout,
+  then move on (jump away). After ~8s (`[audio].persona_ttl_seconds`) the now-irrelevant musing is
+  **dropped** rather than spoken belatedly. Lower/raise `persona_ttl_seconds` on the Settings page and
+  confirm the drop window changes.
+- [ ] 🔊 **Ordinary lines still queue (no chopping):** two unrelated **callouts** close together →
+  the second **waits** for the first to finish (equal priority queues); it does **not** chop the
+  first off. A **reply to you** always jumps ahead of a queued ambient musing.
+
 ### 18.5b Interactive crew (issue #69 — `[crew].enabled`)  🔊 HW
 > Turn on `[crew].enabled = true` (Settings → **Interactive crew**, or *"turn crew on"*). Distinct
 > crew voices need the bus mixer (`[audio].enabled = true`) + a cast pool (the default random

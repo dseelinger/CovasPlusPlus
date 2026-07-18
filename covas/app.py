@@ -34,6 +34,7 @@ from .ed import ContextDetector
 from .memory import MemoryDetector
 from . import crew as crew_mod
 from . import bootstrap
+from .persona_speech import PersonaSpeechArbiter, Priority
 
 def _harden_streams(streams) -> None:
     """Make console output lossy-safe. Claude replies can contain Unicode (arrows, em-dashes,
@@ -308,6 +309,17 @@ class App:
         # run_covas_ui.py, never headless run_covas.py.
         self._web_ui_running = False
         self._proactive_lock = threading.Lock()
+        # The ONE speech arbiter for the persona (Ship's-AI) voice (issue #146): every persona
+        # line — replies, proactive/route callouts, AND the audio layer's ambient PERSONA cues
+        # (which used to speak uncoordinated on the same COVAS bus and MIX) — enqueues here and a
+        # single speaker thread plays them one at a time (priority + freshness + preempt). Built
+        # once here so `_speak` and the AudioLayer (wired in bootstrap) share it. Its default_speak
+        # is the direct persona TTS; most app lines pass their own crew-splitting thunk. The
+        # speaker thread is daemon + lazily started, so a test that never speaks pays nothing.
+        self.persona_arbiter = PersonaSpeechArbiter(
+            self._speak_persona,
+            log=lambda m: self._log("audio", m),
+            max_depth=int((self.cfg.get("audio", {}) or {}).get("persona_queue_depth", 8)))
         self._pump: threading.Thread | None = None
         self._pump_q: queue.Queue | None = None
         self._pump_stop = threading.Event()
@@ -499,7 +511,10 @@ class App:
             self._log("COVAS", f"(proactive) {reply}")
             print(f"\n>> [proactive] {reply}")
             self.set_state("Speaking", "proactive")
-            self._speak(reply, cancel, tts=tts, text_only=text_only)
+            # CALLOUT priority (issue #146): a proactive musing yields to a user reply but outranks
+            # (and preempts) an ambient PERSONA cue. No subject key — an unrelated arrival callout
+            # queues behind another rather than superseding it.
+            self._speak(reply, cancel, tts=tts, text_only=text_only, priority=Priority.CALLOUT)
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — a proactive failure must never crash the app
             self.set_state("Idle", f"proactive error: {e}")
@@ -570,7 +585,10 @@ class App:
             # Ambient, like proactive callouts — logged + spoken but NOT added to history.
             self._log("COVAS", f"(route) {text}")
             print(f"\n>> [route] {text}")
-            self._speak(text, cancel)
+            # CALLOUT priority on the shared "route" subject (issue #146): a fresher route callout
+            # SUPERSEDES an older one still being read (e.g. the next-star update mid old-star line)
+            # — same-subject preempts — instead of stacking two stale route lines back to back.
+            self._speak(text, cancel, priority=Priority.CALLOUT, subject="route")
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — a route callout must never crash the app
             self.set_state("Idle", f"route error: {e}")
@@ -716,6 +734,11 @@ class App:
         BRIEFLY await confirmed silence before returning, so callers can open the mic clean."""
         if self.active_cancel is not None and not self.active_cancel.is_set():
             self.active_cancel.set()
+        # Flush the persona speech arbiter (issue #146): cancel whatever persona line is speaking
+        # AND drop every queued line, so no stale ambient/callout plays after the Commander has
+        # spoken. This covers the ambient PERSONA cues whose cancel Event is the arbiter's own (not
+        # active_cancel); setting active_cancel above already covers an in-flight reply/callout.
+        self.persona_arbiter.flush()
         self.cues.stop()  # stop any cue still playing
         self._halt_playback()
 
@@ -1256,26 +1279,42 @@ class App:
 
     # ---- local voice commands --------------------------------------------
     def _speak(self, text: str, cancel: threading.Event, *, tts=None,  # noqa: ANN001
-               text_only=None) -> None:
-        """Play `text` through the TTS provider (real, mock, or fake). `tts` is the turn-local
-        provider captured at the start of a turn (issue #90) so a mid-turn hot-swap can't change the
-        voice underneath a reply; callers outside a turn omit it and get the live `self.tts`.
-        `text_only` is the turn-local text-only flag, captured with `tts` (issue #90 review): a
-        mid-turn swap to a keyless provider flips the LIVE `self.text_only`, so a turn that started
-        with a working voice must gate on the flag it CAPTURED, not the live one — otherwise its
-        reply is silently dropped. None => use the live `self.text_only` (callers outside a turn).
-        On failure, log LOUDLY (session log + stderr) before re-raising — a dead TTS must be
-        diagnosable, not a silent no-op (e.g. a 401 famous_voice_not_permitted). Callers keep
-        their broad guards and still degrade to text/Idle. In text-only mode (no ElevenLabs key)
-        there is no TTS to attempt — the reply is already shown as text — so skip quietly; that
-        loud path is for a CONFIGURED-but-broken TTS, not the intended keyless mode.
+               text_only=None, priority: int = Priority.REPLY, subject: str = "") -> None:
+        """Play `text` in the persona voice, SERIALIZED through the one speech arbiter (issue #146)
+        so it can never mix with an ambient PERSONA cue on the shared COVAS bus. `tts` is the
+        turn-local provider captured at the start of a turn (issue #90) so a mid-turn hot-swap
+        can't change the voice underneath a reply; callers outside a turn omit it and get the live
+        `self.tts`. `text_only` is the turn-local text-only flag, captured with `tts` (issue #90
+        review): a mid-turn swap to a keyless provider flips the LIVE `self.text_only`, so a turn
+        that started with a working voice must gate on the flag it CAPTURED, not the live one —
+        otherwise its reply is silently dropped. None => use the live `self.text_only`.
 
-        When CREW voicing is on ([crew].enabled, issue #69), the reply is first split into
-        `[Name]`-prefixed segments: persona lines keep the direct TTS path below, crew lines are
-        voiced in their own deterministic cast voice on the radio-treated comms bus. When it's off
-        (the default) the reply is spoken verbatim, exactly as before — the parser isn't invoked."""
+        `priority`/`subject` place this line in the arbiter (issue #146): a REPLY (the default)
+        outranks a CALLOUT and is never preempted by an ambient cue; a `subject` topic key lets a
+        fresher same-subject callout supersede a stale one still being read. This call BLOCKS until
+        the arbiter's speaker thread has spoken (or barge-in/preemption cut) the line — exactly as
+        the old direct call blocked — and re-raises a real TTS failure so callers keep degrading to
+        text/Idle. In text-only mode (no ElevenLabs key) there's nothing to speak, so skip quietly
+        WITHOUT touching the arbiter; that loud failure path is for a CONFIGURED-but-broken TTS."""
         if self.text_only if text_only is None else text_only:
             return
+        line = self.persona_arbiter.enqueue(
+            text, priority=priority, subject=subject, cancel=cancel,
+            speak=lambda c: self._speak_now(text, c, tts=tts))
+        line.wait()
+        line.raise_if_error()  # a real TTS failure propagates, per _speak's diagnosable contract
+
+    def _speak_now(self, text: str, cancel: threading.Event, *, tts=None) -> None:  # noqa: ANN001
+        """The actual persona speak, run ON THE ARBITER'S speaker thread (issue #146) — never
+        called directly by a producer, always via the arbiter so exactly one persona line sounds
+        at a time. On failure it re-raises (after `_speak_persona` logs LOUDLY) so the arbiter can
+        surface it to a blocking `_speak` caller.
+
+        When CREW voicing is on ([crew].enabled, issue #69), the reply is first split into
+        `[Name]`-prefixed segments: persona lines keep the direct TTS path, crew lines are voiced
+        in their own deterministic cast voice on the radio-treated comms bus (a DIFFERENT bus —
+        out of scope for the persona arbiter, #146). When it's off (the default) the reply is
+        spoken verbatim, exactly as before — the parser isn't invoked."""
         if not crew_mod.is_enabled(self.cfg):
             self._speak_persona(text, cancel, tts=tts)
             return
@@ -1779,6 +1818,10 @@ class App:
         self._stop_event_pump()
         self._stop_ed_monitoring()
         self._stop_listener()  # close the hands-free mic listener if it's running (issue #63)
+        try:
+            self.persona_arbiter.stop()  # join the persona speech-arbiter thread (issue #146)
+        except Exception:  # noqa: BLE001 — never let cleanup raise on exit
+            pass
         if self.hud is not None:
             try:
                 self.hud.shutdown()  # tear the overlay window down

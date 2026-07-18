@@ -990,6 +990,22 @@ SCHEMA: list[Setting] = [
             "feel busy (the scale is logarithmic).",
             default=1000000000, min=1000, max=100000000000, unit="people",
             phrasings=("chatter full population", "chatter population threshold")),
+    # The persona speech arbiter (issue #146): how long a queued ambient musing stays fresh, and
+    # how deep the persona-voice queue may back up before the lowest-priority line is dropped.
+    Setting("audio.persona_ttl_seconds", ("audio", "persona_ttl_seconds"), "float",
+            "Ambient musing freshness", "Ambient audio",
+            "How long one of my own ambient musings may wait behind a reply or callout before I "
+            "drop it instead of speaking it late (a 'nice system' line long after you've moved on "
+            "is just noise). Replies and callouts are never dropped.",
+            default=8.0, min=1.0, max=60.0, unit="s",
+            phrasings=("musing freshness", "ambient musing ttl", "persona musing timeout")),
+    Setting("audio.persona_queue_depth", ("audio", "persona_queue_depth"), "int",
+            "Persona voice queue depth", "Ambient audio",
+            "How many of my persona-voice lines may back up in the speech queue before the "
+            "lowest-priority one is dropped (so an event burst can't queue minutes of speech). "
+            "Applies on restart.",
+            default=8, min=1, max=32, unit="lines",
+            phrasings=("persona queue depth", "speech queue depth")),
 
     # --- Companion HUD -----------------------------------------------------
     Setting("hud.enabled", ("hud", "enabled"), "bool",

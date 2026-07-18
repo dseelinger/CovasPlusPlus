@@ -150,6 +150,14 @@ enabled = true
 # tick. This is a NON-VERBAL bed — never a spoken "let me look that up".
 thinking_bed = true
 
+# Persona speech arbiter (issue #146): every Ship's-AI (persona) voice line — replies, proactive
+# and route callouts, AND the ambient "our-perspective" musings — is queued through ONE speaker so
+# they never talk over each other. persona_ttl_seconds is how long an ambient musing may wait
+# behind a reply/callout before it's dropped instead of spoken stale; persona_queue_depth caps how
+# many lines may back up before the lowest-priority one is dropped (applies on restart).
+persona_ttl_seconds = 8.0
+persona_queue_depth = 8
+
 
 [audio.buses]
 # Multi-bus mixer levels (C-series audio layer, DESIGN §7). Each named bus has an independent

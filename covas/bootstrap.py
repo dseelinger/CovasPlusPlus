@@ -139,6 +139,9 @@ def build_audio_layer(app: "App") -> None:
             # these fall back to canned chatter / verbatim comms (no background LLM call).
             allow_chatter_flavor=app.tier_level.chatter_flavor,
             allow_comms_variants=app.tier_level.comms_variants,
+            # Share the app's ONE persona speech arbiter (issue #146) so ambient PERSONA cues
+            # queue behind / yield to replies + callouts instead of mixing on the COVAS bus.
+            persona_arbiter=app.persona_arbiter,
             log=lambda m: app._log("audio", m))
         app.registry.register(
             AudioControlsCapability(app.audio, log=lambda m: app._log("audio", m)))
