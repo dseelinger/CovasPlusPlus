@@ -1865,7 +1865,7 @@ The original seven-phase plan is done and tested:
     alive in the one stretch where nothing happens — passing a long jump with a fresh, playful, in-
     character remark — where the stock experience (and route callouts) leave the tunnel silent, and it
     does so without ever asserting a false game fact.**
-NN. **Persona speech arbiter — one Ship's-AI voice, one line at a time** (issue #146,
+67. **Persona speech arbiter — one Ship's-AI voice, one line at a time** (issue #146,
     `covas/persona_speech.py` (new), `covas/app.py`, `covas/mixer/runtime.py`,
     `covas/bootstrap.py`) — the persona (Ship's-AI) voice had **two uncoordinated producers** both
     submitting to the same clean COVAS bus, which *mixes* concurrent audio: the app/conversation path
@@ -1906,7 +1906,7 @@ NN. **Persona speech arbiter — one Ship's-AI voice, one line at a time** (issu
     surfaces the freshest, most important thing to say — a single arbitrated voice where EDCoPilot /
     COVAS:NEXT let independent line producers collide on the same output.**
 
-NN. **Voice-attribution rule — persona voice is Commander-directed only, never a broadcast** (issue
+68. **Voice-attribution rule — persona voice is Commander-directed only, never a broadcast** (issue
     #131, `covas/mixer/chatter.py`) — tightens the #57 attribution seam (entry 39) with the missing
     *phrasing* rule: a `voice_role=PERSONA` cue is spoken in COVAS's OWN voice on the clean bus, so
     **every line it carries must be a private aside TO the Commander — never an outward greeting,
@@ -1930,7 +1930,7 @@ NN. **Voice-attribution rule — persona voice is Commander-directed only, never
     voice is reserved for speaking to you, which is exactly the fiction a companion should protect and
     where a mis-attributed line does the most damage.**
 
-NN. **Carrier Captain — UI name/voice + arrival & departure responses** (issue #137,
+69. **Carrier Captain — UI name/voice + arrival & departure responses** (issue #137,
     `covas/mixer/carrier.py`, `covas/mixer/runtime.py`, `covas/settings_schema.py`, `config.toml`,
     `docs/audio/ambient-audio.md`) — closes the #19 UI gap and makes the carrier's Captain speak at
     the moments that matter. **UI:** a new **"Carrier voices"** settings group exposes
