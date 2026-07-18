@@ -117,6 +117,28 @@ The natural way to do that, hands still on the stick, is two kinds of voice comm
 For an exact value, the absolute settings still work: *"set the VR HUD distance to 1.5,"* *"set
 the VR HUD curvature to 0.1."*
 
+!!! note "The placement model (issue #145 — fixes landing via #140–#144)"
+    A few things worth knowing about how placement is *meant* to behave (the design is settled;
+    the code catches up in issues #140–#144):
+
+    - **"Pin/place/position the HUD here" always means the VR overlay** — the word "VR" is
+      optional. Look-to-place is a VR-only action (you can't "pin here" the 2D window or the web
+      HUD), so a placement verb is never ambiguous, while plain toggles like *"turn the HUD on"*
+      still address the 2D overlay as before.
+    - **Off to one side after you turn your head? That's heading (yaw), not the lateral offset.**
+      The default placement is world-locked: the panel stays where you pinned it, so it sits
+      off-centre when *you* turn — with `vr_offset_x_m` correctly reading `0.0` (a pin recentres
+      the offset because your gaze fully sets the direction). The fix is a horizontal
+      **recentre** — snap the panel to your *current* heading, keeping distance, height, tilt, and
+      size — or a fresh *"pin the HUD here"* (which also recaptures elevation). Nudging the
+      lateral offset is for fine left/right trim, not for bringing a panel back in front of you.
+    - **Started SteamVR after COVAS++?** Under the model, saying *"turn the VR HUD on"* or
+      *"pin the HUD here"* re-attempts the attach once SteamVR is up — no restart needed — and any
+      failure tells you the specific reason (SteamVR not running, overlay component missing, and
+      so on) instead of a generic "isn't running". It remains attach-only: it never launches
+      SteamVR, and on OpenComposite / VDXR it structurally can't attach — use the
+      [web HUD](#in-headset-without-steamvr-the-web-hud-openkneeboard) there.
+
 | Setting | What it does |
 |---------|--------------|
 | **`[hud].vr_placement`** | `world` (default) parks the panel **cockpit-fixed** in front of you; `head` **locks it to your view** so it follows where you look |
