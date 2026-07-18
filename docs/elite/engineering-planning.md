@@ -6,7 +6,7 @@
 COVAS++ remembers **how each of your ships is built** — its modules and applied engineering — and
 uses that memory to help you plan what to engineer next, grounded on the ship's real loadout, your
 live material inventory, and your engineer unlock progress. Then it can turn a plan into
-[checklist](../getting-started/first-conversation.md) to-dos through the same checklist tools it
+[checklist](../using/checklist.md) to-dos through the same checklist tools it
 already uses.
 
 This is the payoff of the engineering feature set: it ties together your
