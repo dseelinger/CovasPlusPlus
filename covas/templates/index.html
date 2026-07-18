@@ -398,14 +398,18 @@ async function init(){
       msg.textContent = r.opened ? "opened" : (r.path || "couldn't open");
     } catch(e){ msg.textContent = "couldn't open cues folder"; }
   };
-  // #109: re-scan the cue folders and hot-swap, no restart — pairs with OPEN CUES FOLDER
-  // (open -> drop/remove files -> reload). Reports per-type counts so a drop actually landed.
+  // #109/#110: re-scan the drop-in folders and hot-swap, no restart — pairs with OPEN CUES FOLDER
+  // (open -> drop/remove files -> reload). One button covers BOTH surfaces: the turn-stage cues
+  // (counts) and the C11 ambient content — SFX/music/chatter/threat (content). Reports per-category
+  // counts so a drop actually landed.
   $("reloadCues").onclick = async () => {
     const msg = $("cuesReloadMsg");
     try {
       const r = await (await fetch("/api/cues/reload",{method:"POST"})).json();
-      const counts = r.counts || {};
-      const parts = Object.keys(counts).map(k => `${counts[k]} ${k}`);
+      const counts = r.counts || {}, content = r.content || {};
+      const cueParts = Object.keys(counts).map(k => `${counts[k]} ${k}`);
+      const ambParts = Object.keys(content).map(k => `${content[k]} ${k}`);
+      const parts = cueParts.concat(ambParts.length ? ["ambient: " + ambParts.join(", ")] : []);
       msg.textContent = "reloaded — " + (parts.length ? parts.join(", ") : "no cue types found");
     } catch(e){ msg.textContent = "couldn't reload cues"; }
   };

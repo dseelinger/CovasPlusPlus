@@ -112,8 +112,8 @@ Notes:
       failure again → the new clip is in rotation, **no restart**. Remove all files from
       `sounds/failure/`, click **Reload cues** again → falls back to the shipped default cue live.
       Drop a deliberately corrupt file into any type's folder and reload → no crash, other cues
-      still play. (The separate ambient drop-in content — SFX/music/chatter under `audio/`/
-      `content/`, §18 — is **not** covered by this button and still needs a restart.)
+      still play. (The **same** button also reloads the ambient drop-in content — SFX/music/chatter
+      under `audio/`/`content/`, issue #110 — see §18.6.)
 - [ ] **Interdiction sting default:** with `[audio.interdiction].enabled` and no user sting, an
       interdiction plays the shipped original **sting** (not silence).
 - [ ] **Thinking bed fills the wait (issue #5):** ask a slow question (*"Give me the full history of
@@ -1374,6 +1374,18 @@ on in config (or the Settings page) before testing.
   on the ambient bus. Add lines to **`content/chatter/station_traffic.txt`** (one per line, `#` =
   comment), restart, dock → hear your lines (they override the built-in pool). Delete the file →
   falls back to the built-in pool. A missing/empty folder is simply silent (no error).
+- [ ] **Reload ambient content without a restart (issue #110):** with the layer enabled and the app
+  running, add/change lines in **`content/chatter/station_traffic.txt`** (or drop a `.wav` into an
+  **`audio/sfx/<cue>/`** folder, or a track into **`audio/music/<context>/`**), then click the
+  panel's **Reload cues** button (§2, next to **Open cues folder**). The message reports an
+  **ambient:** count (e.g. *"reloaded — … ambient: 2 sfx, 4 chatter, …"*) alongside the turn-cue
+  counts. Dock again (populated system) → your **new chatter lines** are in rotation, **no restart**.
+  Delete the chatter file and reload → falls back to the built-in pool live. Drop a **corrupt** file
+  and reload → no crash, other content still plays.
+- [ ] **Reload respects live state (issue #110):** while **music is playing**, click **Reload cues**
+  → the current track **keeps playing** (no restart of the track, no re-crossfade); a new track only
+  takes over on the next genuine context change (e.g. jump into combat/deep space). Likewise, a cue
+  that fired just before the reload does **not** immediately re-fire — its cooldown is preserved.
 
 Notes:
 

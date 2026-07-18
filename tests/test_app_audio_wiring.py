@@ -50,6 +50,34 @@ def test_audio_enabled_composes_layer_and_registers_controls(tmp_path):
         app.shutdown()
 
 
+def test_reload_audio_content_rescans_and_hotswaps_live(tmp_path):
+    """#110: App.reload_audio_content re-scans the [audio].content_root drop-in folders and swaps
+    them into the live AudioLayer — no restart. End-to-end through the same content_root seam."""
+    app = App(_cfg(tmp_path, audio_enabled=True),
+              llm=FakeLLM(), tts=FakeTTS(), stt=FakeSTT())
+    try:
+        assert app.audio is not None
+        # Drop a chatter line in AFTER startup (the startup scan saw the empty tree).
+        chatter = tmp_path / "content" / "chatter" / "station_traffic.txt"
+        chatter.parent.mkdir(parents=True, exist_ok=True)
+        chatter.write_text("Dropped-in line.\n", encoding="utf-8")
+        counts = app.reload_audio_content()
+        assert counts["chatter"] == 1
+        assert app.audio._registry.get("station_traffic").phrasings == ("Dropped-in line.",)  # noqa: SLF001
+    finally:
+        app.shutdown()
+
+
+def test_reload_audio_content_no_layer_returns_empty(tmp_path):
+    """With the audio layer off, the reload is a fail-soft no-op ({}), never an error."""
+    app = App(_cfg(tmp_path, audio_enabled=False),
+              llm=FakeLLM(), tts=FakeTTS(), stt=FakeSTT())
+    try:
+        assert app.audio is None and app.reload_audio_content() == {}
+    finally:
+        app.shutdown()
+
+
 def test_elevenlabs_provider_routes_speech_through_mixer_not_a_second_stream(monkeypatch, tmp_path):
     """COVAS speech with a mixer opens a mixer SpeechStream, NOT its own device stream."""
     from covas.mixer import COVAS, BusMixer, SpeechStream

@@ -13,16 +13,21 @@ from covas.audio import CUE_TYPES, CuePlayer
 
 
 class _StubCore:
-    def __init__(self, tmp_path, *, with_cues=False):
+    def __init__(self, tmp_path, *, with_cues=False, ambient_counts=None):
         # content_root is the C11/I8 test seam: sounds land under it, not the repo.
         self.cfg = {"audio": {"content_root": str(tmp_path)}}
         # A real CuePlayer (no mixer -> legacy sd path, never opened since we never call play())
         # so /api/cues/reload has something to reload against, mirroring the app's own wiring.
         self.cues = CuePlayer(self.cfg) if with_cues else None
+        self._ambient_counts = ambient_counts
+
+    def reload_audio_content(self) -> dict:
+        """Stub of App.reload_audio_content (#110): the endpoint calls it for the ambient side."""
+        return dict(self._ambient_counts or {})
 
 
-def _client(tmp_path, *, with_cues=False):
-    app = web.create_app(_StubCore(tmp_path, with_cues=with_cues))
+def _client(tmp_path, *, with_cues=False, ambient_counts=None):
+    app = web.create_app(_StubCore(tmp_path, with_cues=with_cues, ambient_counts=ambient_counts))
     app.testing = True
     return app.test_client()
 
@@ -63,3 +68,14 @@ def test_reload_cues_fail_soft_when_no_cue_player_wired(tmp_path):
     r = _client(tmp_path, with_cues=False).post("/api/cues/reload")
     body = r.get_json()
     assert r.status_code == 200 and body["ok"] and body["counts"] == {}
+
+
+# ---- #110: the SAME endpoint also reloads the C11 ambient content (SFX/music/chatter/threat) ----
+def test_reload_also_returns_ambient_content_counts(tmp_path):
+    """One Reload cues action refreshes BOTH surfaces: turn cues (counts) + ambient (content)."""
+    amb = {"sfx": 3, "music": 1, "chatter": 4, "threat": 2}
+    r = _client(tmp_path, with_cues=True, ambient_counts=amb).post("/api/cues/reload")
+    body = r.get_json()
+    assert r.status_code == 200 and body["ok"]
+    assert set(body["counts"]) == set(CUE_TYPES)      # turn-stage side unchanged
+    assert body["content"] == amb                     # ambient side reported alongside

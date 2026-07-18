@@ -202,16 +202,15 @@ is silent — no error. COVAS++ creates the folder skeleton (with a README in ea
 logs a content-status summary showing what's populated and what's still silent. These folders are
 git-ignored — the assets are yours to supply.
 
-!!! note "Still restart-only (unlike the turn cues)"
-    The five **turn-stage cues** (`listen`/`processing`/`completed`/`failure`/`thinking`, see [The
-    voice loop](../getting-started/voice-loop.md#sound-cues)) reload **live** via the control
-    panel's **Reload cues** button (issue #109) — no restart needed after dropping in a file. This
-    ambient drop-in content (SFX/music/chatter/threat lines above) does **not** yet — it's scanned
-    once at startup and woven into the cue registry, music library, and interdiction cue as they're
-    built, so a live reload would mean rebuilding those composed objects in place (governor
-    cooldowns, an in-progress music crossfade, a running chatter loop) rather than a simple
-    reference swap. Deferred as a named follow-up (issue #109 explicitly calls this out rather than
-    leaving it silently restart-only) rather than folded into the same change.
+!!! tip "Reloads live — no restart"
+    The control panel's **Reload cues** button re-scans **both** drop-in surfaces without a restart:
+    the five **turn-stage cues** (`listen`/`processing`/`completed`/`failure`/`thinking`, see [The
+    voice loop](../getting-started/voice-loop.md#sound-cues), issue #109) **and** this ambient
+    content — SFX, music, chatter, and interdiction threat lines (issue #110). Drop a file in (or
+    edit/remove one), click **Reload cues**, and it's picked up on the next line — the message shows
+    what landed. The reload is careful with live state: it keeps the governor's cooldowns, the
+    chatter timing, the current music track (an in-progress crossfade is never interrupted), and the
+    interdiction rotation, so a reload never re-arms a just-fired cue or restarts your music.
 
 !!! note "Voice control"
     You can steer the layer by voice: *"mute the chatter," "quiet the comms," "silence the carrier,"

@@ -1295,7 +1295,8 @@ The original seven-phase plan is done and tested:
     reload there means rebuilding those objects in place around a governor's cooldown state, a
     running chatter loop, and an in-progress music crossfade — non-trivial enough that the issue
     explicitly calls for a **named follow-up** rather than silently staying restart-only; noted in
-    `docs/audio/ambient-audio.md` so it isn't lost. Offline-unit-tested: `reload()` picks up an
+    `docs/audio/ambient-audio.md` so it isn't lost (**now delivered — see entry 53, issue #110**).
+    Offline-unit-tested: `reload()` picks up an
     added file and drops a removed one, falls back to the bundled default when the user folder is
     emptied, skips a corrupt file, and recreates a deleted folder — all via the SAME `CuePlayer`
     instance, never rebuilding the player (`tests/test_cue_player.py`); the endpoint's per-type
@@ -1304,6 +1305,42 @@ The original seven-phase plan is done and tested:
     and `MANUAL_TESTS.md` §2 are in sync. **Improvement thesis vs EDCoPilot/COVAS:NEXT: drop in a
     new cue clip and hear it on your very next press — the whole "just drop a file" pitch stops
     quietly requiring a relaunch to actually take effect.**
+
+53. **Ambient drop-in content: reload live too** (issue #110, follow-up to #109, `covas/mixer/cues.py`,
+    `covas/mixer/music.py`, `covas/mixer/example_cues.py`, `covas/mixer/runtime.py`, `covas/app.py`,
+    `covas/web.py`, `covas/templates/index.html`) — #109 made the turn-stage cues reload live but
+    **deliberately scoped out** the sibling C11 ambient drop-in content (SFX/music/chatter/threat),
+    because that content is woven into composed objects that HOLD LIVE STATE rather than read through
+    one lock-free dict. This closes that gap so the **same** Reload cues button refreshes both
+    surfaces. The hard part is swapping content **around** live state without a restart: the reload
+    rebuilds each composed object in place rather than replacing it. Three small atomic swap seams
+    do the work — `CueRegistry.replace_all()` (validate a fresh cue set, then rebind the read-path
+    attribute LAST so a concurrent event-pump `eligible()` read is never torn — the same
+    atomic-rebind discipline as `CuePlayer.reload`; the driver holds the SAME registry instance, and
+    the governor's cooldowns + the Chatter/Sfx player rotation/frequency state are keyed by cue name
+    on unchanged player instances, so they survive), `MusicDirector.set_library()` (swap the
+    `MusicLibrary` but keep `_context`/`_track`/`_rot`, so the current track keeps playing and an
+    in-progress crossfade is never interrupted — new tracks apply on the next genuine context
+    change), and `InterdictionCue.set_content()` (swap the sting-sample set + threat pool, keep the
+    rotation counters + shared governor so a just-fired interdiction can't re-arm). `AudioLayer.
+    reload_content(bundle)` orchestrates the three (re-overlaying SFX+chatter and preserving the
+    carrier cues, which carry no drop-in content), symmetric with `__init__` which already takes a
+    pre-scanned bundle — so the folder scan (and the `[audio].content_root` seam) stays at the app
+    boundary in a shared `App._scan_audio_content()` used by both startup and `App.reload_audio_
+    content()`. `POST /api/cues/reload` now calls BOTH `core.cues.reload()` (turn cues) and
+    `core.reload_audio_content()` (ambient), returning `counts` (unchanged) plus `content`; the
+    button reports both. Fail-soft throughout: a bad bundle leaves the live content in place and
+    never raises; an absent layer returns `{}`. Same **no-filesystem-watcher** rationale as #109
+    (stdlib-first; the explicit button covers a rarely-used action without a dep/thread).
+    Offline-unit-tested: the three swap seams preserve live state (`tests/test_content_pipeline.py`),
+    `reload_content` swaps cues/music/interdiction while keeping governor cooldowns + the current
+    music track and falls chatter back to its default pool when emptied (`tests/test_audio_layer.py`),
+    the endpoint returns both count maps (`tests/test_cues_web.py`), and an end-to-end app reload
+    through a temp content root (`tests/test_app_audio_wiring.py`). Docs (`docs/audio/ambient-audio.md`)
+    and `MANUAL_TESTS.md` (§2 + §18.6) are in sync. **Improvement thesis vs EDCoPilot/COVAS:NEXT:
+    neither exposes a curate-your-own-soundscape drop-in surface at all; this makes COVAS++ the only
+    one where the ENTIRE ambient library — SFX, music, chatter, interdiction lines — is tunable in a
+    tight drop-a-file → click → hear-it loop with the game running, zero restart friction.**
 
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**

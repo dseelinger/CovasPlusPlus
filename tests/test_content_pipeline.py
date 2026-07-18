@@ -148,3 +148,52 @@ def test_content_bundle_type_is_frozen():
     b = ContentBundle({}, {}, {}, [])
     assert isinstance(b, ContentBundle)
     assert overlay_cues([Cue("x", "comms", {"docked"})], b)[0].name == "x"   # no-op on empty
+
+
+# ---- composed-object swap seams for the live reload (issue #110) ----------------------------
+
+def test_registry_replace_all_is_atomic_and_swaps_the_set():
+    from covas.mixer import CueRegistry
+    reg = CueRegistry([Cue("a", "comms", {"docked"}), Cue("b", "comms", {"docked"})])
+    reg.replace_all([Cue("a", "comms", {"docked"}, phrasings=("new",)), Cue("c", "comms", {"docked"})])
+    assert [c.name for c in reg.cues()] == ["a", "c"]          # whole set swapped, in order
+    assert reg.get("a").phrasings == ("new",) and reg.get("b") is None and reg.get("c") is not None
+
+
+def test_registry_replace_all_all_or_nothing_on_bad_set():
+    from covas.mixer import CueRegistry
+    reg = CueRegistry([Cue("a", "comms", {"docked"})])
+    # a duplicate name in the new set is refused BEFORE any rebind -> old set intact
+    try:
+        reg.replace_all([Cue("x", "comms", {"docked"}), Cue("x", "comms", {"docked"})])
+        raised = False
+    except ValueError:
+        raised = True
+    assert raised and [c.name for c in reg.cues()] == ["a"]
+
+
+def test_music_director_set_library_keeps_current_track():
+    from covas.mixer import MusicDirector, MusicLibrary
+    d = MusicDirector(MusicLibrary({"populated": ["p1.ogg"]}), enabled=True)
+    first = d.update({"populated"})
+    assert first is not None and d.current_track == "p1.ogg"
+    d.set_library(MusicLibrary({"populated": ["p2.ogg"], "deep_space": ["d.ogg"]}))
+    # same context -> NO transition, the current track keeps playing (crossfade not interrupted)
+    assert d.update({"populated"}) is None and d.current_track == "p1.ogg"
+    # a genuine context change now picks up the new library
+    assert d.update({"deep_space"}).to_track == "d.ogg"
+
+
+def test_interdiction_set_content_keeps_rotation_and_governor():
+    emitted = []
+    cue = InterdictionCue(lambda layer: emitted.append(layer.payload) or True,
+                          sting_samples=("s1.wav",), threat_lines=("old threat",))
+    cue.on_event({"event": "Interdiction"})
+    assert emitted[1] == "old threat"                          # layer 1 is the threat line
+    cue.set_content(sting_samples=("s2.wav",), threat_lines=("new threat",))
+    emitted.clear()
+    cue.on_event({"event": "Interdiction"})
+    assert emitted[0] == "s2.wav" and emitted[1] == "new threat"   # new content in play
+    # threat_lines=None leaves the current pool unchanged
+    cue.set_content(sting_samples=())
+    assert cue._threat == ("new threat",)                      # noqa: SLF001

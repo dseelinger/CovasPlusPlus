@@ -474,18 +474,10 @@ class App:
         the ambient layer off; COVAS speech still routes through the mixer. Needs the event pump
         so comms/chatter/interdiction/music react to journal events."""
         try:
-            from .config import data_dir
-            from .mixer import AudioControlsCapability, AudioLayer, ensure_skeleton, load_content
+            from .mixer import AudioControlsCapability, AudioLayer
             # Drop-in content (C11): ensure the folder skeleton (idempotent) then scan it, so a
-            # dropped-in file joins the cues with no code/config edits. Fail-soft. The root is the
-            # writable data dir (project root in a source run, %APPDATA%\COVAS++ when frozen);
-            # [audio].content_root overrides it (a seam so tests don't touch the repo).
-            content_root = self.cfg.get("audio", {}).get("content_root") or data_dir()
-            try:
-                ensure_skeleton(content_root)
-            except Exception:  # noqa: BLE001 — skeleton creation must never block startup
-                pass
-            content = load_content(content_root)
+            # dropped-in file joins the cues with no code/config edits. Fail-soft.
+            content = self._scan_audio_content()
             cheap = Router.from_cfg(self.cfg).cheap_route(None).model
             self.audio = AudioLayer(
                 self.cfg, self.mixer, self.tts,
@@ -514,6 +506,35 @@ class App:
             self.audio = None
             self.bus.publish({"type": "log", "who": "system",
                               "text": f"Audio layer failed to start: {e}"})
+
+    def _scan_audio_content(self):
+        """Scan the C11 drop-in content folders and return the ContentBundle. The root is the
+        writable data dir (project root in a source run, %APPDATA%\\COVAS++ when frozen);
+        [audio].content_root overrides it (the seam so tests don't touch the repo). Ensures the
+        folder skeleton first (idempotent). Shared by startup and the live reload (issue #110).
+        Fail-soft — a skeleton write error never blocks the scan."""
+        from .config import data_dir
+        from .mixer import ensure_skeleton, load_content
+        content_root = self.cfg.get("audio", {}).get("content_root") or data_dir()
+        try:
+            ensure_skeleton(content_root)
+        except Exception:  # noqa: BLE001 — skeleton creation must never block a scan
+            pass
+        return load_content(content_root)
+
+    def reload_audio_content(self) -> dict:
+        """Re-scan the C11 drop-in ambient content (SFX/music/chatter/threat) and hot-swap it into
+        the live AudioLayer — no restart (issue #110). Pairs with `CuePlayer.reload` (issue #109) so
+        the control panel's ONE Reload cues action refreshes BOTH the turn-stage cues and the
+        ambient drop-ins. Returns per-category counts, or {} when the audio layer never came up.
+        Fail-soft — a user-initiated reload never crashes the loop."""
+        if self.audio is None:
+            return {}
+        try:
+            return self.audio.reload_content(self._scan_audio_content())
+        except Exception as e:  # noqa: BLE001 — a reload must never take down the app
+            self._log("audio", f"ambient content reload failed: {e}")
+            return {}
 
     def _build_cast_synth(self):
         """The C10 cast synth router: ElevenLabs for EL/persona voices, local Piper models (cached)
