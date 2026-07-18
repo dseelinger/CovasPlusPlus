@@ -789,7 +789,7 @@ SCHEMA: list[Setting] = [
     Setting("reflex.auto.chaff.cooldown", ("reflex", "auto", "chaff", "cooldown"), "float",
             "Chaff cooldown", "Combat reflexes",
             "Minimum seconds between automatic chaff bursts.",
-            default=8.0, min=0.0, max=300.0, unit="s",
+            default=20.0, min=0.0, max=300.0, unit="s",
             phrasings=("chaff cooldown",)),
 
     # --- Send in-game comms (issue #49) -----------------------------------

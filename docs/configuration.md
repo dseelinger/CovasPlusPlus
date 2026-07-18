@@ -390,7 +390,7 @@ paths: **spoken** / **hotword** (`[reflex]`) and **automatic** (`[reflex.auto]`)
 | `reflex.auto.heat_sink.threshold` | `100.0` | Heat percent to react at (ED signals overheat at >100%; a value above 100 disables it) |
 | `reflex.auto.heat_sink.cooldown` | `10.0` | Minimum seconds between auto heat-sink deployments |
 | `reflex.auto.chaff.enabled` | `false` | Auto-fire chaff when targeted/interdicted |
-| `reflex.auto.chaff.cooldown` | `8.0` | Minimum seconds between auto chaff bursts |
+| `reflex.auto.chaff.cooldown` | `20.0` | Minimum seconds between auto chaff bursts |
 
 ## Send in-game messages (`[comms_send]`)
 
