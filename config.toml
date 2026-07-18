@@ -4,7 +4,7 @@
 #  This is the single source of truth for all default settings.
 #  It is COMMENTED on purpose — edit values freely.
 #
-#  Anything you change in the web UI (Phase 3) is saved to `overrides.json`
+#  Anything you change in the web UI is saved to `overrides.json`
 #  and layered ON TOP of this file at runtime, so this file stays pristine.
 #  To reset a setting back to default, just remove it from overrides.json.
 # ============================================================================
@@ -1179,7 +1179,7 @@ vr_yaw_deg = 0.0        # heading in degrees; 0 = straight ahead. Usually set by
 
 
 [ui]
-# Local control panel (Phase 3).
+# Local control panel.
 host = "127.0.0.1"
 port = 8765
 # Control-panel colour theme (issue #104): "dark" (default), "light", or "elite" (the game's

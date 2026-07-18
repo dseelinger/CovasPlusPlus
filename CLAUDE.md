@@ -5,10 +5,15 @@ Read this first. It's the working agreement for this repo.
 ## What this is
 COVAS++ — a local Windows **voice AI companion for Elite Dangerous**. Push-to-talk →
 local STT (faster-whisper) → LLM → TTS. It converses, tracks a markdown checklist, and
-can web-search. It does **not** fly the ship. Treat the current app as a light MVP.
-Full design and rationale: **`DESIGN_AND_ROADMAP.md`**. Sequenced build prompts live in
-**`CLAUDE_CODE_PROMPTS.md`** — start at **Prompt 1** (cost instrumentation) and do them in
-order, one per fresh session. (The prompts are in that file, not here.)
+can web-search. It does **not** fly the ship. The app is well past MVP — 110+ issues shipped:
+a multi-provider LLM/TTS seam (Anthropic/OpenAI/Gemini · ElevenLabs/Edge/Azure/OpenAI/Cartesia/
+Piper), 40+ self-registering capabilities, an ambient-audio layer, ED journal monitoring,
+route/activity planners, guarded keybind automation, and a packaged Windows installer. Treat it
+as a mature, actively-extended codebase.
+Full design and rationale: **`DESIGN_AND_ROADMAP.md`**. `CLAUDE_CODE_PROMPTS.md` holds the
+original sequenced build prompts (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) — all built
+and merged. The live worklist is the **GitHub issue tracker**; start a fresh session from an
+open issue there, not from the prompt pack.
 
 ## Run / verify
 ```powershell
@@ -42,6 +47,15 @@ on-hardware testing.
   (ED journal, timers) publish here, UI/capabilities subscribe.
 - `covas/config.py` — `config.toml` + `overrides.json`, relative paths resolved to abs.
 - `covas/web.py` + `templates/` — Flask control panel.
+- `covas/capabilities/` — the primary extension surface (43+ self-registering modules);
+  see "Capabilities over loop edits" below.
+- `covas/mixer/` — audio mixing/ducking for voice, ambient SFX/music, and chatter.
+- `covas/ed/` — Elite Dangerous journal/status file monitoring and game-state context.
+- `covas/search/` — web-search tool integration and result shaping.
+- `covas/keybinds/` + `covas/macros/` — guarded ship/SRV/on-foot keybind automation and
+  voice-authored named macros.
+- `covas/comms/` + `covas/nav/` — in-game chat (local/wing) and route/activity planning.
+- `covas/memory/` + `covas/cg/` — durable-fact recall and Community Goal tracking.
 - `poc_local_loop.py` — standalone offline proof of concept.
 
 ## Conventions
@@ -68,10 +82,14 @@ on-hardware testing.
   existing terse-but-commented voice. Keep diffs small and reviewable.
 
 ## Guardrails (this is a PUBLIC repo)
-- **Never commit secrets or personal data.** `ElevenLabsAPIKey.txt`, `personality.txt`,
-  `overrides.json`, `logs/`, `ultimate_checklist.md`, `sounds/`, `voicelines/`, and
-  `*.onnx` are git-ignored — keep it that way. Don't hardcode API keys, absolute
-  `C:\Users\...` paths, the local username, or the Commander's identity anywhere tracked.
+- **Never commit secrets or personal data.** All provider key files (`*APIKey.txt` —
+  Anthropic/Azure/OpenAI/Cartesia/Gemini/Inara/ElevenLabs — and `*.key`) plus per-user data
+  (`personality.txt`, `overrides.json`, `logs/`, `ultimate_checklist.md`, `sounds/`,
+  `voicelines/`, `*.onnx`, `campaign.txt`, `crew.json`, `/memory/`, `custom_macros.jsonl`,
+  `music/`, `/audio/`, `/content/`, `personalities/custom/`, `personalities/voice_pairings.json`)
+  are git-ignored — keep it that way; check `.gitignore` for the current full list rather than
+  assuming this one. Don't hardcode API keys, absolute `C:\Users\...` paths, the local username,
+  or the Commander's identity anywhere tracked.
 - **Config paths are relative** to the project root and resolved in `config.py`. New path
   settings follow the same pattern; add them to `_PATH_FIELDS`.
 - Don't add ship-control/keybind automation without the safety layer described in the
