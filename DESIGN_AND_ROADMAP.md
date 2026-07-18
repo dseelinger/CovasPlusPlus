@@ -1722,6 +1722,51 @@ NN. **Per-ship config memory + engineering planning, bridged to the checklist** 
     checklist — where EDCoPilot/COVAS:NEXT have no persistent per-ship build memory or grounded,
     checklist-integrated engineering planner at all.**
 
+NN. **Ship-metric registry + jump range (current-ship live + fleet ranking)** (issue #139, epic #136;
+    `covas/nav/fsd_data.py` (new), `covas/nav/jump_range.py` (new), `covas/nav/ship_metrics.py` (new),
+    `covas/nav/ships.py`, `covas/capabilities/ship_metrics_capability.py` (new), `covas/bootstrap.py`)
+    — the measurement payoff of the engineering epic: ask COVAS++ **computed** questions about your
+    fleet — *"what's my current jump range"* and *"top three small ships by jump range"* — answered
+    from your **real** ships (each ship's remembered loadout + engineering per #135, the current
+    ship's **live** cargo/fuel, bundled hull specs #83). Built as a **pluggable ship-metric registry**
+    so the query surface is metric-AGNOSTIC and future metrics are cheap. **The seam:** a `Metric`
+    (`key`, spoken `names`, `unit`, `higher_is_better`, `compute(MetricInput) -> MetricResult`) in a
+    `MetricRegistry` that `resolve`s a spoken name → metric and `rank`s any `(label, MetricInput)` set
+    by any metric, direction-aware, separating a `None`/unknown value from a real one. The **query
+    capability** (`ShipMetricsCapability`, tiering group `engineering`) exposes just two shapes —
+    `ship_metric_current` ("my current &lt;metric&gt;", live) and `ship_metric_ranking` ("top N
+    &lt;class&gt; ships by &lt;metric&gt;") — both dispatching through the registry, so adding **dps /
+    shield_mj / cargo / top_speed** later is a NEW registry entry + its `compute`, with **zero change**
+    to the tools, ranking, or voice surface (proved by a trivial second dummy metric in the tests).
+    **Jump range** is the one real metric: a new **FSD reference table** (`fsd_data.py`, point-in-time
+    EDCD/coriolis-sourced — optimal mass, max fuel, and the rating/size fuel constants per class+rating,
+    plus Guardian FSD-booster flat bonuses) feeds a **pure calculator** (`jump_range.py`) implementing
+    the standard ED FSD equation `optimalMass/totalMass · (maxFuel/fuelMul)^(1/fuelPower) + guardian`.
+    Engineering is read straight off the journal's `Loadout` Modifiers (`FSDOptimalMass` /
+    `MaxFuelPerJump`), so an engineered drive uses its **real** engineered stats, not a stock guess.
+    **Module-mass approximation (the honest part):** neither the loadout nor the specs carry per-module
+    masses, so total mass can't be summed directly. Instead we **calibrate the ship's dry mass from the
+    game's OWN `MaxJumpRange`** (which the game computed *with* real module masses) by inverting the
+    equation at that figure — recovering an effective dry mass that already bakes in every fitted
+    module — then vary only fuel + cargo (the two knowns). The current ship gets a **laden** figure at
+    its live load; every other ship a **reference load** (full tank, empty cargo) so a ranking is fair
+    — the answer states the basis. When a build predates that figure, it falls back to a hull-only
+    estimate and **flags the result rough** rather than quoting false precision. Never fabricates: an
+    unresolvable FSD or an unseen ship is reported **unknown**, and a class filter uses the bundled
+    pad size (a new `ships.id_from_journal_symbol` maps a journal ShipType symbol → canonical spec id
+    via the roster's ed_symbol). All getters injected (offline-testable). Offline-unit-tested: the FSD
+    equation vs hand-computed laden/unladen/with-and-without-Guardian figures, the engineered-stat
+    override, the MaxJumpRange calibration round-trip, the current-ship path with injected live
+    cargo/fuel, ranking + class filter over a faked fleet (incl. an unknown-build ship → reported
+    unknown), and registry dispatch with a **second dummy metric** (`tests/test_jump_range.py`,
+    `tests/test_ship_metrics.py`); the FSD-panel match ± cargo, cargo-moves-the-figure, top-N-small,
+    and never-flown-ship-unknown on-hardware checks are `MANUAL_TESTS.md` §9a-4. Docs:
+    `docs/elite/ship-metrics.md` (+ `mkdocs.yml` nav, documenting the cargo/reference-load basis, the
+    module-mass calibration, and the metric-registry seam). **Improvement thesis (Assist): competitors
+    send you to Coriolis/EDSY to compare builds; COVAS++ computes YOUR engineered fleet's numbers and
+    ranks them, by voice, from data it already has — and the metric registry means "for DPS", "most
+    shields" drop in later with no new query surface.**
+
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 

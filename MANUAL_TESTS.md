@@ -906,6 +906,19 @@ Notes:
 - [ ] **No remembered build → honest:** ask about a ship COVAS++ hasn't seen a `Loadout` for this install → it says it has no remembered build for that ship and to board it, rather than inventing modules.
 - [ ] **Stock module isn't guessed:** *"Plan grade 5 on my <a stock module>"* → it says the module is stock and **asks which blueprint** (offering real options), rather than assuming one.
 - [ ] **Plan → checklist round-trip:** *"Add engineering my FSD to grade 5 to my checklist"* → it adds a checklist objective naming the module/grade/engineer/shortfall; *"what's next?"* shows it; *"mark engineering the FSD done"* completes it. Confirm the line appears/updates on the Checklist page too.
+## 9a-4. Ship metrics — jump range & fleet ranking (issue #139)  🎮 ED 🔊 HW 📋 FILE
+> `[elite].enabled = true`. Computes jump range from each ship's **remembered build** (#135) crossed
+> with bundled FSD reference data, and ranks your **owned fleet** (#134). The current ship's figure
+> uses **live** cargo & fuel; other ships are quoted at a reference load (full tank, empty cargo).
+> Board your ships at least once this session so their loadouts are captured, and fly the ship you
+> want a live figure for.
+- [ ] **Current jump range matches the FSD panel:** in your current ship, *"what's my current jump range?"* → the spoken figure matches the in-game right-hand FSD/navigation panel's jump range for your **current** cargo, within a light-year or so. It also states the load basis (e.g. "laden — 32t fuel, 40t of cargo").
+- [ ] **Cargo moves the figure:** note the current jump range, then **load or unload cargo** (buy/sell/collect) and ask again → the figure moves the right way (more cargo → shorter range; less → longer), tracking the panel.
+- [ ] **Top three small ships:** *"top three small ships by jump range"* → ranks your **small-pad** hulls (that have a remembered build) by range, best first, and says it used a reference load. Cross-check the order against what you know of those ships' ranges (Coriolis/EDSY if you like).
+- [ ] **Class filter is honored:** *"top three large ships by jump range"* → only large-pad ships appear; small/medium hulls are excluded.
+- [ ] **Never-flown ship → unknown, not guessed:** own a ship you have **not** boarded since setup (so it has no remembered build) and ask *"rank my ships by jump range"* → that ship is reported as **unknown** ("no remembered build yet"), never given an invented number.
+- [ ] **Named other ship at reference load:** *"what's the jump range of my &lt;a ship you're not flying&gt;?"* → a computed figure quoted at the reference load (full tank, empty cargo), since only the current ship's live cargo is known.
+- [ ] **Unknown metric is declined:** *"rank my ships by shield strength"* → it says it doesn't compute that yet and names what it can do (jump range), rather than inventing a ranking. (Confirms the metric registry is honest about its one metric today.)
 ## 9a. Engineers finder (#65)  🎮 ED 🔊 HW 📋 clipboard
 > `[elite].enabled = true`. Unlock **status** is read live from the journal's `EngineerProgress`
 > event (written at login); locations/requirements come from a bundled offline table. Log into the
