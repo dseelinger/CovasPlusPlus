@@ -22,7 +22,14 @@ from typing import Callable, Optional
 from ..capabilities.base import HelpMeta, Slot
 from .buses import ALERT, AMBIENT, COMMS, COVAS, MUSIC
 from .carrier import CarrierPlayer, build_carrier_config, carrier_cues
-from .chatter import ChatterPlayer, chatter_cues, chatter_interval, situation_context
+from .chatter import (
+    ChatterPlayer,
+    CrewChatterPlayer,
+    chatter_cues,
+    chatter_interval,
+    crew_chatter_cue,
+    situation_context,
+)
 from .comms import capture
 from .content import (
     ContentBundle,
@@ -33,7 +40,7 @@ from .content import (
     status_summary,
     threat_lines,
 )
-from .cues import PERSONA, CueRegistry
+from .cues import CREW, PERSONA, CueRegistry
 from .driver import CueDriver
 from .eligibility import EligibilityEngine
 from .example_cues import DEFAULT_THREAT_LINES, InterdictionCue, SfxPlayer, sfx_cues
@@ -169,6 +176,10 @@ class AudioLayer:
             self._registry.register(cue)
         for cue in carrier_cues():
             self._registry.register(cue)
+        # Ambient crew chatter (issue #126): one CREW-role cue, no phrasings pool (LLM-or-nothing),
+        # voiced by whichever roster member's turn it is. Like the carrier cues it registers
+        # straight in (no drop-in overlay — it carries no pool to overlay).
+        self._registry.register(crew_chatter_cue())
         # The governor only THROTTLES (cooldowns + global rate) here — the audio layer's own
         # per-category flags are the on/off gates, so force it enabled (its [audio.cues].enabled
         # in config maps to the chatter/SFX toggle, not to whether comms may play).
@@ -200,6 +211,15 @@ class AudioLayer:
         self._persona_chatter = ChatterPlayer(self._speak_persona, generate=chatter_gen,
                                                context=self._chatter_context,
                                                min_interval=self._chatter_interval, clock=clock)
+        # Ambient crew chatter (issue #126): same flavor generator (cheap tier) + situation
+        # grounding as ambient chatter, but the speaker is a rotating ROSTER member voiced
+        # fire-and-forget in their own cast voice (NOT the blocking conversation-path speak_crew,
+        # which would stall this event-pump thread). Its interval is a CREW-specific sparse window,
+        # NOT population-scaled — crew are aboard your ship regardless of the local population.
+        self._crew_chatter = CrewChatterPlayer(
+            self._crew_roster, self._speak_crew_ambient, generate=chatter_gen,
+            context=self._chatter_context, min_interval=self._crew_chatter_interval,
+            clock=clock, log=self._log)
         self._sfx = SfxPlayer(self._play_sample)
         # Carrier context voices (#19): each role speaks its own configured voice (or a stable
         # cast-pool fallback) with its display name woven in. Pool-only (fact-safe), no LLM.
@@ -374,6 +394,49 @@ class AudioLayer:
             self.mixer.clear_bus(COMMS)
         return True
 
+    def _crew_roster(self) -> list:
+        """The ENABLED crew roster for ambient crew chatter (issue #126), or [] when crew is off —
+        the empty-roster case the CrewChatterPlayer treats as 'cue ineligible, skip'. Read live
+        from config so a control-panel edit (or a `crew off` toggle) applies to the next line."""
+        try:
+            from .. import crew as crew_mod  # local import: keep the mixer package cycle-free
+            if not crew_mod.is_enabled(self.cfg):
+                return []
+            return crew_mod.load_members(self.cfg)
+        except Exception as e:  # noqa: BLE001 — a roster read glitch just means no crew line
+            self._log(f"crew roster read failed: {e}")
+            return []
+
+    def _speak_crew_ambient(self, name: str, text: str) -> bool:
+        """Voice an AMBIENT crew line (issue #126) in member `name`'s cast voice on the COMMS bus,
+        FIRE-AND-FORGET. This resolves the voice with the SAME precedence as the conversation-path
+        `speak_crew` — explicit `[crew].file` voice_ref (issue #70) > best-fit #124 pairing >
+        deterministic assign (issue #69) — but, crucially, submits to the mixer and returns
+        IMMEDIATELY (no blocking `cancel.wait`): this runs on the audio event-pump thread, so it
+        must not stall waiting for the clip to finish. Fail soft."""
+        try:
+            from .. import crew as crew_mod  # local import: keep the mixer package cycle-free
+            ref = (crew_mod.voice_ref_for(self.cfg, name)
+                  or self._crew_pairings.get(str(name or "").strip().lower(), ""))
+            voice = self._cast.for_crew(name, ref)
+        except Exception as e:  # noqa: BLE001 — a voice-resolve glitch degrades to silence
+            self._log(f"crew chatter voice resolve failed ({name}): {e}")
+            return False
+        return self._submit_voice(voice, text, COMMS)
+
+    def _crew_chatter_interval(self) -> Optional[float]:
+        """The CREW-specific seconds-between-ambient-crew-lines (issue #126) — a sparse gap drawn
+        from `[crew].chatter_min_seconds`..`chatter_max_seconds`. Deliberately NOT population-scaled
+        (crew are aboard your ship, so the local system's population is irrelevant): a randomized
+        gap in the window gives natural, non-clockwork pacing. Read live so a Settings change
+        applies immediately; the global C3 governor still rate-caps on top."""
+        cr = self.cfg.get("crew", {}) or {}
+        lo = float(cr.get("chatter_min_seconds", 180.0))
+        hi = float(cr.get("chatter_max_seconds", 600.0))
+        if hi < lo:
+            lo, hi = hi, lo
+        return self._rng.uniform(lo, hi)
+
     def _chatter_interval(self) -> Optional[float]:
         """Current required seconds between chatter lines, scaled by the live system population
         (see chatter.chatter_interval). Read live so a Settings-page change applies immediately."""
@@ -461,6 +524,11 @@ class AudioLayer:
         role = getattr(cue, "voice_role", "")
         if role == PERSONA:
             return self._persona_chatter(cue) if self.chatter_on else False
+        if role == CREW:
+            # Ambient crew chatter (issue #126): gated on the ambient-audio toggle here; the
+            # crew-enabled + roster-non-empty gate lives inside the player (empty roster -> skip),
+            # and the [audio.cues].flavor gate rides the generator (None flavor gen -> silence).
+            return self._crew_chatter(cue) if self.chatter_on else False
         if role:
             return self._carrier(cue) if self.carrier_on else False
         if cue.samples:
@@ -618,6 +686,7 @@ class AudioLayer:
             comms_gen = make_variant_generator(llm, model=cheap_model) if comms_variants else None
             self._chatter.set_generate(chatter_gen)
             self._persona_chatter.set_generate(chatter_gen)
+            self._crew_chatter.set_generate(chatter_gen)
             self._comms.set_generate(comms_gen)
 
     def apply_settings(self) -> None:

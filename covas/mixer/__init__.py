@@ -53,14 +53,17 @@ from .carrier import (
 )
 from .chatter import (
     ChatterPlayer,
+    CrewChatterPlayer,
     build_chatter_prompt,
+    build_crew_chatter_prompt,
     chatter_cues,
     chatter_interval,
+    crew_chatter_cue,
     is_flavor_safe,
     register_chatter,
     situation_context,
 )
-from .cues import Cue, CueRegistry, cue_problems, validate_cue
+from .cues import CREW, PERSONA, Cue, CueRegistry, cue_problems, validate_cue
 from .driver import CueDriver
 from .example_cues import (
     DEFAULT_PIRATE_LINES,
@@ -123,6 +126,8 @@ __all__ = [
     "load_bus_configs",
     "process",
     "Cue",
+    "CREW",
+    "PERSONA",
     "CueRegistry",
     "cue_problems",
     "validate_cue",
@@ -150,9 +155,12 @@ __all__ = [
     "make_variant_generator",
     "validate_variant",
     "ChatterPlayer",
+    "CrewChatterPlayer",
     "build_chatter_prompt",
+    "build_crew_chatter_prompt",
     "chatter_cues",
     "chatter_interval",
+    "crew_chatter_cue",
     "is_flavor_safe",
     "register_chatter",
     "situation_context",

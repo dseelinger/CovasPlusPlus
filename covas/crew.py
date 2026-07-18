@@ -309,6 +309,14 @@ def system_instruction(cfg: dict) -> Optional[str]:
         " Lines with NO bracket prefix are spoken by you, the ship's companion — that stays the "
         "default. Use crew sparingly and only when it adds something; put the bracket at the very "
         "start of the line, and keep each character's spoken text on its own line."
+        # ADDRESSING (issue #126): when the Commander speaks TO a crew member, let that member
+        # answer for themselves. Static text (no per-turn variables), so the cached prefix is
+        # unchanged turn-to-turn — only the roster above ever varies.
+        " When the Commander addresses a crew member by name (\"Nyx, how are we looking?\"), answer "
+        "AS that member with a `[Name]` line, in character for their role and personality, keeping "
+        "the reply short since it is spoken aloud; you may add your own unprefixed line before or "
+        "after. If the Commander addresses everyone (\"all hands, sound off\"), give a brief `[Name]` "
+        "line for each crew member in turn."
     )
 
 

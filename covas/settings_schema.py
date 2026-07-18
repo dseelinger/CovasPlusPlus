@@ -515,7 +515,11 @@ SCHEMA: list[Setting] = [
             "with a written personality gets a BEST-FIT voice (an LLM casts it against your voice "
             "catalog, in the background, cached); persona-less or pairing-unavailable members keep "
             "the deterministic per-name fallback. A pinned voice always overrides Auto. Gated by "
-            "[personality].auto_voice_pairing. Off by default.",
+            "[personality].auto_voice_pairing. Crew also come ALIVE two more ways (issue #126): "
+            "when you ADDRESS a member by name ('Nyx, how are we looking?') they answer in their "
+            "own voice, in character; and roster members occasionally speak a brief, in-character "
+            "AMBIENT line grounded in their role + the live situation (needs the ambient audio "
+            "layer + [audio.cues].flavor; paced by [crew].chatter_min/max_seconds). Off by default.",
             default=False, phrasings=("crew", "crew voices", "the crew"),
             example="turn crew on"),
 

@@ -490,6 +490,18 @@ npc_registry_file = "npc_crew.json"
 # is saved (not every launch). Gated by the SAME [personality].auto_voice_pairing switch as #96, and
 # kept in a SEPARATE cache file so editing the roster never busts the shipped-persona cache.
 voice_pairings_file = "crew_voice_pairings.json"
+# CREW CHATTER (issue #126). When crew is enabled, roster members occasionally speak a brief,
+# in-character AMBIENT line in their OWN voice on the comms bus — the fighter pilot mutters during
+# an interdiction, the quartermaster grumbles as the hold fills — generated from their role +
+# personality + the live situation. It is LLM-ONLY and validated fact-safe (no names/numbers/
+# places, like ambient chatter); there is NO curated pool, so if ambient flavor generation is off
+# ([audio.cues].flavor = false, or the LLM/tier gate is lean) crew chatter simply stays silent.
+# Pacing: the gap between crew lines is drawn from this sparse min/max window (seconds) — this is
+# seasoning, not a podcast — on TOP of the global C3 rate cap ([audio.cues]). Deliberately NOT
+# population-scaled (unlike station chatter): crew are aboard YOUR ship regardless of the system.
+# Requires [crew].enabled + the ambient audio layer ([audio].enabled + [audio.cues].enabled).
+chatter_min_seconds = 180.0
+chatter_max_seconds = 600.0
 
 
 [elevenlabs]

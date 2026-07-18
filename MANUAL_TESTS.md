@@ -1477,6 +1477,28 @@ on in config (or the Settings page) before testing.
 - [ ] 🖥️ **Separate cache file:** confirm `crew_voice_pairings.json` appears in the data dir
   (git-ignored) alongside — and independent of — `personalities/voice_pairings.json`.
 
+### 18.5f Crew chatter + addressing (issue #126 — `[crew]`)  🔊 🎮 HW
+> Roster members speak in-character AMBIENT lines, and you can talk TO a member and get an in-voice
+> reply. Needs `[crew].enabled = true` with at least one roster member that has a **Role**, the
+> ambient layer on (`[audio].enabled`, `[audio.cues].enabled`) **with `[audio.cues].flavor = true`**
+> (crew chatter is LLM-only), an LLM key, and a non-lean optimization level. For a fast smoke test
+> lower `[crew].chatter_min_seconds`/`chatter_max_seconds` so lines come more often.
+- [ ] 🔊 🎮 **Role-flavored ambient line in the member's voice:** with crew on and in your ship, play
+  for a few minutes → a roster member occasionally speaks a short, in-character line **in their own
+  radio-filtered voice** (not the persona's clean voice), and it fits their **role** + the moment (a
+  gunner during a hardpoints-out fight sounds different from a cook while docked). The line asserts
+  nothing checkable (no names/numbers/places).
+- [ ] 🔊 **Not population-gated:** crew chatter still occurs out in **empty/unpopulated** space
+  (unlike station chatter, which needs an inhabited system) — crew are aboard regardless.
+- [ ] 🔊 **Address a member, get an in-voice reply:** say *"Nyx, how are we looking?"* → the reply
+  comes back in **Nyx's** voice, in character; the companion may add its own unprefixed line. Try
+  *"all hands, sound off"* → each crew member gives a brief line in turn.
+- [ ] 🔊 **Barge-in mid-crew-line:** while a crew chatter (or addressed) line is speaking, tap cancel
+  (`[`) → it stops promptly and returns to Idle.
+- [ ] 🔊 **Silent when flavor off / crew off:** set `[audio.cues].flavor = false` → no crew chatter
+  at all (it's generated-or-nothing, no canned pool). With `[crew].enabled = false`, neither crew
+  chatter nor in-voice addressing occurs — replies are a single voice as before.
+
 ### 18.6 Drop-in content (C11)
 - [ ] On first run with the layer enabled, confirm the skeleton appears: **`audio/sfx/<cue>/`**,
   **`audio/music/<context>/`**, **`content/chatter/*.txt`**, **`content/interdiction_threat.txt`**,

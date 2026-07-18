@@ -26,8 +26,8 @@ from collections import deque
 from typing import Callable, Optional
 
 from .buses import COMMS, COVAS
-from .cues import PERSONA, Cue
-from .eligibility import POPULATED
+from .cues import CREW, PERSONA, Cue
+from .eligibility import IN_SHIP, POPULATED
 
 _WORD = re.compile(r"[A-Za-z']+")
 _SENTENCE = re.compile(r"[.!?]+")
@@ -344,3 +344,175 @@ def register_chatter(registry) -> None:  # noqa: ANN001 — a CueRegistry
     """Register every shipped chatter cue with the cue registry."""
     for cue in chatter_cues():
         registry.register(cue)
+
+
+# ---- ambient CREW chatter (issue #126) ------------------------------------------------------
+# A roster member occasionally speaks a brief in-character ambient line in their OWN cast voice
+# (voice_role=CREW), generated from their role + persona + the live situation — the fighter pilot
+# mutters during an interdiction, the quartermaster grumbles as the hold fills. It's flavor-only
+# (fact_bearing=False) and LLM-OR-NOTHING: there is NO curated pool, so with no generator (ambient
+# flavor off) or a rejected line it simply stays silent. Eligible whenever the Commander is IN the
+# main ship (crew are aboard, so — unlike station chatter — it is NOT population-gated); the
+# crew-enabled + roster-non-empty gate lives in the dispatch/player path, not in the cue's states.
+
+# The STATIC prefix of the crew-chatter prompt (byte-stable, issue #85 / #126) — the role + the hard
+# rules, kept first so a prompt-caching provider reuses it; only the small per-member + situation
+# slice that follows it varies. Mirrors `_CHATTER_PREFIX`. Never fold live state into this string.
+_CREW_CHATTER_PREFIX = (
+    "You voice ONE short, ambient in-character line from a NAMED crew member aboard an Elite "
+    "Dangerous ship, overheard by the Commander. Speak as that crew member, in a way only someone "
+    "in THEIR role would, and let the ship's CURRENT SITUATION set the mood — but assert NOTHING "
+    "checkable: NO names, NO numbers, NO places, nothing to verify. Do not address the Commander "
+    "by name, do not ask a question, and do not narrate; just a line of pure personality. Stay in "
+    "character; never sound like an AI or a narrator."
+)
+
+
+def build_crew_chatter_prompt(member, context: str = "") -> str:  # noqa: ANN001 — a CrewMember
+    """Prompt for a crew member's ambient flavor line (issue #126). Duck-typed on `member`
+    (`name`/`role`/`persona`) so this stays decoupled from `covas.crew`. The static prefix comes
+    first (cacheable head), then the small per-member identity + the live `situation_context`
+    slice — the only varying parts. The `is_flavor_safe`/`_near_repeat` guards are the real filter;
+    the prompt just states the rules."""
+    name = str(getattr(member, "name", "") or "").strip()
+    role = str(getattr(member, "role", "") or "").strip()
+    persona = str(getattr(member, "persona", "") or "").strip()
+    who = f"You are {name}" if name else "You are a crew member"
+    if role:
+        who += f", the ship's {role}"
+    parts = [_CREW_CHATTER_PREFIX, who + "."]
+    if persona:
+        parts.append(f"In character: {persona}")
+    if context.strip():
+        parts.append(f"Right now the ship is {context.strip()}.")
+    parts.append("Reply with ONLY the line.")
+    return "\n".join(parts)
+
+
+def crew_chatter_cue(cooldown_s: float = 120.0) -> Cue:
+    """The single ambient crew-chatter cue (issue #126). No phrasings (LLM-or-nothing);
+    `voice_role=CREW` routes it through the roster-rotating crew voice at play time. Eligible in
+    the main ship only — the crew-enabled + roster-non-empty gate is applied by the player, not the
+    cue (those aren't game-state tokens)."""
+    return Cue("crew_chatter", COMMS, {IN_SHIP}, cooldown_s=cooldown_s,
+               voice_role=CREW, fact_bearing=False)
+
+
+class CrewChatterPlayer:
+    """The C3 driver's `play` callback for the ambient crew-chatter cue (issue #126). Picks the
+    next roster member (deterministic rotation), generates a flavor line grounded in their
+    role/persona + the live situation, validates it fact-safe and non-repeating, and — on success —
+    routes it FIRE-AND-FORGET to that member's cast voice. Any failure or rejection → silence
+    (there is no curated pool to fall back to).
+
+    Injected seams (offline-testable):
+      * `roster() -> list[member]` — the ENABLED roster (each member has `name`/`role`/`persona`);
+        empty (crew off / no members) makes the cue effectively ineligible (skip, no line).
+      * `speak_crew(name, text) -> bool` — voice `text` in crew member `name`'s cast voice,
+        FIRE-AND-FORGET (returns once submitted). The runtime wires this to resolve the voice
+        exactly like `speak_crew` (explicit voice_ref > #124 pairing > deterministic assign) and
+        `_submit_voice` on the COMMS bus — but it must NOT block, since this runs on the audio
+        event-pump thread.
+      * `generate(prompt) -> str` — the cheap-tier flavor generator (None => silence, no pool).
+      * `context() -> str` — the live situation slice (see `situation_context`); None/"" => an
+        ungrounded line.
+      * `min_interval() -> float | None` — CREW-specific seconds-between-lines (NOT
+        population-scaled — crew are aboard). None from the callable => no extra gate; None RETURN
+        from it => skip this turn. `clock` supplies monotonic time so the gate is testable.
+
+    Rotation + throttle: the speaker pointer and the frequency clock both advance on every turn
+    that is actually ATTEMPTED (frequency gate open, roster non-empty) — whether or not the line
+    survives validation — so one member's rejected line neither monopolizes the rotation nor lets
+    the (paid) generator be re-hit on the very next tick."""
+
+    def __init__(
+        self,
+        roster: Callable[[], list],
+        speak_crew: Callable[[str, str], bool],
+        *,
+        generate: Optional[Callable[[str], str]] = None,
+        context: Optional[Callable[[], str]] = None,
+        min_interval: Optional[Callable[[], Optional[float]]] = None,
+        clock: Callable[[], float] = time.monotonic,
+        log: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        self._roster = roster
+        self._speak_crew = speak_crew
+        self._generate = generate
+        self._context = context
+        self._min_interval = min_interval
+        self._clock = clock
+        self._log = log
+        self._idx = 0                              # deterministic rotation pointer into the roster
+        self._last_spoken: float = float("-inf")   # monotonic time of the last ATTEMPTED line
+        self._recent: deque[str] = deque(maxlen=_DEDUPE_WINDOW)
+
+    def set_generate(self, generate: Optional[Callable[[str], str]]) -> None:
+        """Swap the flavor generator after a live provider hot-swap (issue #90). None => silence."""
+        self._generate = generate
+
+    def _members(self) -> list:
+        """The enabled roster, fail-soft ([] on any error) — an empty roster skips the cue."""
+        if self._roster is None:
+            return []
+        try:
+            return list(self._roster() or [])
+        except Exception:  # noqa: BLE001 — a roster glitch just means no crew line this turn
+            return []
+
+    def _situation(self) -> str:
+        """The live situation slice, or "" (no provider / error). Fail-soft — grounding must never
+        break a line."""
+        if self._context is None:
+            return ""
+        try:
+            return self._context() or ""
+        except Exception:  # noqa: BLE001 — a context glitch just yields an ungrounded line
+            return ""
+
+    def _frequency_ok(self, now: float) -> bool:
+        """True unless a crew line was attempted too recently. Checked BEFORE generation so a
+        suppressed turn never touches the (paid) generator."""
+        if self._min_interval is None:
+            return True
+        gap = self._min_interval()
+        if gap is None:      # unknown -> no crew chatter this turn
+            return False
+        return (now - self._last_spoken) >= gap
+
+    def line_for(self, member) -> str:  # noqa: ANN001 — a CrewMember
+        """A validated flavor line for `member`, or "" (no generator / failure / rejected). Unsafe
+        (number/proper-noun) or near-repeat lines are rejected -> silence (no pool fallback)."""
+        if self._generate is None:
+            return ""
+        try:
+            candidate = (self._generate(build_crew_chatter_prompt(member, self._situation())) or "").strip()
+        except Exception:  # noqa: BLE001 — a generator failure degrades to silence
+            return ""
+        if candidate and is_flavor_safe(candidate) and not _near_repeat(candidate, self._recent):
+            return candidate
+        return ""
+
+    def __call__(self, cue: Cue) -> bool:
+        now = self._clock()
+        if not self._frequency_ok(now):
+            return False
+        members = self._members()
+        if not members:
+            return False
+        member = members[self._idx % len(members)]
+        # Advance the rotation + throttle on every ATTEMPT (see class docstring) — before we know
+        # whether the line survives — so a rejected line still yields the speaker turn and costs a
+        # full interval before the next generator call.
+        self._idx += 1
+        self._last_spoken = now
+        text = self.line_for(member)
+        if not text.strip():
+            return False                           # generation failed or was rejected -> silence
+        name = str(getattr(member, "name", "") or "").strip()
+        started = bool(self._speak_crew(name, text))
+        if started:
+            self._recent.append(_normalize_line(text))
+            if self._log is not None:
+                self._log(f"crew_chatter {name} -> {cue.bus}: {text}")
+        return started

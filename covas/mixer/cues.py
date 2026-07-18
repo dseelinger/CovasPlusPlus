@@ -35,6 +35,14 @@ _KNOWN_BUSES = frozenset(BUS_NAMES)
 # routed to a random radioed cast voice.
 PERSONA = "persona"
 
+# Voice-attribution role for AMBIENT CREW CHATTER (issue #126). A cue tagged `voice_role=CREW` is
+# spoken by a NAMED roster member in that member's OWN cast voice on the radio-treated comms bus —
+# the same voice resolution the conversation-path `speak_crew` uses (explicit voice_ref > #124
+# best-fit pairing > deterministic assign). Unlike PERSONA (the ship's own voice) or the carrier
+# roles (fixed captain/tower/chatter), the concrete speaker is chosen at play time by rotating
+# through the enabled roster, so this one cue voices whichever crew member's turn it is.
+CREW = "crew"
+
 
 @dataclass(frozen=True)
 class Cue:
