@@ -103,8 +103,8 @@ inline help:
   turn finishes on the previous one, and a failed switch keeps the working provider and tells you.
   Changing the **talk/cancel/reflex keys** or the **microphone** rebinds them in place; the Whisper
   model, activation mode, bus volumes, and toggles all reload immediately. The only exceptions that
-  still need a restart are `audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`, and
-  `dev.mock` (see the Configuration reference).
+  still need a restart are `audio.enabled`, `audio.mix_sample_rate`, and `ui.host`/`ui.port`
+  (see the Configuration reference).
 
 Everything here is the **same schema** the [voice settings](using/settings.md) use, so the two never
 disagree.

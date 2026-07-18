@@ -107,14 +107,15 @@ _TTS_SECTIONS: tuple[str, ...] = (
 # from the app's side it's a no-op either way and sits with the other non-reconciled ui.* keys:
 #   audio.enabled / audio.mix_sample_rate — the bus-mixer graph is cross-wired and the shared
 #     output device opened at init/start (see the load-bearing fallback around BusMixer.start);
-#   dev.mock — swaps the whole LLM/TTS/STT set for fakes at the composition root;
 #   ui.host / ui.port — bound by Flask when the control panel launches;
 #   ui.theme — control-panel colours only (issue #104); no app-side effect, applied live by the UI.
+# (dev.mock — the fakes swap at the composition root — is dev/test-only and no longer a UI Setting
+#  (issue #130), so it's not in this set; it's set via config.toml [dev] / COVAS_MOCK before launch.)
 # Explicitly NOT here (all live): provider/base_url/model/key/voice (rebuild), whisper.* (reload),
 # keys.* + reflex.ptt (hotkey reconcile), audio.input_device (mic reconcile), volumes/toggles
 # (audio.apply_settings), listen.* (listener reconcile).
 RESTART_REQUIRED: frozenset[str] = frozenset({
-    "audio.enabled", "audio.mix_sample_rate", "dev.mock", "ui.host", "ui.port", "ui.theme",
+    "audio.enabled", "audio.mix_sample_rate", "ui.host", "ui.port", "ui.theme",
 })
 # Top-level config sections that apply LIVE. Single source of truth paired with RESTART_REQUIRED:
 # the drift-guard unit test asserts every settings_schema key falls under LIVE_SECTIONS ∪

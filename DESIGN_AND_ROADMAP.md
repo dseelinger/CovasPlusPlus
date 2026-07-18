@@ -496,8 +496,10 @@ takes effect **without a restart**. The model:
   stream or drops the utterance.
 - **`RESTART_REQUIRED` — the true minimum.** Encoded next to the apply logic as a `frozenset` of
   schema keys: `audio.enabled` and `audio.mix_sample_rate` (the bus-mixer graph is cross-wired and
-  the shared device opened at init/start), `ui.host`/`ui.port` (Flask binds at launch), and
-  `dev.mock` (swaps the whole provider set for fakes at the composition root). A paired
+  the shared device opened at init/start) and `ui.host`/`ui.port` (Flask binds at launch). (`dev.mock`
+  — the fakes swap at the composition root — is dev/test-only and no longer a UI setting per #130, so
+  it's set before launch via `config.toml`/`COVAS_MOCK` rather than through the settings-apply path.)
+  A paired
   `LIVE_SECTIONS` prefix list is the single source of truth for everything else, and a **drift-guard
   unit test** asserts every `settings_schema` key falls under `LIVE_SECTIONS ∪ RESTART_REQUIRED`, so
   a new unclassified setting fails the test until it's placed.

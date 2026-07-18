@@ -55,7 +55,7 @@ Notes:
 Capabilities are gated in **`config.toml`** (edit freely) or **`overrides.json`** (what the panel
 writes). The Settings page (§14.2) can also flip these; **most settings now apply live** (issue #90
 — providers, keys, mic, Whisper, volumes, toggles) with only a tiny `RESTART_REQUIRED` set needing a
-relaunch (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`, `dev.mock` — see §14.3).
+relaunch (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port` — see §14.3).
 Confirm each before running its section (as shipped,
 **everything defaults ON** so the app shows full functionality out of the box):
 - [ ] `[elite].enabled = true` — ED journal/Status monitoring. **Required by** proactive/route callouts, the keybind + honk combat guard, carriers, community goals, and the live "current system" used by every search. (§5, §6, §7, §8, §9, §10)
@@ -1080,7 +1080,8 @@ Notes:
 - [ ] **Change + save:** change a value → the **save bar** appears with a count; **SAVE CHANGES** → 📋 written to `overrides.json` (config.toml stays pristine).
 - [ ] **Per-setting reset:** a changed (overridden) setting shows **RESET** → click it → reverts to default and drops from `overrides.json`.
 - [ ] **Validation:** try an out-of-range number (e.g. voice speed 3.0, above the 2.0 max) → rejected client-side / server-side, not written.
-- [ ] **Live where supported:** change the **Whisper model** → the log notes the model reloaded (no restart). Most settings now apply live — see §14.2a; only the `RESTART_REQUIRED` set (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`, `dev.mock`) needs a relaunch.
+- [ ] **Live where supported:** change the **Whisper model** → the log notes the model reloaded (no restart). Most settings now apply live — see §14.2a; only the `RESTART_REQUIRED` set (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`) needs a relaunch.
+- [ ] **No Dev-mock setting in the UI (issue #130):** the Settings page has **no "Dev mock mode" row** and **no "Developer" group**; voice *"turn mock mode on"* does nothing. The mechanism still works out of band: launch with `[dev] mock = true` in `config.toml` (or `$env:COVAS_MOCK=1`) → the startup log prints `Dev mock ON …` and a turn runs with fakes (no API calls).
 
 ### 14.2a Settings apply LIVE — hot-swap providers & keys (issue #90)  🔊 HW 🌐 PANEL 🌍 NET
 > #90 makes almost every Settings change take effect **without a restart**.

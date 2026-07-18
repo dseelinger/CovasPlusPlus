@@ -16,8 +16,8 @@ settings, with **relative paths** so your checkout stays portable. Anything you 
     finishes on the previous one); change the **talk/cancel/reflex keys**, the **microphone**, the
     Whisper model, the activation mode, bus volumes, or any toggle and it applies in place. Only a
     tiny set needs a restart: `audio.enabled` and `audio.mix_sample_rate` (they open the shared
-    audio device at launch), `ui.host` / `ui.port` (the control panel binds at launch), and
-    `dev.mock`. A failed provider switch is fail-soft — COVAS++ keeps the working one and says so.
+    audio device at launch) and `ui.host` / `ui.port` (the control panel binds at launch). A failed
+    provider switch is fail-soft — COVAS++ keeps the working one and says so.
 
 !!! note "Upgrades pick up new defaults automatically"
     In a packaged install your editable `config.toml` lives in the writable data dir
@@ -574,7 +574,7 @@ See [Companion HUD](using/hud.md). **Off by default.**
 | `azure.region` / `azure.voice` / `azure.style` | `eastus` / `en-US-AriaNeural` / *(blank)* | Azure Neural region, voice ShortName, and optional SSML style when `tts.provider = "azure"` |
 | `openai_tts.base_url` / `.model` / `.voice` / `.instructions` | OpenAI / `gpt-4o-mini-tts` / `alloy` / *(blank)* | OpenAI-compatible endpoint, model, voice, and optional tone steer when `tts.provider = "openai"` |
 | `cartesia.model` / `.voice` / `.language` | `sonic-2` / *(blank)* / `en` | Cartesia Sonic model, voice id, and language when `tts.provider = "cartesia"` (persona-only) |
-| `dev.mock` | `false` | Swap LLM/TTS/STT for fakes — exercise the loop with zero API calls (restart to apply) |
+| `dev.mock` | `false` | **Dev/test only** — swap LLM/TTS/STT for fakes to exercise the loop with zero API calls. Set it here or via `COVAS_MOCK=1` before launch; it is **not** on the Settings page or voice-settable (issue #130) |
 
 > **Pick, don't type — fetched dropdowns (issue #92 / #88).** On the Settings page most model-id and
 > endpoint fields are **editable comboboxes**: a dropdown populated from the provider's *live* catalog
