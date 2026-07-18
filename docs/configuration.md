@@ -423,7 +423,7 @@ The [voice search](search/index.md) categories.
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `nav.enabled` | `true` | Outfitting **and** ship search |
-| `nav.default_pad_size` | `L` | Default landing-pad size your ship needs (`S`/`M`/`L`/`any`) |
+| `nav.default_pad_size` | `L` | Default landing-pad size your ship needs (`S`/`M`/`L`/`any`/`match`). `match` ("Match Current Ship Size") reads your currently-flown ship live from ED; falls back to Large if unknown |
 | `nav.search_size` | `50` | How many nearby stations to fetch before filtering |
 | `nav.verify_stock` | `true` | (Ship search) verify current stock against EDSM before answering |
 | `nav.require_confirmation` | `false` | Gate the (read-only) search behind a separate confirm turn |

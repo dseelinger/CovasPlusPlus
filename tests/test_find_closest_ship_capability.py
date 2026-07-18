@@ -112,6 +112,40 @@ def test_pad_override_any_disables_filter():
     assert not any(k.startswith("has_") for k in http.calls[0]["payload"]["filters"])
 
 
+def test_pad_match_resolves_via_current_ship_size():
+    """"Match Current Ship Size" (#117): the injected get_current_ship_size getter resolves
+    the config default into the actual pad filter sent to Spansh."""
+    http = FakeHttp()
+    cap = FindClosestShipCapability(
+        NavConfig(enabled=True, default_pad_size="match"),
+        http=http, get_current_system=(lambda: "Sol"),
+        get_current_ship_size=(lambda: "S"), clipboard=FakeClipboard())
+    cap.run_tool("find_closest_ship", {"ship": "Anaconda"})
+    assert http.calls[0]["payload"]["filters"]["has_small_pad"] == {"value": True}
+
+
+def test_pad_match_falls_back_to_large_when_ship_unknown():
+    """No ship-size getter wired (or it returns None) -> the conservative Large fallback,
+    never 'any' — a search never returns a station the ship couldn't use."""
+    http = FakeHttp()
+    cap = FindClosestShipCapability(
+        NavConfig(enabled=True, default_pad_size="match"),
+        http=http, get_current_system=(lambda: "Sol"), clipboard=FakeClipboard())
+    cap.run_tool("find_closest_ship", {"ship": "Anaconda"})
+    assert http.calls[0]["payload"]["filters"]["has_large_pad"] == {"value": True}
+
+
+def test_pad_match_as_one_off_tool_arg_override():
+    """A per-search 'match my ship' override works without changing the config default."""
+    http = FakeHttp()
+    cap = FindClosestShipCapability(
+        NavConfig(enabled=True, default_pad_size="L"),
+        http=http, get_current_system=(lambda: "Sol"),
+        get_current_ship_size=(lambda: "M"), clipboard=FakeClipboard())
+    cap.run_tool("find_closest_ship", {"ship": "Anaconda", "pad_size": "match"})
+    assert http.calls[0]["payload"]["filters"]["has_medium_pad"] == {"value": True}
+
+
 def test_clipboard_skipped_when_already_in_that_system():
     """N3 rule: if the nearest station is in the Commander's current system (distance ~0),
     nothing is copied — you're already there."""

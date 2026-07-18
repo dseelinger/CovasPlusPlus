@@ -64,6 +64,31 @@ def test_localised_ship_name_preferred():
     assert ctx.snapshot()["ship"] == "Anaconda"
 
 
+def test_load_game_captures_raw_ship_symbol():
+    # ship_symbol (#117) is the RAW internal symbol, not the title-cased display name —
+    # ed.ships.ship_pad_size looks it up case-insensitively.
+    ctx = EDContext()
+    apply_journal_event(ctx, {"event": "LoadGame", "Ship": "python_nx",
+                              "Ship_Localised": "Python MkII"})
+    s = ctx.snapshot()
+    assert s["ship"] == "Python MkII"          # display name, unchanged (already mixed-case)
+    assert s["ship_symbol"] == "python_nx"     # raw internal symbol, the lookup key
+
+
+def test_loadout_captures_raw_ship_symbol():
+    ctx = EDContext()
+    apply_journal_event(ctx, {"event": "Loadout", "Ship": "federation_corvette",
+                              "Ship_Localised": "Federal Corvette", "ShipName": "Vigil"})
+    s = ctx.snapshot()
+    assert s["ship_symbol"] == "federation_corvette"
+    assert s["ship_name"] == "Vigil"
+
+
+def test_ship_symbol_none_until_loadout():
+    ctx = EDContext()
+    assert ctx.snapshot()["ship_symbol"] is None
+
+
 def test_docked_then_undocked():
     ctx = EDContext()
     apply_journal_event(ctx, {"event": "Docked", "StationName": "Jameson Memorial",

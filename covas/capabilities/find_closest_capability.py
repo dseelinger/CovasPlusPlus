@@ -98,11 +98,23 @@ def _make_logline(log: Callable[[str], None] | None) -> Callable[[str], None]:
     return log if log is not None else (lambda msg: None)
 
 
-def _pad_constraint(inp: dict, default: str) -> str | None:
+def _pad_constraint(
+    inp: dict, default: str,
+    get_current_ship_size: Callable[[], str | None] | None = None,
+) -> str | None:
     """The pad constraint for this search: the tool arg if given, else the config
-    default. 'any' / 'none' / '' disables it."""
+    default. 'any' / 'none' / '' disables it.
+
+    'match' (issue #117 — "Match Current Ship Size") resolves to the Commander's
+    CURRENTLY-FLOWN ship's pad size via the injected getter, falling back to Large when the
+    ship is unknown (undetected, or an unrecognized symbol) — the conservative choice, since
+    a Large pad fits any ship. Applies identically whether 'match' came from the config
+    default or a one-off tool-arg override ('find the closest X for my current ship')."""
     raw = inp.get("pad_size")
     pad = str(raw).strip() if raw is not None else default
+    if pad.lower() == "match":
+        size = get_current_ship_size() if get_current_ship_size is not None else None
+        pad = size or "L"
     if not pad or pad.lower() in ("any", "none", "n/a"):
         return None
     return pad
@@ -209,8 +221,9 @@ _SCHEMA_PROPS = {
     },
     "pad_size": {
         "type": "string",
-        "description": "Required landing-pad size (S/M/L) for the Commander's ship. Omit to "
-                       "use the configured default.",
+        "description": "Required landing-pad size (S/M/L) for the Commander's ship, or "
+                       "'match' to use whatever ship they're CURRENTLY flying (falls back to "
+                       "Large if unknown). Omit to use the configured default.",
     },
 }
 _CONFIRMED_PROP = {
@@ -246,6 +259,10 @@ class FindClosestCapability:
       * `http` — the Http poster for Spansh (RequestsHttp in the app; a fake in tests).
       * `get_current_system` — Callable[[], str|None] returning the Commander's current
         system (ED context, with a journal fallback the app wires up), or None.
+      * `get_current_ship_size` — Callable[[], str|None] returning the pad size ("S"/"M"/"L")
+        the Commander's CURRENTLY-FLOWN ship needs (ED context's ship symbol through
+        `ed.ships.ship_pad_size`), or None when unknown. Backs the "match" pad option
+        (#117); None (the default) makes 'match' fall back to Large, same as an unwired app.
       * `resolve` / `search` / `clipboard` — pure/offline deps, defaulted to the real ones
         but overridable in tests.
     """
@@ -259,6 +276,7 @@ class FindClosestCapability:
         *,
         http: Http | None = None,
         get_current_system: Callable[[], str | None] | None = None,
+        get_current_ship_size: Callable[[], str | None] | None = None,
         resolve: Callable[..., object] = _default_resolve,
         search: Callable[..., object] = find_closest_module,
         clipboard: Callable[[str], None] = _default_copy,
@@ -268,6 +286,7 @@ class FindClosestCapability:
         self._cfg = config
         self._http = http if http is not None else RequestsHttp()
         self._current_system = get_current_system
+        self._current_ship_size = get_current_ship_size
         self._resolve = resolve
         self._search = search
         self._clipboard = clipboard
@@ -317,7 +336,8 @@ class FindClosestCapability:
                      phrasings=("a landing pad size", "a pad size"),
                      example="somewhere with a large pad",
                      help_text="Restrict to stations with a given landing-pad size — small, "
-                               "medium, or large."),
+                               "medium, or large — or say 'match my ship' to use whatever "
+                               "ship you're currently flying for this one search."),
             ),
             help_when_active=("Tell me the module — and its size or mount if I ask — and I'll "
                               "find the nearest station that sells it."),
@@ -406,7 +426,7 @@ class FindClosestCapability:
     def _do_search(self, resolved: Resolved, inp: dict) -> str:
         """The one networked step — fires exactly once, only on RESOLVED + confirmed."""
         system = self._current_system() if self._current_system is not None else None
-        pad = _pad_constraint(inp, self._cfg.default_pad_size)
+        pad = _pad_constraint(inp, self._cfg.default_pad_size, self._current_ship_size)
         try:
             result = self._search(
                 resolved, system, self._http,
@@ -502,8 +522,9 @@ _SHIP_SCHEMA_PROPS = {
     },
     "pad_size": {
         "type": "string",
-        "description": "Required landing-pad size (S/M/L) for the Commander's ship. Omit to "
-                       "use the configured default.",
+        "description": "Required landing-pad size (S/M/L) for the Commander's ship, or "
+                       "'match' to use whatever ship they're CURRENTLY flying (falls back to "
+                       "Large if unknown). Omit to use the configured default.",
     },
 }
 
@@ -519,6 +540,10 @@ class FindClosestShipCapability:
       * `http` — the Http poster for Spansh (RequestsHttp in the app; a fake in tests).
       * `get_current_system` — Callable[[], str|None] returning the Commander's current
         system (ED context, with a journal fallback the app wires up), or None.
+      * `get_current_ship_size` — Callable[[], str|None] returning the pad size ("S"/"M"/"L")
+        the Commander's CURRENTLY-FLOWN ship needs (ED context's ship symbol through
+        `ed.ships.ship_pad_size`), or None when unknown. Backs the "match" pad option
+        (#117); None (the default) makes 'match' fall back to Large, same as an unwired app.
       * `get_local_shipyard` — Callable[[], ShipyardSnapshot|None] reading the game's own
         Shipyard.json (ed/shipyard.py). Ground truth for the last-visited station's stock —
         Spansh's ships list is the CATALOG, so a contradicted candidate gets skipped. None
@@ -540,6 +565,7 @@ class FindClosestShipCapability:
         *,
         http: Http | None = None,
         get_current_system: Callable[[], str | None] | None = None,
+        get_current_ship_size: Callable[[], str | None] | None = None,
         get_local_shipyard: Callable[[], object | None] | None = None,
         stock_lookup: Callable[[str, str], object | None] | None = None,
         resolve: Callable[..., object] = _default_resolve_ship,
@@ -551,6 +577,7 @@ class FindClosestShipCapability:
         self._cfg = config
         self._http = http if http is not None else RequestsHttp()
         self._current_system = get_current_system
+        self._current_ship_size = get_current_ship_size
         self._local_shipyard = get_local_shipyard
         self._stock_lookup = stock_lookup
         self._resolve = resolve
@@ -592,7 +619,8 @@ class FindClosestShipCapability:
                      phrasings=("a landing pad size", "a pad size"),
                      example="somewhere with a large pad",
                      help_text="Restrict to stations with a given landing-pad size — small, "
-                               "medium, or large."),
+                               "medium, or large — or say 'match my ship' to use whatever "
+                               "ship you're currently flying for this one search."),
             ),
             help_when_active=("Tell me the ship — and which model if I ask — and I'll find the "
                               "nearest station that sells it."),
@@ -634,7 +662,7 @@ class FindClosestShipCapability:
     def _do_search(self, resolved: ResolvedShip, inp: dict) -> str:
         """The one networked step — fires as soon as a ship resolves to a single model."""
         system = self._current_system() if self._current_system is not None else None
-        pad = _pad_constraint(inp, self._cfg.default_pad_size)
+        pad = _pad_constraint(inp, self._cfg.default_pad_size, self._current_ship_size)
         # Only pass the stock seam when it exists, so injected `search` fakes without the
         # kwarg keep working (the extra_names pattern).
         kwargs: dict = {}

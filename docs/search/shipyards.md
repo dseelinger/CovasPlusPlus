@@ -47,6 +47,7 @@ without the stock guarantee).
 | Refinement | Say something like… |
 |------------|---------------------|
 | **Landing pad** | *"somewhere with a large pad"* — small, medium, or large |
+| **Match my ship** | *"find the closest Anaconda for my current ship"* — one-off pad size = whatever ship you're CURRENTLY flying |
 
 ## Settings
 
@@ -55,8 +56,12 @@ Ship search shares the `[nav]` section with [outfitting](outfitting.md):
 | Setting | What it does |
 |---------|--------------|
 | `nav.enabled` | Master switch (shared with outfitting search) |
-| `nav.default_pad_size` | Default landing-pad size (override per search) |
+| `nav.default_pad_size` | Default landing-pad size (`S`/`M`/`L`/`any`/**Match Current Ship Size**), override per search |
 | `nav.verify_stock` | Verify each candidate's current stock against EDSM before answering |
 | `nav.search_size` | How many nearby stations to fetch before picking the closest |
+
+**Match Current Ship Size** reads your CURRENTLY-FLOWN ship live from Elite Dangerous and filters
+for a pad it can actually use — falling back to **Large** (never "any") if the ship isn't known yet,
+so a search never sends you to a station you can't dock at.
 
 See the [Configuration reference](../configuration.md#navigation-search-nav-star_systems-search).

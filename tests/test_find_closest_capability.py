@@ -18,7 +18,8 @@ import threading
 from pathlib import Path
 
 from covas.app import App
-from covas.capabilities.find_closest_capability import FindClosestCapability, NavConfig
+from covas.capabilities.find_closest_capability import (FindClosestCapability, NavConfig,
+                                                         _pad_constraint)
 from tests.fakes import FakeSTT, FakeTTS
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "spansh_stations_multicannon.json"
@@ -410,3 +411,52 @@ def test_flow_second_ambiguous_answer_loops_before_resolving(tmp_path):
     # The third turn finally resolves -> under the default it searches once.
     _drive(app, 1)
     assert len(http.calls) == 1
+
+
+# --- "Match Current Ship Size" pad resolution (#117) ----------------------------------------
+
+def test_pad_constraint_match_resolves_to_current_ship_size():
+    pad = _pad_constraint({}, "match", get_current_ship_size=lambda: "S")
+    assert pad == "S"
+
+
+def test_pad_constraint_match_falls_back_to_large_when_ship_unknown():
+    # get_current_ship_size returning None (unrecognized symbol) -> the conservative fallback.
+    pad = _pad_constraint({}, "match", get_current_ship_size=lambda: None)
+    assert pad == "L"
+
+
+def test_pad_constraint_match_falls_back_to_large_with_no_getter():
+    # No getter wired at all (e.g. ED monitoring off) behaves the same as an unknown ship.
+    pad = _pad_constraint({}, "match")
+    assert pad == "L"
+
+
+def test_pad_constraint_match_as_per_search_tool_arg_override():
+    # A one-off "match my ship" override works even when the config default is a fixed letter.
+    pad = _pad_constraint({"pad_size": "match"}, "L", get_current_ship_size=lambda: "M")
+    assert pad == "M"
+
+
+def test_pad_constraint_non_match_values_unaffected():
+    # Plain S/M/L/any behavior is unchanged by the new getter parameter.
+    assert _pad_constraint({}, "L", get_current_ship_size=lambda: "S") == "L"
+    assert _pad_constraint({}, "any", get_current_ship_size=lambda: "S") is None
+    assert _pad_constraint({"pad_size": "M"}, "L", get_current_ship_size=lambda: "S") == "M"
+
+
+def test_capability_wires_match_through_to_search():
+    """End-to-end (still offline): the injected get_current_ship_size getter resolves 'match'
+    into the actual Spansh pad filter sent over the wire (the downstream filter itself is
+    UNCHANGED by #117 — only the resolved letter differs)."""
+    http = FakeHttp()                                    # fixture stations are all Large-pad
+    clip = FakeClipboard()
+    cap = FindClosestCapability(
+        NavConfig(enabled=True, default_pad_size="match"),
+        http=http, get_current_system=(lambda: "Sol"),
+        get_current_ship_size=(lambda: "L"), clipboard=clip)
+    cap.run_tool("find_closest_module",
+                 {"module": "multicannon", "size": "medium", "mount": "fixed"})
+    assert len(http.calls) == 1                          # matches on the first (fresh) pass
+    filters = http.calls[0]["payload"]["filters"]
+    assert "has_large_pad" in filters                    # resolved "match" -> "L" -> has_large_pad

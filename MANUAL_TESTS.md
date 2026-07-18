@@ -710,6 +710,18 @@ Notes:
 
 Notes:
 
+### 7.4 "Match Current Ship Size" landing pad (#117)  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
+> `[nav].enabled = true`; set `nav.default_pad_size = match` (Settings → Navigation & search →
+> Default landing pad → **Match Current Ship Size**). Applies to both the outfitting (§7) and
+> ship (§7.1) searches — same `[nav]` config.
+- [ ] **Small/medium ship widens the search:** while flying a **Courier or Python**, ask *"find the closest fuel scoop"* → nearby **outposts** (medium/small pads) are now eligible, not just Large-pad starports.
+- [ ] **Large ship unchanged:** switch to a **Large** ship (Anaconda/Cutter/Corvette) → the same search behaves as the old fixed `L` default (Large-pad stations only).
+- [ ] **Fallback to Large before any Loadout:** a **fresh session** with ED not yet having emitted a `Loadout`/`LoadGame` event (or ED not running) → the search still runs, filtered for a **Large** pad (never "any") — it should never suggest a station your ship can't use.
+- [ ] **One-off override:** with the default pad size set to something else (e.g. `L`), say *"find the closest multi-cannon for my current ship"* → that ONE search resolves to your current ship's pad size without changing the `nav.default_pad_size` setting.
+- [ ] **Voice-settable:** *"set default landing pad to match my ship"* → confirms it's set to match; *"what's my default landing pad?"* → reports it.
+
+Notes:
+
 ## 8. Voice search categories  🎮 ED 🔊 HW 📋 clipboard 🌍 NET
 > `[star_systems].enabled` and `[search].enabled` = true. Stateless conversational slot-filling over Spansh, nearest-first from your current system, each **copies the primary system** to the clipboard. Misheard filter values are validated against a bundled vocabulary and corrected.
 

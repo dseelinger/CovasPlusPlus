@@ -28,6 +28,10 @@ _FIELDS: tuple[str, ...] = (
     "docked_market_id",     # docked station's MarketID; a carrier's == its CarrierID (own-carrier gate, #19)
     "body",           # nearest body / planet name
     "ship",           # ship type, display name (e.g. "Anaconda")
+    "ship_symbol",    # ship type, RAW internal journal symbol (e.g. "anaconda") — a stable,
+                      # non-localized lookup key (unlike `ship`); None until the first
+                      # Loadout/LoadGame. Feeds `ed.ships.ship_pad_size` for the nav "match
+                      # current ship size" pad option (#117).
     "ship_name",      # Commander's custom ship name (e.g. "Void Runner")
     "docked",         # on a landing pad
     "landing_gear",   # gear down
@@ -83,6 +87,7 @@ class EDContext:
         self.docked_market_id: int | None = None
         self.body: str | None = None
         self.ship: str | None = None
+        self.ship_symbol: str | None = None
         self.ship_name: str | None = None
         self.docked: bool = False
         self.landing_gear: bool = False
