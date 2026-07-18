@@ -114,12 +114,13 @@
       get a voice. The cloud voices sound better but need their own key; leave a keyless cloud voice
       unset and COVAS runs <b>text-only</b> until you add one.</div>
     <label class="f">Voice provider</label>
+    <!-- Azure + Cartesia are EXPERIMENTAL (issue #123): off by default and deliberately not
+         offered here on the first-run public path. Self-enable via overrides.json (set the
+         [experimental.azure_tts]/[experimental.cartesia_tts] flag + [tts].provider). -->
     <select id="ttsProvider">
       <option value="edge">Edge — free neural voices, no key ★</option>
       <option value="elevenlabs">ElevenLabs — premium</option>
-      <option value="azure">Azure Neural — free tier + SLA</option>
       <option value="openai">OpenAI — cheap cloud</option>
-      <option value="cartesia">Cartesia — low-latency persona</option>
       <option value="piper">Piper — local, offline (advanced)</option>
     </select>
 
@@ -225,7 +226,8 @@ function showGroup(prefix, provider, providers){
   providers.forEach(p => $(prefix+"_"+p).classList.toggle("show", p===provider));
 }
 const LLM_PROVIDERS = ["anthropic","openai","gemini"];
-const TTS_PROVIDERS = ["edge","elevenlabs","azure","openai","cartesia","piper"];
+// azure + cartesia omitted: experimental (#123), not offered on the first-run public path.
+const TTS_PROVIDERS = ["edge","elevenlabs","openai","piper"];
 
 $("llmProvider").onchange = e => showGroup("llm", e.target.value, LLM_PROVIDERS);
 $("ttsProvider").onchange = e => showGroup("tts", e.target.value, TTS_PROVIDERS);

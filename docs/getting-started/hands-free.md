@@ -1,5 +1,13 @@
 # Hands-free listening
 
+!!! warning "Experimental — off by default"
+    Hands-free (continuous) activation and the wake word are an **experimental** feature: they ship
+    **disabled** for everyone and are gated at the listen-mode seam, so a flag-off build is
+    push-to-talk only regardless of `listen.mode`. Enable it just for yourself by adding
+    `experimental.voice_activation.enabled = true` to your git-ignored `overrides.json` (see
+    [Experimental feature flags](../configuration.md#experimental-feature-flags)) **and** setting
+    `listen.mode = "continuous"`.
+
 By default COVAS++ is **push-to-talk**: you hold a key to speak (see [The voice loop](voice-loop.md)).
 If you'd rather not touch a key at all, switch on **continuous** (hands-free) mode and just start
 talking — a voice-activity gate hears you, captures what you say, and runs the turn.

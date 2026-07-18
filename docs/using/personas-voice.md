@@ -105,6 +105,15 @@ Nudge it on the Settings page or say *"set the voice speed to 1.5."* A value bey
 range is safely capped, and because only the normalized value is stored, switching providers never
 carries an out-of-range speed across.
 
+!!! warning "Azure and Cartesia are experimental — off by default"
+    The **Azure Neural** and **Cartesia** TTS providers are **experimental**: they ship **disabled**
+    for everyone, aren't offered on the first-run wizard or the public Settings dropdown, and are
+    gated at provider registration. Use one just for yourself by adding
+    `experimental.azure_tts.enabled = true` (or `experimental.cartesia_tts.enabled = true`) to your
+    git-ignored `overrides.json` (see
+    [Experimental feature flags](../configuration.md#experimental-feature-flags)) **and** setting
+    `tts.provider` to `"azure"` / `"cartesia"`.
+
 Prefer a **free, fully-local voice** with no external service at all? Switch `[tts].provider` to
 **Piper**. Piper runs on your CPU alongside the game at no cost — the voice is good, if not quite as
 smooth as ElevenLabs. See [Install & setup](../getting-started/install.md#local-cpu-only-speech).

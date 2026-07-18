@@ -1,5 +1,13 @@
 # Custom macros
 
+!!! warning "Experimental — off by default"
+    Custom macros are an **experimental** feature: they ship **disabled** for everyone and are
+    gated at capability registration, so a flag-off build exposes no macro tools or help. Enable
+    them just for yourself by adding `experimental.macro.enabled = true` to your git-ignored
+    `overrides.json` (see
+    [Experimental feature flags](../configuration.md#experimental-feature-flags)) **and** setting
+    `macros.enabled = true`.
+
 > *"Create a macro called Dock ASAP. When docking is granted, throttle to zero and drop the
 > landing gear."* — *"Saved 'Dock ASAP' with two steps. It'll run automatically when docking is
 > granted, and I'll ask you to confirm before running it."*

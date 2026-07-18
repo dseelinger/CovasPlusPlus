@@ -15,7 +15,8 @@ from pathlib import Path
 
 import keyboard
 
-from .config import load_config, load_overrides, save_overrides, deep_merge, mock_enabled
+from .config import (load_config, load_overrides, save_overrides, deep_merge,
+                     mock_enabled, experimental)
 from . import settings_schema as schema
 from .audio import CuePlayer, Recorder
 from .listen import VadListener
@@ -522,14 +523,21 @@ class App:
         except Exception as e:  # noqa: BLE001 — a route callout must never crash the app
             self.set_state("Idle", f"route error: {e}")
 
+    # The HUD is EXPERIMENTAL (issue #123): all three surface toggles are ANDed with
+    # [experimental.hud] here — the single place every HUD decision reads — so a flag-off build
+    # never shows an overlay, never pumps for it, and never tells the LLM the HUD is "active"
+    # (the prompt-context hint below reads these), matching the registration gate in bootstrap.
     def _hud_enabled(self) -> bool:
-        return bool(self.cfg.get("hud", {}).get("enabled", False))
+        return (bool(self.cfg.get("hud", {}).get("enabled", False))
+                and experimental(self.cfg, "hud"))
 
     def _vr_hud_enabled(self) -> bool:
-        return bool(self.cfg.get("hud", {}).get("vr_enabled", False))
+        return (bool(self.cfg.get("hud", {}).get("vr_enabled", False))
+                and experimental(self.cfg, "hud"))
 
     def _web_hud_enabled(self) -> bool:
-        return bool(self.cfg.get("hud", {}).get("web_enabled", False))
+        return (bool(self.cfg.get("hud", {}).get("web_enabled", False))
+                and experimental(self.cfg, "hud"))
 
     def note_web_ui_started(self) -> None:
         """Called once by web.create_app when the control panel (Flask) comes up, so a web HUD
@@ -861,6 +869,13 @@ class App:
         self._dispatch_utterance(audio, wake_gated=True)
 
     def _listen_mode(self) -> str:
+        # EXPERIMENTAL (issue #123): hands-free voice activation (continuous VAD listening + the
+        # wake word) is gated behind [experimental.voice_activation] (off by default) at THIS
+        # seam — the single choke every listener/wake decision reads. Off, the app is push-to-talk
+        # only regardless of [listen].mode, so no VAD listener starts and the wake gate is never
+        # armed (the continuous path is the only caller that sets wake_gated).
+        if not experimental(self.cfg, "voice_activation"):
+            return "ptt"
         return str(self.cfg.get("listen", {}).get("mode", "ptt")).strip().lower()
 
     def _start_listener(self) -> None:

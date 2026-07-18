@@ -76,6 +76,14 @@ exactly like the assistant path.
 
 ## Automatic reflexes
 
+!!! warning "Experimental — off by default"
+    The **automatic** layer (this section) is an **experimental** feature: it ships **disabled**
+    for everyone and is gated at capability registration. The verbal and second-push-to-talk
+    reflex paths above are **not** experimental. Enable the automatic layer just for yourself by
+    adding `experimental.auto_reflex.enabled = true` to your git-ignored `overrides.json` (see
+    [Experimental feature flags](../configuration.md#experimental-feature-flags)) **and** setting
+    `reflex.auto.enabled = true` (plus the per-reflex enable below).
+
 The **automatic** layer fires the same reflexes the instant your Elite Dangerous status crosses a
 threshold — **no voice, no key, no assistant round-trip.** It's the fastest path (sub-100ms), and it
 runs under the **same** combat-permissive guard as everything above: it can only fire a defensive

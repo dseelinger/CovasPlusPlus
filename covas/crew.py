@@ -184,8 +184,16 @@ class CrewMember:
 
 
 def is_enabled(cfg: dict) -> bool:
-    """Whether crew voicing is on. DEFAULT OFF (opt-in, like the other atmosphere features)."""
-    return bool((cfg.get("crew", {}) or {}).get("enabled", False))
+    """Whether crew voicing is on. DEFAULT OFF (opt-in, like the other atmosphere features).
+
+    EXPERIMENTAL (issue #123): the whole crew feature is additionally gated behind
+    [experimental.crew] (off by default). This is the ONE choke every crew path funnels
+    through — the reply split (app.py), the system-prompt instruction (llm.py), the crew
+    editor (web.py), and crew chatter (mixer/runtime.py) — so a flag-off build voices no
+    crew line and exposes no crew surface, regardless of [crew].enabled."""
+    from .config import experimental
+    return (bool((cfg.get("crew", {}) or {}).get("enabled", False))
+            and experimental(cfg, "crew"))
 
 
 def roster_file(cfg: dict) -> Optional[Path]:

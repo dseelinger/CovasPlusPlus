@@ -18,6 +18,13 @@ from covas import crew
 from covas.crew import Segment, parse_segments, speak_segments
 
 
+def _on(**crew_extra) -> dict:
+    """A crew-ON config: crew is gated behind BOTH [crew].enabled AND the [experimental.crew]
+    flag (issue #123), so every 'crew is on' fixture must set both. Extra keys fold into [crew]."""
+    return {"crew": {"enabled": True, **crew_extra},
+            "experimental": {"crew": {"enabled": True}}}
+
+
 # ============================================================================================
 # 1. Segment parser — the pure, exhaustively-tested core
 # ============================================================================================
@@ -191,7 +198,9 @@ def test_dispatch_barge_in_midway_stops_remaining_segments():
 def test_is_enabled_defaults_off():
     assert crew.is_enabled({}) is False
     assert crew.is_enabled({"crew": {}}) is False
-    assert crew.is_enabled({"crew": {"enabled": True}}) is True
+    # [crew].enabled alone is no longer enough — the experimental flag gates it too (#123).
+    assert crew.is_enabled({"crew": {"enabled": True}}) is False
+    assert crew.is_enabled(_on()) is True
 
 
 def test_system_instruction_is_none_when_off():
@@ -199,14 +208,14 @@ def test_system_instruction_is_none_when_off():
 
 
 def test_system_instruction_present_and_static_when_on():
-    inst = crew.system_instruction({"crew": {"enabled": True}})
+    inst = crew.system_instruction(_on())
     assert inst and "bracket" in inst and "[Nyx]" in inst
     # Static: same config -> byte-identical text (so the cached prefix isn't busted turn-to-turn).
-    assert inst == crew.system_instruction({"crew": {"enabled": True}})
+    assert inst == crew.system_instruction(_on())
 
 
 def test_system_instruction_weaves_the_configured_roster():
-    inst = crew.system_instruction({"crew": {"enabled": True, "roster": ["Nyx", "Vela"]}})
+    inst = crew.system_instruction(_on(roster=["Nyx", "Vela"]))
     assert "Nyx" in inst and "Vela" in inst
 
 
@@ -219,7 +228,7 @@ def test_build_system_appends_crew_instruction_statically():
     # With personality off there's no base system, so the crew instruction rides alongside the
     # always-on ship-spec guardrail (issue #83) in the (still static) system prompt.
     from covas.llm import build_system
-    cfg = {"personality": {"enabled": False}, "crew": {"enabled": True}}
+    cfg = {"personality": {"enabled": False}, **_on()}
     sys1 = build_system(cfg)
     assert sys1 and "[Nyx]" in sys1
     assert sys1 == build_system(cfg)  # static -> cache-safe
@@ -292,7 +301,7 @@ def test_system_instruction_folds_personas_and_stays_static(tmp_path):
     f = tmp_path / "crew.json"
     f.write_text(json.dumps([{"name": "Nyx", "persona": "Sharp sensor officer"},
                              {"name": "Vela", "persona": "Warm engineer."}]), encoding="utf-8")
-    cfg = {"crew": {"enabled": True, "file": str(f)}}
+    cfg = _on(file=str(f))
     inst = crew.system_instruction(cfg)
     assert "Nyx" in inst and "Vela" in inst
     assert "Sharp sensor officer." in inst and "Warm engineer." in inst   # trailing period added
@@ -300,7 +309,7 @@ def test_system_instruction_folds_personas_and_stays_static(tmp_path):
 
 
 def test_system_instruction_omits_persona_clause_when_none_have_one():
-    inst = crew.system_instruction({"crew": {"enabled": True, "roster": ["Nyx"]}})
+    inst = crew.system_instruction(_on(roster=["Nyx"]))
     assert "In character:" not in inst and "Nyx" in inst
 
 
@@ -327,20 +336,19 @@ def test_crew_member_role_is_capped():
 
 
 def test_system_instruction_weaves_role_and_persona():
-    cfg = {"crew": {"enabled": True,
-                    "roster": [{"name": "Zeta", "role": "Fighter pilot", "persona": "Cool head"}]}}
+    cfg = _on(roster=[{"name": "Zeta", "role": "Fighter pilot", "persona": "Cool head"}])
     inst = crew.system_instruction(cfg)
     assert "Zeta (Fighter pilot) — Cool head." in inst
 
 
 def test_system_instruction_weaves_role_only_when_no_persona():
-    cfg = {"crew": {"enabled": True, "roster": [{"name": "Zeta", "role": "Fighter pilot"}]}}
+    cfg = _on(roster=[{"name": "Zeta", "role": "Fighter pilot"}])
     inst = crew.system_instruction(cfg)
     assert "In character: Zeta (Fighter pilot)." in inst
 
 
 def test_system_instruction_no_character_clause_when_neither_role_nor_persona():
-    cfg = {"crew": {"enabled": True, "roster": [{"name": "Zeta"}]}}
+    cfg = _on(roster=[{"name": "Zeta"}])
     inst = crew.system_instruction(cfg)
     assert "In character:" not in inst and "Zeta" in inst
 

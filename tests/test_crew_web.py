@@ -52,6 +52,7 @@ def _cfg(tmp_path) -> dict:
         "elite": {"enabled": False},
         "checklist": {"file": str(checklist)},
         "crew": {"enabled": True, "file": str(tmp_path / "crew.json"), "roster": []},
+        "experimental": {"crew": {"enabled": True}},   # crew is gated behind this too (#123)
         "memory": {"enabled": False, "dir": str(tmp_path / "memory"), "cap": 500},
         "logging": {"dir": str(tmp_path / "logs")},
     }

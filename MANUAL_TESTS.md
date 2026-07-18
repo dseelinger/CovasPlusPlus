@@ -1645,6 +1645,31 @@ Notes:
 
 Notes:
 
+### 18.12 Experimental feature-flag convention (issue #123)  🖥️ 🌐 PANEL
+> Nine half-baked features are gated behind `[experimental.<name>]` (all default **off**): Azure/Cartesia
+> TTS, hands-free voice activation, crew, trade-route, custom macros, automatic reflexes, ambient music,
+> and the Companion HUD. Off, each is **invisible** (no tool/help/Settings surface); on, it works. Doug
+> self-enables via the git-ignored `overrides.json`. Most of this is covered offline by
+> `tests/test_experimental.py`; these checks confirm the public-facing surface on the real app.
+- [ ] **Invisible when off:** with a clean config (no `[experimental]` overrides) but the underlying
+  toggles *on* (`route_plan.enabled`, `macros.enabled`, `crew.enabled`, `hud.enabled = true`), start the
+  app and ask *"what can you do?"* → **no** trade-route, macros, crew, or HUD is mentioned; *"plan a trade
+  route"* / *"turn the HUD on"* → COVAS says it can't (no such tool), not an error.
+- [ ] **Not on the public Settings surface:** open the control panel → the **Voice provider** dropdown
+  does **not** list Azure or Cartesia, the **Activation mode** control does **not** offer *continuous*, and
+  there is **no** `[experimental]` group anywhere on the page.
+- [ ] **Self-enable via `overrides.json`:** add `{ "experimental": { "trade_route": { "enabled": true } } }`
+  to `overrides.json` (with `route_plan.enabled = true`), restart, ask *"what can you do?"* → the
+  trade-route planner now appears and *"plan a trade route from here"* runs. Repeat for one more (e.g.
+  `experimental.hud` + `hud.enabled` → *"turn the HUD on"* shows the overlay).
+- [ ] **First-run wizard:** on a clean install the wizard's **Voice provider** list offers edge/elevenlabs/
+  openai/piper only — **no** Azure or Cartesia.
+- [ ] **Docs badges:** each gated feature's docs page (HUD, crew, hands-free, trade-routes, custom-macros,
+  reflexes§Automatic, ambient-audio§music, personas-voice§Azure/Cartesia) shows the **"Experimental — off
+  by default"** badge with the exact `overrides.json` key.
+
+Notes:
+
 ---
 
 ## 19. Packaged build — install, first-run wizard & updates (I1–I9)  📦 🖥️ 🔊 HW 🌍 NET
