@@ -152,6 +152,13 @@ class EDContext:
         # An `ed.npc_crew.NpcCrewRegistry` (holds its own file path + persistence), or None when
         # unconfigured. Guarded by _lock like the rest — single-writer is the journal thread.
         self._npc_crew = None
+        # Owned-ships registry (issue #134): the persisted identity of the ships the Commander
+        # OWNS, folded from the Shipyard* ownership events and reconciled from Loadout/StoredShips.
+        # The IDENTITY SPINE downstream per-ship config (#135/#139) keys on. An
+        # `ed.owned_ships.OwnedShipsRegistry` (holds its own path + persistence), or None when
+        # unconfigured. Guarded by _lock; single-writer is the journal thread (voice CRUD also
+        # mutates it via the accessors below, serialised by the same lock). Kept OUT of _FIELDS.
+        self._owned_ships = None
 
     def update(self, **changes) -> None:
         """Atomically set one or more fields. Unknown keys raise (fail loud) so a typo
@@ -265,6 +272,65 @@ class EDContext:
         with self._lock:
             reg = self._npc_crew
             return reg.hired() if reg is not None else []
+
+    # -- owned-ships registry (issue #134) -----------------------------------------------
+    def set_owned_ships_registry(self, registry) -> None:
+        """Install the persisted owned-ships registry (an `ed.owned_ships.OwnedShipsRegistry`).
+        Called once at bootstrap after the file path is resolved; None clears it."""
+        with self._lock:
+            self._owned_ships = registry
+
+    def apply_shipyard_event(self, event: dict) -> bool:
+        """Fold one ownership-change (Shipyard*) event into the registry (and persist on change).
+        Returns True on a change; a no-op (False) when no registry is installed. Runs on the
+        journal thread; the lock serialises it against the voice-CRUD / web reads."""
+        with self._lock:
+            reg = self._owned_ships
+            if reg is None:
+                return False
+            return reg.apply_event(event)
+
+    def reconcile_owned_from_loadout(self, snapshot) -> bool:
+        """Reconcile the ACTIVE ship into the owned-ships registry from a `LoadoutSnapshot`
+        (mark active + fill type/name/ident WITHOUT clobbering a manual correction). No-op when
+        no registry is installed."""
+        with self._lock:
+            reg = self._owned_ships
+            if reg is None:
+                return False
+            return reg.reconcile_loadout(snapshot)
+
+    def reconcile_owned_from_stored(self, snapshot) -> bool:
+        """Reconcile stored-ship locations into the owned-ships registry from a
+        `StoredShipsSnapshot` (upsert + locations, never remove). No-op when unconfigured."""
+        with self._lock:
+            reg = self._owned_ships
+            if reg is None:
+                return False
+            return reg.reconcile_stored(snapshot)
+
+    def owned_ships(self) -> list[dict]:
+        """The Commander's owned ships as a list of records (active first, then newest-seen).
+        Empty when no registry / nothing recorded. Thread-safe (read under the lock)."""
+        with self._lock:
+            reg = self._owned_ships
+            return reg.owned() if reg is not None else []
+
+    def add_owned_ship(self, ship_type: str, *, name: str | None = None,
+                       ident: str | None = None) -> dict | None:
+        """Manually add an owned ship (voice/web CRUD), under the lock so it serialises against
+        the journal-thread folds. Returns the stored record, or None (blank type / no registry)."""
+        with self._lock:
+            reg = self._owned_ships
+            return reg.add(ship_type, name=name, ident=ident) if reg is not None else None
+
+    def remove_owned_ship(self, query: str) -> tuple[bool, list]:
+        """Manually remove the single owned ship matching a spoken `query`, under the lock.
+        Returns `(removed, matches)` — removed only on exactly one match. `(False, [])` when no
+        registry is installed."""
+        with self._lock:
+            reg = self._owned_ships
+            return reg.remove_matching(query) if reg is not None else (False, [])
 
     # -- engineer progress (issue #65) ---------------------------------------------------
     def update_engineer_progress(self, mapping: dict) -> None:

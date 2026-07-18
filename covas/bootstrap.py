@@ -288,7 +288,23 @@ def build_ed_monitoring(app: "App") -> None:
         _npc_reg_path = str((app.cfg.get("crew", {}) or {}).get("npc_registry_file", "") or "").strip()
         if _npc_reg_path:
             app.ed_ctx.set_npc_crew_registry(NpcCrewRegistry.load(_npc_reg_path))
+        # Owned-ships registry (issue #134): load the persisted fleet identity (path resolved under
+        # the data dir by config) so the journal watcher can fold buy/sell/switch events and the
+        # voice CRUD can correct it. Fail-soft: a missing file loads empty.
+        from .ed.owned_ships import OwnedShipsRegistry
+        from .capabilities.owned_ships_capability import OwnedShipsCapability
+        _ships_reg_path = str((app.cfg.get("ships", {}) or {}).get("registry_file", "") or "").strip()
+        if _ships_reg_path:
+            app.ed_ctx.set_owned_ships_registry(OwnedShipsRegistry.load(_ships_reg_path))
         app.registry.register(EDContextCapability(app.ed_ctx))
+        # Owned-ships list + voice CRUD (#134): the conversational surface over the fleet identity.
+        # All mutations go through the lock-protected EDContext methods (serialised vs the journal
+        # thread), so "what ships do I own" / "I bought a Python" / "remove the Cobra" are safe.
+        app.registry.register(OwnedShipsCapability(
+            get_owned=app.ed_ctx.owned_ships,
+            add_ship=app.ed_ctx.add_owned_ship,
+            remove_ship=app.ed_ctx.remove_owned_ship,
+            log=lambda m: app._log("owned_ships", m)))
         # On-foot / SRV / exobiology read tools (#54): situational awareness in the modes
         # ED context was silent in. Same live EDContext, mode-specific read answers.
         app.registry.register(OnFootSrvCapability(app.ed_ctx))

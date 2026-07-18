@@ -93,6 +93,7 @@ _DATA_PATH_FIELDS = (
     ("crew", "file"),
     ("crew", "npc_registry_file"),  # hired-NPC-crew seen-set, harvested from the journal (#125)
     ("crew", "voice_pairings_file"),  # generated crew best-fit-voice cache, separate from #96 (#124)
+    ("ships", "registry_file"),  # owned-ships registry, folded from Shipyard events (#134)
     ("memory", "dir"),
     ("macros", "file"),
     ("logging", "dir"),
