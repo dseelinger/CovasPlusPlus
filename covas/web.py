@@ -855,6 +855,36 @@ def create_app(core) -> Flask:
         persona = _suggest_persona(name, b.get("combat_rank"))
         return jsonify({"ok": True, "persona": persona})
 
+    # ---- Engineer unlock dashboard (issue #133) --------------------------------
+    # A READ-ONLY, at-a-glance grid of every ship engineer x {locked / invited / unlocked+grade}
+    # with the outstanding requirement for the locked ones — the scannable "everything left across
+    # all 20+ engineers" view that voice (#65) can't give in one breath. Reuses the SAME two
+    # sources the voice tools do: the bundled reference table (`ed/engineers.py`) joined with the
+    # live `EngineerProgress` map on EDContext — no new data layer, no writes. Fail soft: with ED
+    # monitoring off (no `ed_ctx`) or before the first EngineerProgress event, the join runs on an
+    # empty progress map, so the page renders every engineer with its requirement and a
+    # "no journal data yet" note rather than erroring.
+    def _engineer_progress() -> dict:
+        ctx = getattr(core, "ed_ctx", None)
+        if ctx is None:
+            return {}
+        try:
+            return ctx.engineer_progress()
+        except Exception:  # noqa: BLE001 — a bad/absent context degrades to "no data", never 500s
+            return {}
+
+    @flask_app.route("/engineers")
+    def engineers_page():
+        return render_template("engineers.html")
+
+    @flask_app.route("/engineers/state")
+    def engineers_state():
+        """The engineer dashboard view-model as JSON: every engineer joined with the Commander's
+        live unlock status + the outstanding requirement, plus per-bucket counts and a
+        `has_progress` flag. Always 200 (fail soft) so the page never has to handle an error path."""
+        from .ed.engineers import engineer_dashboard
+        return jsonify(engineer_dashboard(_engineer_progress()))
+
     # ---- Custom macros browser (issue #50) -------------------------------------
     # View / author / delete the Commander's own named macros, mirroring the checklist/memory
     # editors. Authoring here runs the SAME registry validator (`compile_macro`) as voice

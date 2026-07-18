@@ -1313,6 +1313,31 @@ applies to *whichever* TTS provider is active; each provider maps + clamps it to
 
 Notes:
 
+### 14.8 Engineer dashboard (issue #133) — http://127.0.0.1:8765/engineers  🌐 PANEL 🎮 ED
+> A **read-only** at-a-glance grid of every ship engineer × {locked / invited / unlocked+grade}
+> with the outstanding requirement for the locked ones. Reads the SAME data the voice tools (#65)
+> use — the bundled table joined with the live `EngineerProgress` journal map — no new data, no
+> writes. Pure vanilla JS — **no CDN**, works offline.
+- [ ] **Tab + nav:** the 🔧 engineers link exists on the control-panel, checklist, memory, and crew
+  headers; opening it lists **every** engineer (20+) as a card with base, system, and the modules
+  they engineer.
+- [ ] 🎮 **Live status matches the journal:** with Elite running (so `EngineerProgress` has been
+  read), each card's badge matches your real progress — **Unlocked** shows the correct **grade**,
+  invited/discovered show **In progress**, the rest **Locked**. Spot-check one of each against the
+  in-game Engineers screen. The tally chips (All / Unlocked / In progress / Locked) sum to the full
+  count and the footer says "N of M engineers unlocked."
+- [ ] **Outstanding requirement:** every not-yet-unlocked card shows what it **still needs** (the
+  invitation task and/or the unlock gift); unlocked cards show no requirement. These agree with the
+  voice answer for the same engineer (*"how do I unlock The Dweller"*).
+- [ ] **Filter + search:** click a status chip → the grid filters to that bucket; type in the search
+  box (e.g. `FSD`, `Colonia`, an engineer name) → the grid filters live by name, system, or module.
+- [ ] **Fail-soft with no journal data:** open the page with Elite **closed** (or before any
+  `EngineerProgress` this session) → an amber **"no engineer data from the journal yet"** note shows
+  and every engineer is listed **locked** with its requirements — **no error**, still a useful
+  reference.
+
+Notes:
+
 ## 15. Settings persistence  🌐 PANEL 📋 FILE
 - [ ] Set model, voice, thinking depth, and personality to non-default values (panel or voice).
 - [ ] 📋 Open `overrides.json` → your changes are there.
