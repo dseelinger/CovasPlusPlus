@@ -86,9 +86,11 @@ way to place the panel is to put the headset on and adjust by voice until it sit
 
 The natural way to do that, hands still on the stick, is two kinds of voice command:
 
-- **Look-to-place** — face where you want the panel and say *"pin the HUD here."* It swings to
-  your gaze, centred, keeping the current distance and tilt. (It uses your **heading**, so it's
-  aimed for seated cockpit play.)
+- **Look-to-place** — look where you want the panel and say *"pin the HUD here."* It places the
+  panel along your gaze — matching your heading **and** how far up or down you're looking (look
+  down at the dash and it drops there; look up and it rises) — and **tilts it to face you** so it
+  reads head-on. Distance, width, and curvature are kept; it recentres laterally onto your gaze.
+  A near-vertical gaze clamps gracefully (±60° tilt, ±2 m). Aimed for seated cockpit play.
 - **Nudges** — *"move the HUD left / right / up / down,"* *"closer" / "farther"* (or *"forward" /
   "back"*), *"tilt it up / down,"* *"flatter" / "more curved,"* *"bigger" / "smaller,"* *"centre
   the HUD,"* *"reset the HUD position."* Add an amount if you like: *"move it left 20

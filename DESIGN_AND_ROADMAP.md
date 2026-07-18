@@ -240,11 +240,18 @@ the rendering surface differs:
   need an IVRInput action manifest), and ED renders no motion controllers anyway — so voice is
   the placement trigger. **`HudPlacementCapability`** (one `adjust_vr_hud` tool, `core` tier)
   adds what absolute settings can't express: **relative nudges** ("move it left", "closer",
-  "tilt up") and **look-to-place** ("pin the HUD here"). Pin reads the HMD heading on the OpenVR
-  thread (`VrHudView.pin_here` → `hmd_yaw_deg`) and writes `vr_yaw_deg`; nudges step + clamp one
-  `[hud]` value and persist via `update_settings` — both apply live through the same reconcile
-  path and survive a restart. Look-to-place is **yaw-only** (head ≈ the seated origin in a
-  cockpit), keeping the math pure/unit-tested and composing cleanly with the yawed-frame offsets.
+  "tilt up") and **look-to-place** ("pin the HUD here"). Pin reads the HMD pose on the OpenVR
+  thread (`VrHudView.pin_here`) and places the panel on the **full gaze ray** — heading via
+  `hmd_yaw_deg` **and** elevation via `hmd_pitch_deg` (#107): the centre moves onto the gaze line
+  (`forward = d·cos(e)`, `up = d·sin(e)`, keeping straight-line distance `d`) and the face pitches
+  by `−e` so it reads head-on when placed low or high. It therefore persists **every** captured
+  field (`vr_yaw_deg`, `vr_pitch_deg`, `vr_offset_y_m`, `vr_distance_m`, `vr_offset_x_m`), not just
+  yaw — the capability writes the whole returned placement, because `_reconcile_hud` rebuilds the
+  placement from `[hud]` on any later change and would otherwise overwrite anything left unwritten.
+  Nudges step + clamp one `[hud]` value and persist via `update_settings` — both apply live through
+  the same reconcile path and survive a restart. Roll is deliberately not captured (a rolled HUD is
+  disorienting); near-vertical gazes clamp (±60° pitch, ±2 m). The math stays pure/unit-tested and
+  composes cleanly with the yawed-frame offsets.
 - **Attach-only, never launches SteamVR.** `init(VRApplication_Overlay)` *starts* SteamVR if it
   isn't running — unwanted for a Commander on VDXR/OpenComposite/desktop who just left the VR HUD
   enabled (SteamVR isn't their compositor and the overlay can't render there). So `_run` gates

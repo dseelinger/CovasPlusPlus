@@ -412,6 +412,17 @@ def hmd_yaw_deg(matrix: List[List[float]]) -> float:
     return math.degrees(math.atan2(matrix[0][2], matrix[2][2]))
 
 
+def hmd_pitch_deg(matrix: List[List[float]]) -> float:
+    """The elevation (degrees) of the HMD's gaze, for placing a pinned panel on the full gaze
+    ray (not just its heading). ``matrix`` is the HMD's 3x4 device-to-absolute pose; the forward
+    vector is the negated Z column, so ``elevation = degrees(asin(-matrix[1][2]))`` — looking up
+    is positive, looking down negative, level is 0. Pure — unit-tested against known rotations,
+    exactly like ``hmd_yaw_deg``."""
+    import math
+    # Clamp the argument: rounding in a real pose can nudge it a hair past ±1 and raise in asin.
+    return math.degrees(math.asin(max(-1.0, min(1.0, -matrix[1][2]))))
+
+
 def resolve_transform(p: VrPlacement) -> List[List[float]]:
     """The overlay's 3x4 row-major transform: a heading rotation ``Ry(yaw)`` composed with the
     panel's local pose — an X-axis ``pitch`` tilt plus a translation to ``(offset_x, up,
@@ -531,10 +542,12 @@ class VrHudView:
             self._pending_placement = placement
 
     def pin_here(self, timeout: float = 1.5) -> Optional[VrPlacement]:
-        """Look-to-place: swing the panel to the direction you're currently facing (the HMD
-        heading), centred on your gaze, keeping distance/height/tilt/curvature. Returns the new
-        placement (so the caller can persist it) or ``None`` if the overlay/HMD pose isn't
-        available. The HMD pose is read on the OpenVR thread; this blocks briefly for the result."""
+        """Look-to-place: place the panel on the direction you're currently facing — both HMD
+        heading AND elevation — so a downward look drops it and an upward look raises it, tilting
+        the face to match so it reads head-on. Keeps distance/width/curvature. Returns the full
+        new placement (so the caller can persist EVERY changed field — yaw, pitch, up, forward,
+        offset_x) or ``None`` if the overlay/HMD pose isn't available. The HMD pose is read on the
+        OpenVR thread; this blocks briefly for the result."""
         with self._lock:
             self._pin_request = True
             self._pin_result = None
@@ -612,9 +625,20 @@ class VrHudView:
                       f"curve={p.curvature:.2f} mode={p.mode}")
 
     def _pin_to_gaze(self, openvr, overlay, handle) -> Optional["VrPlacement"]:
-        """Read the HMD pose and swing the panel to that heading, centred on the gaze. Returns
-        the new placement (also applied to the live overlay) or ``None`` if the HMD pose isn't
-        valid yet. Runs on the OpenVR thread (all HMD reads do)."""
+        """Read the HMD pose and place the panel on the full gaze ray — heading AND elevation —
+        then tilt its face square to the look direction. Returns the new placement (also applied
+        to the live overlay) or ``None`` if the HMD pose isn't valid yet. Runs on the OpenVR
+        thread (all HMD reads do).
+
+        Given the current ray distance ``d`` (the existing ``forward_m``), the gaze yaw ``Y`` and
+        elevation ``e``: the panel centre moves onto the gaze line — horizontal component
+        ``d·cos(e)`` and vertical ``d·sin(e)`` — keeping its straight-line distance from the
+        origin at ``d``, and the face pitches by ``−e`` so it reads head-on (look down → the top
+        leans toward you). Lateral offset recentres to 0 since the gaze now fully determines both
+        heading and height. A near-vertical gaze clamps to the ±60° pitch / ±2 m vertical ranges
+        (``VrPlacement.normalize``); at those extremes the clamped tilt and the unclamped position
+        can disagree slightly — an accepted edge nobody hits pinning a cockpit HUD."""
+        import math
         system = openvr.VRSystem()
         poses = system.getDeviceToAbsoluteTrackingPose(
             openvr.TrackingUniverseSeated, 0, openvr.k_unMaxTrackedDeviceCount)
@@ -623,8 +647,16 @@ class VrHudView:
             return None
         m = hmd.mDeviceToAbsoluteTracking
         mat = [[float(m[r][c]) for c in range(4)] for r in range(3)]
-        # New heading = where you're looking; recentre laterally so it lands on your gaze.
-        pinned = replace(self._placement, yaw_deg=hmd_yaw_deg(mat), offset_x_m=0.0)
+        d = float(self._placement.forward_m)                 # keep the current viewing distance
+        e = math.radians(hmd_pitch_deg(mat))                 # gaze elevation (up positive)
+        # New heading + elevation = where you're looking; recentre laterally onto the gaze, split
+        # the ray into its horizontal/vertical parts, and tilt the face to −e so it stays head-on.
+        pinned = replace(self._placement,
+                         yaw_deg=hmd_yaw_deg(mat),
+                         forward_m=d * math.cos(e),
+                         up_m=d * math.sin(e),
+                         pitch_deg=-math.degrees(e),
+                         offset_x_m=0.0)
         self._apply_placement(openvr, overlay, handle, pinned)
         return pinned
 

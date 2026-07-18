@@ -346,6 +346,25 @@ def test_hmd_yaw_deg_from_known_matrices():
     assert abs(hmd_yaw_deg(ry90) - 90.0) < 1e-9
 
 
+def test_hmd_pitch_deg_from_known_matrices():
+    """Elevation from the HMD pose: level -> 0, looking up -> positive, down -> negative (#107)."""
+    import math
+    from covas.capabilities.vr_hud import hmd_pitch_deg
+    ident = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]        # level gaze
+    assert abs(hmd_pitch_deg(ident) - 0.0) < 1e-9
+
+    def rx(deg):  # HMD pitched by +deg about X (looking up); forward = -Z column
+        a = math.radians(deg)
+        c, s = math.cos(a), math.sin(a)
+        return [[1, 0, 0, 0], [0, c, -s, 0], [0, s, c, 0]]
+
+    assert abs(hmd_pitch_deg(rx(30.0)) - 30.0) < 1e-9         # looking up -> positive
+    assert abs(hmd_pitch_deg(rx(-30.0)) - (-30.0)) < 1e-9     # looking down -> negative
+    assert abs(hmd_pitch_deg(rx(90.0)) - 90.0) < 1e-9         # straight up
+    # A pose nudged a hair past ±1 by rounding must clamp, not raise.
+    assert abs(hmd_pitch_deg([[1, 0, 0, 0], [0, 0, -1.0000001, 0], [0, 1, 0, 0]]) - 90.0) < 1e-6
+
+
 def test_normalize_wraps_yaw_to_signed_range():
     assert VrPlacement.normalize("world", yaw_deg=270).yaw_deg == -90.0
     assert VrPlacement.normalize("world", yaw_deg="x").yaw_deg == 0.0
