@@ -274,6 +274,7 @@ def build_ed_monitoring(app: "App") -> None:
         from .capabilities.on_foot_engineering_capability import OnFootEngineeringCapability
         from .capabilities.loadout_capability import LoadoutCapability
         from .capabilities.blueprint_capability import BlueprintCapability
+        from .capabilities.materials_capability import MaterialsCapability
         from .capabilities.stored_capability import StoredCapability
         from .nav import copy as _nav_copy
 
@@ -302,6 +303,12 @@ def build_ed_monitoring(app: "App") -> None:
         app.registry.register(BlueprintCapability(
             get_materials=app.ed_ctx.materials_snapshot,
             log=lambda m: app._log("blueprint", m)))
+        # Direct materials-inventory queries (#132): "how many X do I have" / bucket listing /
+        # what's capped, reading the SAME live inventory getter as BlueprintCapability but without
+        # a recipe cross-reference — a separate small capability for the direct-query surface.
+        app.registry.register(MaterialsCapability(
+            get_materials=app.ed_ctx.materials_snapshot,
+            log=lambda m: app._log("materials", m)))
         # Stored ships & modules finder (issue #67): reads the StoredShips/StoredModules
         # snapshots the journal watcher keeps on EDContext. Copies a destination system to
         # the clipboard for a resolved remote ship/module (galaxy-map handoff).
