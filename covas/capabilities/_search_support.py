@@ -6,8 +6,11 @@ and phrase small spoken fragments. Those live here so each category stays focuse
 its vocabulary, and its result sentence — the parts that actually differ.
 
 Nothing here is domain-specific: no slot names, no vocabularies. Every spec-driven category
-(`capabilities/search_family.py`, issue #111) shares these — the last inline copies (the
-pre-`_search_support` star-systems capability) were folded in when that family collapsed.
+(`capabilities/search_family.py`, issue #111) shares these; the star-systems inline copies
+were folded in when that family collapsed. One deliberate holdout: the find-closest MODULE
+tool keeps its inline clipboard/distance fragments — its frozen result line says "in your
+current system" where `distance_phrase` says "your current system", and #111 forbids
+changing a spoken byte.
 """
 from __future__ import annotations
 

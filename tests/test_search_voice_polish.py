@@ -22,7 +22,7 @@ from covas.capabilities.help_capability import HelpCapability
 from covas.capabilities.find_closest_capability import FindClosestCapability, NavConfig
 from covas.capabilities.search_family import (MinorFactionSearchCapability, MiscSearchCapability,
                                               SignalSearchCapability, StationSearchCapability,
-                                              SystemSearchCapability, SystemSearchConfig)
+                                              SystemSearchCapability)
 from covas.search.factions import FACTION_STATES
 from covas.search.stations import STATION_TYPES
 
@@ -161,7 +161,7 @@ def test_help_error_mode_never_emits_the_unresolved_term_as_valid():
 def test_all_search_tools_carry_the_cancel_instruction():
     caps = [
         FindClosestCapability(NavConfig(enabled=True), get_current_system=lambda: "Sol"),
-        SystemSearchCapability(SystemSearchConfig(enabled=True), get_current_system=lambda: "Sol"),
+        SystemSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
         StationSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
         MinorFactionSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
         SignalSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),

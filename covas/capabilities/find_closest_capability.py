@@ -396,6 +396,8 @@ class FindClosestCapability:
         return self._say_result(resolved, result, copied, here)
 
     def _say_result(self, resolved: Resolved, result, copied: bool, here: bool = False) -> str:
+        # Inline on purpose, not sup.distance_phrase: this frozen line says "in your current
+        # system" — one word off the shared helper — and #111 forbids changing a spoken byte.
         dist = ("in your current system" if result.distance_ly < 0.05
                 else f"{result.distance_ly:.1f} light-years away")
         line = (f"Closest {resolved.label}: {result.station} in {result.system}, {dist}. "

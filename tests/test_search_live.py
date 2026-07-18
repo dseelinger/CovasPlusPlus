@@ -78,10 +78,11 @@ def test_live_star_system_capability_round_trips():
     """The star-systems capability end-to-end against real Spansh: a spoken slot -> canonical
     value -> live query -> parsed result -> clipboard. The canary if Spansh's systems response
     or vocabulary shifts."""
-    from covas.capabilities.search_family import SystemSearchCapability, SystemSearchConfig
+    from covas.capabilities._search_support import SearchConfig
+    from covas.capabilities.search_family import SystemSearchCapability
     copied: list[str] = []
     cap = SystemSearchCapability(
-        SystemSearchConfig(enabled=True), http=RequestsHttp(),
+        SearchConfig(enabled=True), http=RequestsHttp(),
         get_current_system=lambda: "Sol", clipboard=copied.append)
     out = cap.run_tool("search_star_systems", {"allegiance": "imperial", "security": "High"})
     assert copied and copied[0] in out          # nearest system name spoken + copied

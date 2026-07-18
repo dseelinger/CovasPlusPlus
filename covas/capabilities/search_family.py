@@ -8,7 +8,7 @@ module repeating the same skeleton (`_TOOL_NAME`/`_DESC`/`_SCHEMA_PROPS`, a `too
 ONE generic `SpecSearchCapability` parameterised by a per-category `SearchDescriptor` (tool
 name, description, schema props, the `CategorySpec` key, help metadata, and one `run` callable
 carrying the parts that genuinely differ — slot validation and the spoken result). A declarative
-table (`SEARCH_FAMILY`) instantiates them; `bootstrap` loops over it.
+table (`SEARCH_GROUP`) instantiates them; `bootstrap` loops over it.
 
 The six are the "thin" tier of issue #111. The BESPOKE tier stays standalone by design — the two
 find-closest tools (`find_closest_capability`, module + ship: `nav/closest.py`, a resolve/confirm
@@ -32,25 +32,19 @@ from datetime import datetime, timezone
 from typing import Callable, Mapping
 
 from ..nav import copy as _default_copy
-from ..search import (NavError, RequestsHttp, build_query, category, execute_search,
+from ..search import (NavError, RequestsHttp, category,
                       parse_bodies, parse_stations, parse_systems)
 from ..search.bodies import (BIO_GENUS_NAMES, BODY_SUBTYPES, nearest_bio_signal, nearest_subtype,
                              resolve_bio_signal, resolve_subtype)
-from ..search.categories import CategorySpec
 from ..search.factions import FACTION_STATES, nearest_state, resolve_state
 from ..search.faction_index import FactionIndex
-from ..search.spansh import Http, _DEFAULT_UA, data_age_days, pad_filter_key
+from ..search.spansh import Http, data_age_days, pad_filter_key
 from ..search.stations import (SERVICES, STATION_TYPES, nearest_service, nearest_type,
                                resolve_service, resolve_type)
 from ..search.systems import VOCAB, nearest_enum, resolve_enum
 from . import _search_support as sup
 from ._search_support import SearchConfig
 from .base import HelpMeta, Slot
-
-# Star-system search predates `_search_support` and used a `[star_systems]`-section config with
-# the SAME three fields as `SearchConfig`; it's now that config read from a different section, so
-# a single class serves both (the alias keeps `SystemSearchConfig(...)` call sites working).
-SystemSearchConfig = SearchConfig
 
 
 @dataclass(frozen=True)

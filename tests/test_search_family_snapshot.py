@@ -62,7 +62,7 @@ def build_family_surface() -> list[dict]:
     from covas.capabilities.search_family import (BodySearchCapability,
                                                   MinorFactionSearchCapability, MiscSearchCapability,
                                                   SignalSearchCapability, StationSearchCapability,
-                                                  SystemSearchCapability, SystemSearchConfig)
+                                                  SystemSearchCapability)
 
     http, clip = _NoHttp(), _noop_copy
     common = dict(http=http, get_current_system=_current_system, clipboard=clip)
@@ -72,7 +72,7 @@ def build_family_surface() -> list[dict]:
         ("find_closest_module", FindClosestCapability(NavConfig(), **common)),
         ("find_closest_ship", FindClosestShipCapability(NavConfig(), **common)),
         ("search_star_systems",
-         SystemSearchCapability(SystemSearchConfig(), **common)),
+         SystemSearchCapability(SearchConfig(), **common)),
         ("search_stations", StationSearchCapability(SearchConfig(), **search_common)),
         ("search_minor_factions",
          MinorFactionSearchCapability(SearchConfig(), **search_common)),
