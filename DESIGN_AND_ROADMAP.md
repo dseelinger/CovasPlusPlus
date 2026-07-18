@@ -1788,6 +1788,46 @@ The original seven-phase plan is done and tested:
     (+ `mkdocs.yml` nav). **Improvement thesis (Assist): grounded in YOUR live inventory — "what am I
     short of / capped on" answered from the journal, not a wiki table.**
 
+NN. **Place-aware & visit-history callouts** (issue #138, `covas/ed/visit_ledger.py` (new),
+    `covas/ed/place_classifier.py` (new), `covas/capabilities/proactive_capability.py`, `covas/app.py`,
+    `covas/ed/context.py`, `covas/ed/journal.py`) — the §5 proactive arrival callout (entry: DESIGN §5)
+    was event-generic: it fired on ANY dock/jump with no idea the station was an engineer's base, your
+    carrier, or somewhere you keep coming back to. Two PURE pieces now feed grounded facts into the
+    SAME callout. **(1) A persistent visit ledger** (`VisitLedger`, git-ignored `visit_ledger.json` —
+    the Commander's own travel history, never committed) folded on the journal thread from arrival
+    events (`FSDJump`/`CarrierJump` → system grain, `Docked` → station grain) via `EDContext`
+    accessors under its lock (mirrors the #125 npc-crew single-writer model). It exposes PURE
+    `VisitStats` (lifetime total, last-24h / last-7d windows, first-visit, first/last-seen) with an
+    **injected clock** so tests advance time deterministically (arrival times come from the event's own
+    `timestamp`, not wall-clock). Bounded so the file can't grow: per-location recent-stamps roll off
+    after a 30-day retention window and cap at 64, lifetime totals + first-seen survive a rolloff (a
+    "50th visit" milestone must), and at most 4000 locations are kept (LRU-evicting the least-recently
+    visited). **(2) An extensible special-place classifier** (`classify_station`/`classify_system` →
+    `Place{kind,label,detail}` or None) recognises an **engineer base** (matching the docked
+    system+station against the bundled `ENGINEERS` table → the engineer's name + specialties), the
+    **own fleet carrier** (reusing `EDContext.at_own_carrier()`, #19), a **first visit to a system**,
+    and a tiny one-row-to-extend **landmark** table (Hutton Orbital, Sol, Shinrarta Dezhra, Colonia,
+    Sag A*). **(3) The enrichment** happens in `app._place_facts` when an arrival callout is about to
+    generate: a pure `place_facts(place, stats)` returns grounded structured facts ONLY when the place
+    is special OR the visit pattern is notable (first visit, a round-number milestone 10/25/50/…, or an
+    unusually busy day) — an ordinary repeat at an ordinary place returns None (today's exact generic
+    callout). Notable facts are passed to `build_prompt(event, summary, facts=…)`, which states them in
+    the USER prompt (never the cached system prompt, so prompt caching is untouched) with an explicit
+    "voice these accurately, do NOT invent names or numbers" — the LLM phrases, never fabricates. A
+    **dedicated place cooldown** (`ProactivePolicy.should_place_remark`/`mark_place_remark`,
+    `[proactive].place_cooldown` default 900s, a separate axis from the per-event cooldown) keeps
+    history remarks occasional so a busy engineering session never narrates every dock. Whole feature
+    gated by `[proactive].enabled`; fail-soft everywhere (a ledger/classifier glitch degrades to the
+    plain callout, never a crash). Offline-unit-tested: ledger stats over faked arrivals + injected
+    clock (24h window, first-vs-repeat, rolloff/bounding), engineer/carrier/landmark/first-visit
+    classification + unknown→None, the `place_facts` gate (grounded facts for special/notable, None for
+    ordinary), and the place cooldown (`tests/test_visit_ledger.py`, `tests/test_place_classifier.py`,
+    additions to `tests/test_proactive.py`); on-hardware dock-at-an-engineer-base phrasing is
+    `MANUAL_TESTS.md` §5.2b. Docs `docs/elite/proactive-callouts.md`. **Improvement thesis (Immerse):
+    competitors fire a generic "docked" line; a companion that knows THIS is Felicity Farseer's
+    workshop and you've been here ten times today is context- and memory-aware in a way a stock event
+    announcer isn't — and every place name and count is a grounded fact, never invented.**
+
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 

@@ -579,6 +579,12 @@ SCHEMA: list[Setting] = [
             "A callout is one sentence — keep it tight and cheap.",
             default=120, min=32, max=512, unit="tokens",
             phrasings=("callout length",)),
+    Setting("proactive.place_cooldown", ("proactive", "place_cooldown"), "int",
+            "Place/history remark cooldown", "Proactive callouts",
+            "How long before another place-aware or visit-history remark (engineer base, your "
+            "carrier, 'tenth time here today') may ride an arrival callout. Keeps them occasional.",
+            default=900, min=0, max=7200, unit="s",
+            phrasings=("place callout cooldown", "history callout cooldown")),
 
     # --- Route callouts ----------------------------------------------------
     Setting("route.enabled", ("route", "enabled"), "bool",

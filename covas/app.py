@@ -454,7 +454,12 @@ class App:
                 self.set_state("Idle")
                 return
             summary = self.ed_ctx.summary() if self.ed_ctx is not None else None
-            prompt = build_prompt(event, summary)
+            # Place-aware & visit-history enrichment (#138): consult the visit ledger + special-place
+            # classifier and, only for a special place or a NOTABLE visit pattern (gated by a
+            # dedicated place cooldown), feed grounded structured facts into the prompt. Ordinary
+            # arrivals get exactly today's generic callout (facts stays None). Fail-soft.
+            facts = self._place_facts(event_name, event)
+            prompt = build_prompt(event, summary, facts=facts)
             # Cheap tier by design (DESIGN §5) — a callout is one sentence; small cap.
             cap = self.proactive.policy.cfg.max_tokens if self.proactive else None
             route = Router.from_cfg(self.cfg).cheap_route(cap)
@@ -487,6 +492,42 @@ class App:
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — a proactive failure must never crash the app
             self.set_state("Idle", f"proactive error: {e}")
+
+    def _place_facts(self, event_name: str, event: dict) -> dict | None:
+        """Grounded place/visit facts for an arrival callout (#138), or None to leave it generic.
+
+        Consults the special-place classifier + the visit ledger (both PURE), then gates the whole
+        enrichment on a DEDICATED place cooldown so a busy engineering session doesn't narrate every
+        dock. Returns a small structured facts dict ONLY when the place is special or the visit
+        pattern is notable AND the cooldown has elapsed. Fail-soft: any error yields None, so a
+        ledger/classifier glitch degrades to today's plain callout, never a crash."""
+        try:
+            if self.ed_ctx is None or self.proactive is None:
+                return None
+            if event_name not in ("Docked", "FSDJump", "CarrierJump"):
+                return None
+            from .ed.place_classifier import classify_station, classify_system, place_facts
+            snap = self.ed_ctx.snapshot()
+            system = event.get("StarSystem") or snap.get("system")
+            if event_name == "Docked":
+                station = event.get("StationName") or snap.get("station")
+                stats = self.ed_ctx.visit_stats_station(system, station)
+                place = classify_station(system, station,
+                                         at_own_carrier=self.ed_ctx.at_own_carrier())
+            else:
+                stats = self.ed_ctx.visit_stats_system(system)
+                first_visit = bool(stats is not None and stats.first_visit)
+                place = classify_system(system, first_visit=first_visit)
+            facts = place_facts(place, stats)
+            if not facts:
+                return None
+            now = time.monotonic()
+            if not self.proactive.policy.should_place_remark(now):
+                return None
+            self.proactive.policy.mark_place_remark(now)
+            return facts
+        except Exception:  # noqa: BLE001 — enrichment must never break a callout
+            return None
 
     def _speak_proactive_line(self, text: str) -> bool:
         """Speak a PREDETERMINED proactive line (e.g. a route callout) through the same

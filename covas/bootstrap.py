@@ -305,6 +305,14 @@ def build_ed_monitoring(app: "App") -> None:
         _ships_loadouts_path = str((app.cfg.get("ships", {}) or {}).get("loadouts_file", "") or "").strip()
         if _ships_loadouts_path:
             app.ed_ctx.set_ship_loadout_store(ShipLoadoutStore.load(_ships_loadouts_path))
+        # Visit ledger (issue #138): load the persisted per-location arrival log (path resolved under
+        # the data dir by config) so the journal watcher can accumulate arrivals and the proactive
+        # callout can ground a history remark ("first time here", "10 times today"). Fail-soft: a
+        # missing file loads empty.
+        from .ed.visit_ledger import VisitLedger
+        _visit_ledger_path = str((app.cfg.get("proactive", {}) or {}).get("visit_ledger_file", "") or "").strip()
+        if _visit_ledger_path:
+            app.ed_ctx.set_visit_ledger(VisitLedger.load(_visit_ledger_path))
         app.registry.register(EDContextCapability(app.ed_ctx))
         # Owned-ships list + voice CRUD (#134): the conversational surface over the fleet identity.
         # All mutations go through the lock-protected EDContext methods (serialised vs the journal

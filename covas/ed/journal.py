@@ -24,6 +24,7 @@ from .modes import MODE_SRV
 from .owned_ships import SHIPYARD_EVENTS
 from .status import describe_transition
 from .stored import parse_stored_ships, parse_stored_modules
+from .visit_ledger import ARRIVAL_EVENTS
 
 # SRV hull integrity (0..1) below which a proactive "hull's getting low" callout is worth it
 # (#54). Status.json has no SRV hull field, so it comes from the journal HullDamage event while
@@ -306,6 +307,10 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     # the fleet identity survives restarts. Runs regardless of a field-patch (no _HANDLERS entry).
     if name in _SHIPYARD_EVENTS:
         ctx.apply_shipyard_event(event)
+    # Visit ledger (#138): record system/station arrivals so proactive callouts can ground a
+    # history remark ("first time here", "10 times today"). Fail-soft no-op when no ledger installed.
+    if name in _ARRIVAL_EVENTS:
+        ctx.record_arrival(event)
     return patch
 
 
@@ -318,6 +323,10 @@ _NPC_CREW_EVENTS = frozenset(
 # The ownership-change events folded into the owned-ships registry (issue #134). The
 # owned_ships module owns the authoritative set; re-exported here for the cheap dispatch test.
 _SHIPYARD_EVENTS = SHIPYARD_EVENTS
+
+# The arrival events folded into the visit ledger (issue #138). The visit_ledger module owns the
+# authoritative set; re-exported here so the dispatch above is a cheap membership test.
+_ARRIVAL_EVENTS = ARRIVAL_EVENTS
 
 
 # The three material buckets each carry a Category on the incremental events.

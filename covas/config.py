@@ -95,6 +95,7 @@ _DATA_PATH_FIELDS = (
     ("crew", "voice_pairings_file"),  # generated crew best-fit-voice cache, separate from #96 (#124)
     ("ships", "registry_file"),  # owned-ships registry, folded from Shipyard events (#134)
     ("ships", "loadouts_file"),  # per-ship loadout+engineering memory, keyed by ShipID (#135)
+    ("proactive", "visit_ledger_file"),  # per-location arrival log for place/history callouts (#138)
     ("memory", "dir"),
     ("macros", "file"),
     ("logging", "dir"),

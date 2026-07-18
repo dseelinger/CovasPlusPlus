@@ -33,6 +33,30 @@ and both cooldowns still gate them.
 
 Lines are short, in-character, and generated on the **cheap tier**, so callouts stay inexpensive.
 
+## It knows where it is (place-aware callouts)
+
+When you arrive somewhere **notable**, COVAS++ recognises it and grounds the callout in real facts
+instead of a generic "docked" line:
+
+- **Engineer bases** — dock at Farseer Inc and it knows that's Felicity Farseer's workshop, and what
+  she engineers.
+- **Your own fleet carrier** — it knows when you're home.
+- **Landmarks** — a small built-in list (Hutton Orbital, Sol, Shinrarta Dezhra, Colonia,
+  Sagittarius A*).
+- **First visit to a system** — it notices the first time you set foot somewhere new.
+
+It also remembers **how often you come here**. A private, on-disk **visit ledger** counts your
+arrivals per system and per station, so a callout can say *"Farseer's again — tenth time today,
+Commander"* or *"first time here."* The place names and the counts are **supplied facts** — COVAS++
+voices them, it never makes them up.
+
+!!! info "Grounded, occasional, and private"
+    The ledger is **git-ignored per-user data** (your own travel history) and never leaves your
+    machine. It's bounded — ancient entries roll off — so the file stays small. History remarks are
+    **occasional**: they only fire on something worth mentioning (a special place, your first visit,
+    a round-number milestone, or an unusually busy day) and ride a **dedicated cooldown**
+    (`proactive.place_cooldown`), so a busy engineering session never narrates every dock.
+
 ## It never talks over you
 
 - A callout is spoken **only when the loop is idle** — if you're mid-conversation, it waits.
@@ -57,6 +81,8 @@ Say **"stop the callouts"** (or "be quiet," "no more announcements") and it goes
 | `proactive.min_interval` | Minimum seconds between any two callouts |
 | `proactive.cooldown` | How long before the same event type may re-announce |
 | `proactive.max_tokens` | Reply length cap for a callout (it's one sentence — keep it tight) |
+| `proactive.place_cooldown` | How long before another place-aware / visit-history remark may ride a callout |
+| `proactive.visit_ledger_file` | Where the private per-location arrival log lives (blank disables it) |
 | `[proactive.events]` | Per-event whitelist — only events set `true` are ever announced |
 
 See the [Configuration reference](../configuration.md#proactive-callouts-proactive) for the full

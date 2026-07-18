@@ -68,6 +68,7 @@ def test_all_path_fields_resolved():
         "crew": {"file": "crew.json", "npc_registry_file": "npc_crew.json",
                 "voice_pairings_file": "crew_voice_pairings.json"},
         "ships": {"registry_file": "owned_ships.json", "loadouts_file": "ship_loadouts.json"},
+        "proactive": {"visit_ledger_file": "visit_ledger.json"},
         "memory": {"dir": "memory"},
         "macros": {"file": "custom_macros.jsonl"},
         "logging": {"dir": "logs"},

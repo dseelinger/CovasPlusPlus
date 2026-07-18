@@ -19,7 +19,10 @@ from .engineers import (ENGINEERS, Engineer, EngineerStatus, find_by_specialty,
 from .journal import (JournalWatcher, apply_carrier_event, apply_journal_event,
                       apply_scan_organic, default_journal_dir, describe_journal_event,
                       parse_journal_line, resolve_journal_dir, srv_hull_transitions)
+from .place_classifier import (Place, classify_station, classify_system,
+                               place_facts, render_facts)
 from .route import RouteStep, RouteTracker, is_scoopable, read_navroute
+from .visit_ledger import VisitLedger, VisitStats
 from .modes import (GAME_MODES, MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV)
 from .ships import ship_pad_size
 from .status import (StatusWatcher, apply_status, decode_flags, describe_transition,
@@ -64,4 +67,11 @@ __all__ = [
     "RouteTracker",
     "ship_pad_size",
     "status_path",
+    "Place",
+    "classify_station",
+    "classify_system",
+    "place_facts",
+    "render_facts",
+    "VisitLedger",
+    "VisitStats",
 ]

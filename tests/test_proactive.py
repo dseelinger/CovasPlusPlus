@@ -216,6 +216,42 @@ def test_build_prompt_contains_event_and_context():
     assert "UNPROMPTED" in prompt          # the model is told it wasn't asked
 
 
+# --- #138 place/history enrichment ----------------------------------------------------
+
+def test_build_prompt_carries_grounded_place_facts():
+    """When facts are supplied, the prompt states them AND tells the model not to invent —
+    grounding discipline (the model phrases, never fabricates)."""
+    facts = {"place": "engineer base", "label": "Farseer Inc, Felicity Farseer's workshop",
+             "detail": "engineers Frame Shift Drive, Thrusters", "visits_24h": 10}
+    prompt = build_prompt({"event": "Docked", "StationName": "Farseer Inc"}, None, facts=facts)
+    assert "Farseer Inc" in prompt
+    assert "Felicity Farseer" in prompt
+    assert "10 times in the last 24 hours" in prompt
+    assert "do NOT invent" in prompt or "not invent" in prompt.lower()
+
+
+def test_build_prompt_without_facts_is_unchanged():
+    """No facts -> exactly today's generic callout (no grounding clause)."""
+    prompt = build_prompt({"event": "Docked", "StationName": "Somewhere"}, None)
+    assert "Grounded facts" not in prompt
+
+
+def test_place_cooldown_gates_history_remarks():
+    """The dedicated place cooldown is a separate axis from the per-event cooldown: a place
+    remark is allowed, armed, then blocked until its own (longer) cooldown elapses."""
+    p = ProactivePolicy(ProactiveConfig.from_cfg({"proactive": {
+        "enabled": True, "place_cooldown": 900}}))
+    assert p.should_place_remark(now=1000.0) is True
+    p.mark_place_remark(now=1000.0)
+    assert p.should_place_remark(now=1500.0) is False   # within the 900s place cooldown
+    assert p.should_place_remark(now=1901.0) is True    # clears after it
+
+
+def test_place_cooldown_default_from_config():
+    c = ProactiveConfig.from_cfg({"proactive": {"enabled": True}})
+    assert c.place_cooldown > 0
+
+
 # --- App wiring -----------------------------------------------------------------------
 
 def _cfg(tmp_path, **extra) -> dict:
