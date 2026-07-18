@@ -134,8 +134,12 @@ rather than random:
 - **Everything external / ambient** — other ships, station traffic, NPC comms — is a **random
   "radioed" cast voice** on the comms bus.
 
-So a musing like *"nice to have some company out here"* comes from your companion, while station
-chatter comes from the anonymous radio cast — the perspective always matches the source.
+**The persona voice is Commander-directed only — never a broadcast.** Whatever the companion says in
+its own voice is a private aside *to you* (*"feels good to have people around us again, Commander"*),
+never a greeting or announcement transmitted to others. Anything that reads as another party talking
+— a hail, a "nice to have some company out here" to an arrival — belongs on the radio cast, not in
+COVAS's voice. So a musing addressed to you comes from your companion, while station chatter comes
+from the anonymous radio cast — the perspective always matches the source.
 
 !!! warning "This uses ElevenLabs credits"
     The cast now defaults to **ElevenLabs**, which burns credits on every comms/chatter line. To go
