@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% include "_zoom.html" %}
+<title>COVAS++ Engineers</title>
+<!-- The engineer unlock dashboard (issue #133): an at-a-glance grid of every ship engineer x
+     {locked / invited / unlocked+grade} with the outstanding requirement for the locked ones.
+     READ ONLY — no writes. Pure vanilla JS, no CDN, so the panel works fully offline. The voice
+     path (#65) answers "how do I unlock X" one engineer at a time; this is the scannable
+     "everything left across all 20+ engineers" view. Data comes from /engineers/state, which
+     joins the bundled reference table with the live EngineerProgress journal map — the SAME two
+     sources the voice tools use. Before the first EngineerProgress event (or with ED monitoring
+     off) the page shows a "no journal data yet" note but still lists every engineer + requirement. -->
+<link rel="stylesheet" href="/static/theme.css">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,var(--header-grad-1),var(--bg))}
+  header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
+  header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
+  header a.sub{color:var(--accent2);text-decoration:none}
+  .wrap{padding:16px;max-width:1100px}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:16px;margin-bottom:16px}
+  .card h2{margin:0 0 12px;font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  input,select{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);
+      border-radius:6px;padding:8px 10px;font-family:inherit;font-size:13px}
+  input:focus,select:focus{outline:none;border-color:var(--accent2)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1 1 240px}
+  .hint{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.6}
+  .banner{display:none;margin:0 0 16px;padding:12px 16px;border:1px solid var(--warn-edge);border-radius:6px;
+      background:var(--warn-bg);color:var(--warn-text);font-size:13px;line-height:1.6}
+  .banner.show{display:block}
+  .banner a{color:var(--accent);text-decoration:none}
+  /* Summary tally chips + status-filter buttons. */
+  .tally{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .chip{border:1px solid var(--edge);border-radius:20px;padding:5px 12px;font-size:12px;letter-spacing:1px;
+      background:var(--btn-bg);color:var(--accent2);cursor:pointer}
+  .chip:hover{background:var(--btn-hover)}
+  .chip.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:bold}
+  .chip b{font-size:13px}
+  /* Engineer grid. */
+  ul#grid{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:12px;
+      grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+  li.eng{border:1px solid var(--edge);border-radius:8px;padding:12px;background:var(--list-item);
+      border-left-width:4px;display:flex;flex-direction:column;gap:6px}
+  li.eng.unlocked{border-left-color:var(--ok)}
+  li.eng.in_progress{border-left-color:var(--warn-text)}
+  li.eng.locked{border-left-color:var(--muted)}
+  li.eng .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  li.eng .name{font-weight:bold;font-size:14px;flex:1 1 auto}
+  .badge{font-size:11px;letter-spacing:.5px;text-transform:uppercase;border-radius:10px;padding:2px 9px;
+      white-space:nowrap;border:1px solid var(--edge)}
+  .badge.unlocked{background:var(--ok);color:var(--on-accent);border-color:var(--ok)}
+  .badge.in_progress{background:var(--warn-bg);color:var(--warn-text);border-color:var(--warn-edge)}
+  .badge.locked{background:var(--btn-bg);color:var(--muted)}
+  li.eng .loc{color:var(--muted);font-size:12px}
+  li.eng .specs{font-size:12px;line-height:1.5}
+  li.eng .specs .label{color:var(--accent2)}
+  li.eng .need{font-size:12px;line-height:1.5;border-top:1px dashed var(--edge);padding-top:6px;margin-top:2px}
+  li.eng .need .label{color:var(--accent);text-transform:uppercase;letter-spacing:.5px;font-size:11px}
+  li.eng .permit{color:var(--warn-text);font-size:11px}
+  li.eng .region{color:var(--muted);font-size:11px;font-style:italic}
+  .empty{color:var(--muted);font-size:13px;padding:12px 0}
+  .msg{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>COVAS++</h1>
+  <span class="sub">ENGINEERS</span>
+  <a href="/" class="sub">← control panel</a>
+  <a href="/settings" class="sub">⚙ settings</a>
+  <a href="/checklist" class="sub">☑ checklist</a>
+  <a href="/memory" class="sub">🧠 memory</a>
+  <a href="/crew" class="sub">🎙 crew</a>
+</header>
+
+<div class="wrap">
+  <div class="banner" id="noData">
+    No engineer data from the journal yet — this comes from Elite's <b>EngineerProgress</b> event,
+    written at login. Start the game with journal monitoring on and reload, and your live unlock
+    status will fill in. Until then, every engineer is shown <b>locked</b> with what it requires.
+  </div>
+
+  <div class="card">
+    <h2>Engineer unlock status</h2>
+    <div class="hint">
+      Every ship engineer at a glance — who's <b>unlocked</b> (and to what grade), who you're
+      <b>part-way</b> with (invited or discovered), and who's still <b>locked</b> with exactly
+      what each one still needs. Live status is read from your journal; the locations and
+      requirements are bundled. Filter by status or search by name, system, or module.
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="tally" id="tally"></div>
+      <input class="grow" id="search" placeholder="Search name, system, or module…" style="margin-left:auto">
+    </div>
+    <ul id="grid"></ul>
+    <div class="empty" id="empty" style="display:none">No engineers match your filter.</div>
+    <div class="row" style="margin-top:12px">
+      <span class="msg" id="msg"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let ENGINEERS = [];   // rows from /engineers/state
+let FILTER = "all";   // active status bucket: all | unlocked | in_progress | locked
+let QUERY = "";       // lowercased search text
+
+const GROUP_LABEL = {unlocked: "Unlocked", in_progress: "In progress", locked: "Locked"};
+
+function badge(e){
+  if (e.group === "unlocked")
+    return `<span class="badge unlocked">Unlocked${e.grade ? " · G" + e.grade : ""}</span>`;
+  if (e.group === "in_progress"){
+    const p = e.progress === "Known" ? "Discovered" : (e.progress || "In progress");
+    return `<span class="badge in_progress">${esc(p)}</span>`;
+  }
+  const p = e.progress === "Barred" ? "Barred" : "Locked";
+  return `<span class="badge locked">${esc(p)}</span>`;
+}
+
+function card(e){
+  const region = e.region === "colonia"
+    ? `<div class="region">Colonia region (~22,000 ly from the bubble)</div>` : "";
+  const permit = e.permit ? `<div class="permit">⚿ ${esc(e.permit)}</div>` : "";
+  const need = e.outstanding
+    ? `<div class="need"><span class="label">Still needs</span> — ${esc(e.outstanding)}</div>` : "";
+  return `<li class="eng ${e.group}">
+    <div class="top"><span class="name">${esc(e.name)}</span>${badge(e)}</div>
+    <div class="loc">${esc(e.station)} · ${esc(e.system)}</div>
+    ${region}
+    <div class="specs"><span class="label">Engineers</span> ${esc(e.specialties.join(", "))}</div>
+    ${permit}
+    ${need}
+  </li>`;
+}
+
+function matches(e){
+  if (FILTER !== "all" && e.group !== FILTER) return false;
+  if (!QUERY) return true;
+  const hay = [e.name, e.system, e.station, e.region, (e.specialties || []).join(" ")]
+    .join(" ").toLowerCase();
+  return hay.includes(QUERY);
+}
+
+function renderTally(counts, total){
+  const chips = [
+    ["all", "All", total],
+    ["unlocked", "Unlocked", counts.unlocked],
+    ["in_progress", "In progress", counts.in_progress],
+    ["locked", "Locked", counts.locked],
+  ];
+  $("tally").innerHTML = chips.map(([key, label, n]) =>
+    `<span class="chip ${FILTER === key ? "active" : ""}" data-f="${key}"><b>${n}</b> ${label}</span>`
+  ).join("");
+  for (const c of $("tally").querySelectorAll(".chip"))
+    c.onclick = () => { FILTER = c.dataset.f; render(); };
+}
+
+function render(){
+  const shown = ENGINEERS.filter(matches);
+  $("grid").innerHTML = shown.map(card).join("");
+  $("empty").style.display = shown.length ? "none" : "block";
+  // Re-mark the active chip without rebuilding counts.
+  for (const c of $("tally").querySelectorAll(".chip"))
+    c.classList.toggle("active", c.dataset.f === FILTER);
+}
+
+async function load(){
+  try {
+    const r = await fetch("/engineers/state");
+    const data = await r.json();
+    ENGINEERS = data.engineers || [];
+    $("noData").classList.toggle("show", !data.has_progress);
+    renderTally(data.counts || {unlocked:0,in_progress:0,locked:0}, data.total || ENGINEERS.length);
+    render();
+    $("msg").textContent = data.has_progress
+      ? `${data.counts.unlocked} of ${data.total} engineers unlocked.`
+      : "Showing bundled requirements — no live journal status yet.";
+  } catch (e){
+    $("msg").textContent = "Failed to load engineer status.";
+  }
+}
+
+$("search").addEventListener("input", () => { QUERY = $("search").value.trim().toLowerCase(); render(); });
+load();
+</script>
+</body>
+</html>

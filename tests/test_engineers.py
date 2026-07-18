@@ -10,8 +10,9 @@ import json
 from pathlib import Path
 
 from covas.ed import EDContext
-from covas.ed.engineers import (ENGINEERS, EngineerStatus, find_by_specialty, find_engineer,
-                                parse_engineer_progress, status_for)
+from covas.ed.engineers import (ENGINEERS, EngineerStatus, engineer_dashboard,
+                                find_by_specialty, find_engineer, parse_engineer_progress,
+                                status_for)
 from covas.ed.journal import apply_journal_event
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "ed" / "engineer_progress.json"
@@ -132,3 +133,70 @@ def test_context_merges_progress_not_replaces():
 
 def test_context_progress_empty_until_seen():
     assert EDContext().engineer_progress() == {}
+
+
+# --- dashboard view-model (issue #133) --------------------------------------------------
+
+def test_dashboard_covers_every_engineer_and_is_serializable():
+    import json
+    dash = engineer_dashboard(parse_engineer_progress(_event()))
+    assert dash["total"] == len(ENGINEERS)
+    assert len(dash["engineers"]) == len(ENGINEERS)
+    # Bucket counts partition the whole fleet.
+    c = dash["counts"]
+    assert c["unlocked"] + c["in_progress"] + c["locked"] == len(ENGINEERS)
+    # JSON-serializable end to end (the route jsonify's it directly).
+    json.dumps(dash)
+
+
+def test_dashboard_unlocked_row_carries_grade_and_no_outstanding():
+    dash = engineer_dashboard(parse_engineer_progress(_event()))
+    row = next(r for r in dash["engineers"] if r["name"] == "Felicity Farseer")
+    assert row["group"] == "unlocked"
+    assert row["progress"] == "Unlocked"
+    assert row["grade"] == 5
+    assert row["outstanding"] == ""            # nothing left once unlocked
+
+
+def test_dashboard_invited_row_needs_only_the_unlock_gift():
+    dash = engineer_dashboard(parse_engineer_progress(_event()))
+    row = next(r for r in dash["engineers"] if r["name"] == "The Dweller")
+    assert row["group"] == "in_progress" and row["progress"] == "Invited"
+    dweller = find_engineer("the dweller")
+    assert row["outstanding"] == dweller.unlock   # just the gift, not the access task
+
+
+def test_dashboard_discovered_row_needs_access_then_gift():
+    dash = engineer_dashboard(parse_engineer_progress(_event()))
+    row = next(r for r in dash["engineers"] if r["name"] == "Tod 'The Blaster' McQuinn")
+    assert row["group"] == "in_progress" and row["progress"] == "Known"
+    # Known = discovered but not invited: the access task remains, then the gift.
+    assert row["access"] in row["outstanding"]
+    assert "Then" in row["outstanding"]
+
+
+def test_dashboard_locked_row_has_full_requirement():
+    dash = engineer_dashboard(parse_engineer_progress(_event()))
+    # Palin isn't in the fixture progress at all -> locked, full requirement shown.
+    row = next(r for r in dash["engineers"] if r["name"] == "Professor Palin")
+    assert row["group"] == "locked" and row["progress"] == ""
+    assert row["grade"] is None
+    assert row["access"] in row["outstanding"] and row["unlock"][1:] in row["outstanding"]
+
+
+def test_dashboard_empty_progress_is_fail_soft():
+    # Before any EngineerProgress event: has_progress False, every engineer locked, still
+    # carries its requirement so the page is useful with zero journal data.
+    for empty in (None, {}):
+        dash = engineer_dashboard(empty)
+        assert dash["has_progress"] is False
+        assert dash["counts"]["locked"] == len(ENGINEERS)
+        assert dash["counts"]["unlocked"] == 0
+        assert all(r["outstanding"] for r in dash["engineers"])
+
+
+def test_dashboard_barred_row_is_locked_bucket():
+    dash = engineer_dashboard({"The Dweller": EngineerStatus(progress="Barred")})
+    row = next(r for r in dash["engineers"] if r["name"] == "The Dweller")
+    assert row["group"] == "locked" and row["progress"] == "Barred"
+    assert "barred" in row["outstanding"].lower()

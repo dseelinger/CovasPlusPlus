@@ -372,3 +372,77 @@ def status_for(engineer: Engineer,
     if not progress:
         return None
     return progress.get(engineer.name)
+
+
+# --- dashboard view-model (issue #133) ------------------------------------------------
+# A PURE join of the static table with the live progress map, shaped for the control-panel
+# Engineering dashboard. Kept here (next to the data it reads) and JSON-serializable so the web
+# route stays a thin adapter and `pytest` can cover the join offline. Voice recites engineers one
+# at a time; this makes "everything left across all 20+ engineers" scannable in one grid.
+
+# The four scannable buckets a row falls in. "in_progress" folds Invited + Known (Discovered);
+# "locked" folds a missing entry, Barred, and any unrecognised progress value (fail soft).
+_GROUP_BY_PROGRESS: dict[str, str] = {
+    "Unlocked": "unlocked",
+    "Invited": "in_progress",
+    "Known": "in_progress",
+    "Barred": "locked",
+}
+
+
+def _outstanding(engineer: Engineer, status: EngineerStatus | None) -> str:
+    """The requirement still standing between the Commander and this engineer's workshop, as
+    one line. Empty once unlocked. Mirrors the voice capability's status prose: Invited needs
+    only the unlock gift; Discovered (Known) needs the invitation task then the gift; not-started
+    (or unknown) needs both."""
+    if status is not None and status.progress == "Unlocked":
+        return ""
+    if status is not None and status.progress == "Invited":
+        return engineer.unlock
+    if status is not None and status.progress == "Barred":
+        return "Currently barred from this engineer."
+    if status is not None and status.progress == "Known":
+        # Discovered but not yet invited: the invitation task remains, then the unlock gift.
+        return f"{engineer.access} Then {engineer.unlock[:1].lower() + engineer.unlock[1:]}"
+    # Not started (no journal entry) or an unrecognised value: both halves remain.
+    return f"{engineer.access} Then {engineer.unlock[:1].lower() + engineer.unlock[1:]}"
+
+
+def _dashboard_row(engineer: Engineer, status: EngineerStatus | None) -> dict:
+    """One JSON-serializable dashboard row for `engineer` given the Commander's status (or None)."""
+    progress = status.progress if status is not None else ""
+    group = _GROUP_BY_PROGRESS.get(progress, "locked")
+    return {
+        "name": engineer.name,
+        "system": engineer.system,
+        "station": engineer.station,
+        "region": engineer.region,
+        "specialties": list(engineer.specialties),
+        "permit": engineer.permit,
+        # Live status: canonical journal value ("Unlocked"/"Invited"/"Known"/"Barred") or "" when
+        # the journal shows no progress with them yet; `group` is the scannable bucket.
+        "progress": progress,
+        "group": group,
+        "grade": status.rank if status is not None else None,
+        "access": engineer.access,
+        "unlock": engineer.unlock,
+        "outstanding": _outstanding(engineer, status),
+    }
+
+
+def engineer_dashboard(progress: dict[str, EngineerStatus] | None) -> dict:
+    """Build the full Engineering-dashboard view-model: every engineer joined with the Commander's
+    live progress, plus per-bucket counts. `has_progress` is False until an `EngineerProgress`
+    event has been read — the page shows a "no journal data yet" note but still lists every
+    engineer with what each requires (all shown locked). Pure and JSON-serializable, so the web
+    route is a thin adapter and the join is unit-tested offline."""
+    rows = [_dashboard_row(e, status_for(e, progress)) for e in ENGINEERS]
+    counts = {"unlocked": 0, "in_progress": 0, "locked": 0}
+    for row in rows:
+        counts[row["group"]] += 1
+    return {
+        "has_progress": bool(progress),
+        "total": len(rows),
+        "counts": counts,
+        "engineers": rows,
+    }

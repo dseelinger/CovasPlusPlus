@@ -47,6 +47,13 @@ is a point-in-time snapshot (see `covas/ed/engineers.py`, which documents its co
 how to refresh it). Your **status** is always live from the journal; only the generic requirement
 prose is bundled.
 
+## See the whole fleet at a glance
+
+Voice is best for a quick "how do I unlock X" mid-flight. For "show me **everything** left across all
+20+ engineers", open the **[Engineer dashboard](../using/engineers.md)** in the control panel — a
+scannable grid of every engineer's live unlock status and outstanding requirement, from the same
+journal data.
+
 ## Settings
 
 This reads **only local journal data** and a bundled table — no game-account login or private API.

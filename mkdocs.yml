@@ -85,6 +85,7 @@ nav:
       - Settings by voice: using/settings.md
       - Copy to clipboard: using/clipboard.md
       - Companion HUD: using/hud.md
+      - Engineer dashboard: using/engineers.md
   - Elite Dangerous awareness:
       - Game-state monitoring: elite/monitoring.md
       - Proactive callouts: elite/proactive-callouts.md

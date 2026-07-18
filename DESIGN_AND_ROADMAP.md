@@ -1614,6 +1614,34 @@ The original seven-phase plan is done and tested:
     crew to the hull you're flying — COVAS++ gives your exploration Phantom and your combat Chieftain
     different crews, switched automatically by the journal the moment you swap ships.**
 
+60. **Engineer unlock dashboard — the visual overview** (issue #133, `covas/ed/engineers.py`,
+    `covas/web.py`, `covas/templates/engineers.html` (new), `covas/templates/index.html` +
+    `crew.html`/`memory.html`/`checklist.html` nav) — a **read-only** control-panel page (`/engineers`)
+    that lays out **every** ship engineer as an at-a-glance grid: each one tagged locked / invited /
+    unlocked+grade from the live journal, with the **outstanding requirement** for anyone not yet
+    unlocked, filterable by status chip and searchable by name/system/module. The visual half of the
+    engineering answer the **voice** tools (#65) already gave one-at-a-time — voice is best for "how do
+    I unlock X" mid-flight, the grid for "show me everything left across all 20+ engineers". **No new
+    data, no writes.** It reuses the **exact two sources** the voice capability joins: the bundled
+    offline reference table (`ENGINEERS`) and the Commander's live `EngineerProgress` map on
+    `EDContext`. The join is a single **pure, JSON-serializable view-model** — `engineer_dashboard(progress)`
+    in `ed/engineers.py`, returning per-engineer rows (status bucket, grade, outstanding requirement)
+    plus per-bucket counts and a `has_progress` flag — kept next to the data and out of the route so
+    `pytest` covers it offline. The Flask route is a thin adapter: `/engineers/state` reads
+    `core.ed_ctx.engineer_progress()` (or `{}`), runs the view-model, and **always 200s** — no
+    `ed_ctx` (monitoring off), a raising context, or no `EngineerProgress` yet all degrade to
+    `has_progress:false` with every engineer shown locked-with-requirements, so the page is a useful
+    reference even with the game closed and never errors. The page is pure vanilla JS, **no CDN**, and
+    self-contained (only the bundled `theme.css`). No in-app voice-help entry is needed — like the
+    crew/memory/checklist editors it's a nav-linked panel page, not a capability. Offline-unit-tested:
+    the view-model's unlocked+grade / invited / discovered / locked+requirement / barred / empty-progress
+    cases and the endpoint's fail-soft branches + self-contained render (`tests/test_engineers.py`,
+    `tests/test_engineers_web.py`). The live-status-matches-the-journal + fail-soft-with-no-data checks
+    are `MANUAL_TESTS.md` §14.8. Docs: `docs/using/engineers.md` (+ cross-link from
+    `docs/elite/engineers.md`). **Improvement thesis (Assist): a scannable full-fleet-of-engineers grid
+    beats reciting them one at a time by voice, and beats EDCoPilot/COVAS:NEXT, which offer no grounded
+    local engineer-unlock dashboard at all.**
+
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 
