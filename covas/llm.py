@@ -10,6 +10,8 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING, Callable, Iterator
 
+from .providers._retry import ProviderError
+
 if TYPE_CHECKING:  # only for type hints — keep the offline stack importable without the SDK
     import anthropic
 
@@ -72,7 +74,9 @@ def list_anthropic_models(cfg: dict, *, limit: int = 100) -> list[str]:
     from .firstrun import anthropic_key
     key = anthropic_key(cfg)
     if not key:
-        raise RuntimeError("no Anthropic key")
+        # Structured, not a bare RuntimeError (issue #108), so a keyless config classifies as a
+        # misconfiguration (401-shaped: "the key looks wrong or missing") like every other provider.
+        raise ProviderError("no Anthropic key", provider="Anthropic", status=401, retryable=False)
     import anthropic
     client = anthropic.Anthropic(api_key=key)
     return [m.id for m in client.models.list(limit=limit).data]

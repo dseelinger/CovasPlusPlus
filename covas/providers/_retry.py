@@ -18,6 +18,12 @@ Scope + boundaries:
 The app consumes two things after a provider gives up: :func:`is_degraded_error` (should the
 Commander hear an in-character "service is overloaded" line?) and :func:`degraded_reason` (the
 precise line to log). Both are provider-agnostic.
+
+A THIRD, distinct outcome (issue #108): a non-transient failure whose status says the request
+itself was broken — a bad/missing key, a nonexistent model, a validation error — is not a "bad
+minute" (retrying it is pointless, `run_with_retry` already fails it fast) but IS the Commander's
+to fix. :func:`is_config_error` classifies that case and :func:`config_hint` names the likely knob
+(key vs. model), so the app can speak a "check your settings" heads-up instead of staying silent.
 """
 from __future__ import annotations
 
@@ -30,6 +36,12 @@ from typing import Callable, Optional, TypeVar
 # 529 "Overloaded". Everything else — 400/401/403/404 and other 4xx auth/validation errors —
 # fails fast (retrying a bad key or a nonexistent model just wastes the Commander's time).
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 529})
+
+# HTTP statuses that mean the REQUEST itself is broken — a bad/missing key, a nonexistent model, or
+# an invalid request body — as opposed to a server having a bad minute. These fail fast (above) AND
+# are user-fixable, so they earn a spoken "check your settings" heads-up instead of the silent
+# cue+log fallback (issue #108).
+CONFIG_STATUS = frozenset({400, 401, 403, 404, 422})
 
 T = TypeVar("T")
 
@@ -226,6 +238,33 @@ def is_degraded_error(err: BaseException) -> bool:
     if isinstance(err, ProviderError):
         return err.retryable
     return _is_transient(err)
+
+
+def is_config_error(err: BaseException) -> bool:
+    """Should the Commander hear a 'check your settings' heads-up for this error (issue #108)? True
+    for a fail-fast :class:`ProviderError` (retryable=False) whose status is a config-shaped 4xx, or
+    for a raw exception carrying that same status (e.g. the Anthropic SDK's ``APIStatusError``).
+
+    Deliberately narrow: an UNCLASSIFIED exception (no status at all — a tool bug, a code crash)
+    returns False here, same as it does for :func:`is_degraded_error`, so it keeps today's silent
+    cue+log behaviour instead of misdiagnosing a bug as a settings problem."""
+    if isinstance(err, ProviderError):
+        return (not err.retryable) and (err.status in CONFIG_STATUS)
+    status = _status_of(err)  # catches the Anthropic SDK's APIStatusError.status_code
+    return status in CONFIG_STATUS
+
+
+def config_hint(err: BaseException) -> str:
+    """Plain-language pointer to which setting is likely wrong, keyed off the HTTP status: 401/403
+    -> the API key, 404 -> the model id, 400/422 -> a generic model/parameter nudge. Used to build
+    the spoken misconfiguration line (issue #108); callers should only call this after
+    :func:`is_config_error` returns True."""
+    status = err.status if isinstance(err, ProviderError) else _status_of(err)
+    if status in (401, 403):
+        return "the API key looks wrong or missing"
+    if status == 404:
+        return "the model name looks wrong"
+    return "the model or request settings look wrong"
 
 
 def retry_event(provider: str, attempt: int, attempts: int, delay: float,

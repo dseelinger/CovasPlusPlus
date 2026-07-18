@@ -706,6 +706,109 @@ def test_degraded_line_degrades_to_log_in_text_only(tmp_path):
     assert app.state == "Idle" and app.history == []
 
 
+# --- LLM misconfiguration voice (issue #108) -------------------------------------------
+# A NON-transient, user-fixable failure (bad model/key/endpoint) is the one silence-is-worst case:
+# the app is useless without an LLM and the fix is entirely the Commander's. Distinct from #97's
+# transient/"overloaded" branch above — retrying a bad key or model just wastes time, so these fail
+# fast (ProviderError(retryable=False)) and speak a different, "check your settings" line instead.
+
+class _MisconfigLLM:
+    """stream_reply raises a fail-fast ProviderError — a bad model id (404), matching what the raw
+    providers now raise from their non-retryable connect branch (issue #108)."""
+
+    def stream_reply(self, messages, cancel, on_event,
+                     tool_handler=None, tools=None, model=None, max_tokens=None):
+        raise ProviderError("Gemini LLM 404: model not found", provider="Gemini",
+                            status=404, retryable=False)
+        yield ("text", "")  # unreachable — keeps this a generator like the real provider
+
+
+class _BadKeyLLM:
+    """stream_reply raises a fail-fast 401 — a wrong/missing API key."""
+
+    def stream_reply(self, messages, cancel, on_event,
+                     tool_handler=None, tools=None, model=None, max_tokens=None):
+        raise ProviderError("OpenAI LLM 401: invalid_api_key", provider="OpenAI",
+                            status=401, retryable=False)
+        yield ("text", "")  # unreachable
+
+
+def test_config_error_speaks_named_misconfig_line_no_orphan(tmp_path):
+    """On a classified misconfiguration the Commander hears a short, provider-named 'check your
+    settings' line (not a raw error), the turn returns to Idle, and history is left clean."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=_MisconfigLLM(), tts=FakeTTS())
+    app._run_turn("what's the latest ED news?", threading.Event())
+    assert app.history == []                                # atomic commit never happened
+    assert app.state == "Idle"
+    assert app.tts.spoken, "a misconfigured provider must still say something"
+    said = app.tts.spoken[0].lower()
+    # Provider name comes from the ACTIVE config (like _speak_degraded), not the error object —
+    # this app's default config is the Anthropic provider ("Claude").
+    assert "claude" in said and "settings" in said           # provider named, points at settings
+    assert "model" in said                                   # 404 -> the model-id hint
+
+
+def test_config_error_401_names_the_key_as_the_fix(tmp_path):
+    """A 401/403 status names the API KEY as the likely fix, not the model."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=_BadKeyLLM(), tts=FakeTTS())
+    app._run_turn("what's the latest ED news?", threading.Event())
+    said = app.tts.spoken[0].lower()
+    assert "key" in said
+
+
+def test_config_error_fires_every_failed_turn_no_rate_limit(tmp_path):
+    """Per the design decision, the misconfig line is NOT rate-limited — each failed turn was a
+    deliberate PTT that got no answer, so it speaks again next time too."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=_MisconfigLLM(), tts=FakeTTS())
+    app._run_turn("first question", threading.Event())
+    app._run_turn("second question", threading.Event())
+    assert len(app.tts.spoken) == 2
+
+
+def test_config_error_does_not_speak_degraded_overloaded_line(tmp_path):
+    """The two spoken branches are mutually exclusive: a config error must NOT say 'overloaded'."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=_MisconfigLLM(), tts=FakeTTS())
+    app._run_turn("what's the latest ED news?", threading.Event())
+    assert "overloaded" not in app.tts.spoken[0].lower()
+
+
+def test_transient_error_does_not_speak_misconfig_line(tmp_path):
+    """The reverse: a transient/exhausted-retry error stays on the #97 'overloaded' branch and must
+    NOT say 'settings' — the two branches never cross."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=_DegradedLLM(), tts=FakeTTS())
+    app._run_turn("what's the latest ED news?", threading.Event())
+    assert "settings" not in app.tts.spoken[0].lower()
+
+
+def test_unknown_error_does_not_speak_misconfig_line(tmp_path):
+    """An unclassified exception (no status at all — a tool bug, a code crash) keeps the OLD silent
+    cue+log behavior: misdiagnosing a bug as 'check your settings' would send the Commander on a
+    wild goose chase."""
+    app = _make_app(tmp_path, stt=FakeSTT(text="hi"), llm=_RaisingLLM(), tts=FakeTTS())
+    app._process(object(), threading.Event())
+    assert app.tts.spoken == []
+    assert app.state == "Idle"
+
+
+def test_config_error_degrades_to_log_in_text_only(tmp_path):
+    """Fail-soft: with no TTS (text-only) the misconfig message must not be spoken or crash — it
+    degrades to a logged line, never silent."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=_MisconfigLLM(), tts=FakeTTS())
+    app.text_only = True
+    app._run_turn("what's the latest ED news?", threading.Event())  # must not raise
+    assert app.tts.spoken == []                            # nothing voiced in text-only
+    assert app.state == "Idle" and app.history == []
+
+
+def test_speak_config_errors_setting_false_suppresses_the_line(tmp_path):
+    """`[llm].speak_config_errors = false` opts out of the spoken line (default stays on)."""
+    app = _make_app(tmp_path, stt=FakeSTT(), llm=_MisconfigLLM(), tts=FakeTTS())
+    app.cfg["llm"] = {"speak_config_errors": False}
+    app._run_turn("what's the latest ED news?", threading.Event())
+    assert app.tts.spoken == []
+    assert app.state == "Idle" and app.history == []
+
+
 # --- latency watchdog (issue #97) -----------------------------------------------------
 
 def test_latency_watchdog_speaks_interim_when_slow(tmp_path):

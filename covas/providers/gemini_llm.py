@@ -21,7 +21,9 @@ Differences from the OpenAI path this provider handles:
 Tiering comes from the router foundation (#11): the per-turn model is `[gemini].tiers.{cheap,standard,
 premium}` (Flash-Lite cheap/default, 3.5 Flash for depth). Usage is costed via the shared `[pricing]` table.
 Key: `[gemini].api_key_file` (DPAPI-encrypted, file-only). Cloud, so in-game is fine.
-Fail soft: a request error raises a clear RuntimeError the app guards, degrading the turn to text.
+Fail soft: a request error raises a structured `ProviderError` the app guards, degrading the turn to
+text (and, for a non-transient misconfiguration — bad key/model/request, issue #108 — speaking a
+heads-up).
 """
 from __future__ import annotations
 
@@ -32,7 +34,7 @@ from typing import Iterator, Optional
 import requests
 
 from ..llm import build_system, estimate_cost
-from ._retry import (RetryPolicy, TransientError, is_retryable_status,
+from ._retry import (ProviderError, RetryPolicy, TransientError, is_retryable_status,
                      parse_retry_after, retry_event, run_with_retry)
 from .base import OnEvent, ToolHandler
 
@@ -62,9 +64,11 @@ class GeminiLLM:
         from ..firstrun import gemini_key
         key = gemini_key(self._cfg)
         if not key:
-            raise RuntimeError(
-                "Gemini LLM selected but no key found (add it in Settings, or to [gemini].api_key_file)."
-            )
+            # Structured, 401-shaped (issue #108): a missing key is a misconfiguration exactly like
+            # a rejected one, so it earns the same spoken "check your settings" heads-up.
+            raise ProviderError(
+                "Gemini LLM selected but no key found (add it in Settings, or to [gemini].api_key_file).",
+                provider="Gemini", status=401, retryable=False)
         return key
 
     def list_models(self, *, timeout=(5, 15)) -> list[str]:  # noqa: ANN001
@@ -259,7 +263,8 @@ def _stream_generate(base_url: str, model: str, key: str, body: dict, cancel: th
     Retry (issue #97) wraps the CONNECT only: a 429/5xx/503 or a connection/timeout backs off
     (honoring Retry-After) and re-tries per `policy`; a 4xx (bad key, 404 model) fails fast. A
     mid-stream drop is NOT retried — it propagates and the turn falls soft. A non-retryable non-200
-    raises the same RuntimeError the app already guards."""
+    raises a structured `ProviderError` (status intact) so the app's misconfiguration voice branch
+    (issue #108) can classify it — never a bare RuntimeError."""
     url = f"{base_url}/models/{model}:streamGenerateContent?alt=sse"
     headers = {"x-goog-api-key": key, "Content-Type": "application/json", "User-Agent": _USER_AGENT}
     policy = policy or RetryPolicy()
@@ -278,7 +283,7 @@ def _stream_generate(base_url: str, model: str, key: str, body: dict, cancel: th
             _close(r)
             if retryable:
                 raise TransientError(detail, status=r.status_code, retry_after=ra, provider="Gemini")
-            raise RuntimeError(detail)
+            raise ProviderError(detail, provider="Gemini", status=r.status_code, retryable=False)
         return r
 
     with run_with_retry(_connect, cancel, policy, provider="Gemini", on_retry=on_retry) as r:

@@ -16,7 +16,9 @@ Tiering is provided by the router foundation (#11): the per-turn `model` comes f
 `reasoning_content` delta route it to `on_event("thinking", …)`, kept OUT of the spoken text. Usage
 is costed via the shared `[pricing]` table (`llm.estimate_cost`). No web-search tool (the OpenAI
 chat/completions API has none — that stays an Anthropic-only capability). Fail soft: a request error
-raises a clear RuntimeError the app already guards, degrading the turn to text, never crashing.
+raises a structured `ProviderError` the app already guards, degrading the turn to text (and, for a
+non-transient misconfiguration — bad key/model/request, issue #108 — speaking a heads-up) — never
+crashing.
 
 Key: `[openai].api_key_file` (DPAPI-encrypted; shared with the OpenAI TTS provider, #16).
 """
@@ -29,7 +31,7 @@ from typing import Iterator, Optional
 import requests
 
 from ..llm import build_system, estimate_cost
-from ._retry import (RetryPolicy, TransientError, is_retryable_status,
+from ._retry import (ProviderError, RetryPolicy, TransientError, is_retryable_status,
                      parse_retry_after, retry_event, run_with_retry)
 from .base import OnEvent, ToolHandler
 
@@ -54,9 +56,11 @@ class OpenAILLM:
         from ..firstrun import openai_key
         key = openai_key(self._cfg)
         if not key:
-            raise RuntimeError(
-                "OpenAI LLM selected but no key found (add it in Settings, or to [openai].api_key_file)."
-            )
+            # Structured, 401-shaped (issue #108): a missing key is a misconfiguration exactly like
+            # a rejected one, so it earns the same spoken "check your settings" heads-up.
+            raise ProviderError(
+                "OpenAI LLM selected but no key found (add it in Settings, or to [openai].api_key_file).",
+                provider="OpenAI", status=401, retryable=False)
         return key
 
     def _messages(self, messages: list[dict]) -> list[dict]:
@@ -266,7 +270,8 @@ def _stream_chat(base_url: str, key: str, body: dict, cancel: threading.Event,
     Retry (issue #97) wraps the CONNECT only: a 429/5xx/529 or a connection/timeout on the initial
     request backs off (honoring Retry-After) and re-tries per `policy`; a 4xx (bad key, 404 model)
     fails fast. Once bytes stream, a mid-stream drop is NOT retried — it propagates and the turn
-    falls soft. A non-retryable non-200 raises the same RuntimeError the app already guards."""
+    falls soft. A non-retryable non-200 raises a structured `ProviderError` (status intact) so the
+    app's misconfiguration voice branch (issue #108) can classify it — never a bare RuntimeError."""
     url = f"{base_url}/chat/completions"
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json",
                "User-Agent": _USER_AGENT}
@@ -281,7 +286,7 @@ def _stream_chat(base_url: str, key: str, body: dict, cancel: threading.Event,
             _close(r)
             if retryable:
                 raise TransientError(detail, status=r.status_code, retry_after=ra, provider="OpenAI")
-            raise RuntimeError(detail)
+            raise ProviderError(detail, provider="OpenAI", status=r.status_code, retryable=False)
         return r
 
     with run_with_retry(_connect, cancel, policy, provider="OpenAI", on_retry=on_retry) as r:

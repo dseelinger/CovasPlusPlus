@@ -277,6 +277,14 @@ SCHEMA: list[Setting] = [
             default="auto", options=OPTIMIZATION_LEVELS,
             phrasings=("optimization level", "tool level", "capability level"),
             example="set the optimization level to minimal"),
+    Setting("llm.speak_config_errors", ("llm", "speak_config_errors"), "bool",
+            "Speak misconfiguration heads-up", "Language model",
+            "When the LLM fails because of a bad model id, a wrong/missing API key, or a bad "
+            "request (persistent, user-fixable — not a transient blip), speak a short "
+            "\"check the AI settings\" line naming the likely fix on every failed turn. Off = keep "
+            "the old silent cue+log-only behavior for these.",
+            default=True, phrasings=("speak config errors", "misconfiguration warning"),
+            example="turn off the misconfiguration warning"),
     Setting("llm.custom_tpm", ("llm", "custom_tpm"), "int",
             "Custom endpoint tokens/min", "Language model",
             "Tokens-per-minute for a CUSTOM/unknown LLM endpoint, used only in 'auto' mode to "

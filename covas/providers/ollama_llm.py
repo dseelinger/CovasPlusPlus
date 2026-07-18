@@ -23,7 +23,7 @@ from typing import Iterator, Optional
 import requests
 
 from ..llm import build_system
-from ._retry import (RetryPolicy, TransientError, is_retryable_status,
+from ._retry import (ProviderError, RetryPolicy, TransientError, is_retryable_status,
                      parse_retry_after, retry_event, run_with_retry)
 from .base import OnEvent, ToolHandler
 
@@ -102,7 +102,9 @@ class OllamaLLM:
                     pass
                 if retryable:
                     raise TransientError(detail, status=r.status_code, retry_after=ra, provider="Ollama")
-                raise RuntimeError(detail)
+                # Structured ProviderError (issue #108), not a bare RuntimeError, so the app's
+                # misconfiguration voice branch can classify a bad model id from status alone.
+                raise ProviderError(detail, provider="Ollama", status=r.status_code, retryable=False)
             return r
 
         try:

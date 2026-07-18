@@ -1200,6 +1200,11 @@ custom_tpm = 0
 # "the AI service is being slow, I'm still trying" line in the CURRENT voice so you're not left in
 # silence. It's a heads-up, not a failure: if the reply then lands, it follows normally. 0 disables.
 slow_warning_seconds = 30
+# Misconfiguration heads-up (issue #108): a bad model id (404), a wrong/missing API key (401/403),
+# or a bad request (400/422) — persistent, user-fixable errors that retry won't help — speak a short
+# "I can't reach <provider>, check the AI settings" line naming the likely fix (key vs. model) on
+# EVERY failed turn, not just once. false = keep the old silent cue+log-only behavior for these.
+speak_config_errors = true
 
 # Transient-error retry (issue #97). A cloud LLM has bad minutes (Anthropic 529 "Overloaded",
 # OpenAI/Groq 429s, Gemini 503s, connection blips). Instead of dying on one, COVAS retries the

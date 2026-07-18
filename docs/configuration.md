@@ -557,6 +557,7 @@ See [Companion HUD](using/hud.md). **Off by default.**
 |---------|---------|--------------|
 | `llm.provider` | `anthropic` | `anthropic` (cloud, Claude), `openai` (any OpenAI-compatible cloud — OpenAI/Groq/DeepSeek/OpenRouter), `gemini` (Google Gemini native — function calling + Search grounding), or `ollama` (local, out-of-game only) |
 | `llm.slow_warning_seconds` | `30` | If a turn goes this long with no spoken reply (slow provider, retry/backoff, hung connection), COVAS speaks a plain-language "the AI service is being slow, still trying" heads-up in the **current voice**. `0` disables it |
+| `llm.speak_config_errors` | `true` | On a **misconfiguration** (bad model id, wrong/missing API key, bad endpoint), speak a short "I can't reach `<provider>` — check the AI settings" heads-up naming the likely fix, on **every** failed turn. `false` = keep the old silent cue+log-only behavior for these |
 | `llm.retry.enabled` | `true` | Retry transient provider errors (overload/rate-limit/5xx, connection/timeout) with backoff before giving up. `false` = a single try, no retry |
 | `llm.retry.attempts` | `4` | Total tries per request (1 initial + up to 3 retries) |
 | `llm.retry.base_delay` / `.max_delay` | `0.5` / `4.0` | First backoff (seconds) and per-sleep ceiling; the delay grows ×2 each retry (0.5, 1, 2, 4…) |
@@ -623,6 +624,17 @@ See [Companion HUD](using/hud.md). **Off by default.**
 > giving up`) — never a cryptic stack trace. Both spoken lines route through your **current voice**
 > and degrade to a text/log line when TTS is unavailable. The behavior is shared across every LLM
 > provider (the Anthropic SDK's own retries are driven from these same knobs).
+>
+> **Misconfiguration heads-up (`llm.speak_config_errors`).** The fail-fast errors above (bad key,
+> bad model, bad request) are a *different* failure mode from an overload: they won't fix themselves
+> on retry, and only **you** can fix them (in Settings). COVAS treats that as the one case where
+> silence is worst — it speaks *"I can't reach `<provider>`, Commander — the API key looks wrong or
+> missing. Check the AI settings."* (or *"the model name looks wrong"* for a 404) on **every** failed
+> turn, not just once, since each failed turn was a deliberate push-to-talk that got no answer. The
+> log always records the precise status/reason regardless. An **unrelated** error (a tool bug, an
+> unexpected crash) is deliberately left OUT of this — only a classified provider status triggers the
+> line, so a code bug never gets misdiagnosed as a settings problem. Set `llm.speak_config_errors =
+> false` to silence just this line (the cue + log still fire).
 
 > **Provider suitability — what limits COVAS actually needs.** COVAS is a *tool-heavy, session-length*
 > workload: it sends a large tool set (**~10K tokens per turn**, growing with history) and runs many
