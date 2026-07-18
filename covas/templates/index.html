@@ -1,17 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{{ theme }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>COVAS++ Control Panel</title>
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root{
-    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
-    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff;
-  }
   *{box-sizing:border-box}
   body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
-  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,#12181f,#0a0d12)}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,var(--header-grad-1),var(--bg))}
   header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
   header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
   .wrap{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px;max-width:1200px}
@@ -19,7 +16,7 @@
   .card h2{margin:0 0 12px;font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
   .row{display:flex;align-items:center;justify-content:space-between;margin:10px 0;gap:10px}
   .row label{color:var(--muted);font-size:13px}
-  select{background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:5px;padding:6px 8px;font-family:inherit;min-width:180px}
+  select{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);border-radius:5px;padding:6px 8px;font-family:inherit;min-width:180px}
   /* Voice list + its type-to-filter box, stacked so the filter spans the row (issue #26). */
   .voicerow{flex-direction:column;align-items:stretch;gap:6px}
   .voicerow .voicehead{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -27,7 +24,7 @@
   .voicesearch{background:transparent;color:var(--muted);border:1px solid var(--edge);border-radius:5px;
        padding:5px 9px;font-family:inherit;font-size:13px;cursor:pointer;flex:0 0 auto}
   .voicesearch:hover{color:var(--text);border-color:var(--accent2)}
-  input.voicefilter{background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:5px;
+  input.voicefilter{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);border-radius:5px;
        padding:6px 8px;font-family:inherit;font-size:12px;width:100%}
   /* #86: provider quick-block header — names the ACTIVE provider the block reflects. */
   .pblock .phead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
@@ -35,74 +32,74 @@
   .pblock .phead .pname{color:var(--accent2);font-weight:bold}
   .pblock .phead a{color:var(--muted);text-decoration:none;font-size:11px}
   .pblock .phead a:hover{color:var(--accent2)}
-  .pblock input[type=text],.pblock input[type=number]{background:#0c1119;color:var(--text);
+  .pblock input[type=text],.pblock input[type=number]{background:var(--panel-inset);color:var(--text);
        border:1px solid var(--edge);border-radius:5px;padding:6px 8px;font-family:inherit;
        font-size:13px;min-width:180px}
   .pblock input[disabled]{color:var(--muted);opacity:.8}
   .status{display:flex;align-items:center;gap:14px;margin-left:auto}
-  .dot{width:16px;height:16px;border-radius:50%;background:#444;box-shadow:0 0 0 rgba(0,0,0,0)}
+  .dot{width:16px;height:16px;border-radius:50%;background:var(--dot-idle);box-shadow:0 0 0 rgba(0,0,0,0)}
   .state-name{font-size:16px;letter-spacing:2px;min-width:170px}
-  .toggle{position:relative;width:52px;height:26px;background:#222c38;border-radius:20px;cursor:pointer;border:1px solid var(--edge);transition:.15s}
+  .toggle{position:relative;width:52px;height:26px;background:var(--toggle-off);border-radius:20px;cursor:pointer;border:1px solid var(--edge);transition:.15s}
   .toggle.on{background:var(--accent)}
-  .toggle .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#e8eef6;transition:.15s}
+  .toggle .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--knob);transition:.15s}
   .toggle.on .knob{left:28px}
-  button.cancel{width:100%;margin-top:8px;padding:12px;background:#3a1414;color:#ff9d9d;border:1px solid #7a2a2a;border-radius:6px;font-family:inherit;letter-spacing:2px;cursor:pointer;font-size:14px}
-  button.cancel:hover{background:#521a1a}
-  .log{height:62vh;overflow-y:auto;background:#080b10;border:1px solid var(--edge);border-radius:6px;padding:10px;font-size:13px;line-height:1.5;
+  button.cancel{width:100%;margin-top:8px;padding:12px;background:var(--danger-bg);color:var(--danger-text);border:1px solid var(--danger-edge);border-radius:6px;font-family:inherit;letter-spacing:2px;cursor:pointer;font-size:14px}
+  button.cancel:hover{background:var(--danger-bg-hover)}
+  .log{height:62vh;overflow-y:auto;background:var(--log-bg);border:1px solid var(--edge);border-radius:6px;padding:10px;font-size:13px;line-height:1.5;
        -webkit-user-select:text;user-select:text;cursor:text}
   /* Make selection clearly visible on the dark log, and force it on in the packaged webview. */
-  .log ::selection{background:#2a4a6a;color:#fff}
+  .log ::selection{background:var(--sel-bg);color:var(--sel-fg)}
   .log .line{position:relative;margin:2px 0;white-space:pre-wrap;word-break:break-word;padding-right:26px}
-  .log .ts{color:#4a5666}
+  .log .ts{color:var(--ts)}
   /* Per-line copy affordance, revealed on hover. user-select:none keeps its glyph out of a manual
      text selection so a dragged selection stays clean. */
   .linecopy{position:absolute;top:0;right:0;display:none;padding:1px 5px;font-size:11px;line-height:1.4;
-       background:#12202c;color:var(--accent2);border:1px solid var(--edge);border-radius:4px;cursor:pointer;
+       background:var(--btn-bg);color:var(--accent2);border:1px solid var(--edge);border-radius:4px;cursor:pointer;
        font-family:inherit;-webkit-user-select:none;user-select:none}
   .log .line:hover .linecopy{display:inline-block}
-  .linecopy:hover{background:#162836}
+  .linecopy:hover{background:var(--btn-hover)}
   .who-Commander{color:var(--accent2)} .who-COVAS{color:var(--accent)} .who-system{color:var(--muted);font-style:italic}
-  .who-thinking{color:#ffb020;font-style:italic}
-  .ev-status{color:#8aa0b8} .ev-status b{color:#fff}
+  .who-thinking{color:var(--thinking);font-style:italic}
+  .ev-status{color:var(--ev-status)} .ev-status b{color:var(--text-strong)}
   .keys{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.7}
-  .keys kbd{background:#0c1119;border:1px solid var(--edge);border-radius:4px;padding:1px 6px;color:var(--text)}
-  .err{color:#ff9d9d}
+  .keys kbd{background:var(--panel-inset);border:1px solid var(--edge);border-radius:4px;padding:1px 6px;color:var(--text)}
+  .err{color:var(--err)}
   .leftcol{display:flex;flex-direction:column;gap:16px}
   input[type=range]{flex:1;min-width:120px;accent-color:var(--accent)}
   .speedval{color:var(--text);font-size:13px;min-width:34px;text-align:right}
   .pv{color:var(--muted);font-size:12px;font-style:italic;line-height:1.5;margin:2px 0 8px;
       border-left:2px solid var(--edge);padding-left:10px;min-height:1em}
-  .pbox{width:100%;background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:6px;
+  .pbox{width:100%;background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);border-radius:6px;
         padding:8px;font-family:inherit;font-size:12px;line-height:1.5;resize:vertical}
   #personaBody{height:90px} #campaign{height:110px}
   .plabel{display:block;color:var(--muted);font-size:12px;margin:12px 0 4px}
   .prow{display:flex;align-items:center;gap:10px;margin-top:8px}
-  .prow button{padding:7px 12px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+  .prow button{padding:7px 12px;background:var(--btn-bg);color:var(--accent2);border:1px solid var(--edge);
         border-radius:6px;font-family:inherit;font-size:12px;letter-spacing:1px;cursor:pointer}
-  .prow button:hover{background:#162836}
-  .pmsg{color:var(--ok,#39d353);font-size:12px}
+  .prow button:hover{background:var(--btn-hover)}
+  .pmsg{color:var(--ok);font-size:12px}
   /* Typed-prompt row (issue #76): a text box + a paper-airplane send, above the live log. */
   .promptrow{display:flex;gap:8px;margin-bottom:10px}
-  .promptrow input{flex:1;background:#0c1119;color:var(--text);border:1px solid var(--edge);
+  .promptrow input{flex:1;background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);
         border-radius:6px;padding:9px 10px;font-family:inherit;font-size:13px}
   .promptrow input:focus{outline:none;border-color:var(--accent)}
-  .promptrow button{padding:9px 14px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+  .promptrow button{padding:9px 14px;background:var(--btn-bg);color:var(--accent2);border:1px solid var(--edge);
         border-radius:6px;font-family:inherit;font-size:15px;cursor:pointer;line-height:1}
-  .promptrow button:hover{background:#162836}
+  .promptrow button:hover{background:var(--btn-hover)}
   .promptrow button:disabled{opacity:.5;cursor:default}
   .logfilter{float:right;font-size:11px;letter-spacing:1px;font-weight:normal}
   .logfilter a{color:var(--muted);cursor:pointer;text-transform:none}
   .logfilter a.active{color:var(--accent)}
   .log.conv-only .line:not(.conv){display:none}
   .banner{display:none;align-items:center;gap:14px;padding:10px 20px;
-      background:linear-gradient(90deg,#1a2a12,#0a0d12);border-bottom:1px solid var(--edge);
-      color:#c9e8a8;font-size:13px;letter-spacing:1px}
+      background:linear-gradient(90deg,var(--banner-grad-1),var(--bg));border-bottom:1px solid var(--edge);
+      color:var(--banner-text);font-size:13px;letter-spacing:1px}
   .banner.show{display:flex}
-  .banner b{color:#8fe06a}
-  .banner button{margin-left:auto;padding:7px 14px;background:#12202c;color:var(--accent2);
+  .banner b{color:var(--banner-strong)}
+  .banner button{margin-left:auto;padding:7px 14px;background:var(--btn-bg);color:var(--accent2);
       border:1px solid var(--edge);border-radius:6px;font-family:inherit;font-size:12px;
       letter-spacing:1px;cursor:pointer}
-  .banner button:hover{background:#162836}
+  .banner button:hover{background:var(--btn-hover)}
   .banner button:disabled{opacity:.5;cursor:default}
   .banner .dismiss{background:none;border:none;color:var(--muted);margin-left:8px;padding:7px 4px}
   /* #78: small, muted, always-on version tag — fixed corner so it never intrudes on layout. */
@@ -112,17 +109,17 @@
      scroll with its content; .logwrap (not .log, which scrolls) is the positioning parent. */
   .logwrap{position:relative}
   .jumpLatest{display:none;position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
-      padding:6px 14px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+      padding:6px 14px;background:var(--btn-bg);color:var(--accent2);border:1px solid var(--edge);
       border-radius:20px;font-family:inherit;font-size:12px;letter-spacing:1px;cursor:pointer;
       box-shadow:0 2px 10px rgba(0,0,0,.5)}
-  .jumpLatest:hover{background:#162836}
+  .jumpLatest:hover{background:var(--btn-hover)}
   .jumpLatest.show{display:block}
   /* #75: portable selection context menu (packaged PyWebView/WebView2 suppresses the native one). */
   .selmenu{display:none;position:fixed;z-index:1000;background:var(--panel);border:1px solid var(--edge);
       border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.5);padding:4px;min-width:100px}
   .selmenu button{display:block;width:100%;padding:6px 14px;background:none;border:none;
       color:var(--text);font-family:inherit;font-size:13px;text-align:left;cursor:pointer;border-radius:4px}
-  .selmenu button:hover{background:#1c2733}
+  .selmenu button:hover{background:var(--menu-hover)}
 </style>
 </head>
 <body>
@@ -193,14 +190,21 @@
 <div class="selmenu" id="selMenu"><button type="button" id="selMenuCopy">Copy</button></div>
 
 <script>
-const STATE_COLORS = {
-  Idle:"#556", Listening:"#39d353", Transcribing:"#00b4ff",
-  Thinking:"#ffb020", Searching:"#20d0d0", Speaking:"#ff5cf0"
+// Status-dot colours live in theme.css as var(--state-*) so each theme can retune them. Resolve
+// the ACTIVE theme's value at call time (getComputedStyle), so a live theme switch recolours the
+// dot on the next status tick without a reload.
+const STATE_VARS = {
+  Idle:"--state-idle", Listening:"--state-listening", Transcribing:"--state-transcribing",
+  Thinking:"--state-thinking", Searching:"--state-searching", Speaking:"--state-speaking"
 };
+function stateColor(state){
+  const name = STATE_VARS[state] || "--state-idle";
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#8895a4";
+}
 const $ = id => document.getElementById(id);
 
 function setStatus(state, extra){
-  const c = STATE_COLORS[state] || "#556";
+  const c = stateColor(state);
   const dot = $("dot");
   dot.style.background = c;
   dot.style.boxShadow = "0 0 12px " + c;

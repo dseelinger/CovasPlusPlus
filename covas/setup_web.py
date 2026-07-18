@@ -48,7 +48,10 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
     @app.route("/")
     @app.route("/setup")
     def setup_page():
-        return render_template("setup.html", finish_message=finish_message)
+        # Server-render the chosen theme so the wizard opens in the right palette with no flash
+        # (issue #104); defaults to dark on a fresh install where [ui].theme isn't set yet.
+        theme = cfg.get("ui", {}).get("theme", "dark")
+        return render_template("setup.html", finish_message=finish_message, theme=theme)
 
     @app.route("/api/setup/status")
     def status():

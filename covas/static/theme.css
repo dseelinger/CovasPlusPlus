@@ -1,0 +1,230 @@
+/* COVAS++ control-panel theme tokens (issue #104).
+ *
+ * SINGLE SOURCE OF TRUTH for every colour in the control-panel templates. Each template links
+ * this file and draws its colours from these custom properties via var(--token); no template
+ * hardcodes a hex literal any more (the search-highlight fallback and drop-shadows aside).
+ *
+ * A theme is one token-override block, chosen by `data-theme` on <html> (server-rendered at
+ * request time from `ui.theme`, so the correct palette is present on first paint — no flash).
+ *   - dark  = the historical baseline; its values are byte-for-byte the old inline :root, so the
+ *             Dark UI is pixel-identical to before this file existed.
+ *   - light = light surfaces, dark text; accents darkened to keep WCAG AA on body text.
+ *   - elite = the game's cockpit HUD: near-black warm ground, ED-orange #ff7100 primary
+ *             (matches vr_hud.py _ACCENT), cyan secondary, amber-tinted text.
+ *
+ * Dark is also the default `:root` so a page with no data-theme still renders correctly.
+ */
+
+:root,
+:root[data-theme="dark"] {
+  /* Surfaces */
+  --bg: #0a0d12;
+  --panel: #121821;
+  --panel-inset: #0c1119;     /* inputs, selects, textareas, kbd, save/search bars */
+  --log-bg: #080b10;          /* the live-log scroll area */
+  --list-item: #0e141d;       /* crew / macro / memory list rows */
+  --header-grad-1: #12181f;   /* header gradient start; the end stop is --bg */
+  /* Borders / dividers */
+  --edge: #26313f;
+  --divider: #1b2330;         /* hairline between setting rows */
+  /* Text */
+  --text: #d6e2f0;
+  --muted: #7d8ea3;
+  --faint: #5c6b7d;           /* dimmer than muted: reset link, examples */
+  --text-strong: #fff;        /* emphasised text on a surface (ev-status <b>) */
+  --on-accent: #120a04;       /* text/icon drawn ON an accent fill (primary buttons) */
+  /* Accents */
+  --accent: #ff7a1a;
+  --accent-hover: #ff8f3c;    /* explicit hover fill where brightness() isn't used */
+  --accent2: #00b4ff;
+  /* Interactive (secondary buttons, toggles) */
+  --btn-bg: #12202c;
+  --btn-hover: #162836;
+  --menu-hover: #1c2733;      /* portable right-click selection menu hover */
+  --toggle-off: #222c38;
+  --knob: #e8eef6;
+  /* Semantic — success */
+  --ok: #39d353;
+  --ok-bg: #10321a;
+  --ok-edge: #1f6b34;
+  /* Semantic — error / danger */
+  --err: #ff9d9d;
+  --err-bg: #2a1418;          /* "not set" key badge fill */
+  --err-edge: #4a2530;        /* "not set" key badge border */
+  --danger-bg: #3a1414;       /* cancel button / bad toast fill */
+  --danger-bg-hover: #521a1a;
+  --danger-edge: #7a2a2a;
+  --danger-text: #ff9d9d;
+  /* Semantic — warning (amber conflict / off banners) */
+  --warn-bg: #2a2114;
+  --warn-edge: #7a5a2a;
+  --warn-text: #ffce7a;
+  /* Semantic — misc state text */
+  --thinking: #ffb020;        /* "thinking…" speaker + Thinking status */
+  --ev-status: #8aa0b8;       /* the » status lines in the log */
+  /* Update banner (success green) */
+  --banner-grad-1: #1a2a12;   /* banner gradient start; end stop is --bg */
+  --banner-text: #c9e8a8;
+  --banner-strong: #8fe06a;
+  /* Log meta */
+  --ts: #4a5666;              /* per-line timestamp */
+  --dot-idle: #444;           /* status dot before the first state arrives */
+  /* Text selection inside the log */
+  --sel-bg: #2a4a6a;
+  --sel-fg: #fff;
+  /* Settings search-match highlight */
+  --highlight-bg: #ffe066;
+  /* Status-dot colours (index.html STATE_COLORS, resolved from CSS so themes can retune them) */
+  --state-idle: #556;
+  --state-listening: #39d353;
+  --state-transcribing: #00b4ff;
+  --state-thinking: #ffb020;
+  --state-searching: #20d0d0;
+  --state-speaking: #ff5cf0;
+  /* Command-palette overlays / tints (rgba: theme-agnostic veils, not part of the hex grep) */
+  --overlay: rgba(3, 6, 10, .62);
+  --accent2-tint: rgba(0, 180, 255, .16);
+  --veil: rgba(255, 255, 255, .06);
+}
+
+:root[data-theme="light"] {
+  /* Surfaces */
+  --bg: #e9eef4;
+  --panel: #ffffff;
+  --panel-inset: #f1f5f9;
+  --log-bg: #f7f9fc;
+  --list-item: #f4f7fb;
+  --header-grad-1: #ffffff;
+  /* Borders / dividers */
+  --edge: #c3ccd8;
+  --divider: #dde3ec;
+  /* Text — AA on the surfaces above */
+  --text: #16202c;
+  --muted: #55616f;
+  --faint: #7b8794;
+  --text-strong: #000000;
+  --on-accent: #241407;       /* dark text on the orange fill reads far better than white */
+  /* Accents — darkened so headings/links clear AA on light */
+  --accent: #c85e00;
+  --accent-hover: #e06e08;
+  --accent2: #0a72b8;
+  /* Interactive */
+  --btn-bg: #e4ebf3;
+  --btn-hover: #d6e0ec;
+  --menu-hover: #eaf0f7;
+  --toggle-off: #c3ccd8;
+  --knob: #ffffff;
+  /* Success */
+  --ok: #1a7f37;
+  --ok-bg: #dcf3e3;
+  --ok-edge: #9dd3ac;
+  /* Error / danger */
+  --err: #b3261e;
+  --err-bg: #fbe3e1;
+  --err-edge: #e6a9a4;
+  --danger-bg: #fbe3e1;
+  --danger-bg-hover: #f6cdc9;
+  --danger-edge: #e0938c;
+  --danger-text: #b3261e;
+  /* Warning */
+  --warn-bg: #fbf0d8;
+  --warn-edge: #d9b878;
+  --warn-text: #7a5a12;
+  /* Misc state text */
+  --thinking: #b5730a;
+  --ev-status: #55616f;
+  /* Update banner */
+  --banner-grad-1: #e5f2d8;
+  --banner-text: #33501a;
+  --banner-strong: #2f6b12;
+  /* Log meta */
+  --ts: #9aa6b4;
+  --dot-idle: #aab4c0;
+  /* Selection */
+  --sel-bg: #b8d4f0;
+  --sel-fg: #0a1622;
+  /* Search highlight */
+  --highlight-bg: #ffe066;
+  /* Status dots */
+  --state-idle: #8895a4;
+  --state-listening: #1a7f37;
+  --state-transcribing: #0a72b8;
+  --state-thinking: #b5730a;
+  --state-searching: #0a8f8f;
+  --state-speaking: #b81a9c;
+  /* Overlays / tints */
+  --overlay: rgba(20, 28, 40, .35);
+  --accent2-tint: rgba(10, 114, 184, .14);
+  --veil: rgba(0, 0, 0, .05);
+}
+
+:root[data-theme="elite"] {
+  /* Surfaces — near-black, warm */
+  --bg: #050301;
+  --panel: #0d0904;
+  --panel-inset: #080502;
+  --log-bg: #060402;
+  --list-item: #0d0904;
+  --header-grad-1: #140c04;
+  /* Borders / dividers — amber-tinted */
+  --edge: #3a2410;
+  --divider: #26180a;
+  /* Text — amber-tinted, AA on near-black */
+  --text: #ffcf9e;
+  --muted: #c98f52;
+  --faint: #8a6234;
+  --text-strong: #fff4e6;
+  --on-accent: #1a0d00;
+  /* Accents — canonical ED HUD orange + cyan */
+  --accent: #ff7100;
+  --accent-hover: #ff8a2a;
+  --accent2: #28c8ff;
+  /* Interactive */
+  --btn-bg: #1a1006;
+  --btn-hover: #2a1a0a;
+  --menu-hover: #2a1a0a;
+  --toggle-off: #2a1c0e;
+  --knob: #ffce9e;
+  /* Success */
+  --ok: #3ad35a;
+  --ok-bg: #0e2a12;
+  --ok-edge: #1f5a2a;
+  /* Error / danger */
+  --err: #ff8f6a;
+  --err-bg: #2a1408;
+  --err-edge: #5a2e14;
+  --danger-bg: #2e1206;
+  --danger-bg-hover: #3e1a08;
+  --danger-edge: #6a3212;
+  --danger-text: #ff9d7a;
+  /* Warning */
+  --warn-bg: #2a1c08;
+  --warn-edge: #7a5a1a;
+  --warn-text: #ffb84a;
+  /* Misc state text */
+  --thinking: #ffb020;
+  --ev-status: #c98f52;
+  /* Update banner */
+  --banner-grad-1: #1a2208;
+  --banner-text: #cbe09a;
+  --banner-strong: #a8e060;
+  /* Log meta */
+  --ts: #7a5a34;
+  --dot-idle: #6a4a2a;
+  /* Selection */
+  --sel-bg: #5a3410;
+  --sel-fg: #fff4e6;
+  /* Search highlight */
+  --highlight-bg: #ffb020;
+  /* Status dots */
+  --state-idle: #8a6234;
+  --state-listening: #3ad35a;
+  --state-transcribing: #28c8ff;
+  --state-thinking: #ffb020;
+  --state-searching: #28d0d0;
+  --state-speaking: #ff5cf0;
+  /* Overlays / tints */
+  --overlay: rgba(5, 3, 1, .72);
+  --accent2-tint: rgba(40, 200, 255, .16);
+  --veil: rgba(255, 206, 158, .06);
+}

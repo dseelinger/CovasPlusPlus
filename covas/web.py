@@ -106,6 +106,14 @@ def create_app(core) -> Flask:
     sock = Sock(flask_app)
     _catalog_cache: dict = {}  # (source, base_url) -> (expires_at, options, error)
 
+    @flask_app.context_processor
+    def _inject_theme() -> dict:
+        """Stamp the active control-panel theme (ui.theme) into EVERY rendered template so the
+        <html data-theme="…"> is correct on first paint — no flash of the wrong palette (issue
+        #104). Defaults to "dark" when unset. Read live from cfg so a theme switch (applied via
+        the settings path) shows on the next navigation/restart with no flash."""
+        return {"theme": core.cfg.get("ui", {}).get("theme", "dark")}
+
     def _catalog_cached(source: str, base_url):
         """Resolve a catalog source through `catalog.resolve`, throttled by _CATALOG_TTL_S so
         reopening a dropdown doesn't re-hit the provider. Fail-soft: returns (options, error)."""

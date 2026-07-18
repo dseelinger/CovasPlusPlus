@@ -1162,6 +1162,10 @@ vr_yaw_deg = 0.0        # heading in degrees; 0 = straight ahead. Usually set by
 # Local control panel (Phase 3).
 host = "127.0.0.1"
 port = 8765
+# Control-panel colour theme (issue #104): "dark" (default), "light", or "elite" (the game's
+# orange-on-black cockpit HUD look). Applies live from the Settings page (Appearance) or by
+# voice ("switch to the light theme"); no restart.
+theme = "dark"
 
 
 # ============================================================================

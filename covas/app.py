@@ -101,16 +101,20 @@ _LLM_SECTIONS: tuple[str, ...] = ("llm", "anthropic", "openai", "gemini", "ollam
 _TTS_SECTIONS: tuple[str, ...] = (
     "tts", "elevenlabs", "edge", "azure", "openai_tts", "cartesia", "piper")
 
-# The TRUE minimum of settings that ONLY take effect on a RESTART (decision #5), as schema keys:
+# The settings the running VOICE LOOP does not live-reconcile, as schema keys. Most need a RESTART
+# (decision #5); ui.theme is the exception — it's a WEB-ONLY setting the app never has to act on
+# (the control panel applies it live in the browser and server-renders it on the next paint), so
+# from the app's side it's a no-op either way and sits with the other non-reconciled ui.* keys:
 #   audio.enabled / audio.mix_sample_rate — the bus-mixer graph is cross-wired and the shared
 #     output device opened at init/start (see the load-bearing fallback around BusMixer.start);
 #   dev.mock — swaps the whole LLM/TTS/STT set for fakes at the composition root;
-#   ui.host / ui.port — bound by Flask when the control panel launches.
+#   ui.host / ui.port — bound by Flask when the control panel launches;
+#   ui.theme — control-panel colours only (issue #104); no app-side effect, applied live by the UI.
 # Explicitly NOT here (all live): provider/base_url/model/key/voice (rebuild), whisper.* (reload),
 # keys.* + reflex.ptt (hotkey reconcile), audio.input_device (mic reconcile), volumes/toggles
 # (audio.apply_settings), listen.* (listener reconcile).
 RESTART_REQUIRED: frozenset[str] = frozenset({
-    "audio.enabled", "audio.mix_sample_rate", "dev.mock", "ui.host", "ui.port",
+    "audio.enabled", "audio.mix_sample_rate", "dev.mock", "ui.host", "ui.port", "ui.theme",
 })
 # Top-level config sections that apply LIVE. Single source of truth paired with RESTART_REQUIRED:
 # the drift-guard unit test asserts every settings_schema key falls under LIVE_SECTIONS ∪

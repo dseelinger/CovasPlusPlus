@@ -1,23 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{{ theme }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>COVAS++ Settings</title>
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root{
-    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
-    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff; --ok:#39d353; --err:#ff9d9d;
-  }
   *{box-sizing:border-box}
   body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
   a{color:var(--accent2);text-decoration:none} a:hover{text-decoration:underline}
   header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);
-         background:linear-gradient(90deg,#12181f,#0a0d12);position:sticky;top:0;z-index:5}
+         background:linear-gradient(90deg,var(--header-grad-1),var(--bg));position:sticky;top:0;z-index:5}
   header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
   header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
   header .spacer{margin-left:auto}
-  .search{background:#0c1119;color:var(--text);border:1px solid var(--edge);border-radius:6px;
+  .search{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);border-radius:6px;
           padding:8px 12px;font-family:inherit;min-width:240px;font-size:13px}
   .wrap{display:grid;grid-template-columns:200px 1fr;gap:20px;padding:20px;max-width:1200px}
   nav.groups{position:sticky;top:78px;align-self:start;display:flex;flex-direction:column;gap:4px}
@@ -25,7 +22,7 @@
   nav.groups a:hover{color:var(--text);background:var(--panel);text-decoration:none}
   .card{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:8px 20px 16px;margin-bottom:18px}
   .card h2{font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin:14px 0 6px}
-  .setting{padding:14px 0;border-top:1px solid #1b2330}
+  .setting{padding:14px 0;border-top:1px solid var(--divider)}
   .setting:first-of-type{border-top:none}
   .setting.hidden{display:none}
   .setting .top{display:flex;align-items:center;gap:12px}
@@ -33,15 +30,15 @@
   .setting.dirty .label{color:var(--accent)}
   .setting .control{flex:1;display:flex;align-items:center;gap:10px;justify-content:flex-end}
   .setting .help{color:var(--muted);font-size:12px;margin-top:6px;line-height:1.5;max-width:640px}
-  .setting .example{color:#5c6b7d;font-style:italic}
+  .setting .example{color:var(--faint);font-style:italic}
   /* Search-match highlight (issue #95) — readable on the dark panel and on a light theme alike. */
-  mark.hl{background:#ffe066;color:inherit;border-radius:2px;padding:0 1px}
+  mark.hl{background:var(--highlight-bg);color:inherit;border-radius:2px;padding:0 1px}
   .setting .err{color:var(--err);font-size:12px;margin-top:6px;display:none}
   .setting.invalid .err{display:block}
-  .reset{color:#5c6b7d;font-size:11px;letter-spacing:1px;cursor:pointer;visibility:hidden;white-space:nowrap}
+  .reset{color:var(--faint);font-size:11px;letter-spacing:1px;cursor:pointer;visibility:hidden;white-space:nowrap}
   .reset:hover{color:var(--accent2)}
   .setting.overridden .reset{visibility:visible}
-  select,input[type=text],input[type=number],input[type=password]{background:#0c1119;color:var(--text);border:1px solid var(--edge);
+  select,input[type=text],input[type=number],input[type=password]{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);
     border-radius:5px;padding:7px 9px;font-family:inherit;font-size:13px;min-width:200px}
   input[type=number]{min-width:120px;text-align:right}
   /* Compact type-to-filter box that sits beside a voice <select> (issue #26). */
@@ -59,33 +56,33 @@
     padding:6px 10px;font-family:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
   .pickbtn:hover{color:var(--text);border-color:var(--accent2)}
   .unit{color:var(--muted);font-size:12px;min-width:52px}
-  .toggle{position:relative;width:50px;height:26px;background:#222c38;border-radius:20px;cursor:pointer;
+  .toggle{position:relative;width:50px;height:26px;background:var(--toggle-off);border-radius:20px;cursor:pointer;
     border:1px solid var(--edge);transition:.15s;flex:0 0 auto}
   .toggle.on{background:var(--accent)}
-  .toggle .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#e8eef6;transition:.15s}
+  .toggle .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--knob);transition:.15s}
   .toggle.on .knob{left:26px}
   .savebar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;
-    padding:12px 22px;background:#0c1119;border-top:1px solid var(--accent);transform:translateY(120%);transition:.18s}
+    padding:12px 22px;background:var(--panel-inset);border-top:1px solid var(--accent);transform:translateY(120%);transition:.18s}
   .savebar.show{transform:translateY(0)}
   .savebar .count{color:var(--muted);font-size:13px;margin-right:auto}
   .savebar button{padding:10px 20px;border-radius:6px;font-family:inherit;letter-spacing:1px;cursor:pointer;font-size:13px}
-  .btn-save{background:var(--accent);color:#120a04;border:1px solid var(--accent)}
+  .btn-save{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)}
   .btn-save:hover{filter:brightness(1.1)}
   .btn-revert{background:transparent;color:var(--muted);border:1px solid var(--edge)}
   .btn-revert:hover{color:var(--text)}
-  .toast{position:fixed;top:74px;right:20px;background:#10321a;color:var(--ok);border:1px solid #1f6b34;
+  .toast{position:fixed;top:74px;right:20px;background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-edge);
     padding:10px 16px;border-radius:6px;font-size:13px;opacity:0;transform:translateY(-8px);transition:.2s;pointer-events:none;z-index:9}
   .toast.show{opacity:1;transform:translateY(0)}
-  .toast.bad{background:#3a1414;color:var(--err);border-color:#7a2a2a}
+  .toast.bad{background:var(--danger-bg);color:var(--err);border-color:var(--danger-edge)}
   .empty{color:var(--muted);padding:40px;text-align:center}
   .kbadge{font-size:11px;letter-spacing:1px;padding:3px 8px;border-radius:10px;text-transform:uppercase;
-    border:1px solid #4a2530;color:var(--err);background:#2a1418;flex:0 0 auto}
-  .kbadge.on{border-color:#1f6b34;color:var(--ok);background:#10321a}
+    border:1px solid var(--err-edge);color:var(--err);background:var(--err-bg);flex:0 0 auto}
+  .kbadge.on{border-color:var(--ok-edge);color:var(--ok);background:var(--ok-bg)}
   .kbtn{background:transparent;color:var(--muted);border:1px solid var(--edge);border-radius:5px;
     padding:7px 12px;font-family:inherit;font-size:12px;letter-spacing:1px;cursor:pointer}
   .kbtn:hover{color:var(--text);border-color:var(--accent2)}
-  .kbtn.set{color:#120a04;background:var(--accent);border-color:var(--accent)}
-  .kbtn.set:hover{filter:brightness(1.1);color:#120a04}
+  .kbtn.set{color:var(--on-accent);background:var(--accent);border-color:var(--accent)}
+  .kbtn.set:hover{filter:brightness(1.1);color:var(--on-accent)}
   .setting .kmsg{color:var(--muted);font-size:12px;margin-top:6px;min-height:0}
   .setting .kmsg.ok{color:var(--ok)} .setting .kmsg.bad{color:var(--err)}
 </style>
@@ -219,7 +216,13 @@ function buildControl(control, s){
     const selOpts = optionsFor(s);
     for(const o of selOpts) sel.appendChild(new Option(o.label,o.value));
     sel.value = s.value; if(sel.value!==String(s.value)) sel.appendChild(new Option(s.value,s.value)), sel.value=s.value;
-    sel.onchange=()=>edit(s.key, sel.value);
+    sel.onchange=()=>{
+      edit(s.key, sel.value);
+      // The theme (issue #104) applies LIVE on selection: stamp data-theme so the whole page
+      // recolours immediately (a preview). SAVE persists it via /api/settings/update; REVERT/RESET
+      // restores the saved theme through applyThemeFromGroups().
+      if(s.key==="ui.theme") document.documentElement.dataset.theme = sel.value;
+    };
     // Long fetched lists (ElevenLabs voices/models) get the command palette (#94) — a searchable,
     // keyboard-driven, highlighted picker for the long case. The #26 inline type-to-filter box stays
     // too (for voices), so both paths work; the <select> is the current-value display.
@@ -445,6 +448,14 @@ function applyGroups(groups){
   const q = $("search").value;
   render();
   $("search").value = q; filter();
+  applyThemeFromGroups();   // #104: re-sync data-theme to the SAVED value (undo any live preview)
+}
+
+// #104: mirror the saved ui.theme onto <html data-theme> — restores the real theme after a REVERT
+// or a save, undoing any in-progress live preview so the page never disagrees with what's stored.
+function applyThemeFromGroups(){
+  const s = findSetting("ui.theme");
+  if(s && s.value) document.documentElement.dataset.theme = s.value;
 }
 
 function toast(msg, bad){
@@ -601,7 +612,7 @@ async function clearKey(row, msg){
 }
 
 $("saveBtn").onclick=save;
-$("revertBtn").onclick=()=>{ for(const k of Object.keys(EDITS)) delete EDITS[k]; render(); filter(); };
+$("revertBtn").onclick=()=>{ for(const k of Object.keys(EDITS)) delete EDITS[k]; render(); filter(); applyThemeFromGroups(); };
 $("search").oninput=filter;
 load();
 </script>
