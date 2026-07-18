@@ -12,12 +12,12 @@ testpaths = ["tests"]
 addopts = "-q -m 'not integration'"
 markers = [
   "integration: touches a real external service or device; excluded from the default run",
-  "local: free integration deps (Ollama, Piper, Whisper, audio)",
+  "local: free integration deps (Piper, Whisper, audio)",
   "paid: paid APIs (Anthropic, ElevenLabs) — run deliberately, costs money",
 ]
 # Commands:
 #   pytest                              unit only (default; no network, no cost)
-#   pytest -m "integration and local"   free integration (Ollama/Piper/Whisper/audio)
+#   pytest -m "integration and local"   free integration (Piper/Whisper/audio)
 #   pytest -m "integration and paid"    deliberate, costs money (Anthropic/ElevenLabs)
 
 [tool.ruff]

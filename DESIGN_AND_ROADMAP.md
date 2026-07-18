@@ -27,7 +27,7 @@ Priorities agreed: **modular refactor**, **cut API costs** (quick cloud wins *an
 
 ## 2. Design principles
 
-1. **Provider-agnostic core.** The voice loop should know it needs "an LLM reply" and "speech from text," not *which* service produces them. Anthropic, Ollama/Qwen, ElevenLabs, and Piper sit behind small interfaces.
+1. **Provider-agnostic core.** The voice loop should know it needs "an LLM reply" and "speech from text," not *which* service produces them. The cloud LLMs (Anthropic, OpenAI-compatible, Gemini), the cloud voices (ElevenLabs, Edge, Azure, …), and local Piper/Whisper all sit behind small interfaces.
 2. **Policy separate from mechanism.** *How* to call a provider (mechanism) is isolated from *which* provider to use for a given request (policy/router). Cost routing changes only the policy.
 3. **Capabilities as plugins.** Checklist, ED-log monitoring, and keybind automation are self-contained capability modules that register their tools and event handlers with the core, rather than being wired into `app.py`.
 4. **Event bus as the spine.** You already have `EventBus`. Make it the one-way nervous system: inputs (voice, ED journal, timers) publish events; capabilities and the UI subscribe. This is what keeps new features additive.
@@ -154,7 +154,7 @@ Think of it as three layers over the event bus.
 ### 3.1 Provider interfaces
 Three tiny protocols. Each has 1–2 methods; existing code becomes the first implementation of each.
 
-- **`LLMProvider.stream_reply(messages, cfg, cancel, on_event, tool_handler) -> Iterator[(kind, chunk)]`** — exactly today's `llm.stream_reply` signature. `AnthropicLLM` wraps the current file; tiering is a *parameter* to it, chosen by the Router, not a separate provider. **Provider-agnostic (issue #11):** the Router picks a canonical **tier** (cheap/standard/premium) and each provider's own `[<provider>].tiers` map turns that into a model id, so the same policy drives any cloud LLM. Each provider normalizes to the same `("text"|"thinking"|"search"|"tool", data)` event stream (+ a provider-agnostic `usage` dict costed via `llm.estimate_cost`) the app already consumes — see `providers/base.py` for the full contract. **In-game policy:** any *cloud* LLM (Anthropic today; OpenAI #12 / Gemini #13 next) is fine in-game; only *local* models (`OllamaLLM`) stay off the in-game path, because a useful local model competes with ED for the GPU (not an API limitation) — it's for offline/out-of-game use.
+- **`LLMProvider.stream_reply(messages, cfg, cancel, on_event, tool_handler) -> Iterator[(kind, chunk)]`** — exactly today's `llm.stream_reply` signature. `AnthropicLLM` wraps the current file; tiering is a *parameter* to it, chosen by the Router, not a separate provider. **Provider-agnostic (issue #11):** the Router picks a canonical **tier** (cheap/standard/premium) and each provider's own `[<provider>].tiers` map turns that into a model id, so the same policy drives any cloud LLM. Each provider normalizes to the same `("text"|"thinking"|"search"|"tool", data)` event stream (+ a provider-agnostic `usage` dict costed via `llm.estimate_cost`) the app already consumes — see `providers/base.py` for the full contract. **In-game policy:** every LLM provider is a *cloud* one (Anthropic, OpenAI #12, Gemini #13) and is fine in-game — cost is handled by the tiering router, not a local model. There is **no local LLM** (issue #128 removed Ollama), because a useful local model would compete with ED for the GPU.
 - **`TTSProvider.speak(text, cancel)`** and **`.synth_pcm(text) -> bytes`** — today's `tts.py` becomes `ElevenLabsTTS`; `PiperTTS` is new and runs fully local. Both emit the same 16-bit mono PCM the playback path already expects, so `audio`/cancellation code is untouched.
 - **`STTProvider.transcribe(audio) -> str`** — today's `Transcriber` implements it directly. Rarely swapped, but the seam keeps STT symmetric with the others.
 
@@ -220,7 +220,7 @@ COVAS++ ships as a **double-click Windows app**, not a "install Python, run the 
 
 The one real architectural change this forced is the **writable user-data dir**. A read-only install tree can't hold config/keys/logs, so `config.py` now distinguishes two roots: **`app_dir()`** (read-only shipped assets — the bundle dir when frozen) and **`data_dir()`** (writable per-user state — `%APPDATA%\COVAS++` when frozen; downloaded models under `%LOCALAPPDATA%`). A **source run keeps both == the project root**, so dev behavior is byte-for-byte unchanged; a frozen build (`sys.frozen`) relocates writable state via the existing `_PATH_FIELDS` mechanism. Both roots are overridable by `COVAS_APP_DIR`/`COVAS_DATA_DIR` (test seam + parity with `[audio].content_root`). This split is *why* updates can replace only the payload and never clobber user settings.
 
-Supporting pieces: **`covas/__version__.py`** is the single source of truth for the version — read by the update-check and (later) stamped into the build. **Updates are Tier 2** (`covas/updates.py` + a UI banner): on launch it compares against the latest GitHub Release, and on a newer one downloads the installer, launches it, and exits so the running exe can be replaced; the installer touches only the payload, so `%APPDATA%\COVAS++` (keys, `overrides.json`, personality, checklist) survives. A **first-run wizard** (in the Flask UI) builds config from nothing — keys, mic, STT-model download, and the chosen voice — since the installer ships no secrets. **The wizard lets you pick ANY supported LLM + TTS combo** (issue #87): the LLM can be Anthropic / OpenAI-compatible / Gemini / Ollama (its "configured" gate is provider-aware — a usable key for a cloud LLM, a reachable model for Ollama — **not** specifically Anthropic), and the voice can be **Edge (the free default, no key)** / ElevenLabs / Azure / OpenAI / Cartesia / Piper. STT is **download-on-first-run** (faster-whisper `small.en`) to keep the installer small; TTS **speaks out of the box** because a user with no premium key still gets a voice via the **free, bundled Edge (`edge-tts`) voice** (#15/#20) — the wizard makes that free path selectable rather than dropping a keyless user to text-only. **ElevenLabs stays optional/premium** (the wizard offers the key and resolves "George" when set), and **Piper** (local/offline) needs a user-downloaded voice; only when the selected provider has no working backend does the loop degrade to text via the existing fail-soft. A tiny **`VersionCapability`** answers "what version are you?" by voice; checking *for* updates stays a UI action.
+Supporting pieces: **`covas/__version__.py`** is the single source of truth for the version — read by the update-check and (later) stamped into the build. **Updates are Tier 2** (`covas/updates.py` + a UI banner): on launch it compares against the latest GitHub Release, and on a newer one downloads the installer, launches it, and exits so the running exe can be replaced; the installer touches only the payload, so `%APPDATA%\COVAS++` (keys, `overrides.json`, personality, checklist) survives. A **first-run wizard** (in the Flask UI) builds config from nothing — keys, mic, STT-model download, and the chosen voice — since the installer ships no secrets. **The wizard lets you pick ANY supported LLM + TTS combo** (issue #87): the LLM can be Anthropic / OpenAI-compatible / Gemini (all cloud — its "configured" gate is provider-aware, a usable key for the chosen cloud LLM, **not** specifically Anthropic), and the voice can be **Edge (the free default, no key)** / ElevenLabs / Azure / OpenAI / Cartesia / Piper. STT is **download-on-first-run** (faster-whisper `small.en`) to keep the installer small; TTS **speaks out of the box** because a user with no premium key still gets a voice via the **free, bundled Edge (`edge-tts`) voice** (#15/#20) — the wizard makes that free path selectable rather than dropping a keyless user to text-only. **ElevenLabs stays optional/premium** (the wizard offers the key and resolves "George" when set), and **Piper** (local/offline) needs a user-downloaded voice; only when the selected provider has no working backend does the loop degrade to text via the existing fail-soft. A tiny **`VersionCapability`** answers "what version are you?" by voice; checking *for* updates stays a UI action.
 
 ### 3.7 Secrets at rest — DPAPI key encryption (issue #21)
 
@@ -416,7 +416,7 @@ Two changes to the worker turn, both keeping the fail-soft discipline of princip
 - **Transient-provider resilience (#97).** A cloud LLM's bad minute (Anthropic 529, 429s, 503s,
   connection blips) no longer kills the turn. A single shared classifier + backoff policy lives in
   `providers/_retry.py` (retryable = 429/500/502/503/529 + connection/timeout; fail-fast = 4xx incl.
-  404) and every raw-`requests` provider (`openai_llm`, `gemini_llm`, `ollama_llm`) wraps its
+  404) and every raw-`requests` provider (`openai_llm`, `gemini_llm`) wraps its
   **connect** in `run_with_retry` — exponential backoff + jitter, honoring `Retry-After`,
   **cancel-aware** (a barge-in aborts the wait), with a **hard total-wait cap** so a turn never
   feels hung. Retry covers the initial connect only; a **mid-stream** drop falls soft (can't re-emit
@@ -465,7 +465,7 @@ takes effect **without a restart**. The model:
   voice swap safe against the shared output device.
 - **Section-granularity diff drives the rebuild.** `update_settings`/`reset_setting` snapshot the
   relevant config sub-trees **before** the merge; afterward, any change under `[llm]`/`[anthropic]`/
-  `[openai]`/`[gemini]`/`[ollama]` rebuilds the LLM, and any change under `[tts]` or a voice section
+  `[openai]`/`[gemini]` rebuilds the LLM, and any change under `[tts]` or a voice section
   (`[elevenlabs]`/`[edge]`/`[azure]`/`[openai_tts]`/`[cartesia]`/`[piper]`) rebuilds the TTS. An
   unrelated key rebuilds neither. The Router is already `Router.from_cfg(self.cfg)` **per turn**, so
   tiers are always live with no work.
@@ -1295,7 +1295,7 @@ run.** Authoring safety is *structural*, not prompt-trust:
 The original seven-phase plan is done and tested:
 
 1. **Cost instrumentation & guardrails** — overrides fix, prompt caching (+1h TTL), Sonnet default, `max_tokens` cap, per-turn usage/cost logging, dev-mock, the unit/integration test harness (§9).
-2. **Provider seam + capability registry** — `providers/` (Anthropic/ElevenLabs/Whisper behind Protocols; Ollama offline-only), `CapabilityRegistry`, checklist relocated to a capability.
+2. **Provider seam + capability registry** — `providers/` (Anthropic/ElevenLabs/Whisper behind Protocols; the LLM is cloud-only — a local Ollama option was later removed in #128), `CapabilityRegistry`, checklist relocated to a capability.
 3. **Cloud tiering router** (§4).
 4. **ED monitoring** — journal + Status watchers, `EDContext`, read-tool + inline context delivery (§5).
 5. **Proactive callouts** — `ProactiveCapability` (§5).
@@ -1469,11 +1469,11 @@ The original seven-phase plan is done and tested:
 
 ## 9. Testing strategy — fast unit tests, opt-in integration
 
-The rule: **the default test run is free and hermetic.** `pytest` runs *unit tests only* — no network, no API calls, no ElevenLabs, no Ollama, no audio hardware — so you can run it on every save without touching your accounts. Anything that talks to a real service is an *integration* test, marked and excluded from the default run.
+The rule: **the default test run is free and hermetic.** `pytest` runs *unit tests only* — no network, no API calls, no ElevenLabs, no audio hardware — so you can run it on every save without touching your accounts. Anything that talks to a real service is an *integration* test, marked and excluded from the default run.
 
 ### Layers
 - **Unit (default — run constantly).** Pure logic and wiring with all I/O faked: router decisions, journal/`Status.json` parsing + `Flags` decode, checklist ops, config resolution, tool-JSON validation/repair, `_build_kwargs`/cache-control construction, event-stream normalization. Fast (<1s), deterministic, offline.
-- **Integration — local (opt-in, free).** Real but no-cost dependencies: Ollama, Piper, Whisper, audio devices. Marked `@pytest.mark.integration` + `@pytest.mark.local`. Run when you touch those paths.
+- **Integration — local (opt-in, free).** Real but no-cost dependencies: Piper, Whisper, audio devices. Marked `@pytest.mark.integration` + `@pytest.mark.local`. Run when you touch those paths.
 - **Integration — paid (opt-in, deliberate).** Real Anthropic / ElevenLabs calls. Marked `@pytest.mark.integration` + `@pytest.mark.paid`. Run rarely and on purpose — cheapest model, one-line prompt. Never in the default run or a pre-commit hook.
 
 ### How the seam makes this cheap

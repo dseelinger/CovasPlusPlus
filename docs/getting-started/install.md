@@ -46,13 +46,12 @@ combination you like** — you're not locked to one vendor:
 1. **AI brain (LLM)** — choose the provider that powers the conversation and give it what it needs:
     - **Anthropic — Claude** (paste an `sk-ant-` key),
     - **OpenAI-compatible** — OpenAI / Groq / DeepSeek / OpenRouter (pick the endpoint preset, a
-      model, and paste that service's key),
-    - **Google Gemini** (paste a Gemini key — Google's free tier is generous), or
-    - **Ollama** — a local model on this PC, no key (*advanced; best out-of-game since a good local
-      model competes with Elite for your GPU*).
+      model, and paste that service's key), or
+    - **Google Gemini** (paste a Gemini key — Google's free tier is generous).
 
-    This is **required** — without a working AI provider there's no brain — but it does **not** have
-    to be Anthropic.
+    All three are **cloud** providers — cost is handled by the tiering router, not a local model (a
+    capable local model would compete with Elite for your GPU). This is **required** — without a
+    working AI provider there's no brain — but it does **not** have to be Anthropic.
 2. **Voice (TTS)** — choose how COVAS speaks. **Edge is the free default and needs no key**, so you
    always get a voice. You can also pick **ElevenLabs**, **Azure**, **OpenAI**, **Cartesia**, or
    local **Piper**. Only the premium cloud voices need their own key; leave a keyless cloud voice
@@ -184,23 +183,22 @@ free voices lookup (skipped if unused), and your **audio devices** are listed. E
     want, set `[audio].input_device` in [`config.toml`](../configuration.md) to the device name
     it printed.
 
-### Run fully local (no cloud)
+### Local, CPU-only speech
 
-The source tree has a swappable **provider seam** — you can replace the cloud pieces with local
-ones that run free on your machine (the packaged app ships cloud-only):
+The source tree has a swappable **provider seam**. Speech runs **locally on the CPU**, and the
+voice can too — nothing here competes with Elite Dangerous for the GPU:
 
-| Piece | Cloud (default) | Local (offline, free) |
-|-------|-----------------|-----------------------|
-| Language model | Anthropic Claude (tiered) | Ollama (e.g. Qwen) — *out-of-game / offline only* |
-| Voice (TTS) | ElevenLabs | Piper |
+| Piece | Cloud | Local (free, CPU) |
+|-------|-------|-------------------|
+| Language model | Anthropic Claude / OpenAI-compatible / Gemini (tiered) | — (cloud only) |
+| Voice (TTS) | ElevenLabs / Edge / Azure / OpenAI / Cartesia | Piper |
 | Speech-to-text | *(already local)* | faster-whisper |
 
 To use the free local **Piper** voice, set `[tts].provider = "piper"` in
-[`config.toml`](../configuration.md) and download a Piper voice. For a fully local language model
-(out-of-game/offline use), see the local proof-of-concept in the project README.
+[`config.toml`](../configuration.md) and download a Piper voice.
 
-!!! info "In-game, the language model is Claude by design"
-    A local language model good enough to be useful competes with Elite Dangerous for your GPU,
-    so the in-game brain is always cloud Claude. Piper (voice) and Whisper (speech-to-text) are
-    light CPU work and run happily alongside the game — Piper is the one local swap that saves
-    money without fighting the game.
+!!! info "The language model is always cloud by design"
+    Cost is handled by the tiering router, not a local model: a local language model good enough to
+    be useful would compete with Elite Dangerous for your GPU. Piper (voice) and Whisper
+    (speech-to-text) are light CPU work and run happily alongside the game — Piper is the one local
+    swap that saves money without fighting the game.

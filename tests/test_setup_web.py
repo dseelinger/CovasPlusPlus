@@ -28,7 +28,6 @@ def client(tmp_path, monkeypatch):
         "openai": {"api_key_file": str(tmp_path / "openai.txt"),
                    "base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini"},
         "gemini": {"api_key_file": str(tmp_path / "gemini.txt"), "model": "gemini-flash-lite-latest"},
-        "ollama": {"host": "http://localhost:11434", "model": "qwen3"},
         "elevenlabs": {"api_key_file": str(tmp_path / "el.txt")},
         "azure": {"api_key_file": str(tmp_path / "azure.txt")},
         "cartesia": {"api_key_file": str(tmp_path / "cartesia.txt")},

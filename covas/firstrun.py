@@ -233,38 +233,20 @@ def elevenlabs_key_available(cfg: dict) -> bool:
 
 
 # ---- provider-aware readiness (issue #87) --------------------------------------------
-# The wizard is no longer Anthropic-only: any supported LLM + TTS combo can finish setup. "Ready"
-# is per-provider — a cloud LLM needs its key, Ollama needs a reachable model, and a voice is free
-# on Edge/Piper (no key) but key-gated on the cloud voices. These reuse the per-provider key helpers
-# above so there's ONE source of truth for "is this provider usable".
-
-def ollama_available(cfg: dict) -> bool:
-    """Whether the configured Ollama model is actually pulled + reachable (its only "key"). Fail-soft:
-    an unreachable server / parse error is simply "not ready", never a crash (offline unit runs stub
-    the fetcher). Mirrors Ollama's real resolve rule via `_model_available`."""
-    try:
-        from .providers.ollama_llm import _model_available, list_ollama_models
-        oll = cfg.get("ollama", {}) or {}
-        host = str(oll.get("host") or "http://localhost:11434")
-        model = str(oll.get("model") or "")
-        if not model:
-            return False
-        return _model_available(model, list_ollama_models(host))
-    except Exception:  # noqa: BLE001 — offline / unreachable / bad payload => not ready
-        return False
-
+# The wizard is no longer Anthropic-only: any supported cloud LLM + TTS combo can finish setup.
+# "Ready" is per-provider — a cloud LLM needs its key, and a voice is free on Edge/Piper (no key)
+# but key-gated on the cloud voices. These reuse the per-provider key helpers above so there's ONE
+# source of truth for "is this provider usable".
 
 def llm_ready(cfg: dict) -> bool:
-    """Whether the ACTIVE [llm].provider has what it needs to answer: a usable key for a cloud
-    provider (Anthropic/OpenAI-compatible/Gemini), or a reachable pulled model for local Ollama.
-    This — not "has an Anthropic key" — is what gates the wizard now (issue #87)."""
+    """Whether the ACTIVE [llm].provider has what it needs to answer: a usable key for the cloud
+    provider (Anthropic/OpenAI-compatible/Gemini). This — not "has an Anthropic key" — is what gates
+    the wizard now (issue #87). Every LLM provider is cloud (issue #128 removed the local one)."""
     provider = str(cfg.get("llm", {}).get("provider", "anthropic")).lower()
     if provider == "openai":
         return bool(openai_key(cfg))
     if provider == "gemini":
         return bool(gemini_key(cfg))
-    if provider == "ollama":
-        return ollama_available(cfg)
     # anthropic (and any unknown value) → the Anthropic key.
     return anthropic_key_available(cfg)
 
@@ -374,7 +356,7 @@ def resolve_default_voice(voices: list[dict], preferred: str = "George") -> dict
 
 def is_configured(cfg: dict) -> bool:
     """Can the app start its real voice loop? Needs the ACTIVE LLM provider ready (a usable key for
-    a cloud LLM, or a reachable model for Ollama — issue #87, no longer Anthropic-specific) and the
+    the cloud LLM — issue #87, no longer Anthropic-specific) and the
     STT weights (voice input). The VOICE is OPTIONAL — Edge/Piper give one for free, a keyless cloud
     voice degrades to text-only — so it does NOT gate; a mic isn't gated either (default works)."""
     return llm_ready(cfg) and stt_model_available(cfg)

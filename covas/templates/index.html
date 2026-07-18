@@ -432,7 +432,7 @@ async function init(){
 // Pretty provider names for the block header.
 const PROVIDER_LABELS = {
   anthropic:"Anthropic (Claude)", openai:"OpenAI-compatible", gemini:"Google Gemini",
-  ollama:"Ollama (local)", elevenlabs:"ElevenLabs", edge:"Edge (free)", azure:"Azure",
+  elevenlabs:"ElevenLabs", edge:"Edge (free)", azure:"Azure",
   cartesia:"Cartesia", piper:"Piper (local)",
 };
 function providerLabel(p){ return PROVIDER_LABELS[p] || p; }
@@ -454,7 +454,7 @@ function normOpts(list){
   });
 }
 
-// Fetch a fetched-catalog options_source (editable comboboxes: OpenAI/Gemini/Ollama models, Edge/
+// Fetch a fetched-catalog options_source (editable comboboxes: OpenAI/Gemini models, Edge/
 // Azure/Cartesia voices). ALWAYS resolves to an array (possibly []) — fail-soft, never throws — so
 // the control degrades to free-text with the current value kept.
 async function fetchCatalog(source, baseUrl){

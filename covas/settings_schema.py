@@ -24,7 +24,7 @@ from typing import Any, Optional
 # an English companion. small.en is the shipped default the first-run wizard installs.
 WHISPER_SIZES = ["tiny", "tiny.en", "base", "base.en", "small", "small.en",
                  "medium", "medium.en", "large-v3"]
-WHISPER_DEVICES = ["cpu", "cuda"]
+WHISPER_DEVICES = ["cpu"]  # CPU-only (issue #128): no local GPU ML compute competes with ED
 WHISPER_COMPUTE = ["int8", "float16", "float32"]
 THINKING_TIERS = ["Off", "Low", "Medium", "High", "Extra", "Max"]
 CACHE_TTLS = ["5m", "1h"]
@@ -32,7 +32,7 @@ CACHE_TTLS = ["5m", "1h"]
 ROUTER_PINS = ["", "cheap", "standard", "premium", "haiku", "sonnet", "opus"]
 PAD_SIZES = ["S", "M", "L", "any"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
-LLM_PROVIDERS = ["anthropic", "openai", "gemini", "ollama"]
+LLM_PROVIDERS = ["anthropic", "openai", "gemini"]
 # Capability/token optimization levels (issue #84): "auto" (per-provider default) + the 5 named
 # budget presets, richest -> leanest. Mirrors covas/tiering.py LEVEL_NAMES (a unit test asserts the
 # two stay in lock-step so this list can't drift from the real levels).
@@ -69,7 +69,6 @@ LLM_PANELS: dict[str, ProviderPanel] = {
     "anthropic": ProviderPanel(("anthropic.model",), supports_thinking=True),
     "openai": ProviderPanel(("openai.base_url", "openai.model"), readonly=("openai.base_url",)),
     "gemini": ProviderPanel(("gemini.model",)),
-    "ollama": ProviderPanel(("ollama.model",)),
 }
 
 TTS_PANELS: dict[str, ProviderPanel] = {
@@ -98,7 +97,6 @@ OPT_EL_VOICES = "@elevenlabs_voices"    # live ElevenLabs voice ids
 # valid, and the current value is never lost when the fetch fails/offline/no-key.
 OPT_OPENAI_MODELS = "@openai_models"        # GET {openai.base_url}/models (OpenAI/Groq/DeepSeek/OpenRouter)
 OPT_GEMINI_MODELS = "@gemini_models"        # GET {gemini.base_url}/models (#91 reuse)
-OPT_OLLAMA_MODELS = "@ollama_models"        # GET {ollama.host}/api/tags (locally-pulled)
 OPT_ANTHROPIC_MODELS_LIVE = "@anthropic_models_live"  # GET /v1/models, static available_models fallback
 OPT_OPENAI_BASE_URLS = "@openai_base_urls"  # preset OpenAI/Groq/DeepSeek/OpenRouter + Custom…
 OPT_EDGE_VOICES = "@edge_voices"            # list_edge_voices() — no key (#88)
@@ -116,7 +114,7 @@ CARTESIA_MODELS = ["sonic-2", "sonic", "sonic-turbo"]
 # escape hatch). Used by validate_value so a custom base_url or an unlisted-but-valid model/voice id
 # is never rejected — the UI flags it as unsupported instead of blocking the save.
 _COMBOBOX_SOURCES = frozenset({
-    OPT_OPENAI_MODELS, OPT_GEMINI_MODELS, OPT_OLLAMA_MODELS, OPT_ANTHROPIC_MODELS_LIVE,
+    OPT_OPENAI_MODELS, OPT_GEMINI_MODELS, OPT_ANTHROPIC_MODELS_LIVE,
     OPT_OPENAI_BASE_URLS, OPT_EDGE_VOICES, OPT_AZURE_VOICES, OPT_CARTESIA_VOICES,
     # The mic picker (#89) is a combobox too: a saved device may be unplugged when the page loads,
     # and blank = system default — both must stay valid rather than be rejected against a live list.
@@ -151,8 +149,8 @@ SCHEMA: list[Setting] = [
     Setting("llm.provider", ("llm", "provider"), "enum",
             "LLM provider", "Providers",
             "Which LLM answers. anthropic (cloud, Claude), openai (any OpenAI-compatible cloud: "
-            "OpenAI/Groq/DeepSeek/OpenRouter), gemini (Google Gemini native — function calling + "
-            "Search grounding), or ollama (local, out-of-game only).",
+            "OpenAI/Groq/DeepSeek/OpenRouter), or gemini (Google Gemini native — function calling + "
+            "Search grounding). All cloud: cost is handled by the tiering router, not a local model.",
             default="anthropic", options=LLM_PROVIDERS,
             phrasings=("llm provider",)),
     Setting("openai.base_url", ("openai", "base_url"), "enum",
@@ -175,12 +173,6 @@ SCHEMA: list[Setting] = [
             "(Flash-Lite/Flash/Pro aliases) live in [gemini.tiers] in config.toml.",
             default="gemini-flash-lite-latest", options_source=OPT_GEMINI_MODELS,
             phrasings=("gemini model",)),
-    Setting("ollama.model", ("ollama", "model"), "enum",
-            "Ollama model", "Providers",
-            "Local model when LLM provider = ollama (out-of-game only). Pick from your locally-pulled "
-            "models or type a tag you'll `ollama pull`, e.g. qwen3 or qwen3:32b.",
-            default="qwen3", options_source=OPT_OLLAMA_MODELS,
-            phrasings=("ollama model", "local model")),
     Setting("tts.provider", ("tts", "provider"), "enum",
             "TTS provider", "Providers",
             "Which voice speaks. edge (free edge-tts neural voices — the default; no SLA, falls "
@@ -486,13 +478,13 @@ SCHEMA: list[Setting] = [
             example="set the whisper model to medium"),
     Setting("whisper.device", ("whisper", "device"), "enum",
             "Whisper device", "Speech-to-text",
-            "cpu is safe everywhere; cuda needs an NVIDIA GPU.",
+            "Whisper runs on the CPU — no GPU needed, and nothing competes with Elite for the GPU.",
             default="cpu", options=WHISPER_DEVICES,
             phrasings=("whisper device",),
             example="set the whisper device to cpu"),
     Setting("whisper.compute_type", ("whisper", "compute_type"), "enum",
             "Whisper compute type", "Speech-to-text",
-            "int8 = fast + low memory on CPU; float16 for cuda.",
+            "int8 = fast + low memory on CPU (the recommended default).",
             default="int8", options=WHISPER_COMPUTE,
             phrasings=("whisper compute type",)),
     Setting("whisper.language", ("whisper", "language"), "string",

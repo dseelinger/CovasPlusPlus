@@ -66,7 +66,7 @@ model** (speech-to-text) and a **Personality** toggle.
   (there's a `change ⚙` link on each block). The quick card then re-renders to match.
 - **Anthropic (Claude)** — a **model** dropdown plus a **Thinking depth** control. Thinking is
   Anthropic-only for now; other LLM providers simply don't show it.
-- **OpenAI-compatible / Gemini / Ollama** — an editable **model** combobox: pick from the endpoint's
+- **OpenAI-compatible / Gemini** — an editable **model** combobox: pick from the endpoint's
   live catalog, or type any model id (free text is always accepted). If the catalog can't be
   fetched (no key, offline), it quietly degrades to a plain text box with your current value kept.
 - **ElevenLabs** — **model**, a searchable **voice** picker (with the type-to-filter box and 🔍

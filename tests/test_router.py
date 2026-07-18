@@ -285,11 +285,12 @@ def test_generic_provider_tier_map_from_its_own_section():
 
 
 def test_generic_provider_without_tiers_uses_single_model_for_all():
-    cfg = {"llm": {"provider": "ollama"}, "router": {"enabled": True},
-           "ollama": {"model": "qwen3"}}
+    # A generic provider whose [<provider>].tiers is unset: every tier reuses [<provider>].model.
+    cfg = {"llm": {"provider": "openai"}, "router": {"enabled": True},
+           "openai": {"model": "gpt-4o-mini"}}
     r = Router.from_cfg(cfg)
-    assert r.cfg.tiers == {"cheap": "qwen3", "standard": "qwen3", "premium": "qwen3"}
-    assert r.decide("use opus").model == "qwen3"      # every tier -> the one local model
+    assert r.cfg.tiers == {"cheap": "gpt-4o-mini", "standard": "gpt-4o-mini", "premium": "gpt-4o-mini"}
+    assert r.decide("use opus").model == "gpt-4o-mini"   # every tier -> the one configured model
 
 
 def test_shipped_config_openai_tiers_do_not_shadow_a_model_swap():

@@ -20,9 +20,6 @@ def make_llm(cfg: dict) -> LLMProvider:
         from .fakes import FakeLLM
         return FakeLLM(cfg)
     name = str(cfg.get("llm", {}).get("provider", "anthropic")).lower()
-    if name == "ollama":
-        from .ollama_llm import OllamaLLM
-        return OllamaLLM(cfg)
     if name == "anthropic":
         from .anthropic_llm import AnthropicLLM
         return AnthropicLLM(cfg)
@@ -37,7 +34,7 @@ def make_llm(cfg: dict) -> LLMProvider:
         from .gemini_llm import GeminiLLM
         return GeminiLLM(cfg)
     raise ValueError(
-        f"Unknown [llm].provider: {name!r} (use 'anthropic', 'openai', 'gemini', or 'ollama')")
+        f"Unknown [llm].provider: {name!r} (use 'anthropic', 'openai', or 'gemini')")
 
 
 def make_tts(cfg: dict, *, mixer=None) -> TTSProvider:  # noqa: ANN001

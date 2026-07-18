@@ -212,7 +212,6 @@ def _provider_cfg(tmp_path, llm, tts="edge"):
         "openai": {"api_key_file": str(tmp_path / "openai.txt"),
                    "base_url": "https://api.groq.com/openai/v1", "model": "llama-3.3-70b"},
         "gemini": {"api_key_file": str(tmp_path / "gemini.txt"), "model": "gemini-flash-lite-latest"},
-        "ollama": {"host": "http://localhost:11434", "model": "qwen3"},
         "elevenlabs": {"api_key_file": str(tmp_path / "el.txt")},
         "azure": {"api_key_file": str(tmp_path / "azure.txt")},
         "cartesia": {"api_key_file": str(tmp_path / "cartesia.txt")},
@@ -236,21 +235,6 @@ def test_is_configured_gemini_llm_no_anthropic_key(tmp_path, monkeypatch):
     assert firstrun.is_configured(cfg) is False
     firstrun.save_key(cfg, "gemini", "AIza-key")
     assert firstrun.is_configured(cfg) is True
-
-
-def test_is_configured_ollama_llm_reachable_model(tmp_path, monkeypatch):
-    """Ollama has no key — readiness is a reachable pulled model (fetcher stubbed, offline)."""
-    import sys
-    cfg = _provider_cfg(tmp_path, "ollama")
-    monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
-    # Patch on the sys.modules entry — `ollama_available` resolves the fetcher via
-    # `from .providers.ollama_llm import list_ollama_models` (sys.modules), which can diverge from the
-    # package attribute after another test re-imports the module; patching here covers both paths.
-    ollama_llm = sys.modules["covas.providers.ollama_llm"]
-    monkeypatch.setattr(ollama_llm, "list_ollama_models", lambda host, **k: [])
-    assert firstrun.is_configured(cfg) is False          # model not pulled
-    monkeypatch.setattr(ollama_llm, "list_ollama_models", lambda host, **k: ["qwen3:latest"])
-    assert firstrun.is_configured(cfg) is True            # qwen3 resolves to qwen3:latest
 
 
 def test_tts_ready_edge_and_piper_need_no_key(tmp_path):

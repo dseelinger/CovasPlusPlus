@@ -97,7 +97,7 @@ def _prune_empty(d: dict) -> None:
 #
 # Section-granularity diff (decision #3): any change ANYWHERE under one of these top-level sections
 # rebuilds that provider; an unrelated key never does.
-_LLM_SECTIONS: tuple[str, ...] = ("llm", "anthropic", "openai", "gemini", "ollama")
+_LLM_SECTIONS: tuple[str, ...] = ("llm", "anthropic", "openai", "gemini")
 _TTS_SECTIONS: tuple[str, ...] = (
     "tts", "elevenlabs", "edge", "azure", "openai_tts", "cartesia", "piper")
 
@@ -120,7 +120,7 @@ RESTART_REQUIRED: frozenset[str] = frozenset({
 # the drift-guard unit test asserts every settings_schema key falls under LIVE_SECTIONS ∪
 # RESTART_REQUIRED, so a NEW setting in an unclassified section fails the test until it's placed.
 LIVE_SECTIONS: tuple[str, ...] = (
-    "llm", "openai", "gemini", "ollama", "tts", "edge", "azure", "openai_tts",
+    "llm", "openai", "gemini", "tts", "edge", "azure", "openai_tts",
     "cartesia", "anthropic", "elevenlabs", "piper", "router", "web_search",
     "conversation", "keys", "listen", "whisper", "personality", "crew", "elite",
     "proactive", "route", "nav", "star_systems", "search", "route_plan",
@@ -1565,7 +1565,7 @@ class App:
         it gets a generic label rather than a wrong brand."""
         name = str((self.cfg.get("llm", {}) or {}).get("provider", "anthropic")).lower()
         return {"anthropic": "Claude", "gemini": "Gemini",
-                "openai": "The AI service", "ollama": "The local model"}.get(name, "The AI service")
+                "openai": "The AI service"}.get(name, "The AI service")
 
     def _speak_degraded(self, err: Exception, cancel: threading.Event, *, tts=None,  # noqa: ANN001
                         text_only=None) -> None:

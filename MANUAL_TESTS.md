@@ -298,7 +298,7 @@ Notes:
 > - **Always-fail** (for "Exhausted → degraded"): point `[openai].base_url` at an endpoint that returns
 >   5xx/429 (e.g. `https://httpstat.us/529`), or at an unroutable host/port to force a **connection timeout**.
 > - Or temporarily lower `[llm.retry].max_total_wait` / raise `attempts` to watch the backoff.
-> - **Note:** retry logging is wired for the raw providers (**openai / gemini / ollama**). The default
+> - **Note:** retry logging is wired for the raw providers (**openai / gemini**). The default
 >   **Anthropic** provider retries *inside its own SDK*, which is silent to the COVAS log — so use the
 >   OpenAI stub above to see the retry lines.
 - [ ] **Retry then recover:** with the flaky stub (fails twice then succeeds), one turn **still answers** —
@@ -1055,7 +1055,7 @@ Notes:
 > On the **Settings** page the model-id and endpoint fields are editable comboboxes: a dropdown fed
 > from the provider's LIVE catalog plus free-text for anything custom. `requires:` the relevant
 > provider key/endpoint for the list to actually populate (OpenAI/Groq key for `openai.model`, Gemini
-> key for `gemini.model`, a running Ollama for `ollama.model`, Azure key+region for `azure.voice`,
+> key for `gemini.model`, Azure key+region for `azure.voice`,
 > Cartesia key for `cartesia.voice`; Edge needs no key). Verify in BOTH the browser (`run_covas_ui.py`)
 > and the packaged native window.
 - [ ] **Base-URL presets:** the **OpenAI LLM base URL** field offers the four presets
@@ -1064,8 +1064,7 @@ Notes:
 - [ ] **Model list populates:** with an OpenAI (or Groq/OpenRouter) key set, open **OpenAI LLM model**
       → the datalist lists that endpoint's models; the row footer shows a count. Change the **base URL**
       to another preset → the model list **refetches** for the new endpoint.
-- [ ] **Gemini / Ollama:** with a Gemini key, **Gemini model** lists Google's live models; with Ollama
-      running, **Ollama model** lists your locally-pulled tags.
+- [ ] **Gemini:** with a Gemini key, **Gemini model** lists Google's live models.
 - [ ] **Edge/Azure/Cartesia voices:** **Edge voice** populates with no key; **Azure voice** populates
       once the Azure key + region are set; **Cartesia voice** once the Cartesia key is set.
 - [ ] **Custom value accepted + flagged:** type a model/voice id NOT in the list → it's kept (flagged
@@ -1086,6 +1085,7 @@ Notes:
 ### 14.2a Settings apply LIVE — hot-swap providers & keys (issue #90)  🔊 HW 🌐 PANEL 🌍 NET
 > #90 makes almost every Settings change take effect **without a restart**.
 - [ ] **Switch the LLM provider live:** on the Settings page change **LLM provider** (e.g. anthropic → gemini, with that provider's key set) and **SAVE CHANGES**. The log shows `LLM now: <provider> / <model>`. Speak a turn → the **next** turn is answered by the new provider (check the router/usage line), **no restart**. A turn already in flight when you saved finishes on the old provider.
+- [ ] **No Ollama, no GPU option (issue #128):** the **LLM provider** dropdown offers exactly **Anthropic / OpenAI-compatible / Gemini** — **no "Ollama"** entry, and there's no Ollama model field. The **Whisper device** row shows **cpu only** (no `cuda`), and its help mentions no GPU. Voice command *"turn on ollama"* / *"set the whisper device to cuda"* does nothing (not a valid setting/option).
 - [ ] **Switch the TTS provider/voice live:** change **TTS provider** (e.g. edge → elevenlabs, or just a different voice) and SAVE → the log shows `Voice now: <provider>` and the next spoken reply uses the new voice. The mixer is **not** rebuilt.
 - [ ] **Ambient audio follows the swap (issue #90 review):** with the **bus mixer + audio layer ON**, switch the TTS voice/provider and SAVE, then trigger an ambient/comms line (or a persona musing) → it speaks in the **new** voice, not the old one (no half-swap). Likewise, switching the **LLM** keeps opt-in chatter-flavor / comms-variants generating on the new provider (canned/verbatim lines are unaffected).
 - [ ] **Failed switch is fail-soft:** switch to a provider whose key is missing/bad and SAVE → the log shows `Couldn't switch … keeping the previous one`, and the next turn **still works** on the previous provider (no dead loop).
@@ -1519,7 +1519,7 @@ Notes:
 - [ ] **Frozen self-test (build machine):** `.\build.ps1 -Installer -SelfTest` → the freeze
   completes and the frozen `COVAS++.exe --selftest` prints `SELFTEST OK …incl. …edge_tts` and exits
   0. A missing bundle fails the build **loudly** instead of shipping. This proves `edge_tts` /
-  `aiohttp` **and** `covas.providers.{edge_tts,azure_tts,openai_tts,cartesia_tts,piper_tts,elevenlabs_tts,openai_llm,gemini_llm,ollama_llm}`
+  `aiohttp` **and** `covas.providers.{edge_tts,azure_tts,openai_tts,cartesia_tts,piper_tts,elevenlabs_tts,openai_llm,gemini_llm}`
   are all in the bundle.
 - [ ] 📋 **Size delta:** note the onedir folder MB and `COVAS++ Setup.exe` MB the build prints; the
   `aiohttp` stack (~10 pkgs) should add only a few MB next to av/onnxruntime — record here: ____.
@@ -1546,9 +1546,9 @@ Notes:
 > On a machine with none of the dev state — that absence *is* the test. The wizard must let you
 > finish with ANY supported LLM + TTS, **not** only Anthropic + ElevenLabs.
 - [ ] First launch (empty `%APPDATA%\COVAS++`) opens the **setup wizard**, not the panel.
-- [ ] **LLM provider picker** offers **Anthropic / OpenAI-compatible / Gemini / Ollama**; selecting one
-      reveals just its fields (Anthropic → key; OpenAI → endpoint preset + model + key; Gemini → key
-      (+ model); Ollama → host + model, no key). The **"AI ready"** badge names the chosen provider.
+- [ ] **LLM provider picker** offers **Anthropic / OpenAI-compatible / Gemini** (all cloud); selecting
+      one reveals just its fields (Anthropic → key; OpenAI → endpoint preset + model + key; Gemini →
+      key (+ model)). The **"AI ready"** badge names the chosen provider.
 - [ ] **TTS provider picker** offers **Edge (free, no key) / ElevenLabs / Azure / OpenAI / Cartesia /
       Piper**; selecting one reveals just its fields. Edge/Piper show **no key field**.
 - [ ] **Non-Anthropic + non-ElevenLabs onboarding (the key case): pick Gemini (or OpenRouter) + Edge**,

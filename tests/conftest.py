@@ -2,7 +2,7 @@
 
 The default `pytest` run must be free and hermetic (DESIGN §9). Two autouse fixtures enforce that:
 
-  * `_block_network` blocks real socket access so an accidental API/ElevenLabs/Ollama call fails
+  * `_block_network` blocks real socket access so an accidental API/ElevenLabs call fails
     loudly instead of silently going out to the wire (and billing money).
   * `_silence_audio` stubs sounddevice PLAYBACK so a unit test that drives a full turn (whose
     CuePlayer loads the shipped `covas/assets/cues/*.wav` and would call `sd.play`) doesn't blast

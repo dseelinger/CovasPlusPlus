@@ -92,7 +92,7 @@ _EL_SOURCES = (schema.OPT_EL_MODELS, schema.OPT_EL_VOICES)
 # Fetched-catalog sources the /api/catalog endpoint may resolve (issue #92 / #88). Only these are
 # accepted, so the endpoint can't be pointed at an arbitrary string.
 _CATALOG_SOURCES = frozenset({
-    schema.OPT_OPENAI_MODELS, schema.OPT_GEMINI_MODELS, schema.OPT_OLLAMA_MODELS,
+    schema.OPT_OPENAI_MODELS, schema.OPT_GEMINI_MODELS,
     schema.OPT_ANTHROPIC_MODELS_LIVE, schema.OPT_OPENAI_BASE_URLS,
     schema.OPT_EDGE_VOICES, schema.OPT_AZURE_VOICES, schema.OPT_CARTESIA_VOICES,
     schema.OPT_INPUT_DEVICES,  # mic picker (#89) — resolved from the local device list

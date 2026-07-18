@@ -38,8 +38,9 @@ sets COVAS++ apart:
   always-connected companion stays affordable without a local model fighting Elite for your GPU.
 - **Immersion, not just answers** — an optional cockpit **ambient-audio** layer, a **multi-voice
   interactive crew**, a glanceable **HUD** overlay, and swappable **personas**.
-- **Local-first and private.** Speech-to-text always runs **on your machine**; there's a fully
-  **offline mode** (Ollama + Piper + Whisper), and API keys are DPAPI-encrypted at rest.
+- **Local-first and private.** Speech-to-text (**Whisper**) and the optional **Piper** voice always
+  run **on your machine** — CPU-only, no GPU contention with the game — and API keys are
+  DPAPI-encrypted at rest. The LLM is cloud (cost handled by tiering, not a local model).
 - **Safety-first automation.** The handful of keystrokes it will send sit behind an allowlist,
   a separate spoken confirmation, a combat/interdiction guard, and a hard abort.
 - **Hands-free option** for accessibility — a voice-activity gate so you never have to touch a key.
@@ -189,19 +190,19 @@ the session never crashes out from under you.
 
 ---
 
-## Provider seam — cloud or local
+## Provider seam — swappable pieces
 
 The three swappable pieces of the loop live behind a small provider interface (`covas/providers/`):
 
-| Piece | Cloud (default) | Local (offline, free) |
-|-------|-----------------|-----------------------|
-| **LLM** | Anthropic Claude (Haiku / Sonnet / Opus, tiered) | Ollama (e.g. Qwen) — out-of-game / offline only |
-| **TTS** | ElevenLabs | Piper |
-| **STT** | — | faster-whisper (already local) |
+| Piece | Cloud | Local (free) |
+|-------|-------|--------------|
+| **LLM** | Anthropic Claude / OpenAI-compatible / Google Gemini (tiered) | — (cloud only; cost handled by tiering) |
+| **TTS** | ElevenLabs / Edge / Azure / OpenAI / Cartesia | Piper |
+| **STT** | — | faster-whisper (CPU) |
 
-Select providers in `config.toml` under `[llm]` and `[tts]`. In-game the LLM path is always
-Anthropic by design — a capable local model competes with ED for the GPU. Piper TTS and Whisper STT
-are light CPU work and run happily alongside the game.
+Select providers in `config.toml` under `[llm]` and `[tts]`. The LLM is always cloud by design —
+cost is handled by the tiering router, not a local model (a capable local model would compete with
+ED for the GPU). Piper TTS and Whisper STT are light **CPU** work and run happily alongside the game.
 
 ---
 
@@ -240,24 +241,19 @@ does and what it needs) or on the Settings page.
 
 ---
 
-## Local offline mode (proof of concept)
+## Local, CPU-only speech
 
-Runs the whole loop with **no cloud and no cost** — Whisper + Qwen (Ollama) + Piper.
+Speech never leaves your machine: **Whisper** STT and the optional **Piper** voice both run
+locally on the **CPU**, so nothing competes with Elite Dangerous for the GPU. Set
+`[tts].provider = "piper"` (and point `[piper].model` at a downloaded `.onnx` voice) for a fully
+free, offline voice:
 
 ```powershell
-# prereqs on this machine
-ollama serve                             # in its own terminal (this one blocks)
-ollama pull qwen3                        # then, in another terminal:
 python -m piper.download_voices en_US-lessac-medium   # then set [piper].model in config.toml
-
-# try it
-python poc_local_loop.py                 # text REPL: type -> Qwen -> Piper speaks
-python poc_local_loop.py --say "Systems nominal, Commander."   # TTS smoke test
-python poc_local_loop.py --from-wav clip.wav                    # STT smoke test
-python poc_local_loop.py --mic           # push-to-talk full local loop
 ```
 
-To make the **main** app local, set `[llm].provider = "ollama"` and `[tts].provider = "piper"`.
+The LLM itself is cloud (Anthropic / OpenAI-compatible / Gemini) — cost is handled by the tiering
+router, not a local model.
 
 ---
 
@@ -285,7 +281,7 @@ marked integration test.
 ```powershell
 python -m compileall covas                    # fast sanity check after edits
 pytest                                        # UNIT tests — offline, free, run often
-pytest -m "integration and local"             # free integration (Ollama/Piper/Whisper/audio)
+pytest -m "integration and local"             # free integration (Piper/Whisper/audio)
 pytest -m "integration and paid"              # deliberate, COSTS money (Anthropic/ElevenLabs)
 ```
 
@@ -310,7 +306,6 @@ fully exercised in CI.
 | `covas/nav/`, `covas/keybinds/`, `covas/cg/` | Outfitting/route search, guarded input executor, community-goal feeds. |
 | `covas/web.py` + `covas/templates/` | Flask control panel. |
 | `covas/config.py` | `config.toml` + `overrides.json`, relative paths resolved to absolute. |
-| `poc_local_loop.py` | Standalone offline (local) proof of concept. |
 | `config.toml` | All defaults, commented. Portable. |
 | `overrides.json` | *(git-ignored)* live UI/voice changes, layered over `config.toml`. |
 | `personality.txt` / `campaign.txt` | *(git-ignored)* your character + personal Commander facts. |

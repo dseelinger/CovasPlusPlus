@@ -11,7 +11,7 @@ import pytest
 
 from covas import catalog
 from covas import settings_schema as schema
-from covas.providers import gemini_llm, ollama_llm, openai_llm
+from covas.providers import gemini_llm, openai_llm
 
 
 # ---- pure parse helpers ----------------------------------------------------
@@ -20,12 +20,6 @@ def test_parse_openai_models_dedupes_and_orders():
                         {"nope": 1}, "x"]}
     assert openai_llm.parse_openai_models(payload) == ["gpt-4o-mini", "gpt-4o"]
     assert openai_llm.parse_openai_models({}) == []
-
-
-def test_parse_ollama_tags():
-    payload = {"models": [{"name": "qwen3:latest"}, {"name": "llama3"}, {"name": "qwen3:latest"}]}
-    assert ollama_llm.parse_ollama_tags(payload) == ["qwen3:latest", "llama3"]
-    assert ollama_llm.parse_ollama_tags({}) == []
 
 
 def test_parse_gemini_models_strips_prefix():
@@ -132,12 +126,6 @@ def test_fetch_failure_is_failsoft(monkeypatch):
     monkeypatch.setattr(openai_llm, "list_openai_models", boom)
     opts, err = catalog.resolve(schema.OPT_OPENAI_MODELS, {})
     assert opts is None and "connection refused" in err   # reason surfaced, no raise
-
-
-def test_ollama_models_no_key_needed(monkeypatch):
-    monkeypatch.setattr(ollama_llm, "list_ollama_models", lambda host, **k: ["qwen3:latest"])
-    opts, err = catalog.resolve(schema.OPT_OLLAMA_MODELS, {"ollama": {"host": "http://h:11434"}})
-    assert err is None and opts[0]["value"] == "qwen3:latest"
 
 
 def test_gemini_models_resolve(monkeypatch):

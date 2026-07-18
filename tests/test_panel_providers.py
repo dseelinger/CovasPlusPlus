@@ -33,7 +33,6 @@ def _cfg(tmp_path, llm_provider="anthropic", tts_provider="elevenlabs") -> dict:
         },
         "openai": {"provider": "", "base_url": "https://api.groq.com/openai/v1", "model": "llama-3.3-70b"},
         "gemini": {"base_url": "", "model": "gemini-flash-lite-latest"},
-        "ollama": {"host": "http://localhost:11434", "model": "qwen3"},
         "elevenlabs": {"model": "eleven_flash_v2_5", "voice_id": "EXAVITQu4vr4xnSDxMaL",
                        "voice_name": "Sarah", "speed": 1.0, "output_format": "pcm_16000"},
         "edge": {"voice": "en-US-AriaNeural"},
@@ -86,11 +85,9 @@ def test_openai_llm_block_is_combobox_model_plus_readonly_base_url(tmp_path, mon
     assert model["value"] == "llama-3.3-70b"
 
 
-def test_gemini_and_ollama_llm_blocks(tmp_path, monkeypatch):
+def test_gemini_llm_block(tmp_path, monkeypatch):
     g = _app(tmp_path, monkeypatch, llm_provider="gemini").public_settings()
     assert _keys(g["llm"]) == ["gemini.model"] and g["llm"]["supports_thinking"] is False
-    o = _app(tmp_path, monkeypatch, llm_provider="ollama").public_settings()
-    assert _keys(o["llm"]) == ["ollama.model"]
 
 
 # --- Speech block reflects the active provider -----------------------------
