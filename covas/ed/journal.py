@@ -21,6 +21,7 @@ from .engineers import parse_engineer_progress
 from .loadout import parse_loadout
 from .materials import parse_materials
 from .modes import MODE_SRV
+from .owned_ships import SHIPYARD_EVENTS
 from .status import describe_transition
 from .stored import parse_stored_ships, parse_stored_modules
 
@@ -275,9 +276,17 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     # _HANDLERS entry of their own — fold those in regardless of whether a field-patch was
     # produced (each event is complete -> replace/merge wholesale).
     if name == "Loadout":                                   # per-module engineering (N9)
-        ctx.set_loadout(parse_loadout(event))
+        loadout = parse_loadout(event)
+        ctx.set_loadout(loadout)
+        # Owned-ships identity (#134): the active ship is owned — reconcile it in (mark active,
+        # fill type/name/ident) without clobbering a manual correction.
+        ctx.reconcile_owned_from_loadout(loadout)
     elif name == "StoredShips":                             # stored-ships inventory (#67)
-        ctx.set_stored_ships(parse_stored_ships(event))
+        stored = parse_stored_ships(event)
+        ctx.set_stored_ships(stored)
+        # Owned-ships identity (#134): every stored ship is owned — upsert + refresh locations
+        # (never removes, so a snapshot predating a manual add can't delete it).
+        ctx.reconcile_owned_from_stored(stored)
     elif name == "StoredModules":                           # stored-modules inventory (#67)
         ctx.set_stored_modules(parse_stored_modules(event))
     # EngineerProgress grounds the engineers finder (#65): merge the {name: status} map so
@@ -289,6 +298,10 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     # ignores multicrew human events. Runs regardless of a field-patch (no _HANDLERS entry).
     if name in _NPC_CREW_EVENTS:
         ctx.apply_npc_crew_event(event)
+    # Owned-ships ownership changes (#134): fold buy/new/sell/swap into the persisted registry so
+    # the fleet identity survives restarts. Runs regardless of a field-patch (no _HANDLERS entry).
+    if name in _SHIPYARD_EVENTS:
+        ctx.apply_shipyard_event(event)
     return patch
 
 
@@ -297,6 +310,10 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
 _NPC_CREW_EVENTS = frozenset(
     {"CrewHire", "CrewAssign", "NpcCrewPaidWage", "NpcCrewRank", "CrewFire"}
 )
+
+# The ownership-change events folded into the owned-ships registry (issue #134). The
+# owned_ships module owns the authoritative set; re-exported here for the cheap dispatch test.
+_SHIPYARD_EVENTS = SHIPYARD_EVENTS
 
 
 # The three material buckets each carry a Category on the incremental events.

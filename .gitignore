@@ -36,6 +36,9 @@ ultimate_checklist.md
 crew.json
 # hired NPC-crew registry (issue #125) — pilot names harvested from the journal (personal)
 npc_crew.json
+# owned-ships registry (issue #134) — the Commander's fleet identity, folded from Shipyard
+# events + manual CRUD (ship names/idents are personal). Journal-derived; never committed.
+owned_ships.json
 # auto-generated crew best-fit-voice pairing cache (issue #124) — mirrors the persona cache above
 # but keyed to the crew roster, so a roster edit never busts the shipped-persona cache.
 crew_voice_pairings.json

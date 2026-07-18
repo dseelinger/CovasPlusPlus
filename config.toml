@@ -578,6 +578,21 @@ chatter_max_seconds = 600.0
 limit_to_seats = false
 
 
+[ships]
+# OWNED-SHIPS REGISTRY (issue #134). Elite writes no single "here is your fleet" snapshot —
+# StoredShips lists only ships in storage, Loadout describes only the ACTIVE ship, and the
+# ownership-change events (ShipyardBuy / ShipyardNew / ShipyardSell / ShipyardSwap) are one-shot
+# deltas. So COVAS++ keeps a small git-ignored registry, keyed by the journal ShipID, that survives
+# restarts: buying / selling / switching updates it automatically, and Loadout/StoredShips reconcile
+# the active ship + last-known locations. Manual voice CRUD ("I bought a Python", "remove the Cobra")
+# corrects it and adds pre-existing ships no event was captured for — a manual entry is never
+# clobbered by the next journal event. Ask "what ships do I own" to hear the fleet. This is the
+# identity spine the per-ship engineering memory (the sibling issue) keys its config on.
+# Requires [elite].enabled (the ownership events come from the journal). Journal-derived per-user
+# data — never committed.
+registry_file = "owned_ships.json"
+
+
 [elevenlabs]
 # API key file (git-ignored). The first-run wizard / Settings "API keys" card write the key here,
 # ENCRYPTED at rest with Windows DPAPI (the file holds "DPAPI:<blob>", not plaintext; a legacy

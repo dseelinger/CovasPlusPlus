@@ -1613,6 +1613,38 @@ The original seven-phase plan is done and tested:
     `crew.limit_to_seats` schema row. **Improvement thesis vs EDCoPilot/COVAS:NEXT: no competitor ties
     crew to the hull you're flying — COVAS++ gives your exploration Phantom and your combat Chieftain
     different crews, switched automatically by the journal the moment you swap ships.**
+60. **Owned-ships registry — persistent fleet identity** (issue #134, `covas/ed/owned_ships.py` (new),
+    `covas/ed/context.py`, `covas/ed/journal.py`, `covas/capabilities/owned_ships_capability.py` (new),
+    `covas/bootstrap.py`, `covas/config.py`, `config.toml`, `.gitignore`) — introduces a **persistent
+    identity for the ships the Commander OWNS**, the spine the Engineering epic's per-ship memory
+    (#135/#139) keys its config on. Elite writes no single "here is your fleet" snapshot — `StoredShips`
+    lists only ships in *storage*, `Loadout` only the *active* ship, and the ownership deltas
+    (`ShipyardBuy`/`ShipyardNew`/`ShipyardSell`/`ShipyardSwap`) were **not handled** at all — so, exactly
+    like the #125 NPC-crew seen-set, a new **pure + persisted** `ed/owned_ships.py` keeps a git-ignored
+    `owned_ships.json` (`OwnedShipsRegistry`, keyed by journal **ShipID**, atomic temp-then-replace write,
+    `load()` fails soft to empty). One record per ship: `{ship_type, name, ident, system, station,
+    active, manual, last_seen}`. **Auto-update.** `fold()` folds the four Shipyard events (New adds +
+    goes active — the record is born on `ShipyardNew` since `ShipyardBuy` carries no new id; Sell and
+    part-exchange Buy remove by `SellShipID`; Swap marks `ShipID` active); `reconcile_loadout()` /
+    `reconcile_stored()` fold the two SNAPSHOT events in — they only add/update and **never remove** (a
+    stored snapshot predating a manual add mustn't delete it) and **never overwrite a `manual` record's
+    name/ident** (a hand-typed correction survives the next journal event), while locations + the active
+    flag (facts) still update. `EDContext` gains `set_owned_ships_registry` / `apply_shipyard_event` /
+    `reconcile_owned_from_{loadout,stored}` / `owned_ships` / lock-protected `add_owned_ship` /
+    `remove_owned_ship` accessors (installed at bootstrap from `[ships].registry_file`, kept OUT of
+    `_FIELDS`); `journal.py` dispatches the Shipyard events and reconciles off the parsed Loadout/
+    StoredShips snapshots. **CRUD.** A self-registering `OwnedShipsCapability` (tiering group
+    `engineering`) exposes `list_owned_ships` + voice `add_owned_ship` / `remove_owned_ship` ("I bought a
+    Python", "remove the Cobra" — ambiguous match asks which); a manual add mints a **synthetic negative
+    ShipID** (real ids are non-negative, so no collision) and flags `manual`. Injected getter/mutator/log
+    seams keep the default `pytest` run offline (`tests/test_owned_ships.py`, 37 tests: folds, reconcilers,
+    corrections-survive, CRUD, load/save/corrupt, journal wiring, capability). Docs
+    `docs/elite/owned-ships.md`, `MANUAL_TESTS.md` §9a-2, in-app help metadata in sync. A web Ships view
+    is deferred to the epic's shared Engineering/Ships page. **Downstream note (#135/#139):** key per-ship
+    config on the string ShipID; the record shape + the `EDContext.owned_ships()` / `owned_ships_registry()`
+    accessors + `[ships].registry_file` are the stable contract. **Improvement thesis vs
+    EDCoPilot/COVAS:NEXT: a durable fleet identity from your own journal — surviving restarts and
+    correctable by voice — that later features hang per-ship memory on.**
 
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**

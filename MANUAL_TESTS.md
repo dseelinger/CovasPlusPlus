@@ -856,6 +856,17 @@ Notes:
 - [ ] **Stored-modules rundown:** *"What modules do I have stored?"* → grouped here / elsewhere / in transit.
 - [ ] **Honest miss:** ask for a ship/module you have **not** stored → it says it doesn't see one and **lists what you actually have** (never invents a location).
 - [ ] **Not seen yet:** ask before docking at a shipyard/outfitting this session → it says to dock at one first (no crash).
+## 9a-2. Owned-ships registry (issue #134)  🎮 ED 🔊 HW 📋 FILE
+> `[elite].enabled = true`. The Commander's **owned** fleet, folded from the journal's ownership events + reconciled from Loadout / StoredShips, persisted git-ignored to `owned_ships.json`. Distinct from 9a (that's ships in *storage*; this is the *whole fleet* identity).
+- [ ] **List the fleet:** *"What ships do I own?"* → reads back your ships, **flags the one you're flying**, and gives each one's last-known system. (Confirm it matches your in-game shipyard fleet list.)
+- [ ] **Buy updates it:** buy a new ship in-game (`ShipyardBuy` → `ShipyardNew`) → ask again → the **new hull is listed and is the active ship**.
+- [ ] **Switch updates active:** switch to another owned ship in the shipyard (`ShipyardSwap`) → *"which ship am I flying?"* → names the one you switched into.
+- [ ] **Sell removes it:** sell a ship (`ShipyardSell`) → ask again → it's **gone** from the fleet.
+- [ ] **Persists across restart:** quit COVAS++, relaunch, ask *"what ships do I own?"* **before docking** → the fleet is still there (loaded from `owned_ships.json`).
+- [ ] **Voice add:** *"I bought a Python"* (or one you own that wasn't captured) → "Added Python to your fleet"; it appears in the list.
+- [ ] **Voice remove + disambiguation:** *"remove the Cobra"* → removed; if you own **two** Cobras it **asks which one** rather than guessing.
+- [ ] **Corrections survive:** add a ship (or rename one) by voice, then dock somewhere with a shipyard (fires `StoredShips` / `Loadout`) → your manual entry / custom name is **still there**, not clobbered.
+- [ ] **Fail-soft before data:** ask *"what ships do I own?"* on a brand-new install with no journal history → it says it hasn't recorded any yet (no crash).
 ## 9a. Engineers finder (#65)  🎮 ED 🔊 HW 📋 clipboard
 > `[elite].enabled = true`. Unlock **status** is read live from the journal's `EngineerProgress`
 > event (written at login); locations/requirements come from a bundled offline table. Log into the
