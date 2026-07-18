@@ -160,21 +160,38 @@ The rendering-approach spike (#46) landed these decisions (full writeup + PoCs i
   alongside the game); **fail soft** when SteamVR is not running. This matches how ED renders
   VR: **ED natively speaks OpenVR/SteamVR (and Oculus SDK) — it has no native OpenXR** — so a
   SteamVR overlay composites over the *native* ED render for the majority of PCVR players.
-- **"True OpenXR overlay" (`XR_EXTX_overlay`) is rejected.** No shipping runtime (SteamVR,
-  Oculus/Meta, WMR) implements it; it exists only as LunarG's provisional D3D11 API-layer
-  reference. The runtime-agnostic *API-layer* approach (how OpenKneeboard works) is a
-  separate C++/D3D/Vulkan product and out of scope to build.
+- **"True OpenXR overlay" (`XR_EXTX_overlay`) is rejected; we REUSE OpenKneeboard's API layer
+  instead of building one (issue #103).** No shipping runtime (SteamVR, Oculus/Meta, WMR, VDXR)
+  implements `XR_EXTX_overlay`, and every separate-process overlay route on a non-SteamVR runtime
+  is closed (VDXR registers no overlay extension; OpenComposite's overlay MR has sat unmerged
+  since 2024). The **only** mechanism that composites over ED on OpenComposite/VDXR is a
+  runtime-agnostic **OpenXR API layer** — a DLL the loader pulls into ED's own process. Building
+  one is ~1–2.5k LOC of C++/D3D and stays out of scope, but we don't need to: **OpenKneeboard is a
+  mature, free API layer whose Web Dashboard tab renders a URL in embedded Chromium with real RGBA
+  transparency.** So the whole job on our side is to serve the HUD as a transparent web page
+  (`/hud`); OpenKneeboard does the compositing. Auto-provisioning or bundling OpenKneeboard is
+  forbidden by its third-party policy / a system-level install, so setup is a documented one-time
+  manual step.
 - **Meta Quest reach.** The SteamVR overlay reaches Quest players **running ED through
   SteamVR** (Link/Air Link with SteamVR active, or Virtual Desktop in SteamVR mode). Quest
-  players on the **native Oculus runtime** or **OpenComposite/OpenXR** are covered by the
-  documented **2D-window + OpenKneeboard/OVR Toolkit** route (the same window-capture path
-  EDCoPilot ships) — we do not build a bespoke OpenXR API layer for them.
-- **Architecture — one renderer, two sinks.** A `HudCapability` (off by default,
-  `[hud].enabled`) subscribes to the `EventBus`, keeps a tiny provider-agnostic `HudModel`
-  snapshot, and a `HudRenderer` draws it once to an offscreen RGBA buffer. A `Flat2DOverlay`
-  sink blits it (tkinter) and a `SteamVROverlay` sink uploads it (`setOverlayRaw`); either
-  sink can be absent without affecting the other, same fail-soft discipline as the provider
-  seam. Redraw only on state change (throttled) — no always-on GPU cost.
+  players on **OpenComposite / VDXR / Virtual Desktop** (no SteamVR) are covered by the **web HUD**
+  (`[hud].web_enabled` → the `/hud` page in OpenKneeboard) — a **natively transparent** page, which
+  *beats* the community EDCoPilot route of OpenKneeboard window-capturing an opaque app window (a
+  black rectangle in the cockpit). **Not** OVR Toolkit: it is itself a SteamVR-only overlay app, so
+  it can't help on the very runtime it would be needed for — the earlier docs that recommended it
+  for OpenComposite were wrong and are corrected by #103.
+- **Architecture — one model, three sinks.** A `HudCapability` (off by default) subscribes to the
+  `EventBus`, keeps a tiny provider-agnostic `HudModel` snapshot, and each surface is a call to the
+  same `_reconcile_surface(view_attr, tried_attr, is_enabled, factory)` helper (lazy-create on first
+  enable, show/hide, fail-soft). The three sinks: a tkinter `HudView` (desktop, `[hud].enabled`), a
+  `VrHudView` uploading a raw RGBA buffer (SteamVR, `[hud].vr_enabled`), and — issue #103 — a
+  trivial `WebHudView` for the transparent `/hud` page OpenKneeboard pulls (`[hud].web_enabled`).
+  The web sink holds no resources: the page is served by Flask regardless, and visibility is the
+  `web_enabled` flag `/api/hud` reads (off → the page renders empty, nothing composites), so "hide"
+  needs no OpenKneeboard remote-control — deferred to a follow-up. It requires the control panel
+  (`run_covas_ui.py`); the factory returns `None` headless and the surface stays off with a log.
+  Any sink can be absent without affecting the others. Redraw only on state change (throttled) — no
+  always-on GPU cost.
 - **Beats-competitors thesis.** EDCoPilot/COVAS:NEXT reach VR only as a *dumb 2D-window
   mirror* the user brings in with third-party capture tooling (OpenKneeboard + OpenComposite).
   COVAS++ ships a **first-party, context-aware SteamVR overlay needing no third-party tool for
@@ -240,11 +257,18 @@ the rendering surface differs:
   need an IVRInput action manifest), and ED renders no motion controllers anyway — so voice is
   the placement trigger. **`HudPlacementCapability`** (one `adjust_vr_hud` tool, `core` tier)
   adds what absolute settings can't express: **relative nudges** ("move it left", "closer",
-  "tilt up") and **look-to-place** ("pin the HUD here"). Pin reads the HMD heading on the OpenVR
-  thread (`VrHudView.pin_here` → `hmd_yaw_deg`) and writes `vr_yaw_deg`; nudges step + clamp one
-  `[hud]` value and persist via `update_settings` — both apply live through the same reconcile
-  path and survive a restart. Look-to-place is **yaw-only** (head ≈ the seated origin in a
-  cockpit), keeping the math pure/unit-tested and composing cleanly with the yawed-frame offsets.
+  "tilt up") and **look-to-place** ("pin the HUD here"). Pin reads the HMD pose on the OpenVR
+  thread (`VrHudView.pin_here`) and places the panel on the **full gaze ray** — heading via
+  `hmd_yaw_deg` **and** elevation via `hmd_pitch_deg` (#107): the centre moves onto the gaze line
+  (`forward = d·cos(e)`, `up = d·sin(e)`, keeping straight-line distance `d`) and the face pitches
+  by `−e` so it reads head-on when placed low or high. It therefore persists **every** captured
+  field (`vr_yaw_deg`, `vr_pitch_deg`, `vr_offset_y_m`, `vr_distance_m`, `vr_offset_x_m`), not just
+  yaw — the capability writes the whole returned placement, because `_reconcile_hud` rebuilds the
+  placement from `[hud]` on any later change and would otherwise overwrite anything left unwritten.
+  Nudges step + clamp one `[hud]` value and persist via `update_settings` — both apply live through
+  the same reconcile path and survive a restart. Roll is deliberately not captured (a rolled HUD is
+  disorienting); near-vertical gazes clamp (±60° pitch, ±2 m). The math stays pure/unit-tested and
+  composes cleanly with the yawed-frame offsets.
 - **Attach-only, never launches SteamVR.** `init(VRApplication_Overlay)` *starts* SteamVR if it
   isn't running — unwanted for a Commander on VDXR/OpenComposite/desktop who just left the VR HUD
   enabled (SteamVR isn't their compositor and the overlay can't render there). So `_run` gates

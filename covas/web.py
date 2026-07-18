@@ -106,6 +106,13 @@ def create_app(core) -> Flask:
     sock = Sock(flask_app)
     _catalog_cache: dict = {}  # (source, base_url) -> (expires_at, options, error)
 
+    # Signal the core that the control panel (this Flask server) exists, so a web HUD (#103)
+    # enabled before the server came up can attach now that /hud is actually served. Guarded so a
+    # stub core in tests that doesn't implement it is fine.
+    _note_ui = getattr(core, "note_web_ui_started", None)
+    if callable(_note_ui):
+        _note_ui()
+
     def _catalog_cached(source: str, base_url):
         """Resolve a catalog source through `catalog.resolve`, throttled by _CATALOG_TTL_S so
         reopening a dropdown doesn't re-hit the provider. Fail-soft: returns (options, error)."""
@@ -177,6 +184,35 @@ def create_app(core) -> Flask:
             },
             "keys": core.cfg["keys"],
         })
+
+    @flask_app.route("/hud")
+    def hud_page():
+        """The transparent web HUD (issue #103). Served for OpenKneeboard's Web Dashboard tab so
+        the companion HUD composites in-headset on ANY OpenXR runtime (OpenComposite / VDXR /
+        Virtual Desktop), where a separate-process SteamVR overlay structurally can't. The page is
+        transparent by construction and polls /api/hud; it renders empty when the HUD is off."""
+        return render_template("hud.html")
+
+    @flask_app.route("/api/hud")
+    def hud_state():
+        """Live HUD snapshot as JSON for the /hud page. FAIL SOFT — never 500: no HUD capability
+        (wiring failed at startup), the web surface being off, or the model raising all collapse to
+        an "off" payload, so the page renders empty and nothing floats in the cockpit."""
+        try:
+            hud = getattr(core, "hud", None)
+            enabled = bool(core.cfg.get("hud", {}).get("web_enabled", False))
+            if hud is None or not enabled:
+                return jsonify({"enabled": False})
+            snap = hud.model.snapshot()
+            return jsonify({
+                "enabled": True,
+                "voice_state": snap.voice_state,
+                "checklist": snap.checklist,
+                "route": snap.route,
+                "callout": snap.callout,
+            })
+        except Exception:  # noqa: BLE001 — a snapshot/config glitch blanks the page, never 500s
+            return jsonify({"enabled": False})
 
     @flask_app.route("/api/update")
     def update_check():

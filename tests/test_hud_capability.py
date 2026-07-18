@@ -300,3 +300,101 @@ def test_on_event_never_raises_on_bad_input():
                         view_factory=lambda p: FakeView())
     for junk in (None, "x", 7, {"type": "settings"}):
         cap.on_event(junk)  # must not raise
+
+
+# --- web HUD surface (issue #103) — third sink over the same reconcile contract ----
+
+def _cap_with_web(web_enabled, web_factory):
+    """A capability with the 2D surface off and only the web surface wired, so these tests
+    exercise the third `_reconcile_surface` call in isolation."""
+    return HudCapability(_model(), is_enabled=lambda: False,
+                         view_factory=lambda p: None,
+                         web_is_enabled=web_enabled, web_view_factory=web_factory)
+
+
+def test_web_surface_created_and_shown_on_first_enable():
+    view = FakeView()
+    _cap_with_web(lambda: True, lambda p: view)
+    assert view.visible is True and view.shows == 1
+
+
+def test_web_surface_disabled_at_startup_is_not_built():
+    built = []
+    _cap_with_web(lambda: False, lambda p: built.append(1) or FakeView())
+    assert built == []  # lazy — created only on first enable
+
+
+def test_web_surface_reconcile_toggles_show_hide():
+    view = FakeView()
+    enabled = {"v": False}
+    cap = _cap_with_web(lambda: enabled["v"], lambda p: view)
+    assert view.visible is None
+    enabled["v"] = True
+    cap.reconcile()
+    assert view.visible is True
+    enabled["v"] = False
+    cap.reconcile()
+    assert view.visible is False
+
+
+def test_web_surface_shutdown_closes_the_view():
+    view = FakeView()
+    cap = _cap_with_web(lambda: True, lambda p: view)
+    cap.shutdown()
+    assert view.closed is True
+
+
+def test_web_factory_returning_none_is_fail_soft_and_logs_control_panel():
+    logs = []
+    HudCapability(_model(), is_enabled=lambda: False, view_factory=lambda p: None,
+                  web_is_enabled=lambda: True, web_view_factory=lambda p: None,
+                  log=logs.append)
+    assert any("run_covas_ui.py" in m for m in logs)  # headless => told to start the control panel
+
+
+def test_on_web_ui_ready_retries_a_web_surface_enabled_before_flask():
+    """A web HUD enabled before the control panel exists first sees a None factory; once Flask
+    signals ready, on_web_ui_ready clears the one-shot latch and the surface attaches (#103)."""
+    view = FakeView()
+    ready = {"v": False}
+
+    def factory(p):
+        return view if ready["v"] else None
+
+    cap = HudCapability(_model(), is_enabled=lambda: False, view_factory=lambda p: None,
+                        web_is_enabled=lambda: True, web_view_factory=factory)
+    assert view.visible is None          # factory returned None at startup (no control panel)
+    ready["v"] = True
+    cap.on_web_ui_ready()
+    assert view.visible is True          # attached on the retry
+
+
+class _WebView:
+    """A WebHudView-like fake: records URL announcements on show, resets on hide/close."""
+
+    def __init__(self):
+        self.shows = 0
+        self.hides = 0
+        self.closed = False
+
+    def show(self):
+        self.shows += 1
+
+    def hide(self):
+        self.hides += 1
+
+    def close(self):
+        self.closed = True
+
+
+def test_webhudview_announces_url_once_per_enable():
+    from covas.capabilities.hud_capability import WebHudView
+    logs = []
+    v = WebHudView("http://127.0.0.1:8765/hud", log=logs.append)
+    v.show()
+    v.show()  # a second reconcile while still enabled must not re-log
+    assert sum("openkneeboard" in m.lower() for m in logs) == 1
+    assert any("/hud" in m for m in logs)
+    v.hide()
+    v.show()  # re-enabled => announce again
+    assert sum("openkneeboard" in m.lower() for m in logs) == 2

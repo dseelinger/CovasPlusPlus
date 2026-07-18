@@ -121,6 +121,29 @@ def test_pin_here_persists_heading_and_recentres():
     assert hud["vr_offset_x_m"] == 0.0    # recentred on the gaze
 
 
+def test_pin_here_persists_the_full_placement_not_just_yaw():
+    """A pin that captures pitch/height/distance must write ALL of them to [hud] — else the next
+    settings change rebuilds the placement from config and silently drops them (#107)."""
+    # _pin_to_gaze returns offset_x_m=0.0 (recentred on the gaze); the capability persists it.
+    cap, hud, _ = _cap(pin=lambda: VrPlacement(
+        yaw_deg=20.0, pitch_deg=15.0, up_m=0.4, forward_m=1.1, offset_x_m=0.0))
+    hud["vr_offset_x_m"] = 0.5            # pre-existing lateral offset
+    _run(cap, "pin_here")
+    assert hud["vr_yaw_deg"] == 20.0
+    assert hud["vr_pitch_deg"] == 15.0
+    assert round(hud["vr_offset_y_m"], 3) == 0.4
+    assert round(hud["vr_distance_m"], 3) == 1.1
+    assert hud["vr_offset_x_m"] == 0.0    # recentred on the gaze
+
+
+def test_pin_here_clamps_extreme_captured_values_on_write():
+    """A near-vertical gaze can return out-of-range pitch/height; the persisted config clamps."""
+    cap, hud, _ = _cap(pin=lambda: VrPlacement(pitch_deg=200.0, up_m=9.0))
+    _run(cap, "pin_here")
+    assert hud["vr_pitch_deg"] == 60.0    # ±60° clamp
+    assert hud["vr_offset_y_m"] == 2.0    # ±2 m clamp
+
+
 def test_pin_here_is_soft_when_no_vr_overlay():
     cap, hud, applied = _cap(pin=lambda: None)
     msg = _run(cap, "pin_here")

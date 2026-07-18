@@ -398,6 +398,10 @@ class App:
         # capability is ALWAYS registered so the toggle (Settings/voice) works live, but the
         # window is created only when enabled and only when a display is available.
         self.hud = None
+        # True once the control panel (Flask) is up — set by web.create_app via
+        # note_web_ui_started(). The web HUD (#103) needs it: /hud is only served under
+        # run_covas_ui.py, never headless run_covas.py.
+        self._web_ui_running = False
         # Persistent-memory CAPTURE (issue #60): a self-contained capability that captures
         # curated journal milestones off the bus and exposes a 'remember that' store tool the
         # LLM calls in-turn. Store-only — recall (#61) extends it. Opt-in ([memory].enabled).
@@ -1090,7 +1094,8 @@ class App:
         this is inert until the Commander opts in (Settings page or 'turn the HUD on'). Fail
         soft: any wiring problem just leaves the HUD off; it must never block startup."""
         try:
-            from .capabilities.hud_capability import HudCapability, HudModel, checklist_line
+            from .capabilities.hud_capability import (
+                HudCapability, HudModel, WebHudView, checklist_line)
             from .capabilities.vr_hud import make_vr_view
             from .ed import read_navroute, resolve_journal_dir
 
@@ -1105,11 +1110,24 @@ class App:
             def _vr_factory(provider):
                 return make_vr_view(provider, self._vr_hud_placement(),
                                     log=lambda m: self._log("hud", m))
+            # The web overlay is a THIRD view over the same model — a transparent /hud page that
+            # OpenKneeboard renders in-headset on any OpenXR runtime (#103). The page reads live
+            # data straight from /api/hud, so the "view" holds nothing; the factory just returns
+            # None (surface stays off) unless the control panel is actually serving /hud.
+            def _web_factory(provider):
+                if not self._web_ui_running:
+                    return None  # needs run_covas_ui.py; headless run_covas.py serves no /hud
+                host = self.cfg.get("ui", {}).get("host", "127.0.0.1")
+                port = self.cfg.get("ui", {}).get("port", 8765)
+                return WebHudView(f"http://{host}:{port}/hud",
+                                  log=lambda m: self._log("hud", m))
             self.hud = HudCapability(
                 model,
                 is_enabled=self._hud_enabled,
                 vr_is_enabled=self._vr_hud_enabled,
                 vr_view_factory=_vr_factory,
+                web_is_enabled=self._web_hud_enabled,
+                web_view_factory=_web_factory,
                 log=lambda m: self._log("hud", m))
             self.registry.register(self.hud)
             # Voice repositioning for the VR overlay (nudges + look-to-place). Reuses the HUD's
@@ -1125,7 +1143,7 @@ class App:
             # callout), so it needs the shared event pump — but only when actually enabled. The
             # toggle itself is driven directly (see _reconcile_hud), so a disabled HUD adds no
             # pump thread and can still be brought up live by voice/Settings.
-            if self._hud_enabled() or self._vr_hud_enabled():
+            if self._hud_enabled() or self._vr_hud_enabled() or self._web_hud_enabled():
                 self._start_event_pump()
         except Exception as e:  # noqa: BLE001 — optional; never block startup
             self.hud = None
@@ -1137,6 +1155,20 @@ class App:
 
     def _vr_hud_enabled(self) -> bool:
         return bool(self.cfg.get("hud", {}).get("vr_enabled", False))
+
+    def _web_hud_enabled(self) -> bool:
+        return bool(self.cfg.get("hud", {}).get("web_enabled", False))
+
+    def note_web_ui_started(self) -> None:
+        """Called once by web.create_app when the control panel (Flask) comes up, so a web HUD
+        (#103) enabled BEFORE the server existed can attach now that /hud is served. Idempotent
+        and fail-soft — it only ever brings the web surface up, never blocks startup."""
+        self._web_ui_running = True
+        if self.hud is not None:
+            try:
+                self.hud.on_web_ui_ready()
+            except Exception as e:  # noqa: BLE001 — a reconcile glitch must not crash startup
+                self._log("hud", f"web UI ready reconcile failed: {e}")
 
     def _vr_hud_placement(self):
         """Build the VR overlay placement from the live [hud] config (clamped to sane ranges).
@@ -1160,7 +1192,7 @@ class App:
         if self.hud is None:
             return
         try:
-            if self._hud_enabled() or self._vr_hud_enabled():
+            if self._hud_enabled() or self._vr_hud_enabled() or self._web_hud_enabled():
                 self._start_event_pump()  # idempotent
             self.hud.reconcile()
             # Push the live placement so a Settings/voice change to distance / offset / pitch /

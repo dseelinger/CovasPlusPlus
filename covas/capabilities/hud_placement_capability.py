@@ -56,7 +56,8 @@ _DESC = (
     "(there is no separate in-game switch; this is the on/off control), 'move the HUD "
     "left/right/up/down', 'closer'/'farther' (or 'forward'/'back'), 'tilt it up/down', "
     "'flatter'/'more curved', 'bigger'/'smaller', 'centre the HUD', 'reset the HUD position', "
-    "and 'pin the HUD here' (swing it to where I'm looking). It applies live and remembers the "
+    "and 'pin the HUD here' (place it along where I'm looking — matching my gaze left/right AND "
+    "up/down, and tilting it to face me). It applies live and remembers the "
     "new state/position. It affects only the VR overlay, not the 2D window. For an exact "
     "placement value ('set the distance to 1.5') use the settings command instead. `action` is "
     "the direction/verb; optional `amount` is centimetres for moves or degrees for tilt (omit "
@@ -145,8 +146,19 @@ class HudPlacementCapability:
             placement = self._pin() if self._pin else None
             if placement is None:
                 return "I couldn't pin the HUD — the VR overlay isn't running."
-            self._apply({"hud": {"vr_yaw_deg": float(getattr(placement, "yaw_deg", 0.0)),
-                                 "vr_offset_x_m": 0.0}})
+            # Persist the WHOLE placement, not just yaw. A later settings change triggers
+            # _reconcile_hud -> _vr_hud_placement, which rebuilds the placement from config and
+            # re-applies it — so any pinned field left out of [hud] is silently overwritten on
+            # the next nudge/toggle. Map every VrPlacement field back to its vr_* config key (the
+            # same mapping _vr_hud_placement reads) and clamp on write, so config and the live
+            # overlay can't disagree. (#107)
+            self._apply({"hud": {
+                "vr_yaw_deg": float(getattr(placement, "yaw_deg", 0.0)),
+                "vr_pitch_deg": _clamp("vr_pitch_deg", _num(getattr(placement, "pitch_deg", 0.0), 0.0)),
+                "vr_offset_y_m": _clamp("vr_offset_y_m", _num(getattr(placement, "up_m", 0.0), 0.0)),
+                "vr_distance_m": _clamp("vr_distance_m", _num(getattr(placement, "forward_m", 1.30), 1.30)),
+                "vr_offset_x_m": _clamp("vr_offset_x_m", _num(getattr(placement, "offset_x_m", 0.0), 0.0)),
+            }})
             return "Pinned the HUD to your view."
 
         if action == "reset":

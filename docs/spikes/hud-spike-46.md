@@ -1,5 +1,16 @@
 # HUD spike (issue #46) — OpenXR vs SteamVR vs 2D overlay
 
+> **Correction banner (issue #103).** This is a **dated historical record**; two of its findings
+> were later superseded and are corrected here, not rewritten below:
+> 1. Its advice to capture the 2D window with **OVR Toolkit** on a non-SteamVR runtime is **wrong**
+>    — OVR Toolkit is itself a SteamVR-only overlay app (a point this very spike's own sources note),
+>    so it cannot help on OpenComposite/VDXR. Use the **web HUD** (`[hud].web_enabled` → OpenKneeboard
+>    Web Dashboard on `/hud`), added in #103, for in-headset on non-SteamVR runtimes.
+> 2. This spike **never evaluated VDXR / Virtual Desktop's native OpenXR** at all; its Quest matrix
+>    treats "OpenComposite / native OpenXR" only as a perf tweak and misses that rig entirely. #103
+>    covers it: the runtime-agnostic route is OpenKneeboard's in-process OpenXR **API layer**, which
+>    we *reuse* (serve a transparent page) rather than build.
+
 *Research spike. Produces a **decision**, not a shipped feature. Part of epic #40 (VR overlay
 + simplified HUD). No product commitment until this lands. Web facts verified 2026-07;
 nothing here was run against VR hardware or Elite Dangerous in this environment — see
