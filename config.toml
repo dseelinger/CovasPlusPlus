@@ -475,6 +475,12 @@ roster = []
 # (blank = the deterministic auto-assignment). Git-ignored (persona text is personal). When this
 # file is absent, the legacy `roster` list above is used instead, so existing setups are unchanged.
 file = "crew.json"
+# HIRED NPC-CREW registry (issue #125). Elite writes no snapshot of currently-hired crew, so we
+# harvest your fighter pilots' names from the sparse journal events (CrewHire / CrewAssign /
+# NpcCrewPaidWage / NpcCrewRank / CrewFire) into this small git-ignored seen-set, keyed by CrewID,
+# that survives restarts. The Crew editor reads it to offer your ACTUAL pilots to ADOPT (prefill
+# name + role + a generated persona). Journal-derived per-user data — never committed.
+npc_registry_file = "npc_crew.json"
 
 
 [elevenlabs]

@@ -57,6 +57,9 @@ _MAX_ROSTER = 12
 # A persona line is trimmed to this in the (cached) system prefix so one runaway paragraph can't
 # blow up the prompt — the Commander gets consistent flavor, not an essay billed every session.
 _MAX_PERSONA = 400
+# A role is a short free-text FUNCTION label ("Fighter pilot", "Quartermaster") — capped tight so
+# it stays a phrase, not prose, in the cached crew instruction (issue #125).
+_MAX_ROLE = 60
 
 
 @dataclass(frozen=True)
@@ -144,32 +147,40 @@ class CrewMember:
     verbatim both for the `[Name]` prefix the model writes and for the deterministic voice fallback,
     so it must match the spelling the model uses. `persona` is optional free-form flavor folded into
     the static crew instruction; `voice_ref` is an optional EXPLICIT voice id (an ElevenLabs
-    voice_id or a Piper .onnx path) that overrides the auto-assigned voice — blank = auto-assign."""
+    voice_id or a Piper .onnx path) that overrides the auto-assigned voice — blank = auto-assign.
+    `role` (issue #125) is an optional free-text FUNCTION label ("Fighter pilot", "Ship's cook")
+    woven into the static instruction so the model plays the character's *role*, not just their
+    temperament — legacy files with no `role` key load unchanged (default '')."""
 
     name: str
     persona: str = ""
     voice_ref: str = ""
+    role: str = ""
 
     def to_dict(self) -> dict:
-        return {"name": self.name, "persona": self.persona, "voice_ref": self.voice_ref}
+        return {"name": self.name, "persona": self.persona,
+                "voice_ref": self.voice_ref, "role": self.role}
 
     @classmethod
     def from_obj(cls, obj: object) -> Optional["CrewMember"]:
         """Coerce one roster entry into a member, fail-soft. Accepts a bare string (a name, for the
-        legacy `[crew].roster = ["Nyx", ...]` form) or a table `{name, persona, voice_ref}`. Returns
-        None for anything with no usable name so a typo can't inject a nameless voice."""
+        legacy `[crew].roster = ["Nyx", ...]` form) or a table `{name, persona, voice_ref, role}`.
+        A missing `role` key defaults to '' so pre-#125 roster files load unchanged. Returns None
+        for anything with no usable name so a typo can't inject a nameless voice."""
         if isinstance(obj, str):
-            name, persona, voice_ref = obj, "", ""
+            name, persona, voice_ref, role = obj, "", "", ""
         elif isinstance(obj, dict):
             name = str(obj.get("name", "")).strip()
             persona = str(obj.get("persona", "") or "").strip()
             voice_ref = str(obj.get("voice_ref", "") or "").strip()
+            role = str(obj.get("role", "") or "").strip()
         else:
             return None
         name = str(name).strip()
         if not name:
             return None
-        return cls(name=name, persona=persona[:_MAX_PERSONA], voice_ref=voice_ref)
+        return cls(name=name, persona=persona[:_MAX_PERSONA], voice_ref=voice_ref,
+                   role=role[:_MAX_ROLE])
 
 
 def is_enabled(cfg: dict) -> bool:
@@ -259,10 +270,12 @@ def system_instruction(cfg: dict) -> Optional[str]:
     cache turn-to-turn — the cache only rewrites the once when the setting or roster changes.
     Returns None when crew is off (nothing added, prefix unchanged).
 
-    Each member's `persona` (issue #70) is woven in as a short "Name — persona." clause so the model
-    voices a consistent character; members without a persona just contribute their name to the
-    roster hint. Voice assignment (`voice_ref`) is a synthesis-side concern and deliberately NOT put
-    in the prompt (the model needn't know which voice a name maps to)."""
+    Each member's `persona` (issue #70) is woven in as a short "Name (Role) — persona." clause so
+    the model voices a consistent character playing a consistent FUNCTION; a member with a `role`
+    (issue #125) but no persona still contributes "Name (Role)." Members with neither just
+    contribute their name to the roster hint. Voice assignment (`voice_ref`) is a synthesis-side
+    concern and deliberately NOT put in the prompt (the model needn't know which voice maps to a
+    name)."""
     if not is_enabled(cfg):
         return None
     members = load_members(cfg)
@@ -271,7 +284,12 @@ def system_instruction(cfg: dict) -> Optional[str]:
         f" Your crew: {', '.join(names)}." if names else
         " You may use any short crew name that fits the moment."
     )
-    personas = [f"{m.name} — {m.persona}" for m in members if m.persona]
+    # "Name (Role) — persona." / "Name (Role)." / "Name — persona." — role and persona each optional,
+    # so a member contributes a clause here only when they have at least one of the two.
+    def _clause(m: CrewMember) -> str:
+        head = f"{m.name} ({m.role})" if m.role else m.name
+        return f"{head} — {m.persona}" if m.persona else head
+    personas = [_clause(m) for m in members if m.persona or m.role]
     persona_line = (" In character: " + " ".join(
         p if p.endswith(".") else p + "." for p in personas)) if personas else ""
     return (

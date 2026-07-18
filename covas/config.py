@@ -91,6 +91,7 @@ _DATA_PATH_FIELDS = (
     ("cg", "api_key_file"),
     ("checklist", "file"),
     ("crew", "file"),
+    ("crew", "npc_registry_file"),  # hired-NPC-crew seen-set, harvested from the journal (#125)
     ("memory", "dir"),
     ("macros", "file"),
     ("logging", "dir"),

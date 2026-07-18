@@ -34,6 +34,8 @@ logs/
 ultimate_checklist.md
 # crew roster (issue #70) — the Commander's characters + persona text (personal)
 crew.json
+# hired NPC-crew registry (issue #125) — pilot names harvested from the journal (personal)
+npc_crew.json
 # persistent memory (issue #59) — private, human-readable facts about the Commander.
 # Anchored to the repo root so it doesn't also swallow docs/memory.md etc.
 /memory/

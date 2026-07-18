@@ -44,9 +44,10 @@
   .banner a{color:var(--accent);text-decoration:none}
   ul#list{list-style:none;margin:0;padding:0}
   li.crew{border:1px solid var(--edge);border-radius:6px;padding:12px;margin-bottom:10px;background:var(--list-item)}
-  li.crew .nameRow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-  li.crew .cName{flex:1 1 200px;font-weight:bold}
-  li.crew .cVoice{flex:1 1 220px}
+  li.crew .nameRow{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+  li.crew .cName{flex:1 1 180px;font-weight:bold}
+  li.crew .cRole{flex:1 1 150px}
+  li.crew .cVoice{flex:1 1 200px}
   li.crew textarea.cPersona{width:100%;min-height:52px;resize:vertical;line-height:1.5}
   .empty{color:var(--muted);font-size:13px;padding:8px 0}
   .conflict{display:none;margin-top:12px;padding:12px;border:1px solid var(--warn-edge);border-radius:6px;
@@ -75,11 +76,16 @@
   <div class="card">
     <h2>Crew roster</h2>
     <div class="hint">
-      Each character has a <b>name</b> (how the companion refers to them and their line prefix),
-      an optional <b>personality</b> woven into the system prompt, and a <b>voice</b>. Leave the
-      voice on <i>Auto</i> to let COVAS++ pick a stable one deterministically, or pin a specific
-      cast voice.
+      Each character has a <b>name</b> (how the companion refers to them and their line prefix), an
+      optional <b>role</b> (a function like <i>Fighter pilot</i> or <i>Quartermaster</i>, woven into
+      the prompt so the model plays the part), an optional <b>personality</b>, and a <b>voice</b>.
+      Leave the voice on <i>Auto</i> to let COVAS++ pick a stable one deterministically, or pin a
+      specific cast voice.<br>
+      The <b>Name</b> box also suggests your <b>hired NPC fighter pilots</b> (from your journal):
+      pick one to <b>adopt</b> them — role and a generated personality are prefilled for you to edit.
+      Typing a custom name works exactly as before.
     </div>
+    <datalist id="hiredList"></datalist>
     <ul id="list" style="margin-top:12px"></ul>
     <div class="empty" id="empty" style="display:none">No crew yet. Add a character to begin.</div>
     <div class="row" style="margin-top:12px">
@@ -101,6 +107,7 @@
 const $ = id => document.getElementById(id);
 let VERSION = null;   // content-hash of the roster file as we last loaded/saved it
 let VOICES = [];      // [{ref,label}] voice options for the per-character dropdown
+let HIRED = [];       // [{name,combat_rank}] hired NPC pilots from the journal (#125) — datalist
 
 function flash(text, isErr){
   const el = $("msg");
@@ -111,12 +118,13 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 function addRow(member){
-  const m = member || {name:"", persona:"", voice_ref:""};
+  const m = member || {name:"", persona:"", voice_ref:"", role:""};
   const li = document.createElement("li");
   li.className = "crew";
   li.innerHTML = `
     <div class="nameRow">
-      <input class="cName" placeholder="Name — e.g. Nyx" value="${esc(m.name)}">
+      <input class="cName" list="hiredList" placeholder="Name — e.g. Nyx" value="${esc(m.name)}">
+      <input class="cRole" placeholder="Role (optional) — e.g. Fighter pilot" value="${esc(m.role)}">
       <span class="cVoiceSlot"></span>
       <button class="small danger del">DELETE</button>
     </div>
@@ -135,6 +143,10 @@ function addRow(member){
   picker.classList.add("cVoice");
   li.querySelector(".cVoiceSlot").replaceWith(picker);
   li.querySelector(".del").onclick = () => { li.remove(); refreshCount(); };
+  // Adopt flow (#125): choosing an EXACT hired-pilot name prefills role + a generated persona,
+  // both editable before save. 'change' fires on datalist pick or blur. Never clobbers text you've
+  // already entered (adopt only when role AND persona are still empty).
+  li.querySelector(".cName").addEventListener("change", () => adopt(li));
   $("list").appendChild(li);
   $("empty").style.display = "none";
   refreshCount();
@@ -144,9 +156,32 @@ function collect(){
   // Gather the on-screen rows into a members list; drop nameless rows (nothing to voice).
   return [...$("list").querySelectorAll("li.crew")].map(li => ({
     name: li.querySelector(".cName").value.trim(),
+    role: li.querySelector(".cRole").value.trim(),
     persona: li.querySelector(".cPersona").value.trim(),
     voice_ref: li.querySelector(".cVoice").value,
   })).filter(m => m.name);
+}
+
+async function adopt(li){
+  // Selecting an EXACT hired-pilot name adopts them: prefill Role + a generated persona, both
+  // editable before save. Fail-soft — a failed suggest leaves the persona blank, never an error.
+  const nameEl = li.querySelector(".cName");
+  const roleEl = li.querySelector(".cRole");
+  const persEl = li.querySelector(".cPersona");
+  const hit = HIRED.find(h => h.name === nameEl.value.trim());
+  if (!hit) return;                                   // custom name — behaves exactly as before
+  if (roleEl.value.trim() || persEl.value.trim()) return;  // don't clobber your own edits
+  roleEl.value = "Fighter pilot";
+  persEl.value = "Generating personality…"; persEl.disabled = true;
+  try {
+    const r = await fetch("/api/crew/suggest_persona", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: hit.name, combat_rank: hit.combat_rank }),
+    });
+    const data = await r.json();
+    persEl.value = (r.ok && data.persona) ? data.persona : "";
+  } catch (e) { persEl.value = ""; }
+  finally { persEl.disabled = false; refreshCount(); }
 }
 
 function refreshCount(){
@@ -158,6 +193,9 @@ function refreshCount(){
 function apply(data){          // fold a server snapshot into the UI
   VERSION = data.version;
   VOICES = data.voices || [];
+  HIRED = data.hired || [];
+  // Rebuild the shared datalist of hired pilots (#125) — plain <option>s, one per pilot name.
+  $("hiredList").innerHTML = HIRED.map(h => `<option value="${esc(h.name)}">`).join("");
   $("fileName").textContent = data.name || "";
   $("offBanner").classList.toggle("show", data.enabled === false);
   $("conflict").classList.remove("show");

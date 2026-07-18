@@ -28,9 +28,13 @@ changes.
 
 ## Defining your crew (the Crew tab)
 
-Open the control panel and click **🎙 crew**. Each character has three fields:
+Open the control panel and click **🎙 crew**. Each character has four fields:
 
 - **Name** — how the companion refers to them, and the `[Name]` prefix it uses. Case-sensitive.
+- **Role** *(optional)* — a free-text **function** for the character: *Fighter pilot*,
+  *Quartermaster*, *Ship's cook*, whatever fits. It folds into the system prompt so the model
+  plays the character's *job*, not just their temperament (`"Nyx (Sensor officer) — sharp-eyed
+  and dry."`). A role with no personality still tells the model what the character *does*.
 - **Personality** *(optional)* — a short line of flavor ("Sharp-eyed sensor officer, terse and
   dry") that folds into the system prompt so the character stays consistent turn to turn.
 - **Voice** — the same **searchable voice picker** (🔍 command palette + type-to-filter) the
@@ -49,6 +53,33 @@ rewrite it the once, when you save a change — they don't add per-turn cost.
 
 You can still use the legacy inline `[crew].roster = ["Nyx", "Vela"]` list in `config.toml`
 (names only). It's used only when no `crew.json` exists; the Crew tab supersedes it.
+
+## Adopting your hired NPC fighter pilots
+
+If you've **hired an NPC fighter pilot** in game (from a Crew Lounge), COVAS++ can turn that pilot
+— the one who actually flies your ship-launched fighter — into a speaking crew member, grounded in
+your own journal.
+
+The **Name** box in the Crew tab is a suggestions list: it offers the pilots COVAS++ has seen in
+your journal. Pick one to **adopt** them:
+
+- their **name** is filled in,
+- their **role** is prefilled to *Fighter pilot*, and
+- a **nominal personality is generated** for them (one quick, cheap model call, only when you
+  adopt — never during a conversation).
+
+All three are just a starting point — edit or clear any of them before you **SAVE ROSTER**. Typing
+a name that *isn't* one of your hired pilots works exactly as before; the suggestions never
+constrain what you can type.
+
+!!! note "Where the suggestions come from"
+    Elite doesn't write a single "here's your current crew" line, so COVAS++ harvests pilot names
+    from the sparse journal events it *does* write — `CrewHire`, `CrewAssign`, wage payments, rank
+    ticks, and `CrewFire` — into a small, git-ignored `npc_crew.json` (`[crew].npc_registry_file`)
+    that builds up over time and survives restarts. A pilot hired long ago resurfaces the next time
+    they're paid a wage. This needs [Elite Dangerous monitoring](../elite/monitoring.md) turned on;
+    with it off, the Name box simply shows no suggestions. Adoption is always explicit — a hired
+    pilot **never** joins your speaking roster on their own.
 
 ## How it works
 

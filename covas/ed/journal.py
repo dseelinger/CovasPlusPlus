@@ -284,7 +284,19 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
     # "what have I unlocked / what's left" is answered from the Commander's own journal.
     elif name == "EngineerProgress":
         ctx.update_engineer_progress(parse_engineer_progress(event))
+    # Hired NPC crew (#125): fold the five crew events into the persisted registry so the Crew
+    # editor can offer the Commander's ACTUAL fighter pilots to adopt. NPC crew only — the fold
+    # ignores multicrew human events. Runs regardless of a field-patch (no _HANDLERS entry).
+    if name in _NPC_CREW_EVENTS:
+        ctx.apply_npc_crew_event(event)
     return patch
+
+
+# The NPC-crew events harvested into the seen-set registry (issue #125). Kept as a module constant
+# so the dispatch above is a cheap membership test, and the parser owns the authoritative list.
+_NPC_CREW_EVENTS = frozenset(
+    {"CrewHire", "CrewAssign", "NpcCrewPaidWage", "NpcCrewRank", "CrewFire"}
+)
 
 
 # The three material buckets each carry a Category on the incremental events.

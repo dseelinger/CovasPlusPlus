@@ -146,6 +146,12 @@ class EDContext:
         # as loadout: big, structured, read on demand by the BlueprintCapability — never in the
         # cached system prompt.
         self._materials = None
+        # Hired NPC crew registry (issue #125): a persisted seen-set of the Commander's hired
+        # fighter pilots, harvested from the CrewHire/CrewAssign/NpcCrewPaidWage/NpcCrewRank/CrewFire
+        # events. Read by the Crew editor to offer pilots to ADOPT; never folded into the prompt.
+        # An `ed.npc_crew.NpcCrewRegistry` (holds its own file path + persistence), or None when
+        # unconfigured. Guarded by _lock like the rest — single-writer is the journal thread.
+        self._npc_crew = None
 
     def update(self, **changes) -> None:
         """Atomically set one or more fields. Unknown keys raise (fail loud) so a typo
@@ -235,6 +241,30 @@ class EDContext:
         seen yet. Immutable, so handing out the reference is thread-safe."""
         with self._lock:
             return self._stored_modules
+
+    # -- hired NPC crew registry (issue #125) --------------------------------------------
+    def set_npc_crew_registry(self, registry) -> None:
+        """Install the persisted NPC-crew registry (an `ed.npc_crew.NpcCrewRegistry`). Called once
+        at bootstrap after the file path is resolved; None clears it."""
+        with self._lock:
+            self._npc_crew = registry
+
+    def apply_npc_crew_event(self, event: dict) -> bool:
+        """Fold one journal crew event into the registry (and persist on change). Returns True on a
+        change. A no-op (False) when no registry is installed. Runs on the journal thread; the lock
+        serialises it against the Crew editor's read."""
+        with self._lock:
+            reg = self._npc_crew
+            if reg is None:
+                return False
+            return reg.apply_event(event)
+
+    def npc_crew_hired(self) -> list[dict]:
+        """The hired NPC pilots as `[{name, combat_rank}]` for the Crew-editor datalist, newest
+        first. Empty when no registry / no journal history. Thread-safe (read under the lock)."""
+        with self._lock:
+            reg = self._npc_crew
+            return reg.hired() if reg is not None else []
 
     # -- engineer progress (issue #65) ---------------------------------------------------
     def update_engineer_progress(self, mapping: dict) -> None:

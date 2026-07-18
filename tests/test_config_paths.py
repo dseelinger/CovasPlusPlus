@@ -65,7 +65,7 @@ def test_all_path_fields_resolved():
         "cartesia": {"api_key_file": "CartesiaAPIKey.txt"},
         "cg": {"api_key_file": "InaraAPIKey.txt"},
         "checklist": {"file": "ultimate_checklist.md"},
-        "crew": {"file": "crew.json"},
+        "crew": {"file": "crew.json", "npc_registry_file": "npc_crew.json"},
         "memory": {"dir": "memory"},
         "macros": {"file": "custom_macros.jsonl"},
         "logging": {"dir": "logs"},

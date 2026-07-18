@@ -643,15 +643,62 @@ def create_app(core) -> Flask:
             out.append({"ref": ref, "label": f"{v.provider}:{ref} ({role})"})
         return out
 
+    def _crew_hired() -> list[dict]:
+        """The Commander's hired NPC fighter pilots (issue #125) as `[{name, combat_rank}]`, from the
+        journal-harvested registry on the live EDContext — the Name box offers these to ADOPT. Empty
+        when Elite monitoring is off or no pilots have been seen; the editor simply shows no
+        suggestions. Never raises (a missing ed_ctx / registry degrades to no suggestions)."""
+        ctx = getattr(core, "ed_ctx", None)
+        if ctx is None:
+            return []
+        try:
+            return ctx.npc_crew_hired()
+        except Exception:  # noqa: BLE001 — suggestions are advisory; never block the editor
+            return []
+
     def _crew_snapshot() -> dict:
-        """The roster + voice options + version, re-read from the shared file so the content-hash
-        `version` and the returned members always describe the same on-disk state."""
+        """The roster + voice options + hired pilots + version, re-read from the shared file so the
+        content-hash `version` and the returned members always describe the same on-disk state."""
         path = _crew_path()
         members = crew_mod.load_members(core.cfg)
         return {"members": [m.to_dict() for m in members], "voices": _crew_voices(),
+                "hired": _crew_hired(),
                 "enabled": crew_mod.is_enabled(core.cfg),
                 "version": _file_version(path) if path else "",
                 "name": path.name if path else ""}
+
+    # A canned fallback persona used when the cheap-tier suggest call is unavailable or fails —
+    # the adopt flow must ALWAYS return editable text, never an error (issue #125).
+    _CANNED_PERSONA = "Steady in the seat; professional and brief on comms."
+
+    def _suggest_persona(name: str, combat_rank) -> str:
+        """ONE cheap-tier LLM call for a two-sentence fighter-pilot persona, fail-soft to a canned
+        line. Editor-time only (the Commander triggers it by adopting a pilot) — NEVER on the voice
+        path, and any failure degrades to the canned template rather than surfacing an error."""
+        llm = getattr(core, "llm", None)
+        if llm is None or not name:
+            return _CANNED_PERSONA
+        try:
+            from .router import Router
+            from .ed.npc_crew import combat_rank_name
+            cheap = Router.from_cfg(core.cfg).cheap_route(None).model
+            rank_txt = (combat_rank_name(combat_rank) if isinstance(combat_rank, int)
+                        else str(combat_rank or "").strip())
+            rank_clause = f", combat rank {rank_txt}," if rank_txt else ""
+            prompt = (
+                f"In two short sentences, write a personality for an Elite Dangerous NPC fighter "
+                f"pilot named {name}{rank_clause} who flies the Commander's ship-launched fighter. "
+                f"Describe temperament and comms style only — no backstory. "
+                f"Reply with just the two sentences.")
+            parts: list[str] = []
+            for kind, chunk in llm.stream_reply(
+                    [{"role": "user", "content": prompt}], threading.Event(),
+                    lambda *_a: None, model=cheap, max_tokens=90):
+                if kind == "text":
+                    parts.append(chunk)
+            return "".join(parts).strip() or _CANNED_PERSONA
+        except Exception:  # noqa: BLE001 — best-effort; fall back to the canned line
+            return _CANNED_PERSONA
 
     @flask_app.route("/crew")
     def crew_page():
@@ -684,6 +731,18 @@ def create_app(core) -> Flask:
                           "text": f"Crew roster updated from the web editor "
                                   f"({len(members)} character(s))."})
         return jsonify({"ok": True, **_crew_snapshot()})
+
+    @flask_app.route("/api/crew/suggest_persona", methods=["POST"])
+    def crew_suggest_persona():
+        """Generate a nominal persona for a hired pilot the Commander is ADOPTING (issue #125): ONE
+        cheap-tier LLM call, editor-time, fail-soft to a canned line. The Commander edits/discards
+        the text before saving, so this never touches the roster itself."""
+        b = request.get_json(force=True) or {}
+        name = str(b.get("name", "") or "").strip()
+        if not name:
+            return jsonify({"ok": False, "error": "name is required"}), 400
+        persona = _suggest_persona(name, b.get("combat_rank"))
+        return jsonify({"ok": True, "persona": persona})
 
     # ---- Custom macros browser (issue #50) -------------------------------------
     # View / author / delete the Commander's own named macros, mirroring the checklist/memory
