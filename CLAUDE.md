@@ -107,3 +107,8 @@ is the one cost cut that runs fine next to the game.
 ## Workflow
 One capability/change per branch; small commits; each roadmap step is independently
 shippable. Update `DESIGN_AND_ROADMAP.md` if a decision changes the architecture.
+- **Every new-feature issue names exactly one product pillar** it strengthens — Assist / Act /
+  Immerse (see `DESIGN_AND_ROADMAP.md` §2.1) — in its improvement thesis. A feature that fits none
+  is a non-goal by default; a fourth pillar is a deliberate §2.1 decision, never implicit in an
+  issue. Consolidation/refactor/docs issues are Foundation and exempt. A session authoring an issue
+  refuses a no-pillar feature (or escalates it to a roadmap discussion) rather than filing it.
