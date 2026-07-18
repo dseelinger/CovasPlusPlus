@@ -1089,6 +1089,38 @@ Notes:
 - [ ] **Refine** the query → the highlight tracks the new match; a query matching only a **section name** still surfaces that section's settings.
 - [ ] **Clear** the search box → all highlights are removed and the full list is restored.
 
+### 14.2d Settings page left-aligned (issue #106)  🌐 PANEL
+> The Settings body used to be centered under a full-bleed header, leaving a wide empty gutter on
+> the left of a maximized window. #106 left-aligns it to match the control panel.
+- [ ] **Maximized on a wide (≥1600px) monitor:** the Settings body (group nav + cards) sits **under
+      the header logo**, hard against the left — **no** large empty gutter on the left.
+- [ ] **Matches the control panel:** open the control panel (`/`) and the Settings page (`/settings`)
+      side by side — both are left-aligned; Settings is no longer the odd one out.
+- [ ] **Still readable / collapses gracefully:** setting rows stay readable (help text still capped);
+      narrow the window below 1200px → the layout stays sensible and the **sticky group nav** still
+      scrolls the page and stays usable.
+
+### 14.2e Theme selector — Dark / Light / Elite (issue #104)  🌐 PANEL
+> Settings → **Appearance** → **Theme** picks the control-panel palette. Dark is the default and
+> must look exactly as before; Light and Elite must recolour **every** page fully.
+- [ ] **Default is Dark, unchanged:** with a fresh config (or `ui.theme = "dark"`), the control panel
+      looks identical to before this feature — no colour shifts anywhere.
+- [ ] **Switch to Light (live, no reload):** Settings → Appearance → Theme → **light** → the page
+      recolours **immediately** (no save needed to preview, no reload). Then **SAVE CHANGES**. Every
+      page — index, settings, checklist, crew, macros, memory, the 🔍 command palette, and the
+      first-run setup wizard — is fully light: light surfaces, **legible** dark text, and readable
+      toggles / secondary buttons / the red CANCEL & danger buttons / the amber conflict banners. No
+      orphaned dark patch.
+- [ ] **Switch to Elite:** Theme → **elite** and SAVE → orange-on-near-black cockpit look; the accent
+      matches the in-game / [companion HUD](docs/using/hud.md) orange (`#ff7100`).
+- [ ] **No flash on load / navigation:** with Light or Elite saved, hard-reload each page and click
+      between the header links → the chosen palette is present on **first paint** (no flash of Dark).
+- [ ] **Persists across restart:** quit and relaunch → the panel opens in the saved theme.
+- [ ] **By voice:** say *"switch to the light theme"* (or *"use the Elite Dangerous theme"*) → the
+      setting changes; open/navigate to a page and it shows the new theme.
+- [ ] **REVERT restores the saved theme:** change the Theme dropdown to preview a different look, then
+      click **REVERT** (don't save) → the page snaps back to the saved theme.
+
 ### 14.3 Personality tab (N7)
 - [ ] **Persona picker:** the Personality tab lists personas; selecting one shows a **preview**. Pick a different persona → the next reply's **voice/register changes**.
 - [ ] **Campaign preserved:** switch persona and confirm your **Campaign** text (personal facts) is unchanged — switching voice never wipes it.

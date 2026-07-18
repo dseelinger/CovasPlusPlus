@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{{ theme }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,41 +8,38 @@
      ship's log. Pure vanilla JS — no CDN — so the panel works fully offline. Every write
      carries the content-hash base_version; a 409 (a voice edit landed) reloads instead of
      clobbering, mirroring the checklist editor's stale-write guard. -->
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root{
-    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
-    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff;
-  }
   *{box-sizing:border-box}
   body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
-  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,#12181f,#0a0d12)}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,var(--header-grad-1),var(--bg))}
   header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
   header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
   header a.sub{color:var(--accent2);text-decoration:none}
   .wrap{padding:16px;max-width:1000px}
   .card{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:16px;margin-bottom:16px}
   .card h2{margin:0 0 12px;font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
-  input,select,textarea{background:#0c1119;color:var(--text);border:1px solid var(--edge);
+  input,select,textarea{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);
       border-radius:6px;padding:8px 10px;font-family:inherit;font-size:13px}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent2)}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .grow{flex:1 1 240px}
-  button{padding:9px 16px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+  button{padding:9px 16px;background:var(--btn-bg);color:var(--accent2);border:1px solid var(--edge);
       border-radius:6px;font-family:inherit;font-size:13px;letter-spacing:1px;cursor:pointer}
-  button:hover{background:#162836}
-  button.primary{background:var(--accent);color:#0a0d12;border-color:var(--accent);font-weight:bold}
+  button:hover{background:var(--btn-hover)}
+  button.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:bold}
   button.primary:hover{filter:brightness(1.1)}
-  button.danger{color:#ff9d9d}
+  button.danger{color:var(--danger-text)}
   button.small{padding:5px 10px;font-size:12px}
-  .msg{color:#39d353;font-size:12px}
-  .msg.err{color:#ff9d9d}
+  .msg{color:var(--ok);font-size:12px}
+  .msg.err{color:var(--err)}
   .hint{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.6}
   .count{color:var(--muted);font-size:12px;margin-left:auto}
   ul#list{list-style:none;margin:0;padding:0}
-  li.mem{border:1px solid var(--edge);border-radius:6px;padding:12px;margin-bottom:10px;background:#0e141d}
+  li.mem{border:1px solid var(--edge);border-radius:6px;padding:12px;margin-bottom:10px;background:var(--list-item)}
   li.mem .txt{font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
   li.mem .meta{color:var(--muted);font-size:11px;margin-top:6px;letter-spacing:.5px}
-  li.mem .tag{display:inline-block;background:#12202c;border:1px solid var(--edge);border-radius:10px;
+  li.mem .tag{display:inline-block;background:var(--btn-bg);border:1px solid var(--edge);border-radius:10px;
       padding:1px 8px;margin-right:5px;color:var(--accent2)}
   li.mem .type{color:var(--accent);text-transform:uppercase;margin-right:8px}
   li.mem .actions{margin-top:10px;display:flex;gap:8px}
@@ -51,8 +48,8 @@
   li.mem.editing .view{display:none}
   .editor textarea{width:100%;min-height:56px;resize:vertical;line-height:1.5}
   .empty{color:var(--muted);font-size:13px;padding:8px 0}
-  .conflict{display:none;margin-top:12px;padding:12px;border:1px solid #7a5a2a;border-radius:6px;
-      background:#2a2114;color:#ffce7a;font-size:13px;line-height:1.6}
+  .conflict{display:none;margin-top:12px;padding:12px;border:1px solid var(--warn-edge);border-radius:6px;
+      background:var(--warn-bg);color:var(--warn-text);font-size:13px;line-height:1.6}
   .conflict.show{display:block}
   .conflict button{margin-right:8px;margin-top:8px}
 </style>

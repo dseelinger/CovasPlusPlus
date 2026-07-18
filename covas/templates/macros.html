@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{{ theme }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,44 +10,41 @@
      the server re-validates with the SAME compile_macro the voice path uses, so a web-authored
      macro is anti-hallucination-checked identically: an out-of-allowlist action is a 400, not a
      saved macro. Authoring here shares the same JSONL file the voice loop reads. -->
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root{
-    --bg:#0a0d12; --panel:#121821; --edge:#26313f; --text:#d6e2f0;
-    --muted:#7d8ea3; --accent:#ff7a1a; --accent2:#00b4ff;
-  }
   *{box-sizing:border-box}
   body{margin:0;font-family:Consolas,"Segoe UI",monospace;background:var(--bg);color:var(--text)}
-  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,#12181f,#0a0d12)}
+  header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:2px solid var(--accent);background:linear-gradient(90deg,var(--header-grad-1),var(--bg))}
   header h1{font-size:20px;margin:0;letter-spacing:3px;color:var(--accent)}
   header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
   header a.sub{color:var(--accent2);text-decoration:none}
   .wrap{padding:16px;max-width:1000px}
   .card{background:var(--panel);border:1px solid var(--edge);border-radius:8px;padding:16px;margin-bottom:16px}
   .card h2{margin:0 0 12px;font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
-  input,select{background:#0c1119;color:var(--text);border:1px solid var(--edge);
+  input,select{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);
       border-radius:6px;padding:8px 10px;font-family:inherit;font-size:13px}
   input:focus,select:focus{outline:none;border-color:var(--accent2)}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .grow{flex:1 1 200px}
-  button{padding:9px 16px;background:#12202c;color:var(--accent2);border:1px solid var(--edge);
+  button{padding:9px 16px;background:var(--btn-bg);color:var(--accent2);border:1px solid var(--edge);
       border-radius:6px;font-family:inherit;font-size:13px;letter-spacing:1px;cursor:pointer}
-  button:hover{background:#162836}
-  button.primary{background:var(--accent);color:#0a0d12;border-color:var(--accent);font-weight:bold}
+  button:hover{background:var(--btn-hover)}
+  button.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:bold}
   button.primary:hover{filter:brightness(1.1)}
-  button.danger{color:#ff9d9d}
+  button.danger{color:var(--danger-text)}
   button.small{padding:5px 10px;font-size:12px}
-  .msg{color:#39d353;font-size:12px}
-  .msg.err{color:#ff9d9d}
+  .msg{color:var(--ok);font-size:12px}
+  .msg.err{color:var(--err)}
   .hint{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.6}
   .count{color:var(--muted);font-size:12px;margin-left:auto}
   ul#list{list-style:none;margin:0;padding:0}
-  li.mac{border:1px solid var(--edge);border-radius:6px;padding:12px;margin-bottom:10px;background:#0e141d}
+  li.mac{border:1px solid var(--edge);border-radius:6px;padding:12px;margin-bottom:10px;background:var(--list-item)}
   li.mac .name{font-size:15px;color:var(--accent);letter-spacing:1px}
   li.mac .body{font-size:13px;line-height:1.5;margin-top:6px;color:var(--text);word-break:break-word}
   li.mac .meta{color:var(--muted);font-size:11px;margin-top:6px;letter-spacing:.5px}
   li.mac .trig{color:var(--accent2)}
   li.mac .actions{margin-top:10px;display:flex;gap:8px}
-  .step{border:1px solid var(--edge);border-radius:6px;padding:8px;margin-bottom:8px;background:#0e141d}
+  .step{border:1px solid var(--edge);border-radius:6px;padding:8px;margin-bottom:8px;background:var(--list-item)}
   .step .row{align-items:center}
   .step .fld{display:none}
   .empty{color:var(--muted);font-size:13px;padding:8px 0}

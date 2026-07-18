@@ -981,6 +981,16 @@ SCHEMA: list[Setting] = [
             default=0.1, min=0.0, max=1.0,
             phrasings=("vr hud curve", "vr overlay curvature")),
 
+    # --- Appearance --------------------------------------------------------
+    Setting("ui.theme", ("ui", "theme"), "enum",
+            "Theme", "Appearance",
+            "Colour theme for the control panel: 'dark' (the default), 'light' (light surfaces for "
+            "daytime/streaming use), or 'elite' (the game's orange-on-black cockpit HUD look). "
+            "Applies live — no restart.",
+            default="dark", options=["dark", "light", "elite"],
+            phrasings=("theme", "ui theme", "color theme", "colour theme"),
+            example="switch to the light theme"),
+
     # --- Control panel -----------------------------------------------------
     Setting("ui.host", ("ui", "host"), "string",
             "Control panel host", "Control panel",

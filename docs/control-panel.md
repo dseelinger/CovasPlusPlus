@@ -124,6 +124,32 @@ provider (Anthropic, ElevenLabs, OpenAI, Gemini, Azure, Cartesia, and Inara). It
 - **Takes effect on restart** — providers read their key at launch, so a new or rotated key applies
   the next time you start COVAS++.
 
+## Appearance & themes
+
+Under the **Appearance** group on the Settings page is a **Theme** selector with three built-in
+looks. Pick one and it applies **live, with no reload** — the whole panel recolours on the spot —
+and persists to `overrides.json`, so it's remembered across restarts and shown on **every** page.
+
+- **Dark** *(default)* — the original control-panel palette.
+- **Light** — light surfaces with dark text, tuned for daytime desk use, screenshots, and streaming
+  overlays (body text meets WCAG AA contrast).
+- **Elite Dangerous** — the game's cockpit look: near-black backgrounds with the in-game **HUD
+  orange** (`#ff7100`) and a cyan secondary, so the panel reads as part of the cockpit. The accent
+  is deliberately identical to the [companion HUD](using/hud.md)'s orange.
+
+You can also switch by **voice** — *"switch to the light theme"*, *"use the Elite Dangerous theme"* —
+since the theme is an ordinary [setting](using/settings.md). Because the theme is baked into each
+page as it's served, opening or navigating to any page shows the right palette **immediately**, with
+no flash of the wrong colours. Set it in `config.toml` too:
+
+```toml
+[ui]
+theme = "dark"   # "dark" | "light" | "elite"
+```
+
+Only the control-panel colours change; the desktop/VR [HUD overlays](using/hud.md) keep their own
+palettes, and the checklist's rich Markdown editor stays on its dark editor theme.
+
 ## Personality tab
 
 Manage your [personas and campaign](using/personas-voice.md):
