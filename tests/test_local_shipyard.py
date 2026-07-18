@@ -165,8 +165,7 @@ def test_everything_vetoed_is_spoken_not_silent():
 # --- the capability speaks the skip --------------------------------------------------------
 
 def test_capability_says_why_the_nearest_station_was_skipped():
-    from covas.capabilities.find_closest_capability import NavConfig
-    from covas.capabilities.find_closest_ship_capability import FindClosestShipCapability
+    from covas.capabilities.find_closest_capability import FindClosestShipCapability, NavConfig
 
     body = {"results": [_station("du Fresne Exchange", "Wolf 397", 0.0),
                         _station("Cregglezone", "Wolf 397", 0.0)]}
@@ -187,8 +186,7 @@ def test_capability_says_why_the_nearest_station_was_skipped():
 
 def test_capability_survives_a_broken_snapshot_reader():
     body = {"results": [_station("Cregglezone", "Wolf 397", 0.0)]}
-    from covas.capabilities.find_closest_capability import NavConfig
-    from covas.capabilities.find_closest_ship_capability import FindClosestShipCapability
+    from covas.capabilities.find_closest_capability import FindClosestShipCapability, NavConfig
 
     def boom():
         raise OSError("disk on fire")

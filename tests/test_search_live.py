@@ -63,7 +63,7 @@ def test_live_faction_index_resolves_a_mistranscription():
 def test_live_minor_faction_capability_finds_a_mistranscribed_faction():
     """End-to-end: the exact failure from the bug report now returns a real system."""
     from covas.capabilities._search_support import SearchConfig
-    from covas.capabilities.minor_faction_search_capability import MinorFactionSearchCapability
+    from covas.capabilities.search_family import MinorFactionSearchCapability
     from covas.search.faction_index import FactionIndex
     copied: list[str] = []
     cap = MinorFactionSearchCapability(
@@ -78,11 +78,11 @@ def test_live_star_system_capability_round_trips():
     """The star-systems capability end-to-end against real Spansh: a spoken slot -> canonical
     value -> live query -> parsed result -> clipboard. The canary if Spansh's systems response
     or vocabulary shifts."""
-    from covas.capabilities.system_search_capability import (SystemSearchCapability,
-                                                             SystemSearchConfig)
+    from covas.capabilities._search_support import SearchConfig
+    from covas.capabilities.search_family import SystemSearchCapability
     copied: list[str] = []
     cap = SystemSearchCapability(
-        SystemSearchConfig(enabled=True), http=RequestsHttp(),
+        SearchConfig(enabled=True), http=RequestsHttp(),
         get_current_system=lambda: "Sol", clipboard=copied.append)
     out = cap.run_tool("search_star_systems", {"allegiance": "imperial", "security": "High"})
     assert copied and copied[0] in out          # nearest system name spoken + copied

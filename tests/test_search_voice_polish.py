@@ -20,11 +20,9 @@ from covas.capabilities._search_support import SearchConfig, recovery
 from covas.capabilities.base import CapabilityRegistry
 from covas.capabilities.help_capability import HelpCapability
 from covas.capabilities.find_closest_capability import FindClosestCapability, NavConfig
-from covas.capabilities.minor_faction_search_capability import MinorFactionSearchCapability
-from covas.capabilities.misc_search_capability import MiscSearchCapability
-from covas.capabilities.signal_search_capability import SignalSearchCapability
-from covas.capabilities.station_search_capability import StationSearchCapability
-from covas.capabilities.system_search_capability import SystemSearchCapability, SystemSearchConfig
+from covas.capabilities.search_family import (MinorFactionSearchCapability, MiscSearchCapability,
+                                              SignalSearchCapability, StationSearchCapability,
+                                              SystemSearchCapability)
 from covas.search.factions import FACTION_STATES
 from covas.search.stations import STATION_TYPES
 
@@ -163,7 +161,7 @@ def test_help_error_mode_never_emits_the_unresolved_term_as_valid():
 def test_all_search_tools_carry_the_cancel_instruction():
     caps = [
         FindClosestCapability(NavConfig(enabled=True), get_current_system=lambda: "Sol"),
-        SystemSearchCapability(SystemSearchConfig(enabled=True), get_current_system=lambda: "Sol"),
+        SystemSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
         StationSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
         MinorFactionSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),
         SignalSearchCapability(SearchConfig(enabled=True), get_current_system=lambda: "Sol"),

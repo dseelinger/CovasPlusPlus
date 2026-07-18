@@ -4,7 +4,7 @@ Body SUBTYPES and biological-signal LANDMARK subtypes exactly as Spansh's `bodie
 accepts and emits them — verified against the live API (an unknown value is silently ignored,
 so these were confirmed by watching a filter actually NARROW results, not by trusting docs).
 
-Two vocabularies power the body finder (`capabilities/body_search_capability.py`):
+Two vocabularies power the body finder (the `bodies` category in `capabilities/search_family.py`):
 
   * `BODY_SUBTYPES` — the planetary body types a Commander asks for by voice (Earth-like world,
     Ammonia world, Water world, the gas-giant classes, …). Stars are deliberately left out: the

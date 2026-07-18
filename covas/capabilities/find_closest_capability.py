@@ -1,30 +1,36 @@
-"""Find-closest-module capability — "find the closest station that sells module X".
+"""Find-closest capabilities — "the closest station that sells module X / ship Y".
 
-The dialogue is multi-turn but the tool is STATELESS: the conversation history *is* the
-state, so each re-call just passes more-complete args (module → +size/mount → +confirmed).
-The tool is a pure function of its arguments; there's no pending-request object to manage.
+Two bespoke tools that deliberately stay OUTSIDE the spec-driven search family (issue #111): they
+use the outfitting/shipyard request path in `nav/closest.py` (module resolution + mount/pad
+post-filter; ship roster + local-shipyard cross-check + EDSM stock verification), NOT the generic
+`build_query`/`execute_search` slot search the family is built on — and the module tool carries a
+stateful confirmation turn-gate. Forcing either through the family descriptor would need so many
+hooks it would be obfuscation, not simplification. They share the `[nav]` config and the same
+resolve -> search dialog, so they're grouped in one module.
 
-Flow the tool DESCRIPTION steers the LLM through (DESIGN / build prompt):
+The dialogue is multi-turn but the tools are STATELESS: the conversation history *is* the state, so
+each re-call just passes more-complete args (module -> +size/mount -> +confirmed; loose ship family
+-> a picked variant). The tool is a pure function of its arguments; there's no pending-request
+object to manage.
+
+Flow the MODULE tool DESCRIPTION steers the LLM through:
   1. Commander asks for the closest <module>.
   2. The LLM normalizes the (maybe misheard) name and calls the tool. The tool validates
      against the offline taxonomy and returns structured guidance:
-       - NEED_ATTRS  → ask for the missing size/mount (never guess), don't search.
-       - AMBIGUOUS   → ask which module they meant, don't search.
-       - UNKNOWN     → say so, offer suggestions, don't search.
-       - RESOLVED    → state the interpretation and ask the Commander to CONFIRM (still no
-                       search — `confirmed` is not yet true).
-  3. Commander narrows / confirms / cancels. On "cancel / never mind" the LLM simply drops
-     the request (it doesn't call the tool) — verbal cancel is an LLM-recognized intent,
-     separate from the hard PTT-cancel.
-  4. Only when the module is RESOLVED *and* `confirmed=true` does the real, rate-limited
-     Spansh query fire — exactly once. It reads the current system (ED context; journal
-     fallback), finds the nearest station, copies the SYSTEM name to the clipboard, and
-     returns a short spoken line.
+       - NEED_ATTRS  -> ask for the missing size/mount (never guess), don't search.
+       - AMBIGUOUS   -> ask which module they meant, don't search.
+       - UNKNOWN     -> say so, offer suggestions, don't search.
+       - RESOLVED    -> state the interpretation and (if require_confirmation) ask to CONFIRM.
+  3. Commander narrows / confirms / cancels. On "cancel / never mind" the LLM simply drops the
+     request (it doesn't call the tool) — a verbal cancel is an LLM-recognized intent.
+  4. When RESOLVED (and confirmed if required), the one rate-limited Spansh query fires — once.
 
-Everything I/O-bound is injected (`http`, `get_current_system`, `clipboard`) so the whole
-capability is unit-testable offline and the default `pytest` never hits the network or the
-real clipboard (DESIGN §9). Fail soft throughout — an unknown module or a failed lookup is
-spoken, never raised into the loop.
+The SHIP tool is the shipyard sibling: same pattern, but ships have no size/mount and no
+confirmation gate (a resolved ship is a single unambiguous decision), so it searches at once.
+
+Everything I/O-bound is injected (`http`, `get_current_system`, `clipboard`) so the whole module is
+unit-testable offline and the default `pytest` never hits the network or the real clipboard (DESIGN
+§9). Fail soft throughout — an unknown module/ship or a failed lookup is spoken, never raised.
 """
 from __future__ import annotations
 
@@ -32,11 +38,13 @@ import threading
 from dataclasses import dataclass
 from typing import Callable
 
-from ..nav import (Ambiguous, NavError, NeedAttrs, Resolved, Unknown,
-                   copy as _default_copy, find_closest_module, resolve as _default_resolve)
+from ..nav import (Ambiguous, AmbiguousShip, NavError, NeedAttrs, Resolved, ResolvedShip,
+                   SHIP_NAMES, Unknown, UnknownShip, copy as _default_copy, find_closest_module,
+                   find_closest_ship, resolve as _default_resolve,
+                   resolve_ship as _default_resolve_ship)
 from ..nav.closest import Http, RequestsHttp, _DEFAULT_BASE_URL, _DEFAULT_UA, _SEARCH_SIZE
 from ..nav.modules import TAXONOMY
-from ._search_support import stale_note
+from . import _search_support as sup
 from .base import HelpMeta, Slot
 
 
@@ -46,7 +54,8 @@ from .base import HelpMeta, Slot
 @dataclass(frozen=True)
 class NavConfig:
     """Immutable snapshot of `[nav]`. Off by default; the capability isn't registered unless
-    `enabled`."""
+    `enabled`. Shared by BOTH find-closest tools (module + ship) — pad default, base URL,
+    user-agent, search size, enable toggle."""
     enabled: bool = False
     base_url: str = _DEFAULT_BASE_URL
     user_agent: str = _DEFAULT_UA
@@ -79,7 +88,9 @@ class NavConfig:
         )
 
 
-# ---- tool ---------------------------------------------------------------------------------
+# ==========================================================================================
+# Find closest MODULE — find_closest_module (bespoke: nav/closest.py + confirmation turn-gate)
+# ==========================================================================================
 
 _TOOL_NAME = "find_closest_module"
 
@@ -179,7 +190,11 @@ def _build_tool(require_confirmation: bool) -> dict:
 
 
 class FindClosestCapability:
-    """Advertises `find_closest_module` and runs the resolve → confirm → search dialog.
+    """Advertises `find_closest_module` and runs the resolve -> confirm -> search dialog.
+
+    STANDALONE by design (issue #111): the outfitting request path (`nav/closest.py` module
+    resolution + mount/pad post-filter) and the stateful confirmation turn-gate don't fit the
+    generic slot-search family.
 
     Injected seams (all so the default test run is offline):
       * `http` — the Http poster for Spansh (RequestsHttp in the app; a fake in tests).
@@ -333,21 +348,21 @@ class FindClosestCapability:
     def _say_unknown(self, o: Unknown) -> str:
         if o.suggestions:
             return (f"I don't recognize '{o.query}' as a module. Did you mean "
-                    f"{_or_list(o.suggestions)}?")
+                    f"{sup.or_list(o.suggestions)}?")
         return (f"I don't recognize '{o.query}' as a module. Tell me the module name another "
                 "way.")
 
     def _say_ambiguous(self, o: Ambiguous) -> str:
-        return (f"That could be a few modules — {_or_list(o.candidates)}. Which one?")
+        return (f"That could be a few modules — {sup.or_list(o.candidates)}. Which one?")
 
     def _say_need_attrs(self, o: NeedAttrs) -> str:
         asks: list[str] = []
         for attr in o.missing:
             opts = o.options.get(attr, [])
             if attr == "size":
-                asks.append(f"what size ({_or_list(opts)})")
+                asks.append(f"what size ({sup.or_list(opts)})")
             elif attr == "mount":
-                asks.append(f"which mount ({_or_list(opts)})")
+                asks.append(f"which mount ({sup.or_list(opts)})")
         joined = " and ".join(asks) if asks else "a bit more detail"
         return (f"I've got the {o.module}. Before I search, {joined}? I won't guess.")
 
@@ -381,6 +396,8 @@ class FindClosestCapability:
         return self._say_result(resolved, result, copied, here)
 
     def _say_result(self, resolved: Resolved, result, copied: bool, here: bool = False) -> str:
+        # Inline on purpose, not sup.distance_phrase: this frozen line says "in your current
+        # system" — one word off the shared helper — and #111 forbids changing a spoken byte.
         dist = ("in your current system" if result.distance_ly < 0.05
                 else f"{result.distance_ly:.1f} light-years away")
         line = (f"Closest {resolved.label}: {result.station} in {result.system}, {dist}. "
@@ -389,8 +406,8 @@ class FindClosestCapability:
         if isinstance(arrival, (int, float)) and arrival >= 1:
             line += f" About {arrival:,.0f} light-seconds from the star."
         # Present only when the answer came from the stale fallback (nothing fresh matched).
-        line += stale_note(result.extra.get("stock_age_days"), what="that listing",
-                           risk="outfitting stock rotates and it may be gone")
+        line += sup.stale_note(result.extra.get("stock_age_days"), what="that listing",
+                               risk="outfitting stock rotates and it may be gone")
         if here:
             line += " You're already there, so I haven't copied anything."
         else:
@@ -434,13 +451,280 @@ class FindClosestCapability:
             self._log(msg)
 
 
-def _or_list(items: list[str]) -> str:
-    """Join options for speech: 'A', 'A or B', 'A, B, or C'."""
-    items = [str(i) for i in items if i]
-    if not items:
-        return ""
-    if len(items) == 1:
-        return items[0]
-    if len(items) == 2:
-        return f"{items[0]} or {items[1]}"
-    return ", ".join(items[:-1]) + f", or {items[-1]}"
+# ==========================================================================================
+# Find closest SHIP — find_closest_ship (bespoke: nav/closest.py ship path + EDSM stock verify)
+# ==========================================================================================
+
+_SHIP_TOOL = "find_closest_ship"
+
+_SHIP_DESC = (
+    "Find the closest Elite Dangerous station that SELLS a given SHIP (from a shipyard), by "
+    "distance from the Commander's current system, and copy that system's name to the "
+    "clipboard. Use THIS tool whenever the Commander wants to buy/find a whole SHIP ('where "
+    "can I buy an Anaconda', 'find the closest Krait', 'nearest Python'). For an outfitting "
+    "MODULE (multi-cannon, fuel scoop, shield generator) use find_closest_module instead; for "
+    "the nearest station by SERVICE/TYPE/PAD use search_stations. Resolve the ship "
+    "CONVERSATIONALLY, then search:\n"
+    "1. Normalize the spoken ship name to a real ship (e.g. 'conda' -> Anaconda, 'fdl' -> "
+    "Fer-de-Lance, 'clipper' -> Imperial Clipper) and call this tool with `ship` set to your "
+    "best interpretation.\n"
+    "2. The tool replies with structured guidance. If it says the name is AMBIGUOUS (a "
+    "family like Krait, Cobra, Viper, Asp, Diamondback, or Type), ask which one it lists — "
+    "NEVER guess. If UNKNOWN, say so and offer the suggestions.\n"
+    "3. As soon as the ship is resolved to a single model, the tool searches immediately and "
+    "returns the nearest station — there's no size/mount to ask about and no separate confirm "
+    "step. If the Commander says 'cancel' / 'never mind', DROP the request and acknowledge — "
+    "do NOT call this tool.\n"
+    "It is stateless — re-call it each turn with the most specific name known so far (family "
+    "-> picked model). When the tool returns a result, relay the station, system, and "
+    "distance, and ALWAYS tell the Commander that the system name has been copied to their "
+    "clipboard."
+)
+
+_SHIP_SCHEMA_PROPS = {
+    "ship": {
+        "type": "string",
+        "description": "Your best interpretation of the ship name (e.g. 'Anaconda', 'Krait "
+                       "Phantom', 'Type-9 Heavy', 'Fer-de-Lance'). For an ambiguous family "
+                       "(Krait, Cobra, Viper, Asp, Type), pass what you have and the tool will "
+                       "ask which model.",
+    },
+    "pad_size": {
+        "type": "string",
+        "description": "Required landing-pad size (S/M/L) for the Commander's ship. Omit to "
+                       "use the configured default.",
+    },
+}
+
+
+class FindClosestShipCapability:
+    """Advertises `find_closest_ship` and runs the resolve -> search dialog.
+
+    STANDALONE by design (issue #111): the shipyard request path (`nav/closest.py` roster
+    resolution + local-shipyard cross-check + EDSM live-stock verification) and the
+    ResolvedShip/AmbiguousShip/UnknownShip outcomes don't fit the generic slot-search family.
+
+    Injected seams (all so the default test run is offline):
+      * `http` — the Http poster for Spansh (RequestsHttp in the app; a fake in tests).
+      * `get_current_system` — Callable[[], str|None] returning the Commander's current
+        system (ED context, with a journal fallback the app wires up), or None.
+      * `get_local_shipyard` — Callable[[], ShipyardSnapshot|None] reading the game's own
+        Shipyard.json (ed/shipyard.py). Ground truth for the last-visited station's stock —
+        Spansh's ships list is the CATALOG, so a contradicted candidate gets skipped. None
+        (the default) disables the cross-check.
+      * `stock_lookup` — the (system, station) -> current-stock callable (an
+        `EdsmStockLookup` in the app) that confirms each candidate is REALLY selling the
+        ship before it's spoken — the local veto generalized to unvisited stations. None
+        (the default) skips verification, keeping tests offline and legacy behavior intact.
+      * `resolve` / `search` / `clipboard` — pure/offline deps, defaulted to the real ones
+        but overridable in tests.
+    """
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
+
+    def __init__(
+        self,
+        config: NavConfig,
+        *,
+        http: Http | None = None,
+        get_current_system: Callable[[], str | None] | None = None,
+        get_local_shipyard: Callable[[], object | None] | None = None,
+        stock_lookup: Callable[[str, str], object | None] | None = None,
+        resolve: Callable[..., object] = _default_resolve_ship,
+        search: Callable[..., object] = find_closest_ship,
+        clipboard: Callable[[str], None] = _default_copy,
+        ship_index: object | None = None,
+        log: Callable[[str], None] | None = None,
+    ) -> None:
+        self._cfg = config
+        self._http = http if http is not None else RequestsHttp()
+        self._current_system = get_current_system
+        self._local_shipyard = get_local_shipyard
+        self._stock_lookup = stock_lookup
+        self._resolve = resolve
+        self._search = search
+        self._clipboard = clipboard
+        # Optional live roster: surfaces ship names Spansh knows that the bundle is missing
+        # (newly-released hulls), folded into resolution so a new ship is findable with no code
+        # change. None -> bundled roster only (the default; keeps tests offline).
+        self._ship_index = ship_index
+        self._log = log
+
+    # -- capability interface ---------------------------------------------------------
+    def tools(self) -> list[dict]:
+        return [{
+            "name": _SHIP_TOOL,
+            "description": _SHIP_DESC,
+            "input_schema": {"type": "object", "properties": dict(_SHIP_SCHEMA_PROPS),
+                             "required": ["ship"]},
+        }]
+
+    def help_meta(self) -> HelpMeta:
+        """Describe this capability for the help subsystem. Templated help is projected from
+        this — nothing here is generated by an LLM."""
+        return HelpMeta(
+            category="shipyards",
+            group="navigation and search",
+            one_liner=("I find the closest station selling a given ship and copy that system "
+                       "to your clipboard."),
+            example="find the closest Anaconda",
+            slots=(
+                Slot(param="ship",
+                     phrasings=("the ship name", "the ship"),
+                     example="where can I buy a Python",
+                     help_text="Name the ship you want — an Anaconda, a Python, a Krait, a "
+                               "Type-9, and so on. If it's a family like Krait or Cobra, I'll "
+                               "ask which model."),
+                Slot(param="pad_size",
+                     phrasings=("a landing pad size", "a pad size"),
+                     example="somewhere with a large pad",
+                     help_text="Restrict to stations with a given landing-pad size — small, "
+                               "medium, or large."),
+            ),
+            help_when_active=("Tell me the ship — and which model if I ask — and I'll find the "
+                              "nearest station that sells it."),
+        )
+
+    def help_vocabulary(self) -> dict[str, list[str]]:
+        """The canonical ship names help's failure-recovery mode matches an unresolved term
+        against, so a suggested correction is always a real ship (never invented)."""
+        return {"ship": list(SHIP_NAMES)}
+
+    def run_tool(self, name: str, inp: dict) -> str:
+        if name != _SHIP_TOOL:
+            return f"Unknown tool: {name}"
+        try:
+            return self._handle(inp)
+        except Exception as e:  # noqa: BLE001 — the voice loop must survive any tool error
+            self._logline(f"error: {e}")
+            return f"Ship lookup error: {e}"
+
+    # -- dialog -----------------------------------------------------------------------
+    def _handle(self, inp: dict) -> str:
+        ship = str(inp.get("ship") or "").strip()
+        if not ship:
+            return "Which ship should I find the closest station for?"
+
+        # Fold in any hulls the live index learned Spansh knows but the bundle doesn't. Only
+        # pass the kwarg when there ARE extras, so the injected resolve seam stays simple.
+        extra = self._extra_names()
+        outcome = self._resolve(ship, extra_names=extra) if extra else self._resolve(ship)
+
+        if isinstance(outcome, UnknownShip):
+            return self._say_unknown(outcome)
+        if isinstance(outcome, AmbiguousShip):
+            return self._say_ambiguous(outcome)
+        if isinstance(outcome, ResolvedShip):
+            return self._do_search(outcome, inp)
+        return "I couldn't interpret that ship — try naming it another way."
+
+    def _say_unknown(self, o: UnknownShip) -> str:
+        if o.suggestions:
+            return (f"I don't recognize '{o.query}' as a ship. Did you mean "
+                    f"{sup.or_list(o.suggestions)}?")
+        return (f"I don't recognize '{o.query}' as a ship. Tell me the ship name another way.")
+
+    def _say_ambiguous(self, o: AmbiguousShip) -> str:
+        return f"That could be a few ships — {sup.or_list(o.candidates)}. Which one?"
+
+    def _do_search(self, resolved: ResolvedShip, inp: dict) -> str:
+        """The one networked step — fires as soon as a ship resolves to a single model."""
+        system = self._current_system() if self._current_system is not None else None
+        pad = self._pad_size(inp)
+        # Only pass the stock seam when it exists, so injected `search` fakes without the
+        # kwarg keep working (the extra_names pattern).
+        kwargs: dict = {}
+        if self._stock_lookup is not None:
+            kwargs["stock_lookup"] = self._stock_lookup
+        try:
+            result = self._search(
+                resolved, system, self._http,
+                pad_size=pad,
+                base_url=self._cfg.base_url,
+                user_agent=self._cfg.user_agent,
+                search_size=self._cfg.search_size,
+                local_shipyard=self._read_local_shipyard(),
+                **kwargs,
+            )
+        except NavError as e:
+            self._logline(f"search failed for {resolved.label}: {e}")
+            return str(e)
+
+        # Copy the SYSTEM name unless the station is in the Commander's current system (N3
+        # rule): you're already there, so copying your own system just clobbers the clipboard.
+        copied, here = sup.deliver_system(self._clipboard, result.system, result.distance_ly,
+                                          self._log)
+        stock = ("confirmed" if result.extra.get("stock_verified")
+                 else "unverified" if result.extra.get("stock_unverified") else "unchecked")
+        self._logline(f"nearest {resolved.label}: {result.station} in {result.system} "
+                      f"({result.distance_ly:.1f} ly), pad {result.pad}, stock={stock}, "
+                      f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
+        return self._say_result(resolved, result, copied, here)
+
+    def _say_result(self, resolved: ResolvedShip, result, copied: bool, here: bool) -> str:
+        line = ""
+        # A nearer station was contradicted — by the Commander's own shipyard visit, or by
+        # current stock data (EDSM). Say why it isn't the answer before naming the one that
+        # is; at most ONE skip note, this is spoken aloud.
+        skipped = result.extra.get("skipped_local")
+        if skipped:
+            line += (f"Spansh lists it at {skipped}, but the shipyard you visited there "
+                     f"doesn't currently stock it. ")
+        elif result.extra.get("skipped_stock"):
+            line += (f"Spansh lists it nearer at {result.extra['skipped_stock']}, but "
+                     f"current stock data says it isn't actually available there. ")
+        line += (f"Closest {resolved.label}: {result.station} in {result.system}, "
+                 f"{sup.distance_phrase(result.distance_ly)}. Largest pad {result.pad}.")
+        arrival = result.extra.get("distance_to_arrival")
+        if isinstance(arrival, (int, float)) and arrival >= 1:
+            line += f" About {arrival:,.0f} light-seconds from the star."
+        price = result.extra.get("ship_price")
+        if isinstance(price, (int, float)) and price >= 1:
+            line += f" It runs about {price:,.0f} credits."
+        # Present only when the answer came from the stale fallback (nothing fresh matched).
+        line += sup.stale_note(result.extra.get("stock_age_days"), what="that listing",
+                               risk="shipyard stock rotates and it may be gone")
+        # The stock check couldn't confirm this one (no data / source down) — say so rather
+        # than imply the certainty a confirmed answer has.
+        if result.extra.get("stock_unverified"):
+            line += " I couldn't verify live stock for this one, so no guarantees."
+        return line + sup.clipboard_note(result.system, copied, here)
+
+    # -- helpers ----------------------------------------------------------------------
+    def _read_local_shipyard(self):
+        """The Commander's own Shipyard.json snapshot, or None. Fail-soft — the cross-check
+        is a bonus; a broken reader never blocks a lookup."""
+        if self._local_shipyard is None:
+            return None
+        try:
+            return self._local_shipyard()
+        except Exception as e:  # noqa: BLE001 — ground truth is a bonus, never fatal
+            self._logline(f"local shipyard snapshot unavailable: {e}")
+            return None
+
+    def _extra_names(self) -> tuple[str, ...]:
+        """Newly-released ship names from the live index (empty until its background fetch
+        lands, or if it's absent/unreachable). Fail-soft — a broken index never blocks a
+        lookup; resolution just uses the bundled roster."""
+        idx = self._ship_index
+        if idx is None:
+            return ()
+        try:
+            return tuple(idx.extra_names())
+        except Exception as e:  # noqa: BLE001 — the live roster is a bonus, never fatal
+            self._logline(f"ship index unavailable: {e}")
+            return ()
+
+    def _pad_size(self, inp: dict) -> str | None:
+        """The pad constraint for this search: the tool arg if given, else the config default.
+        'any' / 'none' / '' disables it."""
+        raw = inp.get("pad_size")
+        pad = str(raw).strip() if raw is not None else self._cfg.default_pad_size
+        if not pad or pad.lower() in ("any", "none", "n/a"):
+            return None
+        return pad
+
+    def _logline(self, msg: str) -> None:
+        if self._log is not None:
+            self._log(msg)

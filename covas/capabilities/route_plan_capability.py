@@ -1,22 +1,27 @@
-"""Route-planning capability — the FOUNDATION proof for the Spansh route planners (#41).
+"""Spansh route planners — trade loop, neutron/long-range, and Road to Riches (#41/#42/#43).
 
-The route foundation (`search/routes.py`) stands up the async submit+poll client, the freshness
-discipline, and the galaxy-map plot-handoff seam. This capability is the thin surface that proves
-them end to end with ONE tool — `plan_trade_route` — so the Commander can voice-plan a trade loop
-from where they're docked, hear the best first hop (with an age caveat when prices are stale), and
-have the next stop handed to the galaxy map (clipboard until the keybind galaxy-map automation, #32,
-lands). The richer planners — Road to Riches (#42), the full trade planner (#44), mining (#45) —
-add sibling tools on the SAME client; they don't touch this file.
+Three bespoke planner tools that deliberately stay OUTSIDE the spec-driven search family (issue
+#111): they run over the ASYNC route client in `search/routes.py` (submit-and-poll a Spansh job,
+then a galaxy-map plot handoff via `RoutePlotter`), NOT the synchronous `build_query`/
+`execute_search` slot search the family is built on. They share that client + the plot seam + the
+LLM-native "fill the numbers you know or ask" shape, so they're grouped in one module:
 
-LLM-native and stateless, like the search capabilities: the model fills the numbers it knows (or
-asks the Commander), the start defaults to the current docked station, and the conversation is the
-memory. Everything I/O-bound is injected (`http`, `get_current_system`, `get_current_station`,
-`plotter`, `sleep`) so the default `pytest` run is offline (DESIGN §9). Fail soft throughout — a bad
-value or a failed plot is spoken, never raised.
+  * `plan_trade_route`  (#41) — a profitable multi-hop buy/sell loop from where you're docked,
+    with per-hop and whole-loop price-freshness caveats.
+  * `plot_neutron_route` (#43) — the neutron-highway long-range plotter (A -> B in far fewer
+    jumps); no market data, so no freshness caveat.
+  * `plan_riches_route`  (#42) — Road to Riches: nearby systems of high-value UNSCANNED bodies to
+    First-Discovery-scan for exploration credits.
 
-LIVE-VERIFY: the trade request/result shape lives in `search/routes.py` (`build_trade_request` /
-`parse_trade_route`) and is confirmed on-hardware per the issue; this capability is unaffected by a
-field-name correction there.
+All are LLM-native and stateless: the model fills what it knows (or asks), the start defaults to
+the current system/station, and the conversation is the memory. Everything I/O-bound is injected
+(`http`, `get_current_system`, `get_current_station`, `plotter`, `sleep`) so the default `pytest`
+run is offline (DESIGN §9). Fail soft throughout — a bad value or a failed plot is spoken, never
+raised.
+
+LIVE-VERIFY: the request/result shapes live in `search/routes.py` (`build_*_request` /
+`parse_*_route`) and are confirmed on-hardware per the issues; these capabilities are unaffected by
+a field-name correction there.
 """
 from __future__ import annotations
 
@@ -26,12 +31,19 @@ from typing import Callable
 
 from ..nav import copy as _default_copy
 from ..search import NavError, RequestsHttp
-from ..search.routes import (TRADE_ROUTE_URL, RoutePlotter, RouteWaypoint, build_trade_request,
-                             hop_age_days, parse_trade_route, stale_age_caveat, submit_and_poll)
+from ..search.routes import (RICHES_ROUTE_URL, ROUTE_URL, TRADE_ROUTE_URL, RoutePlotter,
+                             RouteWaypoint, build_galaxy_request, build_riches_request,
+                             build_trade_request, hop_age_days, parse_galaxy_route,
+                             parse_riches_route, parse_trade_route, stale_age_caveat,
+                             submit_and_poll)
 from ..search.spansh import Http, _DEFAULT_UA
 from .base import HelpMeta, Slot
 
-_TOOL_NAME = "plan_trade_route"
+
+# ==========================================================================================
+# Trade route — plan_trade_route (#41)
+# ==========================================================================================
+_TRADE_TOOL = "plan_trade_route"
 
 
 @dataclass(frozen=True)
@@ -55,7 +67,7 @@ class RoutePlanConfig:
         )
 
 
-_DESC = (
+_TRADE_DESC = (
     "Plan a profitable multi-hop TRADE ROUTE (a buy/sell loop) for the Commander using Spansh, "
     "starting from the station they're currently docked at, and hand the first destination to the "
     "galaxy map. Use when they ask to plan trading, find a trade run, or 'where should I trade from "
@@ -73,7 +85,7 @@ _DESC = (
     "pass it along. Tell them the next stop was copied to their clipboard for the galaxy map."
 )
 
-_SCHEMA_PROPS = {
+_TRADE_SCHEMA_PROPS = {
     "capital": {"type": "integer", "description": "Credits available to spend on cargo."},
     "max_cargo": {"type": "integer", "description": "Cargo capacity in tons."},
     "jump_range": {"type": "number", "description": "Laden jump range in light-years."},
@@ -99,7 +111,10 @@ _SCHEMA_PROPS = {
 
 
 class RoutePlanCapability:
-    """Advertises `plan_trade_route` and runs it over the shared route client + plot seam."""
+    """Advertises `plan_trade_route` and runs it over the shared route client + plot seam.
+
+    STANDALONE by design (issue #111): the async submit-and-poll route client + RoutePlotter
+    handoff don't fit the synchronous slot-search family."""
     # Tiering group (issue #84): the token-budget cluster this capability's tools belong
     # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
     TIERING_GROUP = "search"
@@ -126,8 +141,8 @@ class RoutePlanCapability:
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:
-        return [{"name": _TOOL_NAME, "description": _DESC,
-                 "input_schema": {"type": "object", "properties": dict(_SCHEMA_PROPS),
+        return [{"name": _TRADE_TOOL, "description": _TRADE_DESC,
+                 "input_schema": {"type": "object", "properties": dict(_TRADE_SCHEMA_PROPS),
                                   "required": []}}]
 
     def help_meta(self) -> HelpMeta:
@@ -158,7 +173,7 @@ class RoutePlanCapability:
         )
 
     def run_tool(self, name: str, inp: dict) -> str:
-        if name != _TOOL_NAME:
+        if name != _TRADE_TOOL:
             return f"Unknown tool: {name}"
         try:
             return self._handle(inp)
@@ -246,6 +261,373 @@ class RoutePlanCapability:
         return (f"{verb} {hop.commodity} at {hop.source_station} and sell at "
                 f"{hop.destination_station} in {hop.destination_system} for about "
                 f"{hop.profit_per_unit:,} a ton{tag}.")
+
+    def _logline(self, msg: str) -> None:
+        if self._log is not None:
+            self._log(msg)
+
+
+# ==========================================================================================
+# Neutron / long-range route — plot_neutron_route (#43)
+# ==========================================================================================
+_NEUTRON_TOOL = "plot_neutron_route"
+
+# Spansh efficiency: 1–100, higher = fewer jumps by taking more neutron detours. 60 is the site's
+# sensible middle ground (fewer jumps without wildly long neutron hops).
+_MIN_EFFICIENCY = 1
+_MAX_EFFICIENCY = 100
+
+
+@dataclass(frozen=True)
+class NeutronPlanConfig:
+    """Immutable snapshot of `[neutron_plan]`. Off by default; not registered unless enabled."""
+    enabled: bool = False
+    user_agent: str = _DEFAULT_UA
+    default_efficiency: int = 60
+
+    @classmethod
+    def from_cfg(cls, cfg: dict) -> "NeutronPlanConfig":
+        n = cfg.get("neutron_plan", {}) or {}
+        d = cls()
+        eff = int(n.get("default_efficiency", d.default_efficiency) or d.default_efficiency)
+        return cls(
+            enabled=bool(n.get("enabled", False)),
+            user_agent=str(n.get("user_agent", d.user_agent) or d.user_agent),
+            default_efficiency=min(_MAX_EFFICIENCY, max(_MIN_EFFICIENCY, eff)),
+        )
+
+
+_NEUTRON_DESC = (
+    "Plot a NEUTRON / long-range GALAXY route for the Commander using Spansh's neutron-highway "
+    "plotter, then hand the first waypoint to the galaxy map. Use when they ask to plot a route to "
+    "a distant system, a neutron route, a long-range or galaxy route, or 'get me to <system> in as "
+    "few jumps as possible'.\n"
+    "- `to_system` (destination) is REQUIRED — ask for it if they don't say where.\n"
+    "- `jump_range` (their LADEN jump range in ly) is REQUIRED — ask for it if missing; it bounds "
+    "each jump.\n"
+    "- The start defaults to their current system; pass `from_system` only to start elsewhere.\n"
+    "- `efficiency` (1-100, higher = fewer jumps via more neutron boosts) defaults sensibly; omit "
+    "unless they ask for a more efficient or more direct route.\n"
+    "- Relay the summary: total jumps, how many waypoints, and the first one. Tell them the first "
+    "waypoint was copied to their clipboard for the galaxy map."
+)
+
+_NEUTRON_SCHEMA_PROPS = {
+    "to_system": {"type": "string",
+                  "description": "Destination system to plot a route to. Required."},
+    "jump_range": {"type": "number",
+                   "description": "Laden jump range in light-years. Required — ask if unknown."},
+    "from_system": {"type": "string",
+                    "description": "Start system. Omit to use the Commander's current system."},
+    "efficiency": {"type": "integer",
+                   "description": "Neutron efficiency 1-100 (higher = fewer jumps). Omit for the "
+                                  "default."},
+}
+
+
+class NeutronPlanCapability:
+    """Advertises `plot_neutron_route` and runs it over the shared galaxy plotter + plot seam.
+
+    STANDALONE by design (issue #111): the async galaxy plotter (submit-and-poll) + RoutePlotter
+    handoff don't fit the synchronous slot-search family."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
+
+    def __init__(
+        self,
+        config: NeutronPlanConfig,
+        *,
+        http: Http | None = None,
+        get_current_system: Callable[[], str | None] | None = None,
+        plotter: RoutePlotter | None = None,
+        clipboard: Callable[[str], None] = _default_copy,
+        sleep: Callable[[float], None] = time.sleep,
+        log: Callable[[str], None] | None = None,
+    ) -> None:
+        self._cfg = config
+        self._http = http if http is not None else RequestsHttp()
+        self._current_system = get_current_system
+        self._plotter = plotter if plotter is not None else RoutePlotter(clipboard=clipboard, log=log)
+        self._sleep = sleep
+        self._log = log
+
+    # -- capability interface ---------------------------------------------------------
+    def tools(self) -> list[dict]:
+        return [{"name": _NEUTRON_TOOL, "description": _NEUTRON_DESC,
+                 "input_schema": {"type": "object", "properties": dict(_NEUTRON_SCHEMA_PROPS),
+                                  "required": ["to_system"]}}]
+
+    def help_meta(self) -> HelpMeta:
+        return HelpMeta(
+            category="neutron routes",
+            group="navigation and search",
+            one_liner=("I plot a long-range neutron-highway route to a distant system — total "
+                       "jumps and the first waypoint — and copy that waypoint to your clipboard "
+                       "for the galaxy map."),
+            example="plot a neutron route to Colonia",
+            slots=(
+                Slot(param="to_system",
+                     phrasings=("your destination", "where to"),
+                     example="plot a neutron route to Sagittarius A*",
+                     help_text="The system you want to reach — the route's destination."),
+                Slot(param="jump_range",
+                     phrasings=("your jump range", "how far you jump"),
+                     example="a neutron route to Colonia for a 55 light-year jump range",
+                     help_text="Your laden jump range in light-years — it bounds each jump."),
+                Slot(param="efficiency",
+                     phrasings=("how efficient", "fewer jumps or more direct"),
+                     example="a more efficient neutron route to Colonia",
+                     help_text="1-100; higher trades longer detours for fewer total jumps."),
+            ),
+            help_when_active=("Tell me your destination and your laden jump range, and I'll plot a "
+                              "long-range neutron route and copy the first waypoint for the galaxy "
+                              "map."),
+        )
+
+    def run_tool(self, name: str, inp: dict) -> str:
+        if name != _NEUTRON_TOOL:
+            return f"Unknown tool: {name}"
+        try:
+            return self._handle(inp)
+        except Exception as e:  # noqa: BLE001 — the voice loop must survive any tool error
+            self._logline(f"error: {e}")
+            return f"Neutron-route error: {e}"
+
+    # -- dialog -----------------------------------------------------------------------
+    def _handle(self, inp: dict) -> str:
+        to_system = str(inp.get("to_system") or "").strip()
+        if not to_system:
+            return "Where do you want to go? Tell me the destination system to plot a route to."
+
+        if inp.get("jump_range") in (None, ""):
+            return ("What's your laden jump range in light-years? I need it to plot the neutron "
+                    "route.")
+
+        from_system = str(inp.get("from_system") or "").strip() or (
+            self._current_system() if self._current_system else None)
+        if not from_system:
+            return (f"I don't know where you are — tell me the system to start from, or the route "
+                    f"to {to_system} can't be plotted.")
+
+        efficiency = self._efficiency(inp)
+        try:
+            params = build_galaxy_request(from_system, to_system,
+                                          jump_range=float(inp["jump_range"]), efficiency=efficiency)
+            result = submit_and_poll(self._http, ROUTE_URL, params,
+                                     user_agent=self._cfg.user_agent, sleep=self._sleep,
+                                     subject="the neutron plotter", lookup_name="neutron route")
+        except (NavError, TypeError, ValueError) as e:
+            self._logline(f"neutron plot failed: {e}")
+            return str(e) if isinstance(e, NavError) else (
+                f"I couldn't read that jump range — give me a number in light-years.")
+
+        waypoints = parse_galaxy_route(result)
+        if not waypoints:
+            return (f"Spansh couldn't plot a neutron route from {from_system} to {to_system} — "
+                    "double-check the system names, or try a longer jump range.")
+        return self._say_and_plot(from_system, to_system, waypoints)
+
+    def _efficiency(self, inp: dict) -> int:
+        """The efficiency to use — the tool arg (clamped) or the configured default."""
+        raw = inp.get("efficiency")
+        if raw in (None, ""):
+            return self._cfg.default_efficiency
+        try:
+            return min(_MAX_EFFICIENCY, max(_MIN_EFFICIENCY, int(raw)))
+        except (TypeError, ValueError):
+            return self._cfg.default_efficiency
+
+    def _say_and_plot(self, from_system: str, to_system: str, waypoints) -> str:
+        # The last waypoint's `jumps` is the cumulative total for the whole route (galaxy plotter).
+        total_jumps = max((w.jumps for w in waypoints), default=len(waypoints))
+        first = waypoints[0].system
+        count = len(waypoints)
+        stops = "waypoint" if count == 1 else "waypoints"
+        line = (f"Neutron route to {to_system}: {total_jumps} jumps across {count} {stops}. "
+                f"First hop is {first}.")
+        plot = self._plotter.plot_next([waypoints[0]])
+        self._logline(f"neutron route {from_system} -> {to_system}: {total_jumps} jumps, "
+                      f"{count} waypoints, first -> {first}")
+        return f"{line} {plot}"
+
+    def _logline(self, msg: str) -> None:
+        if self._log is not None:
+            self._log(msg)
+
+
+# ==========================================================================================
+# Road to Riches — plan_riches_route (#42)
+# ==========================================================================================
+_RICHES_TOOL = "plan_riches_route"
+
+
+@dataclass(frozen=True)
+class RichesPlanConfig:
+    """Immutable snapshot of `[riches_plan]`. Off by default; not registered unless enabled."""
+    enabled: bool = False
+    user_agent: str = _DEFAULT_UA
+    default_radius: float = 50.0
+    default_max_results: int = 25
+    default_min_value: int = 300_000
+    use_mapping_value: bool = True
+
+    @classmethod
+    def from_cfg(cls, cfg: dict) -> "RichesPlanConfig":
+        r = cfg.get("riches_plan", {}) or {}
+        d = cls()
+        return cls(
+            enabled=bool(r.get("enabled", False)),
+            user_agent=str(r.get("user_agent", d.user_agent) or d.user_agent),
+            default_radius=float(r.get("default_radius", d.default_radius) or d.default_radius),
+            default_max_results=int(r.get("default_max_results", d.default_max_results)
+                                    or d.default_max_results),
+            default_min_value=int(r.get("default_min_value", d.default_min_value)
+                                  or d.default_min_value),
+            use_mapping_value=bool(r.get("use_mapping_value", d.use_mapping_value)),
+        )
+
+
+_RICHES_DESC = (
+    "Plan a ROAD TO RICHES route — a chain of nearby systems with high-value UNSCANNED bodies to "
+    "First-Discovery-scan for exploration credits — using Spansh, starting from the Commander's "
+    "current system, and hand the first system to the galaxy map. Use when they ask to 'plan a "
+    "Road to Riches', find an exploration/credit-farming route, or 'where can I scan for money'.\n"
+    "- You MUST have their `jump_range` (laden jump range in ly): fill it if known, otherwise ASK.\n"
+    "- The start defaults to the Commander's current system; pass `from_system` only to start "
+    "elsewhere.\n"
+    "- Optional: `radius` (ly to search around the start), `max_results` (how many systems), "
+    "`min_value` (minimum per-body scan value to bother with). Omit for sensible defaults.\n"
+    "- Relay the summary: the first system, how many bodies to scan there, and the estimated "
+    "values. Tell them the first system was copied to their clipboard for the galaxy map."
+)
+
+_RICHES_SCHEMA_PROPS = {
+    "jump_range": {"type": "number", "description": "Laden jump range in light-years (required)."},
+    "from_system": {"type": "string",
+                    "description": "Start system. Omit to use the Commander's current system."},
+    "radius": {"type": "number",
+               "description": "Search radius in light-years around the start. Omit for the default."},
+    "max_results": {"type": "integer",
+                    "description": "Maximum number of systems in the route. Omit for the default."},
+    "min_value": {"type": "integer",
+                  "description": "Minimum per-body scan value (credits) worth including. Omit for "
+                                 "the default."},
+}
+
+
+class RichesPlanCapability:
+    """Advertises `plan_riches_route` and runs it over the shared route client + plot seam.
+
+    STANDALONE by design (issue #111): the async Road-to-Riches route client + RoutePlotter
+    handoff don't fit the synchronous slot-search family."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
+
+    def __init__(
+        self,
+        config: RichesPlanConfig,
+        *,
+        http: Http | None = None,
+        get_current_system: Callable[[], str | None] | None = None,
+        plotter: RoutePlotter | None = None,
+        clipboard: Callable[[str], None] = _default_copy,
+        sleep: Callable[[float], None] = time.sleep,
+        log: Callable[[str], None] | None = None,
+    ) -> None:
+        self._cfg = config
+        self._http = http if http is not None else RequestsHttp()
+        self._current_system = get_current_system
+        self._plotter = plotter if plotter is not None else RoutePlotter(clipboard=clipboard, log=log)
+        self._sleep = sleep
+        self._log = log
+
+    # -- capability interface ---------------------------------------------------------
+    def tools(self) -> list[dict]:
+        return [{"name": _RICHES_TOOL, "description": _RICHES_DESC,
+                 "input_schema": {"type": "object", "properties": dict(_RICHES_SCHEMA_PROPS),
+                                  "required": ["jump_range"]}}]
+
+    def help_meta(self) -> HelpMeta:
+        return HelpMeta(
+            category="Road to Riches",
+            group="navigation and search",
+            one_liner=("I plan a Road to Riches from where you are — nearby systems full of "
+                       "high-value bodies to First-Discovery-scan for credits — and copy the first "
+                       "system to your clipboard for the galaxy map."),
+            example="plan me a Road to Riches route",
+            slots=(
+                Slot(param="jump_range",
+                     phrasings=("your jump range", "how far you jump"),
+                     example="a Road to Riches for a 40 light-year jump range",
+                     help_text="Your laden jump range in light-years — it bounds each jump."),
+                Slot(param="radius",
+                     phrasings=("how far to search", "the search radius"),
+                     example="a Road to Riches within 30 light-years",
+                     help_text="How far around your start to look for scannable systems."),
+                Slot(param="min_value",
+                     phrasings=("the minimum scan value", "how valuable the bodies must be"),
+                     example="a Road to Riches with bodies worth at least a million each",
+                     help_text="Skip bodies whose estimated scan value is below this."),
+            ),
+            help_when_active=("Tell me your jump range and I'll plan a Road to Riches from your "
+                              "current system — nearby systems with high-value bodies to scan."),
+        )
+
+    def run_tool(self, name: str, inp: dict) -> str:
+        if name != _RICHES_TOOL:
+            return f"Unknown tool: {name}"
+        try:
+            return self._handle(inp)
+        except Exception as e:  # noqa: BLE001 — the voice loop must survive any tool error
+            self._logline(f"error: {e}")
+            return f"Road-to-Riches error: {e}"
+
+    # -- dialog -----------------------------------------------------------------------
+    def _handle(self, inp: dict) -> str:
+        system = str(inp.get("from_system") or "").strip() or (
+            self._current_system() if self._current_system else None)
+        if not system:
+            return ("I need a starting system — tell me where to start, or wait until I can read "
+                    "your current system from the game.")
+
+        if inp.get("jump_range") in (None, ""):
+            return "To plan a Road to Riches I need your laden jump range. What is it?"
+
+        try:
+            params = build_riches_request(
+                from_system=system, jump_range=float(inp["jump_range"]),
+                radius=float(inp.get("radius") or self._cfg.default_radius),
+                max_results=int(inp.get("max_results") or self._cfg.default_max_results),
+                min_value=int(inp.get("min_value") or self._cfg.default_min_value),
+                use_mapping_value=self._cfg.use_mapping_value)
+            result = submit_and_poll(self._http, RICHES_ROUTE_URL, params,
+                                     user_agent=self._cfg.user_agent, sleep=self._sleep,
+                                     subject="the Road-to-Riches planner",
+                                     lookup_name="Road-to-Riches route")
+        except NavError as e:
+            self._logline(f"riches plan failed: {e}")
+            return str(e)
+
+        systems = parse_riches_route(result)
+        if not systems:
+            return ("Spansh didn't find a Road-to-Riches route from there with those limits — try a "
+                    "bigger radius, a longer jump range, or a lower minimum scan value.")
+        return self._say_and_plot(systems)
+
+    def _say_and_plot(self, systems) -> str:
+        first = systems[0]
+        total = sum(s.total_value for s in systems)
+        bodies = "body" if first.body_count == 1 else "bodies"
+        line = (f"Road to Riches: start at {first.system} — {first.body_count} {bodies} to scan "
+                f"worth about {first.total_value:,} credits. Across {len(systems)} systems that's "
+                f"roughly {total:,} credits in first-discovery scans.")
+        # Plot the first system — that's where the Commander flies to start scanning.
+        plot = self._plotter.plot_next([RouteWaypoint(first.system)])
+        self._logline(f"riches route: {len(systems)} systems, first -> {first.system} "
+                      f"({first.body_count} bodies)")
+        return f"{line} {plot}"
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:

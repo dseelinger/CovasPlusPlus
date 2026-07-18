@@ -1007,8 +1007,7 @@ def build_ship_nav(app: "App") -> None:
     try:
         from .nav import RequestsHttp, ShipIndex
         from .nav.edsm_stock import EdsmStockLookup
-        from .capabilities.find_closest_capability import NavConfig
-        from .capabilities.find_closest_ship_capability import FindClosestShipCapability
+        from .capabilities.find_closest_capability import FindClosestShipCapability, NavConfig
         from .ed.journal import resolve_journal_dir
         from .ed.shipyard import read_shipyard_snapshot
 
@@ -1069,9 +1068,9 @@ def build_system_search(app: "App") -> None:
     fallback (same seam as find-closest)."""
     try:
         from .search import RequestsHttp
-        from .capabilities.system_search_capability import (SystemSearchCapability,
-                                                            SystemSearchConfig)
-        scfg = SystemSearchConfig.from_cfg(app.cfg)
+        from .capabilities._search_support import SearchConfig
+        from .capabilities.search_family import SystemSearchCapability
+        scfg = SearchConfig.from_cfg(app.cfg, "star_systems")
         app.system_search = SystemSearchCapability(
             scfg, http=RequestsHttp(),
             get_current_system=app._current_system,
@@ -1095,10 +1094,7 @@ def build_searches(app: "App") -> None:
         from .search import RequestsHttp
         from .search.faction_index import FactionIndex
         from .capabilities._search_support import SearchConfig
-        from .capabilities.station_search_capability import StationSearchCapability
-        from .capabilities.minor_faction_search_capability import MinorFactionSearchCapability
-        from .capabilities.signal_search_capability import SignalSearchCapability
-        from .capabilities.misc_search_capability import MiscSearchCapability
+        from .capabilities.search_family import SEARCH_GROUP, SpecSearchCapability
 
         scfg = SearchConfig.from_cfg(app.cfg, "search")
         http = RequestsHttp()
@@ -1108,11 +1104,13 @@ def build_searches(app: "App") -> None:
         factions = FactionIndex()
         common = dict(http=http, get_current_system=app._current_system,
                       log=lambda msg: app._log("search", msg))
+        # Loop the declarative family table (issue #111): each row is (descriptor, wants_factions),
+        # in the SAME registration order as before, so the tools() ordering prompt caching keys off
+        # is unchanged. Only the faction-taking categories are handed the shared index.
         app.searches = [
-            StationSearchCapability(scfg, factions=factions, **common),
-            MinorFactionSearchCapability(scfg, factions=factions, **common),
-            SignalSearchCapability(scfg, **common),
-            MiscSearchCapability(scfg, factions=factions, **common),
+            SpecSearchCapability(desc, scfg,
+                                 **(dict(common, factions=factions) if wants else common))
+            for desc, wants in SEARCH_GROUP
         ]
         for cap in app.searches:
             app.registry.register(cap)
@@ -1136,7 +1134,7 @@ def build_bodies(app: "App") -> None:
     try:
         from .search import RequestsHttp
         from .capabilities._search_support import SearchConfig
-        from .capabilities.body_search_capability import BodySearchCapability
+        from .capabilities.search_family import BodySearchCapability
 
         bcfg = SearchConfig.from_cfg(app.cfg, "bodies")
         app.body_search = BodySearchCapability(
@@ -1188,8 +1186,8 @@ def build_neutron_plan(app: "App") -> None:
     clipboard until the galaxy-map keybind automation (#32) lands."""
     try:
         from .search import RequestsHttp
-        from .capabilities.neutron_plan_capability import (NeutronPlanCapability,
-                                                           NeutronPlanConfig)
+        from .capabilities.route_plan_capability import (NeutronPlanCapability,
+                                                         NeutronPlanConfig)
 
         ncfg = NeutronPlanConfig.from_cfg(app.cfg)
         app.neutron_plan = NeutronPlanCapability(
@@ -1216,7 +1214,7 @@ def build_riches_plan(app: "App") -> None:
     clipboard until the galaxy-map keybind automation (#32) lands."""
     try:
         from .search import RequestsHttp
-        from .capabilities.riches_plan_capability import RichesPlanCapability, RichesPlanConfig
+        from .capabilities.route_plan_capability import RichesPlanCapability, RichesPlanConfig
 
         rcfg = RichesPlanConfig.from_cfg(app.cfg)
         app.riches_plan = RichesPlanCapability(

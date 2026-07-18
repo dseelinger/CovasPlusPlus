@@ -1,5 +1,8 @@
 """Mining-helper capability (#45) — plan and run a mining session by voice.
 
+STANDALONE by design (issue #111): hotspot + sell-price + checklist side effects don't ride the
+synchronous `_search_support` slot-search pipeline, so this stays outside `search_family.py`.
+
 One tool — `plan_mining_session` — ties three pieces together for a named material (Painite, Low
 Temperature Diamonds, Tritium…):
 

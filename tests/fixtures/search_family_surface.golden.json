@@ -1,0 +1,1433 @@
+[
+  {
+    "capability": "find_closest_module",
+    "tools": [
+      {
+        "name": "find_closest_module",
+        "description": "Find the closest Elite Dangerous station that SELLS a given outfitting module, by distance from the Commander's current system, and copy that system's name to the clipboard. (If the Commander wants a whole SHIP rather than a module \u2014 'where can I buy an Anaconda' \u2014 use the find_closest_ship tool; if they want the nearest station by SERVICE, TYPE, or PAD, use search_stations.) Resolve the module CONVERSATIONALLY, then search:\n1. Normalize the spoken module name to a real module (e.g. 'multiple cannon' or 'multicannon' -> Multi-Cannon) and call this tool with `module` set to your best interpretation.\n2. The tool replies with structured guidance. If it says attributes are MISSING (size and/or mount), ask the Commander for exactly those \u2014 offering the valid options it lists \u2014 and NEVER guess them. If it says the name is AMBIGUOUS, ask which one. If UNKNOWN, say so and offer the suggestions.\n3. As soon as the module is fully specified (name plus any required size/mount), the tool searches immediately and returns the nearest station \u2014 no separate confirmation step. If the Commander says 'cancel' / 'never mind' / 'forget it', DROP the request and acknowledge \u2014 do NOT call this tool.\nIt is stateless \u2014 re-call it each turn with everything known so far (module, then +size/+mount). When the tool returns a result, relay the station, system, and distance, and ALWAYS tell the Commander that the system name has been copied to their clipboard.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "module": {
+              "type": "string",
+              "description": "Your best interpretation of the module name (e.g. 'Multi-Cannon', 'Frame Shift Drive', 'Fuel Scoop')."
+            },
+            "size": {
+              "type": "string",
+              "description": "Module size when relevant: a word for weapons (small/medium/large/huge) or a class number for internals (1-8). Omit if unknown \u2014 the tool will ask."
+            },
+            "mount": {
+              "type": "string",
+              "description": "Weapon mount when relevant: fixed / gimballed / turreted. Omit if unknown \u2014 the tool will ask."
+            },
+            "pad_size": {
+              "type": "string",
+              "description": "Required landing-pad size (S/M/L) for the Commander's ship. Omit to use the configured default."
+            }
+          },
+          "required": [
+            "module"
+          ]
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "outfitting",
+      "one_liner": "I find the closest station selling an outfitting module and copy that system to your clipboard.",
+      "example": "find the closest multi-cannon",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "module",
+          "phrasings": [
+            "the module name",
+            "the module"
+          ],
+          "example": "find the nearest fuel scoop",
+          "help_text": "Name the module you want \u2014 a multi-cannon, a fuel scoop, a frame shift drive, and so on."
+        },
+        {
+          "param": "size",
+          "phrasings": [
+            "a size",
+            "a class"
+          ],
+          "example": "a large multi-cannon",
+          "help_text": "For modules that come in several sizes, say the size \u2014 small, medium, large, huge, or a class number."
+        },
+        {
+          "param": "mount",
+          "phrasings": [
+            "a mount",
+            "fixed, gimballed, or turreted"
+          ],
+          "example": "a gimballed multi-cannon",
+          "help_text": "For weapons, say the mount: fixed, gimballed, or turreted."
+        },
+        {
+          "param": "pad_size",
+          "phrasings": [
+            "a landing pad size",
+            "a pad size"
+          ],
+          "example": "somewhere with a large pad",
+          "help_text": "Restrict to stations with a given landing-pad size \u2014 small, medium, or large."
+        }
+      ],
+      "help_when_active": "Tell me the module \u2014 and its size or mount if I ask \u2014 and I'll find the nearest station that sells it."
+    },
+    "help_vocabulary": {
+      "module": [
+        "AX Missile Rack",
+        "AX Multi-Cannon",
+        "Abrasion Blaster",
+        "Advanced Discovery Scanner",
+        "Advanced Docking Computer",
+        "Advanced Missile Rack",
+        "Advanced Multi-Cannon",
+        "Advanced Planetary Approach Suite",
+        "Advanced Plasma Accelerator",
+        "Auto Field-Maintenance Unit",
+        "Basic Discovery Scanner",
+        "Beam Laser",
+        "Bi-Weave Shield Generator",
+        "Burst Laser",
+        "Business Class Passenger Cabin",
+        "Cannon",
+        "Cargo Rack",
+        "Cargo Scanner",
+        "Caustic Sink Launcher",
+        "Chaff Launcher",
+        "Collector Limpet Controller",
+        "Concord Cannon",
+        "Corrosion Resistant Cargo Rack",
+        "Cytoscrambler Burst Laser",
+        "Decontamination Limpet Controller",
+        "Detailed Surface Scanner",
+        "Economy Class Passenger Cabin",
+        "Electronic Countermeasure",
+        "Enforcer Cannon",
+        "Enhanced AX Missile Rack",
+        "Enhanced AX Multi-Cannon",
+        "Enhanced Performance Thrusters",
+        "Enhanced Xeno Scanner",
+        "Enzyme Missile Rack",
+        "Experimental Weapon Stabiliser",
+        "Fighter Hangar",
+        "First Class Passenger Cabin",
+        "Fragment Cannon",
+        "Frame Shift Drive",
+        "Frame Shift Drive (SCO)",
+        "Frame Shift Drive Interdictor",
+        "Frame Shift Wake Scanner",
+        "Fuel Scoop",
+        "Fuel Tank",
+        "Fuel Transfer Limpet Controller",
+        "Guardian FSD Booster",
+        "Guardian Gauss Cannon",
+        "Guardian Hull Reinforcement",
+        "Guardian Hybrid Power Distributor",
+        "Guardian Hybrid Power Plant",
+        "Guardian Module Reinforcement",
+        "Guardian Nanite Torpedo Pylon",
+        "Guardian Plasma Charger",
+        "Guardian Shard Cannon",
+        "Guardian Shield Reinforcement",
+        "Hatch Breaker Limpet Controller",
+        "Heat Sink Launcher",
+        "Hull Reinforcement Package",
+        "Imperial Hammer Rail Gun",
+        "Intermediate Discovery Scanner",
+        "Kill Warrant Scanner",
+        "Life Support",
+        "Lightweight Alloy",
+        "Luxury Class Passenger Cabin",
+        "Meta Alloy Hull Reinforcement",
+        "Military Grade Composite",
+        "Mine Launcher",
+        "Mining Lance",
+        "Mining Laser",
+        "Mining Multi Limpet Controller",
+        "Mining Volley Repeater",
+        "Mirrored Surface Composite",
+        "Missile Rack",
+        "Mk II Ablative Lightweight Alloys",
+        "Mk II Ablative Military Grade Composite",
+        "Mk II Ablative Mirrored Surface Composite",
+        "Mk II Ablative Reactive Surface Composite",
+        "Mk II Ablative Reinforced Alloys",
+        "Mk II Agile Boost Thrusters",
+        "Mk II Cargo Rack",
+        "Mk II Gravity Optimised Thrusters",
+        "Mk II Mining Multi-Limpet Controller",
+        "Mk II Plasma Shock Accelerator",
+        "Mk II Supercharge Optimised Frame Shift Drive (SCO)",
+        "MkII Business Class Passenger Cabin",
+        "MkII Economy Class Passenger Cabin",
+        "Module Reinforcement Package",
+        "Multi-Cannon",
+        "Operations Multi Limpet Controller",
+        "Pacifier Frag-Cannon",
+        "Pack-Hound Missile Rack",
+        "Planetary Approach Suite",
+        "Planetary Vehicle Hangar",
+        "Plasma Accelerator",
+        "Point Defence",
+        "Power Distributor",
+        "Power Plant",
+        "Prismatic Shield Generator",
+        "Prospector Limpet Controller",
+        "Pulse Disruptor Laser",
+        "Pulse Laser",
+        "Pulse Wave Analyser",
+        "Pulse Wave Xeno Scanner",
+        "Rail Gun",
+        "Reactive Surface Composite",
+        "Recon Limpet Controller",
+        "Refinery",
+        "Reinforced Alloy",
+        "Remote Release Flak Launcher",
+        "Remote Release Flechette Launcher",
+        "Repair Limpet Controller",
+        "Rescue Multi Limpet Controller",
+        "Research Limpet Controller",
+        "Retributor Beam Laser",
+        "Rocket Propelled FSD Disruptor",
+        "Seeker Missile Rack",
+        "Seismic Charge Launcher",
+        "Sensors",
+        "Shield Booster",
+        "Shield Cell Bank",
+        "Shield Generator",
+        "Shock Cannon",
+        "Shock Mine Launcher",
+        "Shutdown Field Neutraliser",
+        "Standard Docking Computer",
+        "Sub-Surface Displacement Missile",
+        "Sub-Surface Extraction Missile",
+        "Supercruise Assist",
+        "Thargoid Pulse Neutraliser",
+        "Thrusters",
+        "Torpedo Pylon",
+        "Universal Multi Limpet Controller",
+        "Xeno Multi Limpet Controller",
+        "Xeno Scanner"
+      ]
+    }
+  },
+  {
+    "capability": "find_closest_ship",
+    "tools": [
+      {
+        "name": "find_closest_ship",
+        "description": "Find the closest Elite Dangerous station that SELLS a given SHIP (from a shipyard), by distance from the Commander's current system, and copy that system's name to the clipboard. Use THIS tool whenever the Commander wants to buy/find a whole SHIP ('where can I buy an Anaconda', 'find the closest Krait', 'nearest Python'). For an outfitting MODULE (multi-cannon, fuel scoop, shield generator) use find_closest_module instead; for the nearest station by SERVICE/TYPE/PAD use search_stations. Resolve the ship CONVERSATIONALLY, then search:\n1. Normalize the spoken ship name to a real ship (e.g. 'conda' -> Anaconda, 'fdl' -> Fer-de-Lance, 'clipper' -> Imperial Clipper) and call this tool with `ship` set to your best interpretation.\n2. The tool replies with structured guidance. If it says the name is AMBIGUOUS (a family like Krait, Cobra, Viper, Asp, Diamondback, or Type), ask which one it lists \u2014 NEVER guess. If UNKNOWN, say so and offer the suggestions.\n3. As soon as the ship is resolved to a single model, the tool searches immediately and returns the nearest station \u2014 there's no size/mount to ask about and no separate confirm step. If the Commander says 'cancel' / 'never mind', DROP the request and acknowledge \u2014 do NOT call this tool.\nIt is stateless \u2014 re-call it each turn with the most specific name known so far (family -> picked model). When the tool returns a result, relay the station, system, and distance, and ALWAYS tell the Commander that the system name has been copied to their clipboard.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "ship": {
+              "type": "string",
+              "description": "Your best interpretation of the ship name (e.g. 'Anaconda', 'Krait Phantom', 'Type-9 Heavy', 'Fer-de-Lance'). For an ambiguous family (Krait, Cobra, Viper, Asp, Type), pass what you have and the tool will ask which model."
+            },
+            "pad_size": {
+              "type": "string",
+              "description": "Required landing-pad size (S/M/L) for the Commander's ship. Omit to use the configured default."
+            }
+          },
+          "required": [
+            "ship"
+          ]
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "shipyards",
+      "one_liner": "I find the closest station selling a given ship and copy that system to your clipboard.",
+      "example": "find the closest Anaconda",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "ship",
+          "phrasings": [
+            "the ship name",
+            "the ship"
+          ],
+          "example": "where can I buy a Python",
+          "help_text": "Name the ship you want \u2014 an Anaconda, a Python, a Krait, a Type-9, and so on. If it's a family like Krait or Cobra, I'll ask which model."
+        },
+        {
+          "param": "pad_size",
+          "phrasings": [
+            "a landing pad size",
+            "a pad size"
+          ],
+          "example": "somewhere with a large pad",
+          "help_text": "Restrict to stations with a given landing-pad size \u2014 small, medium, or large."
+        }
+      ],
+      "help_when_active": "Tell me the ship \u2014 and which model if I ask \u2014 and I'll find the nearest station that sells it."
+    },
+    "help_vocabulary": {
+      "ship": [
+        "Sidewinder",
+        "Eagle",
+        "Hauler",
+        "Adder",
+        "Imperial Eagle",
+        "Viper MkIII",
+        "Cobra MkIII",
+        "Viper MkIV",
+        "Diamondback Scout",
+        "Cobra MkIV",
+        "Cobra MkV",
+        "Type-6 Transporter",
+        "Dolphin",
+        "Diamondback Explorer",
+        "Imperial Courier",
+        "Keelback",
+        "Asp Scout",
+        "Asp Explorer",
+        "Vulture",
+        "Federal Dropship",
+        "Imperial Clipper",
+        "Federal Assault Ship",
+        "Type-7 Transporter",
+        "Type-8 Transporter",
+        "Federal Gunship",
+        "Krait MkII",
+        "Krait Phantom",
+        "Orca",
+        "Mamba",
+        "Fer-de-Lance",
+        "Python",
+        "Python MkII",
+        "Mandalay",
+        "Corsair",
+        "Type-9 Heavy",
+        "Type-10 Defender",
+        "Type-11 Prospector",
+        "Beluga Liner",
+        "Alliance Chieftain",
+        "Alliance Crusader",
+        "Alliance Challenger",
+        "Federal Corvette",
+        "Imperial Cutter",
+        "Anaconda",
+        "Panther Clipper MkII",
+        "Kestrel Mk II",
+        "Caspian Explorer",
+        "Lynx Highliner"
+      ]
+    }
+  },
+  {
+    "capability": "search_star_systems",
+    "tools": [
+      {
+        "name": "search_star_systems",
+        "description": "Find the nearest Elite Dangerous STAR SYSTEM matching what the Commander describes \u2014 by superpower allegiance, government, economy, security, population, Powerplay, or colonization state \u2014 measured from their current system, and copy the system's name to the clipboard. It is LLM-native and STATELESS; the conversation is the memory:\n1. Fill only the slots the Commander actually SAID; every unspoken slot means 'Any'. Normalize loosely (e.g. 'imperial' -> Empire allegiance, 'mining economy' -> Extraction) and pass your best interpretation.\n2. If a value is genuinely unclear, ASK \u2014 offering a couple of valid options \u2014 rather than guessing. If the tool replies that a value wasn't recognized, relay its suggested correction and try again.\n3. You do NOT need a separate confirmation turn: state your interpretation briefly and search. To REFINE, call again with the accumulated slots plus the new one; for a fresh search, just call with the new slots. 'Cancel'/'never mind' -> drop it, don't call.\n4. When the tool returns a match, relay the system, its distance, and the couple of traits that matter, and ALWAYS tell the Commander the system name was copied to their clipboard.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "allegiance": {
+              "type": "string",
+              "description": "Superpower allegiance: Federation, Empire, Alliance, Independent, Guardian, or Thargoid."
+            },
+            "government": {
+              "type": "string",
+              "description": "Government type, e.g. Democracy, Corporate, Anarchy, Dictatorship, Theocracy, Feudal."
+            },
+            "economy": {
+              "type": "string",
+              "description": "Main economy, e.g. Extraction (mining), High Tech, Agriculture, Industrial, Refinery, Tourism."
+            },
+            "security": {
+              "type": "string",
+              "description": "Security level: High, Medium, Low, Anarchy."
+            },
+            "power": {
+              "type": "string",
+              "description": "Powerplay power in the system, e.g. Aisling Duval, Edmund Mahon, Felicia Winters, Jerome Archer, Archon Delaine."
+            },
+            "power_state": {
+              "type": "string",
+              "description": "Powerplay state: Stronghold, Fortified, Exploited, or Unoccupied."
+            },
+            "min_population": {
+              "type": "integer",
+              "description": "Minimum system population (e.g. 1000000000 for 'over a billion'). Omit for no lower bound."
+            },
+            "max_population": {
+              "type": "integer",
+              "description": "Maximum system population. Omit for no upper bound."
+            },
+            "needs_permit": {
+              "type": "boolean",
+              "description": "True to require a permit-locked system, false to exclude one. Omit if the Commander didn't say."
+            },
+            "colonised": {
+              "type": "boolean",
+              "description": "True for already-colonised systems, false for uncolonised. Omit if unspoken."
+            },
+            "being_colonised": {
+              "type": "boolean",
+              "description": "True for systems currently OPEN for / undergoing colonization. Omit if unspoken."
+            },
+            "near": {
+              "type": "string",
+              "description": "Reference system to measure from. Omit to use the Commander's current system."
+            }
+          },
+          "required": []
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "star systems",
+      "one_liner": "I find the nearest star system matching an allegiance, government, economy, security, population, Powerplay, or colonization state, and copy its name to your clipboard.",
+      "example": "find the nearest Empire system with high security",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "allegiance",
+          "phrasings": [
+            "an allegiance",
+            "aligned to a superpower"
+          ],
+          "example": "the closest Alliance system",
+          "help_text": "Restrict to a superpower \u2014 Federation, Empire, Alliance, Independent, Guardian, or Thargoid."
+        },
+        {
+          "param": "government",
+          "phrasings": [
+            "a government",
+            "a government type"
+          ],
+          "example": "a nearby Democracy system",
+          "help_text": "Restrict to a government type, like Democracy, Corporate, Anarchy, or Theocracy."
+        },
+        {
+          "param": "primary_economy",
+          "phrasings": [
+            "an economy",
+            "an economy type"
+          ],
+          "example": "the nearest High Tech system",
+          "help_text": "Restrict to a main economy, like Extraction, High Tech, Agriculture, or Industrial."
+        },
+        {
+          "param": "security",
+          "phrasings": [
+            "a security level",
+            "how secure"
+          ],
+          "example": "a nearby high security system",
+          "help_text": "Restrict by security: High, Medium, Low, or Anarchy."
+        },
+        {
+          "param": "power",
+          "phrasings": [
+            "a Powerplay power",
+            "a power"
+          ],
+          "example": "the closest system under Aisling Duval",
+          "help_text": "Restrict to a Powerplay power present in the system, like Aisling Duval or Edmund Mahon."
+        },
+        {
+          "param": "power_state",
+          "phrasings": [
+            "a Powerplay state",
+            "a power state"
+          ],
+          "example": "the nearest Stronghold system",
+          "help_text": "Restrict by Powerplay state: Stronghold, Fortified, Exploited, or Unoccupied."
+        },
+        {
+          "param": "population",
+          "phrasings": [
+            "a population",
+            "how populated"
+          ],
+          "example": "a nearby system with over a billion people",
+          "help_text": "Restrict by population \u2014 say a minimum or a range, like over a billion."
+        },
+        {
+          "param": "needs_permit",
+          "phrasings": [
+            "permit locked",
+            "whether it needs a permit"
+          ],
+          "example": "the nearest permit-locked system",
+          "help_text": "Require, or exclude, permit-locked systems."
+        },
+        {
+          "param": "is_colonised",
+          "phrasings": [
+            "colonised or not",
+            "whether it's colonised"
+          ],
+          "example": "the closest uncolonised system",
+          "help_text": "Restrict to already-colonised or uncolonised systems."
+        },
+        {
+          "param": "is_being_colonised",
+          "phrasings": [
+            "open for colonization",
+            "being colonised"
+          ],
+          "example": "the nearest system open for colonization",
+          "help_text": "Restrict to systems currently open for or undergoing colonization."
+        }
+      ],
+      "help_when_active": "Tell me the traits \u2014 allegiance, economy, security, and so on \u2014 and I'll find the nearest system that matches."
+    },
+    "help_vocabulary": {
+      "allegiance": [
+        "Alliance",
+        "Empire",
+        "Federation",
+        "Independent",
+        "Guardian",
+        "Thargoid"
+      ],
+      "government": [
+        "Anarchy",
+        "Communism",
+        "Confederacy",
+        "Cooperative",
+        "Corporate",
+        "Democracy",
+        "Dictatorship",
+        "Feudal",
+        "Patronage",
+        "Prison",
+        "Prison Colony",
+        "Theocracy",
+        "None"
+      ],
+      "economy": [
+        "Agriculture",
+        "Colony",
+        "Extraction",
+        "High Tech",
+        "Industrial",
+        "Military",
+        "Refinery",
+        "Service",
+        "Terraforming",
+        "Tourism",
+        "None"
+      ],
+      "security": [
+        "Anarchy",
+        "Low",
+        "Medium",
+        "High"
+      ],
+      "power": [
+        "A. Lavigny-Duval",
+        "Aisling Duval",
+        "Archon Delaine",
+        "Denton Patreus",
+        "Edmund Mahon",
+        "Felicia Winters",
+        "Jerome Archer",
+        "Li Yong-Rui",
+        "Nakato Kaine",
+        "Pranav Antal",
+        "Yuri Grom",
+        "Zemina Torval"
+      ],
+      "power state": [
+        "Exploited",
+        "Fortified",
+        "Stronghold",
+        "Unoccupied"
+      ]
+    }
+  },
+  {
+    "capability": "search_stations",
+    "tools": [
+      {
+        "name": "search_stations",
+        "description": "Find the nearest Elite Dangerous STATION by its facilities \u2014 station type, services (shipyard, outfitting, market, material trader, interstellar factors, \u2026), landing-pad size, distance from the star, or controlling faction \u2014 from the Commander's current system, and copy the station's SYSTEM name to the clipboard.\nROUTING: if the Commander is really after a MODULE ('where can I buy a fuel scoop'), use find_closest_module instead; if they want a whole SHIP ('where can I buy a Python'), use find_closest_ship instead \u2014 those find the nearest station SELLING that, and return a station too. Use THIS tool for 'nearest station with <service/type/pad>'.\nIt is LLM-native and STATELESS:\n1. Fill only the slots the Commander said; unspoken means Any. Surface stations and fleet carriers are INCLUDED by default \u2014 if they say 'no carriers', set no_carriers. 'Close to the star' means within about a thousand light-seconds.\n2. If a service or station type is unclear, ask or relay the tool's suggested correction \u2014 don't invent one.\n3. Refine by re-calling with the accumulated slots (each call RE-QUERIES \u2014 a new constraint can change which station is nearest); a fresh search is just new slots. On 'cancel' / 'never mind', drop it and do NOT call this tool. Report the station, its system, pad, and distance, and ALWAYS say the system name was copied to the clipboard.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "station_type": {
+              "type": "string",
+              "description": "Station type, e.g. Coriolis Starport, Orbis Starport, Outpost, Planetary Port, Settlement, Mega ship."
+            },
+            "services": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Required services, e.g. Shipyard, Outfitting, Market, Material Trader, Interstellar Factors Contact, Black Market."
+            },
+            "faction": {
+              "type": "string",
+              "description": "Controlling minor faction name (exact-ish). Free text."
+            },
+            "pad_size": {
+              "type": "string",
+              "description": "Minimum landing-pad size the ship needs: S, M, or L."
+            },
+            "max_arrival_distance": {
+              "type": "integer",
+              "description": "Maximum distance from the main star, in light-seconds (e.g. 1000 for 'close to the star')."
+            },
+            "no_carriers": {
+              "type": "boolean",
+              "description": "Set true to EXCLUDE fleet carriers (they're included by default). Omit otherwise."
+            },
+            "near": {
+              "type": "string",
+              "description": "Reference system to measure from. Omit to use the current system."
+            }
+          },
+          "required": []
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "stations",
+      "one_liner": "I find the nearest station by its type, services, landing pad, distance from the star, or controlling faction, and copy its system to your clipboard.",
+      "example": "find the nearest station with a shipyard and a large pad",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "type",
+          "phrasings": [
+            "a station type",
+            "a kind of station"
+          ],
+          "example": "the nearest Orbis Starport",
+          "help_text": "Restrict to a station type, like Coriolis Starport, Outpost, Planetary Port, or Mega ship."
+        },
+        {
+          "param": "services",
+          "phrasings": [
+            "a service",
+            "services"
+          ],
+          "example": "somewhere with a material trader",
+          "help_text": "Require services, like Shipyard, Outfitting, Market, Material Trader, or Interstellar Factors."
+        },
+        {
+          "param": "controlling_minor_faction",
+          "phrasings": [
+            "a controlling faction",
+            "run by a faction"
+          ],
+          "example": "a station controlled by the Dark Wheel",
+          "help_text": "Restrict to stations controlled by a named minor faction."
+        },
+        {
+          "param": "has_large_pad",
+          "phrasings": [
+            "a landing pad size",
+            "a pad size"
+          ],
+          "example": "somewhere with a large pad",
+          "help_text": "Require a landing-pad size \u2014 small, medium, or large."
+        },
+        {
+          "param": "distance_to_arrival",
+          "phrasings": [
+            "close to the star",
+            "distance from the star"
+          ],
+          "example": "a station close to the star",
+          "help_text": "Restrict to stations within a distance of the main star, like close to the star."
+        }
+      ],
+      "help_when_active": "Tell me the type, services, or pad you need \u2014 and say 'no carriers' to leave out fleet carriers \u2014 and I'll find the nearest station."
+    },
+    "help_vocabulary": {
+      "station type": [
+        "Coriolis Starport",
+        "Ocellus Starport",
+        "Orbis Starport",
+        "Outpost",
+        "Planetary Outpost",
+        "Planetary Port",
+        "Settlement",
+        "Mega ship",
+        "Asteroid base"
+      ],
+      "service": [
+        "Market",
+        "Outfitting",
+        "Shipyard",
+        "Repair",
+        "Refuel",
+        "Restock",
+        "Universal Cartographics",
+        "Vista Genomics",
+        "Bartender",
+        "Search and Rescue",
+        "Missions",
+        "Material Trader",
+        "Technology Broker",
+        "Interstellar Factors Contact",
+        "Black Market",
+        "Crew Lounge",
+        "Redemption Office"
+      ]
+    }
+  },
+  {
+    "capability": "search_minor_factions",
+    "tools": [
+      {
+        "name": "search_minor_factions",
+        "description": "Find the nearest Elite Dangerous STAR SYSTEM by MINOR FACTION \u2014 where a named faction is present or in control, and/or by faction allegiance, government, or active state (war, boom, election, \u2026) \u2014 from the Commander's current system, and copy the system name to the clipboard. Stateless and LLM-native:\n1. A named faction defaults to 'is PRESENT in the system'. Only if the Commander says the faction CONTROLS / runs / owns the system, set controls=true. Pass the faction name as spoken (free text); don't invent one.\n2. Allegiance, government, and state are validated \u2014 if one isn't recognized, relay the tool's suggested correction. Fill only what was said; unspoken means Any.\n3. Refine by re-calling with the accumulated slots (each call RE-QUERIES). If the Commander says 'cancel' / 'never mind', drop it and do NOT call this tool. Report the system and why it matched, and ALWAYS say the system name was copied to the clipboard.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "faction": {
+              "type": "string",
+              "description": "Minor faction name, as spoken (free text)."
+            },
+            "controls": {
+              "type": "boolean",
+              "description": "True only if the faction must CONTROL the system; omit/false means merely present (the default)."
+            },
+            "allegiance": {
+              "type": "string",
+              "description": "Faction allegiance: Federation, Empire, Alliance, Independent."
+            },
+            "government": {
+              "type": "string",
+              "description": "Faction government, e.g. Democracy, Corporate, Anarchy."
+            },
+            "state": {
+              "type": "string",
+              "description": "Active faction state, e.g. War, Civil War, Boom, Election, Expansion, Infrastructure Failure."
+            },
+            "near": {
+              "type": "string",
+              "description": "Reference system to measure from. Omit to use the current system."
+            }
+          },
+          "required": []
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "minor factions",
+      "one_liner": "I find the nearest system where a minor faction is present or in control, or by faction allegiance, government, or state, and copy the system to your clipboard.",
+      "example": "find the nearest system where the Dark Wheel is present",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "minor_faction_presences",
+          "phrasings": [
+            "a faction is present",
+            "where a faction is"
+          ],
+          "example": "where the Dark Wheel is present",
+          "help_text": "Find systems where a named minor faction is present."
+        },
+        {
+          "param": "controlling_minor_faction",
+          "phrasings": [
+            "a faction controls",
+            "run by a faction"
+          ],
+          "example": "controlled by the Dark Wheel",
+          "help_text": "Find systems a named minor faction controls, rather than just is present in."
+        },
+        {
+          "param": "allegiance",
+          "phrasings": [
+            "an allegiance",
+            "aligned to"
+          ],
+          "example": "a nearby Independent faction system",
+          "help_text": "Restrict by faction allegiance \u2014 Federation, Empire, Alliance, or Independent."
+        },
+        {
+          "param": "government",
+          "phrasings": [
+            "a government",
+            "a government type"
+          ],
+          "example": "a Cooperative faction nearby",
+          "help_text": "Restrict by faction government, like Democracy, Corporate, or Cooperative."
+        },
+        {
+          "param": "controlling_minor_faction_state",
+          "phrasings": [
+            "a faction state",
+            "at war, in boom, in election"
+          ],
+          "example": "the nearest faction at war",
+          "help_text": "Restrict by active faction state, like War, Boom, Election, or Expansion."
+        }
+      ],
+      "help_when_active": "Name the faction \u2014 and say whether it should control the system or just be present \u2014 and I'll find the nearest match."
+    },
+    "help_vocabulary": {
+      "allegiance": [
+        "Alliance",
+        "Empire",
+        "Federation",
+        "Independent",
+        "Guardian",
+        "Thargoid"
+      ],
+      "government": [
+        "Anarchy",
+        "Communism",
+        "Confederacy",
+        "Cooperative",
+        "Corporate",
+        "Democracy",
+        "Dictatorship",
+        "Feudal",
+        "Patronage",
+        "Prison",
+        "Prison Colony",
+        "Theocracy",
+        "None"
+      ],
+      "faction state": [
+        "Blight",
+        "Boom",
+        "Bust",
+        "Civil Liberty",
+        "Civil Unrest",
+        "Civil War",
+        "Drought",
+        "Election",
+        "Expansion",
+        "Famine",
+        "Infrastructure Failure",
+        "Investment",
+        "Lockdown",
+        "Natural Disaster",
+        "Outbreak",
+        "Pirate Attack",
+        "Public Holiday",
+        "Retreat",
+        "Terrorist Attack",
+        "War"
+      ]
+    }
+  },
+  {
+    "capability": "search_signals",
+    "tools": [
+      {
+        "name": "search_signals",
+        "description": "Find the nearest Elite Dangerous STRUCTURE by type \u2014 a megaship, settlement, outpost, starport, planetary port, or asteroid base \u2014 from the Commander's current system, and copy its SYSTEM name to the clipboard. Stateless and LLM-native: fill the type the Commander named. If they ask for a type that isn't one of these, offer the closest type you CAN find rather than inventing a result. On 'cancel' / 'never mind', drop it and do NOT call this tool. Report the structure, its system, and distance, and ALWAYS say the system name was copied to the clipboard.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "signal_type": {
+              "type": "string",
+              "description": "Structure type to find: Mega ship, Settlement, Outpost, Coriolis/Orbis/Ocellus Starport, Planetary Port, or Asteroid base."
+            },
+            "near": {
+              "type": "string",
+              "description": "Reference system to measure from. Omit to use the current system."
+            }
+          },
+          "required": []
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "signals",
+      "one_liner": "I find the nearest structure \u2014 a megaship, settlement, outpost, or starport \u2014 and copy its system to your clipboard.",
+      "example": "find the nearest megaship",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "type",
+          "phrasings": [
+            "a structure type",
+            "a kind of structure"
+          ],
+          "example": "the closest settlement",
+          "help_text": "Name the structure \u2014 a megaship, settlement, outpost, starport, planetary port, or asteroid base."
+        }
+      ],
+      "help_when_active": "Tell me the structure \u2014 a megaship, settlement, and so on \u2014 and I'll find the nearest one."
+    },
+    "help_vocabulary": {
+      "structure type": [
+        "Coriolis Starport",
+        "Ocellus Starport",
+        "Orbis Starport",
+        "Outpost",
+        "Planetary Outpost",
+        "Planetary Port",
+        "Settlement",
+        "Mega ship",
+        "Asteroid base"
+      ]
+    }
+  },
+  {
+    "capability": "search_faction_states",
+    "tools": [
+      {
+        "name": "search_faction_states",
+        "description": "Find the nearest Elite Dangerous STAR SYSTEM by its CONTROLLING faction's state \u2014 for wars and civil wars, boom, election, infrastructure failure, and the missions those states generate \u2014 from the Commander's current system, and copy the system name to the clipboard. Map mission-speak to the underlying state: 'massacre missions' or 'combat zones' -> War or Civil War; 'restore / repair missions' -> Infrastructure Failure; 'mining missions' aren't a state Spansh can filter, so say so rather than guessing. Stateless and LLM-native: fill only what was said (state, and optionally a faction name, allegiance, or Powerplay state), validate \u2014 relay any suggested correction \u2014 and search. Refine by re-calling with the accumulated slots (each call RE-QUERIES); on 'cancel' / 'never mind', drop it and do NOT call this tool. Report the system and its state, and ALWAYS say the system name was copied to the clipboard.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "description": "Controlling faction state: War, Civil War, Boom, Election, Expansion, Infrastructure Failure, Outbreak, Lockdown, \u2026"
+            },
+            "faction": {
+              "type": "string",
+              "description": "Optional controlling minor faction name (free text)."
+            },
+            "allegiance": {
+              "type": "string",
+              "description": "Optional allegiance: Federation, Empire, Alliance, Independent."
+            },
+            "power_state": {
+              "type": "string",
+              "description": "Optional Powerplay state: Stronghold, Fortified, Exploited, Unoccupied."
+            },
+            "near": {
+              "type": "string",
+              "description": "Reference system to measure from. Omit to use the current system."
+            }
+          },
+          "required": []
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "faction states",
+      "one_liner": "I find the nearest system by its controlling faction's state \u2014 wars, civil wars, boom, election, infrastructure failure \u2014 and copy the system to your clipboard.",
+      "example": "find the nearest system at war",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "controlling_minor_faction_state",
+          "phrasings": [
+            "a faction state",
+            "at war, in boom, in election"
+          ],
+          "example": "the nearest civil war",
+          "help_text": "The controlling faction's state, like War, Civil War, Boom, Election, or Infrastructure Failure."
+        },
+        {
+          "param": "controlling_minor_faction",
+          "phrasings": [
+            "a controlling faction",
+            "run by a faction"
+          ],
+          "example": "where the Dark Wheel is in control",
+          "help_text": "Narrow to a named controlling minor faction."
+        },
+        {
+          "param": "allegiance",
+          "phrasings": [
+            "an allegiance",
+            "aligned to"
+          ],
+          "example": "a nearby Empire system at war",
+          "help_text": "Narrow by allegiance \u2014 Federation, Empire, Alliance, or Independent."
+        },
+        {
+          "param": "power_state",
+          "phrasings": [
+            "a Powerplay state",
+            "a power state"
+          ],
+          "example": "a Fortified system in boom",
+          "help_text": "Narrow by Powerplay state \u2014 Stronghold, Fortified, Exploited, or Unoccupied."
+        }
+      ],
+      "help_when_active": "Tell me the state \u2014 war, boom, election \u2014 or the kind of missions you want, and I'll find the nearest system."
+    },
+    "help_vocabulary": {
+      "faction state": [
+        "Blight",
+        "Boom",
+        "Bust",
+        "Civil Liberty",
+        "Civil Unrest",
+        "Civil War",
+        "Drought",
+        "Election",
+        "Expansion",
+        "Famine",
+        "Infrastructure Failure",
+        "Investment",
+        "Lockdown",
+        "Natural Disaster",
+        "Outbreak",
+        "Pirate Attack",
+        "Public Holiday",
+        "Retreat",
+        "Terrorist Attack",
+        "War"
+      ],
+      "power state": [
+        "Exploited",
+        "Fortified",
+        "Stronghold",
+        "Unoccupied"
+      ],
+      "allegiance": [
+        "Alliance",
+        "Empire",
+        "Federation",
+        "Independent",
+        "Guardian",
+        "Thargoid"
+      ]
+    }
+  },
+  {
+    "capability": "search_bodies",
+    "tools": [
+      {
+        "name": "search_bodies",
+        "description": "Find the nearest Elite Dangerous BODY (planet or moon) by its type or its biological signals, from the Commander's current system, and copy the body's SYSTEM name to the clipboard for the galaxy map. Answers 'nearest Earth-like world', 'closest ammonia / water world', or 'nearest body with <biology> signals'.\nROUTING: this is a SINGLE-body lookup. If they want a whole exploration/credit RUN of systems to scan, use plan_riches_route (Road to Riches) instead.\nIt is LLM-native and STATELESS:\n1. Fill only the slots the Commander said; unspoken means Any. `body_type` is a body class (Earth-like world, Ammonia world, Water world, High metal content world, a gas-giant class, \u2026). `biological_signal` is an exobiology genus ('Bacterium', 'Stratum', 'Tussock'), a specific species ('Bacterium Aurasus'), or 'any biological'. Optionally `landable`, or `max_arrival_distance` in light-seconds.\n2. If a type or biology is unclear, relay the tool's suggested correction \u2014 don't invent one.\n3. Refine by re-calling with the accumulated slots (each call RE-QUERIES). On 'cancel' / 'never mind', drop it and do NOT call this tool. Report the body, its system, distance, and distance from the star, and ALWAYS say the system name was copied to the clipboard.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "body_type": {
+              "type": "string",
+              "description": "Body class to find, e.g. Earth-like world, Ammonia world, Water world, High metal content world, Class II gas giant."
+            },
+            "biological_signal": {
+              "type": "string",
+              "description": "Biological signal to require: an exobiology genus (Bacterium, Stratum, Tussock, Aleoida, \u2026), a specific species (Bacterium Aurasus), or 'any biological'."
+            },
+            "landable": {
+              "type": "boolean",
+              "description": "Set true to require a landable body (needed to scan surface biology on foot). Omit for any."
+            },
+            "max_arrival_distance": {
+              "type": "integer",
+              "description": "Maximum distance from the main star, in light-seconds. Omit for any."
+            },
+            "near": {
+              "type": "string",
+              "description": "Reference system to measure from. Omit to use the current system."
+            }
+          },
+          "required": []
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "bodies",
+      "one_liner": "I find the nearest body \u2014 an Earth-like world, ammonia or water world, or one with a given biological signal \u2014 and copy its system to your clipboard for the galaxy map.",
+      "example": "find the nearest Earth-like world",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "subtype",
+          "phrasings": [
+            "a body type",
+            "a kind of world"
+          ],
+          "example": "the closest ammonia world",
+          "help_text": "Name the body class \u2014 Earth-like world, ammonia world, water world, high metal content world, or a gas-giant class."
+        },
+        {
+          "param": "landmark_subtype",
+          "phrasings": [
+            "a biological signal",
+            "a type of biology"
+          ],
+          "example": "the nearest body with Bacterium",
+          "help_text": "Require a biological signal \u2014 an exobiology genus like Bacterium or Stratum, a specific species, or 'any biological'."
+        },
+        {
+          "param": "is_landable",
+          "phrasings": [
+            "landable",
+            "one I can land on"
+          ],
+          "example": "a landable body with Aleoida",
+          "help_text": "Require a landable body \u2014 needed to scan surface biology on foot."
+        },
+        {
+          "param": "distance_to_arrival",
+          "phrasings": [
+            "close to the star",
+            "distance from the star"
+          ],
+          "example": "an Earth-like world close to the star",
+          "help_text": "Restrict to bodies within a distance of the main star."
+        }
+      ],
+      "help_when_active": "Tell me a body type \u2014 like an Earth-like world \u2014 or a biological signal like Bacterium, and I'll find the nearest one."
+    },
+    "help_vocabulary": {
+      "body type": [
+        "Earth-like world",
+        "Ammonia world",
+        "Water world",
+        "Water giant",
+        "High metal content world",
+        "Metal-rich body",
+        "Rocky body",
+        "Rocky Ice world",
+        "Icy body",
+        "Class I gas giant",
+        "Class II gas giant",
+        "Class III gas giant",
+        "Class IV gas giant",
+        "Class V gas giant",
+        "Gas giant with ammonia-based life",
+        "Gas giant with water-based life",
+        "Helium gas giant",
+        "Helium-rich gas giant"
+      ],
+      "biological signal": [
+        "Aleoida",
+        "Bacterium",
+        "Cactoida",
+        "Clypeus",
+        "Concha",
+        "Electricae",
+        "Fonticulua",
+        "Frutexa",
+        "Fumerola",
+        "Fungoida",
+        "Osseus",
+        "Recepta",
+        "Stratum",
+        "Tubus",
+        "Tussock"
+      ]
+    }
+  },
+  {
+    "capability": "plan_trade_route",
+    "tools": [
+      {
+        "name": "plan_trade_route",
+        "description": "Plan a profitable multi-hop TRADE ROUTE (a buy/sell loop) for the Commander using Spansh, starting from the station they're currently docked at, and hand the first destination to the galaxy map. Use when they ask to plan trading, find a trade run, or 'where should I trade from here'.\n- Fill the numbers you know or can infer, and ASK for any you can't: `capital` (credits to spend), `max_cargo` (cargo capacity in tons), `jump_range` (laden jump range in ly).\n- Optional refinements, only when the Commander mentions them: `max_hops` (loop length), `requires_large_pad` (big ship), `max_arrival_distance` (avoid long supercruise to the station, ls), `allow_planetary` (include planetary ports), `avoid_loops` (don't revisit a station), `max_price_age_days` (only trust prices newer than this).\n- The start defaults to where they're docked. If they aren't docked, pass `from_system` + `from_station`, or ask where to start.\n- Relay the WHOLE loop the tool returns (each hop: what to buy where, where to sell, profit per ton) and the round-trip total; if the tool adds a freshness caveat or flags a leg's price age, pass it along. Tell them the next stop was copied to their clipboard for the galaxy map.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "capital": {
+              "type": "integer",
+              "description": "Credits available to spend on cargo."
+            },
+            "max_cargo": {
+              "type": "integer",
+              "description": "Cargo capacity in tons."
+            },
+            "jump_range": {
+              "type": "number",
+              "description": "Laden jump range in light-years."
+            },
+            "max_hops": {
+              "type": "integer",
+              "description": "Maximum number of hops in the loop. Omit for the default."
+            },
+            "requires_large_pad": {
+              "type": "boolean",
+              "description": "True if the ship needs a large landing pad."
+            },
+            "max_arrival_distance": {
+              "type": "integer",
+              "description": "Max supercruise distance from the star to the station, in light-seconds. Omit for no cap."
+            },
+            "allow_planetary": {
+              "type": "boolean",
+              "description": "True to include planetary ports (surface markets)."
+            },
+            "avoid_loops": {
+              "type": "boolean",
+              "description": "True (default) to never revisit the same station in the loop."
+            },
+            "max_price_age_days": {
+              "type": "integer",
+              "description": "Only trust market prices newer than this many days. Omit for the configured default."
+            },
+            "from_system": {
+              "type": "string",
+              "description": "Start system. Omit to use the current (docked) system."
+            },
+            "from_station": {
+              "type": "string",
+              "description": "Start station. Omit to use the current docked station."
+            }
+          },
+          "required": []
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "trade routes",
+      "one_liner": "I plan a profitable multi-hop trade loop from where you're docked \u2014 every hop's buy, sell, and profit plus the round-trip total, with a heads-up when prices are stale \u2014 and copy the next stop to your clipboard for the galaxy map.",
+      "example": "plan me a trade route from here",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "max_cargo",
+          "phrasings": [
+            "your cargo capacity",
+            "how much cargo"
+          ],
+          "example": "plan a trade route with 720 tons of cargo",
+          "help_text": "Your cargo capacity in tons \u2014 it sizes the profit per hop."
+        },
+        {
+          "param": "jump_range",
+          "phrasings": [
+            "your jump range",
+            "how far you jump"
+          ],
+          "example": "a trade route for a 30 light-year jump range",
+          "help_text": "Your laden jump range in light-years \u2014 it bounds each hop."
+        },
+        {
+          "param": "capital",
+          "phrasings": [
+            "your budget",
+            "credits to spend"
+          ],
+          "example": "a trade route with 100 million to spend",
+          "help_text": "Credits available to buy cargo."
+        }
+      ],
+      "help_when_active": "Tell me your cargo capacity, jump range, and budget, and I'll plan a trade loop from the station you're docked at."
+    },
+    "help_vocabulary": null
+  },
+  {
+    "capability": "plot_neutron_route",
+    "tools": [
+      {
+        "name": "plot_neutron_route",
+        "description": "Plot a NEUTRON / long-range GALAXY route for the Commander using Spansh's neutron-highway plotter, then hand the first waypoint to the galaxy map. Use when they ask to plot a route to a distant system, a neutron route, a long-range or galaxy route, or 'get me to <system> in as few jumps as possible'.\n- `to_system` (destination) is REQUIRED \u2014 ask for it if they don't say where.\n- `jump_range` (their LADEN jump range in ly) is REQUIRED \u2014 ask for it if missing; it bounds each jump.\n- The start defaults to their current system; pass `from_system` only to start elsewhere.\n- `efficiency` (1-100, higher = fewer jumps via more neutron boosts) defaults sensibly; omit unless they ask for a more efficient or more direct route.\n- Relay the summary: total jumps, how many waypoints, and the first one. Tell them the first waypoint was copied to their clipboard for the galaxy map.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "to_system": {
+              "type": "string",
+              "description": "Destination system to plot a route to. Required."
+            },
+            "jump_range": {
+              "type": "number",
+              "description": "Laden jump range in light-years. Required \u2014 ask if unknown."
+            },
+            "from_system": {
+              "type": "string",
+              "description": "Start system. Omit to use the Commander's current system."
+            },
+            "efficiency": {
+              "type": "integer",
+              "description": "Neutron efficiency 1-100 (higher = fewer jumps). Omit for the default."
+            }
+          },
+          "required": [
+            "to_system"
+          ]
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "neutron routes",
+      "one_liner": "I plot a long-range neutron-highway route to a distant system \u2014 total jumps and the first waypoint \u2014 and copy that waypoint to your clipboard for the galaxy map.",
+      "example": "plot a neutron route to Colonia",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "to_system",
+          "phrasings": [
+            "your destination",
+            "where to"
+          ],
+          "example": "plot a neutron route to Sagittarius A*",
+          "help_text": "The system you want to reach \u2014 the route's destination."
+        },
+        {
+          "param": "jump_range",
+          "phrasings": [
+            "your jump range",
+            "how far you jump"
+          ],
+          "example": "a neutron route to Colonia for a 55 light-year jump range",
+          "help_text": "Your laden jump range in light-years \u2014 it bounds each jump."
+        },
+        {
+          "param": "efficiency",
+          "phrasings": [
+            "how efficient",
+            "fewer jumps or more direct"
+          ],
+          "example": "a more efficient neutron route to Colonia",
+          "help_text": "1-100; higher trades longer detours for fewer total jumps."
+        }
+      ],
+      "help_when_active": "Tell me your destination and your laden jump range, and I'll plot a long-range neutron route and copy the first waypoint for the galaxy map."
+    },
+    "help_vocabulary": null
+  },
+  {
+    "capability": "plan_riches_route",
+    "tools": [
+      {
+        "name": "plan_riches_route",
+        "description": "Plan a ROAD TO RICHES route \u2014 a chain of nearby systems with high-value UNSCANNED bodies to First-Discovery-scan for exploration credits \u2014 using Spansh, starting from the Commander's current system, and hand the first system to the galaxy map. Use when they ask to 'plan a Road to Riches', find an exploration/credit-farming route, or 'where can I scan for money'.\n- You MUST have their `jump_range` (laden jump range in ly): fill it if known, otherwise ASK.\n- The start defaults to the Commander's current system; pass `from_system` only to start elsewhere.\n- Optional: `radius` (ly to search around the start), `max_results` (how many systems), `min_value` (minimum per-body scan value to bother with). Omit for sensible defaults.\n- Relay the summary: the first system, how many bodies to scan there, and the estimated values. Tell them the first system was copied to their clipboard for the galaxy map.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "jump_range": {
+              "type": "number",
+              "description": "Laden jump range in light-years (required)."
+            },
+            "from_system": {
+              "type": "string",
+              "description": "Start system. Omit to use the Commander's current system."
+            },
+            "radius": {
+              "type": "number",
+              "description": "Search radius in light-years around the start. Omit for the default."
+            },
+            "max_results": {
+              "type": "integer",
+              "description": "Maximum number of systems in the route. Omit for the default."
+            },
+            "min_value": {
+              "type": "integer",
+              "description": "Minimum per-body scan value (credits) worth including. Omit for the default."
+            }
+          },
+          "required": [
+            "jump_range"
+          ]
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "Road to Riches",
+      "one_liner": "I plan a Road to Riches from where you are \u2014 nearby systems full of high-value bodies to First-Discovery-scan for credits \u2014 and copy the first system to your clipboard for the galaxy map.",
+      "example": "plan me a Road to Riches route",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "jump_range",
+          "phrasings": [
+            "your jump range",
+            "how far you jump"
+          ],
+          "example": "a Road to Riches for a 40 light-year jump range",
+          "help_text": "Your laden jump range in light-years \u2014 it bounds each jump."
+        },
+        {
+          "param": "radius",
+          "phrasings": [
+            "how far to search",
+            "the search radius"
+          ],
+          "example": "a Road to Riches within 30 light-years",
+          "help_text": "How far around your start to look for scannable systems."
+        },
+        {
+          "param": "min_value",
+          "phrasings": [
+            "the minimum scan value",
+            "how valuable the bodies must be"
+          ],
+          "example": "a Road to Riches with bodies worth at least a million each",
+          "help_text": "Skip bodies whose estimated scan value is below this."
+        }
+      ],
+      "help_when_active": "Tell me your jump range and I'll plan a Road to Riches from your current system \u2014 nearby systems with high-value bodies to scan."
+    },
+    "help_vocabulary": null
+  },
+  {
+    "capability": "plan_mining_session",
+    "tools": [
+      {
+        "name": "plan_mining_session",
+        "description": "Plan a MINING SESSION for the Commander: find the nearest ring HOTSPOT for a material, the best FRESH place to sell it, drop the mining loop onto their checklist, and hand the hotspot system to the galaxy map. Use when they ask where to mine something, to find a Painite / Low Temperature Diamonds / Void Opal / Tritium hotspot, or to plan a mining run.\n- `material` is REQUIRED \u2014 the thing to mine (e.g. 'Painite', 'Low Temperature Diamonds', 'Tritium'). Ask if they don't say.\n- The start defaults to their current system; pass `from_system` only to start elsewhere.\n- `sell_commodity` defaults to the mined material; pass it only if they want to sell something different.\n- Optional: `requires_large_pad` (big ship \u2014 only sell where a large pad fits), `max_price_age_days` (only trust sell prices newer than this), `add_to_checklist` (default true \u2014 drop the go-to-hotspot / mine / sell-here loop as trackable steps), `plot` (default true \u2014 copy the hotspot system to the clipboard for the galaxy map).\n- Relay what the tool returns: the hotspot (system, ring, how many overlaps, how stale the hotspot data is), the best sell (station, system, price per ton) AND any freshness caveat it adds, and that the loop was added to their checklist / the system copied for the galaxy map.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "material": {
+              "type": "string",
+              "description": "The material to mine (Painite, Low Temperature Diamonds, Void Opal, Tritium, Platinum, Alexandrite, \u2026). Required."
+            },
+            "from_system": {
+              "type": "string",
+              "description": "Start system. Omit to use the Commander's current system."
+            },
+            "sell_commodity": {
+              "type": "string",
+              "description": "Commodity to price for selling. Omit to use the mined material."
+            },
+            "requires_large_pad": {
+              "type": "boolean",
+              "description": "True to only consider sell stations with a large pad."
+            },
+            "max_price_age_days": {
+              "type": "integer",
+              "description": "Only trust sell prices newer than this many days. Omit for the configured default."
+            },
+            "add_to_checklist": {
+              "type": "boolean",
+              "description": "True (default) to drop the mining loop onto the checklist as trackable steps."
+            },
+            "plot": {
+              "type": "boolean",
+              "description": "True (default) to copy the hotspot system to the clipboard for the galaxy map."
+            }
+          },
+          "required": [
+            "material"
+          ]
+        }
+      }
+    ],
+    "help_meta": {
+      "category": "mining",
+      "one_liner": "I plan a mining run \u2014 the nearest ring hotspot for a material, the best FRESH place to sell it (stale prices flagged), and the go-mine-sell loop dropped onto your checklist \u2014 and copy the hotspot system for the galaxy map.",
+      "example": "where's the nearest Painite hotspot",
+      "group": "navigation and search",
+      "slots": [
+        {
+          "param": "material",
+          "phrasings": [
+            "what to mine",
+            "the material"
+          ],
+          "example": "find me a Low Temperature Diamonds hotspot",
+          "help_text": "The material to mine \u2014 I find its nearest ring hotspot."
+        },
+        {
+          "param": "requires_large_pad",
+          "phrasings": [
+            "large pad only",
+            "big ship"
+          ],
+          "example": "a Painite hotspot and somewhere with a large pad to sell it",
+          "help_text": "Only price sell stations that can take a large pad."
+        },
+        {
+          "param": "max_price_age_days",
+          "phrasings": [
+            "how fresh the price must be",
+            "the price age"
+          ],
+          "example": "a Void Opal run with prices no older than a day",
+          "help_text": "Only trust a sell price newer than this many days."
+        }
+      ],
+      "help_when_active": "Tell me what you want to mine and I'll find the nearest hotspot, the best fresh place to sell it, and drop the loop onto your checklist."
+    },
+    "help_vocabulary": null
+  }
+]

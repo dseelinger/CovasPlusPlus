@@ -11,8 +11,8 @@ import json
 from pathlib import Path
 
 from covas.capabilities.base import CapabilityRegistry, help_meta_problems
-from covas.capabilities.system_search_capability import (SystemSearchCapability,
-                                                         SystemSearchConfig)
+from covas.capabilities._search_support import SearchConfig
+from covas.capabilities.search_family import SystemSearchCapability
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "spansh_systems_federation_sol.json"
 
@@ -47,7 +47,7 @@ def _cap(*, http=None, clip=None, system="Sol"):
     http = http or FakeHttp()
     clip = clip or FakeClipboard()
     cap = SystemSearchCapability(
-        SystemSearchConfig(enabled=True),
+        SearchConfig(enabled=True),
         http=http,
         get_current_system=(lambda: system),
         clipboard=clip,

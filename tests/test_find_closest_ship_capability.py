@@ -16,8 +16,7 @@ import threading
 from pathlib import Path
 
 from covas.app import App
-from covas.capabilities.find_closest_capability import NavConfig
-from covas.capabilities.find_closest_ship_capability import FindClosestShipCapability
+from covas.capabilities.find_closest_capability import FindClosestShipCapability, NavConfig
 from tests.fakes import FakeSTT, FakeTTS
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "spansh_stations_ship_anaconda.json"

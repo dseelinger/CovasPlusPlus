@@ -1,14 +1,16 @@
 """Shared plumbing for the LLM-native Spansh search capabilities (Search Prompts 4–5).
 
-The five search capabilities (outfitting, star systems, stations, minor factions, signals,
-misc) all repeat the same non-domain steps: work out the reference system, build+run the
-query over the shared client, copy the primary system to the clipboard, and phrase small
-spoken fragments. Those live here so each capability file stays focused on its slots, its
-vocabulary, and its result sentence — the parts that actually differ.
+The Spansh search categories all repeat the same non-domain steps: work out the reference
+system, build+run the query over the shared client, copy the primary system to the clipboard,
+and phrase small spoken fragments. Those live here so each category stays focused on its slots,
+its vocabulary, and its result sentence — the parts that actually differ.
 
-Nothing here is domain-specific: no slot names, no vocabularies. (The outfitting and
-star-systems capabilities predate this module and keep their own inline copies; the four
-Prompt-5 categories share these.)
+Nothing here is domain-specific: no slot names, no vocabularies. Every spec-driven category
+(`capabilities/search_family.py`, issue #111) shares these; the star-systems inline copies
+were folded in when that family collapsed. One deliberate holdout: the find-closest MODULE
+tool keeps its inline clipboard/distance fragments — its frozen result line says "in your
+current system" where `distance_phrase` says "your current system", and #111 forbids
+changing a spoken byte.
 """
 from __future__ import annotations
 
