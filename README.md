@@ -1,6 +1,7 @@
 # COVAS++
 
 [![Docs](https://img.shields.io/badge/docs-COVAS%2B%2B-deeporange)](https://dseelinger.github.io/CovasPlusPlus/)
+[![Support on Ko-fi](https://img.shields.io/badge/support-Ko--fi-ff5e5b)](https://ko-fi.com/dougseelinger)
 
 📖 **[Full documentation site →](https://dseelinger.github.io/CovasPlusPlus/)** — install, setup, and a
 page per feature with example voice commands.
@@ -330,6 +331,15 @@ blob won't decrypt on a different machine/account, so re-enter keys after a move
 This is a public repo: API keys, personality/campaign files, logs, checklists, sounds, voice models,
 and `overrides.json` are all git-ignored. Keep them that way. Tip: create **spend-capped or
 restricted keys** at each provider as defense-in-depth.
+
+---
+
+## Support
+
+COVAS++ is free and always will be. If it's made your time in the black better, a tip helps cover
+the API tokens behind every reply and the evenings behind every feature — nothing gets paywalled.
+
+**❤ [Support COVAS++ on Ko-fi →](https://ko-fi.com/dougseelinger)**
 
 ---
 
