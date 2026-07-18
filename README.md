@@ -5,16 +5,14 @@
 📖 **[Full documentation site →](https://dseelinger.github.io/CovasPlusPlus/)** — install, setup, and a
 page per feature with example voice commands.
 
-A local **voice AI companion** for [Elite Dangerous](https://www.elitedangerous.com/), for Windows.
-Hold a key, talk, and get a spoken reply in character. It knows where you are and how your ship is
-doing because it reads the same journal Elite writes to disk — so its answers are **grounded in your
-actual game, not guessed**. It searches the whole galaxy by voice, plans routes, tracks your
-engineering materials, keeps a checklist, remembers what matters to you, layers in an optional
-cockpit soundscape, and presses the odd ship control — all through one push-to-talk loop.
-
-It **does not fly your ship** — it's a conversation and knowledge companion, not a flight-control
-tool: situational awareness, lookups, and banter, with a hard safety layer around the few keystrokes
-it will send.
+A local **ship's AI** for [Elite Dangerous](https://www.elitedangerous.com/), for Windows.
+The in-game COVAS reads canned lines; COVAS++ holds a conversation. Hold a key, talk, and get a
+spoken reply in character. It knows where you are and how your ship is doing because it reads the
+same journal Elite writes to disk — so its answers are **grounded in your actual game, not
+guessed**. It searches the whole galaxy by voice, plans routes, tracks your engineering materials,
+keeps a checklist, remembers what matters to you, presses guarded ship controls on request, and
+fills the cockpit with personas, a voiced crew, and an ambient soundscape — all through one
+push-to-talk loop, with a hard safety layer around every keystroke it will send.
 
 > Unofficial, fan-made. Elite Dangerous is a trademark of Frontier Developments plc.
 > COVAS++ is not affiliated with, endorsed by, or supported by Frontier.

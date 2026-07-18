@@ -1,9 +1,9 @@
 site_name: COVAS++
 site_description: >-
-  A local voice AI companion for Elite Dangerous — hold a key, talk, and get a
-  spoken reply in character. Its answers are grounded in your real game, not
-  guessed: it searches the galaxy by voice, plans routes, tracks your engineering
-  materials, remembers what matters to you, and more.
+  A ship's AI for Elite Dangerous — hold a key, talk, and the ship answers in
+  character. Grounded in your real game, not guessed: galaxy search and route
+  planning by voice, guarded ship controls, personas, a voiced crew, and an
+  ambient cockpit soundscape — local-first on your own Windows PC.
 site_url: https://dseelinger.github.io/CovasPlusPlus/
 repo_url: https://github.com/dseelinger/CovasPlusPlus
 repo_name: dseelinger/CovasPlusPlus

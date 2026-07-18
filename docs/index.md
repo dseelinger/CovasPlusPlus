@@ -1,11 +1,12 @@
 # COVAS++
 
-**A local voice AI companion for [Elite Dangerous](https://www.elitedangerous.com/), for Windows.**
-Hold a key, talk, and get a spoken reply in character. Because COVAS++ reads the same journal
-Elite writes to disk, its answers are **grounded in your actual game, not guessed**. It searches
-the whole galaxy by voice, plans routes, tracks your engineering materials, tracks a checklist,
-remembers what matters to you, layers in an optional cockpit soundscape, and presses the odd ship
-control on request — all through one push-to-talk loop.
+**A real ship's AI for [Elite Dangerous](https://www.elitedangerous.com/), for Windows.**
+The COVAS the game ships with reads canned lines. COVAS++ holds up its end of the conversation:
+it **knows** your game — grounded in the same journal Elite writes to disk, searching the whole
+galaxy by voice — it **acts** on your word through a small set of heavily-guarded ship controls,
+and it **inhabits** your ship, with swappable personas, a named and voiced crew, an ambient
+cockpit soundscape, and a glanceable HUD. All through one push-to-talk loop that runs on your
+own machine.
 
 !!! info "Unofficial, fan-made"
     Elite Dangerous is a trademark of Frontier Developments plc. COVAS++ is not
@@ -13,22 +14,43 @@ control on request — all through one push-to-talk loop.
 
 ## What it is
 
-A companion that sits alongside the game and talks with you. You press a key, speak, and it
-answers out loud in the voice and character you choose. Because it reads the same journal
-and status files the game already writes to disk, it knows where you are, how your ship is
-doing, and what you've been up to — so its answers are grounded in your actual game, not
-guesses.
+Hold a key, speak, release — and the ship answers, out loud, in the voice and character you
+chose. Because COVAS++ reads the journal and status files the game already writes to disk, it
+knows where you are, how your ship is doing, and what you've been up to — so its answers are
+**grounded in your actual game, not guessed**. Three things, one loop:
+
+### It knows your game
 
 - **Push-to-talk voice** — hold a key, speak, release. Speech is transcribed **on your own
   machine**; nothing leaves your PC just to hear you.
 - **Situational awareness** — "Where am I? How's my fuel? What did I just do?" answered from
   live telemetry.
 - **Galaxy search by voice** — the nearest station selling a module or a ship, the nearest
-  system matching what you describe, and more — with the result system copied to your clipboard.
-- **A voice checklist**, **proactive callouts**, **route callouts**, **community goals**,
-  **fleet-carrier tracking**, and a handful of **guarded ship controls**.
-- **In character** — swappable personas, an ElevenLabs or local voice, and your own personal
-  Commander facts kept separate so switching voice never wipes them.
+  system matching what you describe, and more — with the result system copied to your clipboard
+  — plus [trade-route](search/trade-routes.md), [neutron](search/neutron-route.md),
+  [Road-to-Riches](search/road-to-riches.md) and [mining](search/mining.md) planners.
+- **A voice checklist**, **proactive callouts**, **route callouts**,
+  **[community goals](elite/community-goals.md)**, **fleet-carrier tracking**, and a
+  transparent, editable [persistent memory](using/memory.md).
+
+### It acts on your word
+
+- **Guarded ship controls** — a small [allowlisted set of keystrokes](automation/keybinds.md)
+  behind a separate spoken confirmation, a combat/interdiction guard, and a hard abort.
+- **Voice-authored [macros](automation/custom-macros.md)** and
+  **[reflexes](automation/reflexes.md)** — name a sequence once, trigger it by voice.
+- **[In-game comms](automation/comms.md)** — dictate a local or wing chat message without
+  touching the keyboard.
+
+### It brings the ship to life
+
+- **Swappable [personas](using/personas-voice.md)** with an ElevenLabs, cloud, or local voice —
+  and your own Commander facts kept separate, so switching voice never wipes them.
+- **A named, voiced [crew](using/crew.md)** — distinct cast voices today, growing into
+  role-aware characters you can address, drawn from the fighter pilots you've actually hired.
+- **An ambient cockpit [soundscape](audio/ambient-audio.md)** — station chatter, a music
+  director, alert cues — mixed underneath the ship's voice.
+- **A glanceable [HUD](using/hud.md)** — on the desktop or inside your VR headset.
 
 ## Why COVAS++
 
@@ -63,16 +85,11 @@ Other Elite voice assistants converse and read your game state too. What sets CO
 - **Hands-free option** for accessibility — a [voice-activity gate](getting-started/hands-free.md) so
   you never have to touch a key.
 
-## What it does **not** do
+## Trust & scope
 
-COVAS++ is a **conversation and knowledge companion, not a flight-control tool.**
-
-- **It does not fly your ship.** No autopilot, no combat automation, no flying you between
-  stars. It offers situational awareness, lookups, and banter — not hands-off flight.
-- **The few keystrokes it will send are heavily guarded.** The one ship control it can press
-  (toggle landing gear) sits behind an allowlist, a separate spoken confirmation, a
-  combat/interdiction guard, and a hard abort. Auto-honk (firing the Discovery Scanner on
-  arrival) is the only other keystroke, and it's off by default and combat-gated.
+- **Every keystroke it can send is heavily guarded.** Ship controls sit behind an allowlist, a
+  separate spoken confirmation, a combat/interdiction guard, and a hard abort — automation grows
+  one proven action at a time, never by opening the floodgates.
 - **It does not read game memory or use any private API.** Everything about your game comes
   from the log files Elite Dangerous writes to disk — the same source other community tools use.
 - **It is not a Frontier product** and can't do anything the game doesn't expose through those

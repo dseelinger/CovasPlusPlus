@@ -12,12 +12,14 @@ list of half-built things; new work lands as a complete feature and gets its own
 
 A couple of things are kept intentionally small — that's a design choice, not an unfinished corner:
 
-- **Ship controls stay minimal and guarded.** COVAS++ presses exactly one control on request
-  (toggle landing gear) plus the optional auto-honk. This is by design: reliable, *safe* keystroke
-  automation into Elite Dangerous is the twitchy part, so it's proven one action at a time behind a
-  hard safety layer (allowlist, separate-turn confirmation, combat guard, hard abort) rather than
-  opening the floodgates. More actions would only be added after on-hardware validation, one at a
-  time, behind the same safeguards. **COVAS++ will not fly your ship.**
+- **Ship controls stay guarded and allowlisted.** COVAS++ presses a curated set of named
+  ship/SRV/on-foot controls on request — throttle, landing gear, frame shift drive, panels, and the
+  like — every one behind a hard safety layer (allowlist, combat/interdiction guard, hard abort),
+  with consequential actions (a jump, deploying hardpoints) requiring a separate spoken confirmation
+  while benign ones fire immediately. This is by design: reliable, *safe* keystroke automation into
+  Elite Dangerous is the twitchy part, so the allowlist grew — and grows — one on-hardware-validated
+  action at a time rather than opening the floodgates. It stops at discrete controls: there's no
+  autopilot and no closed-loop flying-the-ship-for-you, on purpose.
 
 - **The ambient audio layer is opt-in and content-light.** The whole [audio subsystem](audio/ambient-audio.md)
   ships off by default, and its sound effects and music are **drop-in** — you supply your own
