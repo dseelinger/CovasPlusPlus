@@ -379,6 +379,9 @@ class App:
         # auto-honk so a hard abort releases keys held by either (and the .binds file is parsed
         # a single time). Lazily populated by the helpers below.
         self._shared_executor = None
+        # Shared window focuser (#105) — foregrounds ED before injection; built once alongside the
+        # executor and reused by keybinds + comms. None off-Windows (Win32Backend raises there).
+        self._shared_focuser = None
         self._binds_cache: dict | None = None
         # Shared hard-abort flag so ONE "abort" stops a running sequence started by EITHER the
         # keybind capability or a custom macro (they share the executor too). Created once here.
@@ -1217,9 +1220,10 @@ class App:
             binds = self._ed_binds()
             executor = self._key_executor()   # raises ExecutorError off-Windows -> caught below
             snapshot = ((lambda: self.ed_ctx.snapshot()) if self.ed_ctx is not None else None)
+            focuser = self._window_focuser()   # None off-Windows -> focus_game absent, no auto-focus
             self.keybinds = KeybindCapability(
                 binds=binds, executor=executor, config=kcfg,
-                status_snapshot=snapshot,
+                status_snapshot=snapshot, focuser=focuser,
                 abort_event=self._keybind_abort,   # shared with custom macros (#50)
                 log=lambda msg: self._log("keybind", msg))
             self.registry.register(self.keybinds)
@@ -1276,6 +1280,24 @@ class App:
             from .keybinds.executor import KeyExecutor
             self._shared_executor = KeyExecutor()
         return self._shared_executor
+
+    def _window_focuser(self):
+        """Build (once) the shared window focuser used to bring ED to the foreground before
+        injection (#105). Returns None off-Windows (Win32Backend raises there) or if it can't be
+        built — every caller treats None as 'focus feature absent' and degrades to ambient focus,
+        so this never blocks startup. Unlike the executor it must NOT raise: a focus feature that
+        won't build is optional, whereas a keystroke executor that won't build means keybinds
+        genuinely can't run."""
+        if self._shared_focuser is None:
+            try:
+                from .keybinds.focus import WindowFocuser
+                self._shared_focuser = WindowFocuser(
+                    log=lambda msg: self._log("keybind", msg))
+            except Exception as e:  # noqa: BLE001 — off-Windows/unavailable -> feature simply absent
+                self.bus.publish({"type": "log", "who": "system",
+                                  "text": f"Window focus unavailable: {e}"})
+                self._shared_focuser = None
+        return self._shared_focuser
 
     # ---- Tier-2 combat reflexes (#36) -------------------------------------
     def _start_reflex(self) -> None:
@@ -1377,12 +1399,19 @@ class App:
             from .capabilities.comms_capability import CommsSendCapability, CommsSendConfig
             from .nav import clipboard
 
+            from .capabilities.keybind_capability import KeybindConfig
+
             ccfg = CommsSendConfig.from_cfg(self.cfg)
             binds = self._ed_binds()
             executor = self._key_executor()   # raises ExecutorError off-Windows -> caught below
+            # Auto-focus before a comms send is gated on [keybinds].focus_before_inject (#105):
+            # only pass a focuser when it's on, so with it off the injector keeps the old
+            # ambient-focus behaviour. None off-Windows regardless.
+            focuser = (self._window_focuser()
+                       if KeybindConfig.from_cfg(self.cfg).focus_before_inject else None)
             self.comms = CommsSendCapability(
                 binds=binds, executor=executor, config=ccfg,
-                copy=clipboard.copy,
+                copy=clipboard.copy, focuser=focuser,
                 log=lambda msg: self._log("comms", msg))
             self.registry.register(self.comms)
 

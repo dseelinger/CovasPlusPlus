@@ -186,6 +186,7 @@ class CommsSendCapability:
         config: CommsSendConfig,
         injector: object | None = None,
         copy: Optional[Callable[[str], None]] = None,
+        focuser: object | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
         log: Optional[Callable[[str], None]] = None,
@@ -193,8 +194,12 @@ class CommsSendCapability:
         self._binds = binds or {}
         self._executor = executor
         self._cfg = config
+        # `focuser` (#105) is forwarded into the default injector so a comms send pulls ED forward
+        # before pasting. Passed only when [keybinds].focus_before_inject is on; None keeps the old
+        # ambient-focus behaviour. Ignored when a pre-built `injector` is supplied (tests do that).
         self._injector = injector or ClipboardTextInjector(
-            executor=executor, copy=copy, sleep=sleep, settle=config.settle_seconds)
+            executor=executor, copy=copy, sleep=sleep, settle=config.settle_seconds,
+            focuser=focuser)
         self._clock = clock
         self._sleep = sleep
         self._log = log

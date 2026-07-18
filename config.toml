@@ -677,6 +677,12 @@ require_confirmation = true
 # Refuse to touch controls when ED Status reports danger/interdiction (and when ED status is
 # unavailable — we won't act unless we can prove it's safe). Leave ON.
 combat_guard = true
+# Bring the Elite Dangerous window to the foreground right before pressing a ship control (or
+# sending a comms message), so a spoken command can't misfire into a window that stole focus
+# (#105). A no-op when Elite is already the active window (cheap check, no cost while flying).
+# The explicit "focus Elite" voice command works regardless of this toggle; turn this OFF only if
+# you want injection to use whatever window currently has focus (the old behaviour). Leave ON.
+focus_before_inject = true
 # Only offer/allow actions valid for the CURRENT game mode (mainship / fighter / SRV / on-foot,
 # read from ED Status). Stops on-foot actions being offered while flying, and vice-versa. When
 # the mode is unknown (ED monitoring off), gating is skipped and the combat guard still applies.

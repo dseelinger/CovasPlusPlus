@@ -525,6 +525,16 @@ Notes:
 - [ ] **Combat guard:** in **danger/interdiction** (or with `[elite]` off) arming/confirming `launch` is **refused**.
 - [ ] **Off by default:** with the default allowlist (`landing_gear` only), *"launch"* is **not** offered and is refused — the sequence ships opt-in.
 
+### 6.1d Focus the Elite window (#105 — `[keybinds].enabled = true`)  🎮 ED ⌨️ INJECT 🔊 HW
+> Makes injection deterministic by bringing ED to the foreground. The explicit *"focus Elite"* command is always available (no allowlist/mode/combat gate). Auto-focus (`[keybinds].focus_before_inject`, **on by default**) pulls ED forward right before a keybind macro or a comms send.
+- [ ] **Explicit focus:** **alt-tab** from ED to a browser, then *"COVAS, set focus on Elite."* → the **ED window comes to the front**. Log: `focused ED window`.
+- [ ] **Auto-focus before a keybind:** with `focus_before_inject = true`, alt-tab to a browser, then arm+confirm *"toggle landing gear"* → ED is **foregrounded first** and the gear toggles **in the game** (the key does not land in the browser).
+- [ ] **Restores when minimised:** **minimise** ED, then *"focus the game"* → ED **restores** and comes to the front.
+- [ ] **Not running → fail soft:** with ED **closed**, *"focus Elite"* → COVAS says it **can't find the Elite window — is the game running?** No crash, and it doesn't claim success.
+- [ ] **Auto-focus off:** set `[keybinds].focus_before_inject = false`, alt-tab away, arm+confirm landing gear → focus is **not** changed (the keypress goes to whatever window has focus, the old behaviour). The explicit *"focus Elite"* command still works.
+- [ ] **Comms send focuses too:** with comms on (§6.4) and `focus_before_inject = true`, alt-tab away, compose+confirm a local message → ED is **foregrounded before the paste** so the message lands in ED chat, not the other window.
+- [ ] **VR rig (VDXR) 🥽:** with ED running in-headset via Virtual Desktop/OpenComposite, repeat the *explicit focus* and *auto-focus before a keybind* checks and confirm **desktop foreground** behaves — i.e. VD streaming doesn't defeat `SetForegroundWindow`. This is the one path only the real rig can settle.
+
 ### 6.2 Auto-honk (N5 + K2 — `[honk].enabled = true`, **on by default**)
 > Fires the Discovery Scanner shortly after you jump into a **new** system — no button press, and **no fire-group setup**. Bind the Discovery Scanner's fire to a **key** in ED (a HOTAS/mouse-only bind can't be pressed; a keyboard secondary, even with a modifier, is fine). At launch the log reports "Auto-honk ON …" or a "bind it in-game" warning.
 - [ ] **Happy path:** with the **Discovery Scanner** in your current fire group, **jump** to a new system → after a short probe it **holds** the fire button ~`hold_seconds` (default 5) and honks; the system map populates. Log: `honked — current fire group`.
