@@ -1866,6 +1866,35 @@ The original seven-phase plan is done and tested:
     character remark — where the stock experience (and route callouts) leave the tunnel silent, and it
     does so without ever asserting a false game fact.**
 
+NN. **Carrier Captain — UI name/voice + arrival & departure responses** (issue #137,
+    `covas/mixer/carrier.py`, `covas/mixer/runtime.py`, `covas/settings_schema.py`, `config.toml`,
+    `docs/audio/ambient-audio.md`) — closes the #19 UI gap and makes the carrier's Captain speak at
+    the moments that matter. **UI:** a new **"Carrier voices"** settings group exposes
+    `audio.carrier.enabled` plus the Captain's and Tower Control's `name` / `voice_ref` /
+    `voice_provider`, the voice fields rendered through the **#120 reusable searchable voice picker**
+    (ElevenLabs-backed combobox with the escape hatch for a Piper `.onnx` path / unlisted id). The
+    keys map straight onto `build_carrier_config`'s existing `[audio.carrier].<role>` read, so they
+    persist, apply live (`AudioLayer.apply_settings` already re-reads the carrier config + names), and
+    still work from `config.toml`. **Event-anchored responses:** the ambient captain cues fire on
+    location context throttled by a long cooldown (a random greeting, not guaranteed), so a new
+    `CarrierEventResponder` fires a **guaranteed** captain line directly off the journal event (the
+    interdiction-cue pattern, NOT the driver budget) — a welcome on `SupercruiseExit` at/near the
+    owned carrier, and a send-off on `Undocked` from it (gated on the undock being the OWN carrier: a
+    fleet-carrier undock whose `MarketID` matches the tracked `CarrierID`). A shared `CaptainDedup`
+    (short window) keeps the guaranteed line from stacking with an ambient captain welcome in the same
+    tick — the responder marks it on fire, and `_dispatch_play` skips an ambient captain cue while the
+    window is open. The captain pool also gains deferential duty flavor (status/deck/jump-prep/upkeep
+    asides, always employed-by/deferential to the owner). This stays on the CAST voice / COMMS bus and
+    is deliberately NOT routed through the #146 persona speech-arbiter. Fail-soft throughout (no carrier
+    / voices off / muted → silent). Offline-unit-tested in `tests/test_carrier_voices.py` (arrival +
+    departure fire, own-carrier gating incl. id mismatch, dedup blocks the double-fire, AudioLayer
+    end-to-end, voices-off / muted silence) and `tests/test_settings_schema.py` (the seven carrier keys
+    resolve, group, picker/combobox, provider enum, name round-trip); on-hardware captain-voice-at-the-
+    transition is `MANUAL_TESTS.md` §9.1a. **Improvement thesis (Immerse): the fleet carrier feels like
+    a crewed home that greets you by name the instant you drop in and sees you off as you leave —
+    configurable in the UI, deferential to its owner — where EDCoPilot/COVAS:NEXT carrier chatter is
+    generic and never anchored to those exact arrival/departure beats.**
+
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 

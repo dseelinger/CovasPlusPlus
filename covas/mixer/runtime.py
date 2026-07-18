@@ -22,7 +22,14 @@ from typing import Callable, Optional
 from ..capabilities.base import HelpMeta, Slot
 from ..config import experimental
 from .buses import ALERT, AMBIENT, COMMS, COVAS, MUSIC
-from .carrier import CarrierPlayer, build_carrier_config, carrier_cues
+from .carrier import (
+    CAPTAIN,
+    CaptainDedup,
+    CarrierEventResponder,
+    CarrierPlayer,
+    build_carrier_config,
+    carrier_cues,
+)
 from .chatter import (
     ChatterPlayer,
     CrewChatterPlayer,
@@ -55,6 +62,9 @@ from .voices import VoiceCast, build_cast
 # Journal arrival events that carry the current system + its Population; used to re-cast the
 # comms voices per system and to scale chatter frequency by population.
 _ARRIVAL_EVENTS = frozenset({"FSDJump", "CarrierJump", "Location"})
+# Journal events that anchor a GUARANTEED captain line at the carrier transition (#137): a
+# supercruise-arrival at/near the owned carrier and an undock leaving it.
+_CARRIER_EVENT_TRIGGERS = frozenset({"SupercruiseExit", "Undocked"})
 # How many recent players keep a stable random voice (a wing/operation's worth).
 _PLAYER_VOICE_MEMORY = 25
 # Anti-repeat window (issue #57): avoid re-handing-out any of the last N cast voices, so the ambient
@@ -230,6 +240,14 @@ class AudioLayer:
         # cast-pool fallback) with its display name woven in. Pool-only (fact-safe), no LLM.
         self._carrier = CarrierPlayer(self._submit_voice, self._carrier_voice,
                                       names=self._carrier_cfg.name_map(), log=self._log)
+        # Event-anchored captain responses (#137): a GUARANTEED captain line on supercruise-arrival
+        # at/near the owned carrier and on undock leaving it, fired straight off the journal event
+        # (not the ambient budget). The shared CaptainDedup keeps a guaranteed line and a long-
+        # cooldown ambient welcome from stacking into a back-to-back double-fire in the same tick.
+        self._captain_dedup = CaptainDedup(clock=clock)
+        self._carrier_events = CarrierEventResponder(
+            self._play_carrier_event, at_near=self._carrier_at_near,
+            owned_id=self._owned_carrier_id, dedup=self._captain_dedup, log=self._log)
         self._driver = CueDriver(self._registry, self._engine, self._governor,
                                  self._dispatch_play, context=ed_ctx, clock=clock)
 
@@ -341,6 +359,35 @@ class AudioLayer:
             )
         except Exception:  # noqa: BLE001 — a context glitch must never break the pump
             pass
+
+    def _carrier_at_near(self) -> tuple[bool, bool]:
+        """The live (at_own, near_own) location context for the event-anchored responder (#137),
+        read from EDContext. Fail-soft: any glitch reads as 'not there' so nothing fires."""
+        if self._ed_ctx is None:
+            return (False, False)
+        try:
+            return (bool(self._ed_ctx.at_own_carrier()), bool(self._ed_ctx.near_own_carrier()))
+        except Exception:  # noqa: BLE001 — a context glitch just means no event-anchored line
+            return (False, False)
+
+    def _owned_carrier_id(self) -> Optional[int]:
+        """The owned carrier's CarrierID (== its MarketID), so an undock from a DIFFERENT carrier
+        in the same system isn't mistaken for leaving ours (#137). None when unknown/unavailable."""
+        if self._ed_ctx is None:
+            return None
+        try:
+            cid = self._ed_ctx.carrier_snapshot().get("carrier_id")
+            return int(cid) if isinstance(cid, int) and not isinstance(cid, bool) else None
+        except Exception:  # noqa: BLE001 — no id -> the responder skips the id check, fail-soft
+            return None
+
+    def _play_carrier_event(self, cue) -> bool:  # noqa: ANN001 — a Cue
+        """The event-anchored responder's play seam (#137): voice a captain cue through the same
+        CarrierPlayer as the ambient cues, but gated on the carrier toggle + master mute here (the
+        responder itself is transition-triggered, not budget-governed)."""
+        if self.muted or not self.carrier_on:
+            return False
+        return self._carrier(cue)
 
     # -- routing helpers (all fail soft) ----------------------------------------
     def _submit_voice(self, voice, text: str, bus: str) -> bool:  # noqa: ANN001 — a Voice
@@ -539,7 +586,16 @@ class AudioLayer:
             # and the [audio.cues].flavor gate rides the generator (None flavor gen -> silence).
             return self._crew_chatter(cue) if self.chatter_on else False
         if role:
-            return self._carrier(cue) if self.carrier_on else False
+            if not self.carrier_on:
+                return False
+            # Share the captain dedup (#137): if a guaranteed arrival/departure line JUST spoke,
+            # skip the long-cooldown ambient captain welcome/status/duty so they don't stack.
+            if role == CAPTAIN and not self._captain_dedup.allow():
+                return False
+            fired = self._carrier(cue)
+            if fired and role == CAPTAIN:
+                self._captain_dedup.mark()
+            return fired
         if cue.samples:
             return self._sfx(cue) if self.sfx_on else False
         if cue.phrasings:
@@ -594,6 +650,11 @@ class AudioLayer:
             self._refresh_carrier_context()
             if self.muted:
                 return
+            # Event-anchored captain responses (#137): fire BEFORE the driver tick so the shared
+            # dedup blocks an ambient captain echo in this same tick. The responder is gated on the
+            # carrier toggle inside its play seam, so it's naturally silent when carrier voices are off.
+            if name in _CARRIER_EVENT_TRIGGERS:
+                self._carrier_events.on_event(event)
             if self.music_on:
                 states = self._engine.states(fuel_pct=self._fuel())
                 self._realize_music(self._music.update(states))

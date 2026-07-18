@@ -895,6 +895,27 @@ Notes:
 - [ ] **Voice control:** *"mute the carrier"* → carrier voices stop; *"carrier voices on"* → they
       resume. *"silence all the background audio"* also mutes them. Your own replies are unaffected.
 
+### 9.1a Carrier Captain — Settings-UI name/voice + arrival/departure responses (issue #137)  🎮 ED 🔊 HW 🌐 PANEL
+> Needs the control panel (`run_covas_ui.py`) + `[audio].enabled` + `[elite].enabled`, and you must
+> own a fleet carrier. The Captain's arrival/departure lines are **guaranteed** at the transition.
+- [ ] **Set name + voice in the UI:** open the control panel → **Settings → "Carrier voices"** group.
+      Type a **Captain name** (e.g. "Reynolds"), pick a **Captain voice** from the 🔍 searchable
+      dropdown (and set the matching **voice provider**), **Save**. Reopen the page → the values
+      **persisted**. Do the same for **Tower Control**.
+- [ ] **Applies live:** with the app running, change the Captain name/voice and Save → the **next**
+      Captain line uses the new name and voice (no restart).
+- [ ] **Arrival response:** supercruise to **your** carrier and **drop out of supercruise** at/near
+      it → the **Captain welcomes you** (e.g. *"dropping in nicely — good to have you back,
+      Commander"*), in the configured voice/name.
+- [ ] **Departure response:** dock at your carrier, then **undock to leave** → the **Captain gives a
+      send-off** (e.g. *"safe flying, Commander; we'll hold station"*).
+- [ ] **No double-fire:** the arrival/departure line does **not** immediately double up with a second
+      ambient Captain greeting in the same moment (short dedup).
+- [ ] **Carrier voices off = silence:** set the **"Carrier voices"** master switch off (or say *"mute
+      the carrier"*) → dropping in / undocking at your carrier produces **no** Captain line.
+- [ ] **Not a normal station:** undock from a **normal station** that happens to be in your carrier's
+      system → **no** send-off (only leaving the carrier itself triggers it).
+
 Notes:
 
 ## 9a. Stored ships & modules finder (issue #67)  🎮 ED 🔊 HW 📋 clipboard

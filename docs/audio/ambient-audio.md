@@ -80,20 +80,39 @@ speaking:
 - **Tower Control** — docking and traffic-control flavor, while you're **docked** at the carrier.
 - **Carrier chatter** — anonymous deck/crew/services buzz, while docked.
 
-Each role has its **own voice and display name**, set under `[audio.carrier].<role>` (`captain`,
-`tower`, `chatter`). Leave a role's `voice_ref` blank and it's auto-assigned a distinct, stable
-voice from the cast pool, so the three still sound like different people with zero setup; set a
-`voice_ref` (an ElevenLabs voice_id or Piper `.onnx` path) and optional `voice_provider` to pin an
-exact voice through [any registered provider](#per-role-providers-the-voice-ladder). The `name` you
-give the Captain and Tower is woven into their lines.
+Each role has its **own voice and display name**. Set them right on the **Settings page** under the
+**"Carrier voices"** group — name the **Captain** and **Tower Control**, and pick each one's voice
+from the same **searchable voice dropdown** (🔍 command palette + type-to-filter) the other voice
+fields use: choose a voice from your ElevenLabs library, or type a Piper `.onnx` path / any voice id
+(with the matching **voice provider**). Changes **persist and apply live** — the very next carrier
+line uses the new name and voice. It's still fully editable in `config.toml` under
+`[audio.carrier].<role>` (`captain`, `tower`, `chatter`) if you prefer. Leave a role's voice blank
+and it's auto-assigned a distinct, stable voice from the cast pool, so the roles still sound like
+different people with zero setup. The `name` you give the Captain and Tower is woven into their lines.
+
+### Captain responses on arrival and departure
+
+Beyond the occasional ambient greeting, the **Captain speaks at the two moments that matter**, every
+time:
+
+- **Arrival** — the instant you **drop out of supercruise at (or in the same system as) your
+  carrier**, the Captain welcomes you back (*"dropping in nicely — good to have you back,
+  Commander"*).
+- **Departure** — when you **undock to leave** your carrier, the Captain gives a send-off (*"safe
+  flying, Commander; we'll hold station"*).
+
+These are **guaranteed at the transition** (not left to the random ambient cooldown), and a short
+dedup keeps them from doubling up with an ambient welcome in the same beat. The rest of the Captain's
+lines — status reports, deck and jump-prep asides, upkeep notes — stay occasional and are always in
+the deferential, *employed-by-you* register.
 
 The whole feature is **on by default** but naturally silent — it only speaks when you actually own a
 carrier and are there. It needs [game-state monitoring](../elite/monitoring.md) (the "at my own
 carrier" context is read from the journal, pinned to your carrier's identity so a **squadron** or
-other carrier never triggers it). Every line is drawn from a curated pool (the language model is
-never in this path), and literal docking messages still come through the normal
-[comms voices](#voices-for-the-cast) — this layer is pure atmosphere on top. Say *"mute the
-carrier"* / *"carrier voices on"* to toggle it at runtime.
+other carrier never triggers it — nor does undocking from a normal station in the same system). Every
+line is drawn from a curated pool (the language model is never in this path), and literal docking
+messages still come through the normal [comms voices](#voices-for-the-cast) — this layer is pure
+atmosphere on top. Say *"mute the carrier"* / *"carrier voices on"* to toggle it at runtime.
 
 ## Voices for the cast
 
@@ -233,6 +252,7 @@ git-ignored — the assets are yours to supply.
 
 The audio layer lives under the `[audio]`, `[audio.buses.*]`, `[audio.comms]`, `[audio.voices]`,
 `[audio.carrier.*]`, `[music]`, and related sections. The Settings page has an **"Ambient audio"** group for the common
-knobs — master and per-part enables, per-bus volumes, and the voice-cast provider — most of which
-apply live. See the [Configuration reference](../configuration.md#ambient-audio-audio-music) for the
+knobs — master and per-part enables, per-bus volumes, and the voice-cast provider — plus a
+**"Carrier voices"** group for your carrier's master switch and the Captain/Tower **name + voice**,
+most of which apply live. See the [Configuration reference](../configuration.md#ambient-audio-audio-music) for the
 full set.

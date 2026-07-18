@@ -197,6 +197,48 @@ def test_public_schema_folds_in_value_and_overridden_flag():
     assert "elevenlabs.voice_name" not in flat
 
 
+# ---- fleet-carrier name/voice UI (issue #19 gap + #137) --------------------
+def test_carrier_settings_expose_name_and_voice_under_one_group():
+    """The captain + tower name/voice/provider rows all live in the 'Carrier voices' group, are
+    voice-settable, and round-trip through validate/set_value (issue #137 closes the #19 UI gap)."""
+    keys = ["audio.carrier.enabled",
+            "audio.carrier.captain.name", "audio.carrier.captain.voice_provider",
+            "audio.carrier.captain.voice_ref",
+            "audio.carrier.tower.name", "audio.carrier.tower.voice_provider",
+            "audio.carrier.tower.voice_ref"]
+    for key in keys:
+        st = s.by_key[key]
+        assert st.group == "Carrier voices"
+        assert st.phrasings                                   # voice-settable
+
+
+def test_carrier_voice_ref_renders_through_the_shared_picker():
+    """Both role voices are ElevenLabs-backed comboboxes (issue #120 picker + the #92 escape hatch),
+    so a Piper .onnx path / unlisted id stays valid instead of being rejected offline."""
+    for key in ("audio.carrier.captain.voice_ref", "audio.carrier.tower.voice_ref"):
+        st = s.by_key[key]
+        assert st.options_source == s.OPT_EL_VOICES and st.allow_custom is True
+        assert s.is_combobox(st) is True
+        # An unlisted id (or a Piper path) is accepted when the live list can't be resolved offline.
+        assert s.validate_value(st, "some-custom-onnx-or-id", options=None)[1] is None
+
+
+def test_carrier_voice_provider_is_a_blank_or_cast_provider_enum():
+    for key in ("audio.carrier.captain.voice_provider", "audio.carrier.tower.voice_provider"):
+        st = s.by_key[key]
+        assert st.type == "enum" and st.default == "" and "" in st.options
+        assert s.validate_value(st, "piper") == ("piper", None)
+        assert s.validate_value(st, "") == ("", None)          # blank = use the cast provider
+        assert s.validate_value(st, "bogus")[0] is None
+
+
+def test_carrier_name_round_trips_and_defaults_match():
+    cap = s.by_key["audio.carrier.captain.name"]
+    tower = s.by_key["audio.carrier.tower.name"]
+    assert cap.default == "Captain" and tower.default == "Tower Control"
+    assert s.set_value({}, cap, "Reynolds") == {"audio": {"carrier": {"captain": {"name": "Reynolds"}}}}
+
+
 # ---- doc_url "Setup guide →" links (issue #121) ----------------------------
 def test_doc_url_round_trips_into_the_payload():
     """A Setting's optional doc_url surfaces in the field payload alongside help; None when unset."""

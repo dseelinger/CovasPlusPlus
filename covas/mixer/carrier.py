@@ -26,6 +26,7 @@ have no I/O; only the injected `speak`/`voice_for` seams touch synthesis.
 """
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -108,6 +109,7 @@ def carrier_cues() -> list[Cue]:
                 "{captain} here — welcome back aboard, Commander.",
                 "This is {captain}. Good to have you on the flight deck.",
                 "{captain} speaking. All decks report nominal.",
+                "{captain} here — the ship's yours, Commander; make yourself at home.",
             ),
         ),
         Cue(
@@ -117,6 +119,25 @@ def carrier_cues() -> list[Cue]:
                 "{captain}: services are online and the crew's squared away.",
                 "{captain} here — she's holding steady, Commander.",
                 "This is {captain}. Refuel, repair, and rearm are all standing by.",
+                "{captain}: hull and systems check out green across the board, Commander.",
+            ),
+        ),
+        # Deferential duty flavor (issue #137): status/deck/jump-prep/upkeep asides, always in the
+        # employed-by register — reported to the owner, never a peer. Low-frequency, aboard only.
+        Cue(
+            "carrier_captain_duty", COMMS, {AT_OWN_CARRIER}, cooldown_s=280.0,
+            voice_role=CAPTAIN,
+            phrasings=(
+                "{captain} here — the quartermaster's balanced the books; nothing needs your hand, "
+                "Commander.",
+                "This is {captain}. Deck crew's rotated and upkeep's paid through the week, at your "
+                "leisure.",
+                "{captain}: tritium reserves are steady — I'll flag you well before we run short, "
+                "Commander.",
+                "This is {captain}. Jump drive's prepped and cycled, ready the moment you set a "
+                "course.",
+                "{captain} here — cargo's stowed and the manifest's in order, Commander; your "
+                "carrier's running clean.",
             ),
         ),
         Cue(
@@ -125,6 +146,7 @@ def carrier_cues() -> list[Cue]:
             phrasings=(
                 "{captain} here — good to see you back in the system, Commander.",
                 "This is {captain}. We've got you on the scope; the deck's ready when you are.",
+                "{captain}: your carrier's holding station, Commander — come in whenever you like.",
             ),
         ),
         # -- Tower Control: docking/traffic flavor, DOCKED only ---------------------------------
@@ -167,6 +189,145 @@ def carrier_cues() -> list[Cue]:
             ),
         ),
     ]
+
+
+# ---- event-anchored captain responses (issue #137) ----------------------------------------
+# The ambient cues above fire on LOCATION context throttled by a long cooldown, so a welcome is a
+# random greeting — NOT guaranteed at the exact moment you arrive or leave. These two GUARANTEE a
+# captain line at the transitions that matter: dropping out of supercruise at/near the owned carrier
+# (arrival) and undocking from it (departure). They're fired DIRECTLY at the event (like the
+# interdiction cue), not registered with the driver, so the ambient budget can't swallow them.
+_ARRIVAL_EVENT = "SupercruiseExit"     # dropped into normal space (at/near the carrier's system)
+_DEPARTURE_EVENT = "Undocked"          # left the pad; the event carries StationType + MarketID
+_FLEET_CARRIER = "fleetcarrier"        # Undocked.StationType for a carrier (case-insensitive)
+
+
+def carrier_event_cues() -> dict[str, Cue]:
+    """The two event-anchored captain cues (issue #137), keyed 'arrival'/'departure'. Each carries
+    the CAPTAIN role + its own deferential pool so it routes through the same CarrierPlayer (name
+    weaving + configured voice) as the ambient cues, but is fired at the transition, not the driver."""
+    return {
+        "arrival": Cue(
+            "carrier_captain_arrival", COMMS, {NEAR_OWN_CARRIER}, voice_role=CAPTAIN,
+            phrasings=(
+                "{captain} here — dropping in nicely. Good to have you back, Commander.",
+                "This is {captain}. Welcome home, Commander; the deck's ready for you.",
+                "{captain} speaking — we have you on approach. Good to see you, Commander.",
+            ),
+        ),
+        "departure": Cue(
+            "carrier_captain_departure", COMMS, {NEAR_OWN_CARRIER}, voice_role=CAPTAIN,
+            phrasings=(
+                "{captain} here — safe flying, Commander; we'll hold station.",
+                "This is {captain}. Fair winds, Commander; the carrier's yours to return to.",
+                "{captain}: clear of the deck. We'll keep her warm for you, Commander.",
+            ),
+        ),
+    }
+
+
+class CaptainDedup:
+    """A short shared 'a captain line just spoke' gate (issue #137). Both the event-anchored
+    responder and the ambient captain path consult it, so the guaranteed arrival/departure line and
+    a long-cooldown ambient welcome can't stack into a back-to-back double-fire. Monotonic-clock,
+    not thread-guarded — driven from the single audio event-pump thread."""
+
+    def __init__(self, *, clock: Callable[[], float] = time.monotonic, window_s: float = 60.0) -> None:
+        self._clock = clock
+        self._window = float(window_s)
+        self._last = float("-inf")
+
+    def allow(self) -> bool:
+        """True when no captain line has spoken within the dedup window."""
+        return (self._clock() - self._last) >= self._window
+
+    def mark(self) -> None:
+        """Record that a captain line just spoke (starts the window)."""
+        self._last = self._clock()
+
+
+class CarrierEventResponder:
+    """Fires a GUARANTEED captain line at the two carrier transitions — supercruise-arrival at/near
+    the owned carrier, and undock leaving it — independent of the ambient cooldown cues (issue #137).
+
+    Injected seams (offline-testable):
+      * `play(cue) -> bool` — voice a captain cue (the app wires this to the CarrierPlayer, gated on
+        carrier-on / not-muted); returns True only if it started.
+      * `at_near() -> (at_own, near_own)` — the live own-carrier location context.
+      * `owned_id() -> Optional[int]` — the owned carrier's CarrierID (== its MarketID), so an undock
+        from a DIFFERENT carrier in the same system isn't mistaken for leaving ours. None = unknown.
+      * `dedup` — the shared CaptainDedup (None = no dedup); prevents a double-fire with the ambient
+        captain cue in the same tick.
+    Fail-soft: never raises into the event pump."""
+
+    def __init__(
+        self,
+        play: Callable[[Cue], bool],
+        *,
+        at_near: Callable[[], tuple[bool, bool]],
+        owned_id: Optional[Callable[[], Optional[int]]] = None,
+        dedup: Optional[CaptainDedup] = None,
+        log: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        self._play = play
+        self._at_near = at_near
+        self._owned_id = owned_id
+        self._dedup = dedup
+        self._log = log
+        cues = carrier_event_cues()
+        self._arrival = cues["arrival"]
+        self._departure = cues["departure"]
+
+    def _is_own_carrier_undock(self, event: dict) -> bool:
+        """Whether an Undocked event is us leaving the OWN carrier: a fleet-carrier undock whose
+        MarketID matches the owned carrier id (or, when the id is unknown, any fleet-carrier undock —
+        the caller has already confirmed we're in the owned carrier's system)."""
+        if str(event.get("StationType") or "").strip().lower() != _FLEET_CARRIER:
+            return False
+        owned = None
+        if self._owned_id is not None:
+            try:
+                owned = self._owned_id()
+            except Exception:  # noqa: BLE001 — an id-read glitch just drops the id check
+                owned = None
+        mid = event.get("MarketID")
+        if owned is not None and isinstance(mid, int) and not isinstance(mid, bool):
+            return mid == owned
+        return True
+
+    def _fire(self, cue: Cue) -> bool:
+        """Play the cue through the dedup gate; on a real play, arm the shared window."""
+        if self._dedup is not None and not self._dedup.allow():
+            return False
+        started = bool(self._play(cue))
+        if started:
+            if self._dedup is not None:
+                self._dedup.mark()
+            if self._log is not None:
+                self._log(f"carrier[captain] event {cue.name} -> {cue.bus}")
+        return started
+
+    def on_event(self, event: dict) -> bool:
+        """React to one bus event: an arrival (SupercruiseExit near/at the owned carrier) or a
+        departure (Undocked from it) fires the matching captain line. Returns whether one played.
+        Never raises — it shares the audio event pump."""
+        try:
+            if not isinstance(event, dict):
+                return False
+            name = event.get("event")
+            if name == _ARRIVAL_EVENT:
+                _at, near = self._at_near()
+                if not near:
+                    return False
+                return self._fire(self._arrival)
+            if name == _DEPARTURE_EVENT:
+                _at, near = self._at_near()
+                if not near or not self._is_own_carrier_undock(event):
+                    return False
+                return self._fire(self._departure)
+            return False
+        except Exception:  # noqa: BLE001 — a bad event must never take down the pump
+            return False
 
 
 # ---- player -------------------------------------------------------------------------------

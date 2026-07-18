@@ -41,6 +41,9 @@ OPTIMIZATION_LEVELS = ["auto", "Full", "Standard", "Lean", "Minimal", "Bare"]
 # CAST_PROVIDERS (not offered for the NPC/comms/chatter cast).
 TTS_PROVIDERS = ["elevenlabs", "piper", "edge", "azure", "openai", "cartesia"]
 CAST_PROVIDERS = ["piper", "elevenlabs", "edge", "azure", "openai"]
+# A carrier role's optional per-role TTS provider (issue #137): the cast providers plus a leading
+# blank = "use the cast provider / the role's [audio.voices.providers] override".
+CARRIER_PROVIDERS = [""] + CAST_PROVIDERS
 
 # --- quick-panel per-provider descriptors (issue #86) ----------------------
 # The control panel's LLM/Speech quick blocks MIRROR the active [llm]/[tts].provider: they render
@@ -990,6 +993,59 @@ SCHEMA: list[Setting] = [
             "feel busy (the scale is logarithmic).",
             default=1000000000, min=1000, max=100000000000, unit="people",
             phrasings=("chatter full population", "chatter population threshold")),
+
+    # --- Fleet carrier voices (issue #19 name/voice UI + #137 arrival/departure) ------------
+    Setting("audio.carrier.enabled", ("audio", "carrier", "enabled"), "bool",
+            "Carrier voices", "Carrier voices",
+            "Bring your OWN fleet carrier to life with named, independently-voiced roles when you're "
+            "at (or in the same system as) it: a Captain and Tower Control speak welcome/status and "
+            "docking flavor, and the captain gives a spoken WELCOME when you drop out of supercruise "
+            "at the carrier and a SEND-OFF when you undock to leave. Naturally silent unless you own "
+            "a carrier and are there. Say 'mute the carrier' / 'carrier voices on' to toggle live.",
+            default=True,
+            phrasings=("carrier voices", "the carrier captain", "carrier voice"),
+            example="turn the carrier voices off"),
+    Setting("audio.carrier.captain.name", ("audio", "carrier", "captain", "name"), "string",
+            "Captain name", "Carrier voices",
+            "The display name of your carrier's Captain, woven into their lines (e.g. 'Reynolds "
+            "here — welcome back aboard, Commander'). Blank falls back to 'Captain'.",
+            default="Captain",
+            phrasings=("captain name", "carrier captain name", "name my captain"),
+            example="set the captain name to Reynolds"),
+    Setting("audio.carrier.captain.voice_provider", ("audio", "carrier", "captain", "voice_provider"),
+            "enum", "Captain voice provider", "Carrier voices",
+            "Which TTS provider voices the Captain: piper (local, free), elevenlabs, edge, azure, or "
+            "openai. Blank = the cast provider (or the captain's [audio.voices.providers] override). "
+            "Set this to match the voice id you pick below.",
+            default="", options=CARRIER_PROVIDERS,
+            phrasings=("captain voice provider", "carrier captain provider")),
+    Setting("audio.carrier.captain.voice_ref", ("audio", "carrier", "captain", "voice_ref"), "enum",
+            "Captain voice", "Carrier voices",
+            "The Captain's voice. Pick a voice from your ElevenLabs library, or type a Piper .onnx "
+            "path / any voice id for the provider above (the escape hatch). Blank = a distinct, "
+            "stable voice auto-picked from the cast pool, so the Captain still sounds like their own "
+            "person with zero setup.",
+            default="", options_source=OPT_EL_VOICES, allow_custom=True,
+            phrasings=("captain voice", "carrier captain voice")),
+    Setting("audio.carrier.tower.name", ("audio", "carrier", "tower", "name"), "string",
+            "Tower Control name", "Carrier voices",
+            "The display name of your carrier's docking/traffic control, woven into its lines. Spoken "
+            "only while docked at the carrier. Blank falls back to 'Tower Control'.",
+            default="Tower Control",
+            phrasings=("tower name", "carrier tower name", "tower control name"),
+            example="set the tower name to Flight Ops"),
+    Setting("audio.carrier.tower.voice_provider", ("audio", "carrier", "tower", "voice_provider"),
+            "enum", "Tower voice provider", "Carrier voices",
+            "Which TTS provider voices Tower Control: piper, elevenlabs, edge, azure, or openai. "
+            "Blank = the cast provider (or the tower's [audio.voices.providers] override).",
+            default="", options=CARRIER_PROVIDERS,
+            phrasings=("tower voice provider", "carrier tower provider")),
+    Setting("audio.carrier.tower.voice_ref", ("audio", "carrier", "tower", "voice_ref"), "enum",
+            "Tower voice", "Carrier voices",
+            "Tower Control's voice. Pick from your ElevenLabs library, or type a Piper .onnx path / "
+            "any voice id for the provider above. Blank = a distinct, stable auto-picked cast voice.",
+            default="", options_source=OPT_EL_VOICES, allow_custom=True,
+            phrasings=("tower voice", "carrier tower voice")),
 
     # --- Companion HUD -----------------------------------------------------
     Setting("hud.enabled", ("hud", "enabled"), "bool",

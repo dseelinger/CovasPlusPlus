@@ -11,12 +11,15 @@ from covas.ed.journal import apply_carrier_event, apply_journal_event
 from covas.mixer import (
     AudioLayer,
     BusMixer,
+    CaptainDedup,
+    CarrierEventResponder,
     CarrierPlayer,
     CueRegistry,
     EligibilityEngine,
     apply_names,
     build_carrier_config,
     carrier_cues,
+    carrier_event_cues,
 )
 from covas.mixer.carrier import CAPTAIN, CHATTER, TOWER
 from covas.mixer.eligibility import AT_OWN_CARRIER, NEAR_OWN_CARRIER, STATES, unknown_states
@@ -379,3 +382,140 @@ def test_carrier_voice_falls_back_to_a_distinct_pool_voice():
     tower = layer._carrier_voice("tower")      # noqa: SLF001
     assert cap.ref in {"VA", "VB", "VC", "VD"} and cap.ref != "PERSONA"
     assert isinstance(tower.ref, str)
+
+
+# ============================================================================================
+# 8. Event-anchored captain responses (issue #137) — arrival / departure + dedup
+# ============================================================================================
+
+def test_carrier_event_cues_are_captain_role_and_known_states():
+    cues = carrier_event_cues()
+    assert set(cues) == {"arrival", "departure"}
+    for cue in cues.values():
+        assert cue.voice_role == CAPTAIN
+        assert cue.eligible_states <= STATES
+        assert cue.phrasings                       # a non-empty deferential pool
+
+
+class _PlayRec:
+    def __init__(self, ok=True):
+        self.ok = ok
+        self.cues = []
+
+    def __call__(self, cue):
+        self.cues.append(cue)
+        return self.ok
+
+
+def _responder(*, at=False, near=False, ok=True, owned=None, dedup=None):
+    rec = _PlayRec(ok)
+    r = CarrierEventResponder(rec, at_near=lambda: (at, near),
+                              owned_id=(lambda: owned), dedup=dedup)
+    return r, rec
+
+
+def test_arrival_fires_captain_welcome_near_own_carrier():
+    r, rec = _responder(near=True, at=False)
+    assert r.on_event({"event": "SupercruiseExit", "StarSystem": "Sol"}) is True
+    assert [c.name for c in rec.cues] == ["carrier_captain_arrival"]
+
+
+def test_arrival_silent_when_away():
+    r, rec = _responder(near=False, at=False)
+    assert r.on_event({"event": "SupercruiseExit", "StarSystem": "Deciat"}) is False
+    assert rec.cues == []
+
+
+def test_departure_fires_send_off_on_own_carrier_undock():
+    r, rec = _responder(near=True, at=False)
+    assert r.on_event({"event": "Undocked", "StationName": "K7X-B0X",
+                       "StationType": "FleetCarrier", "MarketID": 42}) is True
+    assert [c.name for c in rec.cues] == ["carrier_captain_departure"]
+
+
+def test_departure_ignores_a_normal_station_undock():
+    r, rec = _responder(near=True, at=False)
+    # Undocking from a Coriolis in the carrier's system is NOT leaving the carrier.
+    assert r.on_event({"event": "Undocked", "StationName": "Jameson Memorial",
+                       "StationType": "Coriolis", "MarketID": 99}) is False
+    assert rec.cues == []
+
+
+def test_departure_ignores_a_different_carrier_when_id_known():
+    r, rec = _responder(near=True, owned=42)
+    # A fleet-carrier undock whose MarketID isn't our owned CarrierID = a squadron/other carrier.
+    assert r.on_event({"event": "Undocked", "StationType": "FleetCarrier", "MarketID": 999}) is False
+    assert rec.cues == []
+
+
+def test_departure_fires_when_id_matches_owned_carrier():
+    r, rec = _responder(near=True, owned=42)
+    assert r.on_event({"event": "Undocked", "StationType": "FleetCarrier", "MarketID": 42}) is True
+    assert [c.name for c in rec.cues] == ["carrier_captain_departure"]
+
+
+def test_unrelated_event_never_fires():
+    r, rec = _responder(near=True, at=True)
+    assert r.on_event({"event": "FSDJump", "StarSystem": "Sol"}) is False
+    assert rec.cues == []
+
+
+def test_dedup_blocks_a_second_captain_line_in_the_window():
+    dedup = CaptainDedup(clock=lambda: 0.0, window_s=60.0)
+    r, rec = _responder(near=True, dedup=dedup)
+    assert r.on_event({"event": "SupercruiseExit"}) is True          # fires + marks the window
+    # A second transition at the same instant is inside the window -> suppressed.
+    assert r.on_event({"event": "Undocked", "StationType": "FleetCarrier"}) is False
+    assert len(rec.cues) == 1
+
+
+def test_captain_dedup_window_reopens_after_it_elapses():
+    now = {"t": 0.0}
+    dedup = CaptainDedup(clock=lambda: now["t"], window_s=60.0)
+    assert dedup.allow() is True
+    dedup.mark()
+    assert dedup.allow() is False
+    now["t"] = 61.0
+    assert dedup.allow() is True
+
+
+# ============================================================================================
+# 9. Event-anchored responses through the AudioLayer (dedup with the ambient cue)
+# ============================================================================================
+
+def test_layer_arrival_speaks_captain_once_and_dedups_the_ambient_cue():
+    # Drop out of supercruise NEAR the owned carrier: the guaranteed arrival line speaks in the
+    # configured captain voice/name, and the ambient captain_nearby cue is deduped in the SAME tick
+    # (same clock), so exactly ONE captain line comes out.
+    ctx = _FakeCtx(near=True, at=False)
+    layer, tts = _carrier_layer(ctx, captain={"name": "Reynolds", "voice_ref": "CAPVOICE"})
+    layer.on_event({"type": "ed_event", "event": "SupercruiseExit", "StarSystem": "Sol"})
+    assert len(tts.said) == 1
+    text, voice_id = tts.said[0]
+    assert voice_id == "CAPVOICE" and "Reynolds" in text
+
+
+def test_layer_departure_speaks_send_off_once():
+    ctx = _FakeCtx(near=True, at=False)   # just undocked: in-system, no longer docked
+    layer, tts = _carrier_layer(ctx, captain={"name": "Reynolds", "voice_ref": "CAPVOICE"})
+    layer.on_event({"type": "ed_event", "event": "Undocked", "StationName": "K7X-B0X",
+                    "StationType": "FleetCarrier", "MarketID": 42})
+    assert len(tts.said) == 1
+    text, voice_id = tts.said[0]
+    assert voice_id == "CAPVOICE" and "Reynolds" in text
+
+
+def test_layer_no_event_line_when_carrier_voices_off():
+    ctx = _FakeCtx(near=True, at=False)
+    layer, tts = _carrier_layer(ctx, captain={"voice_ref": "CAPVOICE"})
+    layer.set_carrier(False)
+    layer.on_event({"type": "ed_event", "event": "SupercruiseExit", "StarSystem": "Sol"})
+    assert tts.said == []
+
+
+def test_layer_no_event_line_when_muted():
+    ctx = _FakeCtx(near=True, at=False)
+    layer, tts = _carrier_layer(ctx, captain={"voice_ref": "CAPVOICE"})
+    layer.set_muted(True)
+    layer.on_event({"type": "ed_event", "event": "Undocked", "StationType": "FleetCarrier"})
+    assert tts.said == []
