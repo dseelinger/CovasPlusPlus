@@ -1865,6 +1865,46 @@ The original seven-phase plan is done and tested:
     alive in the one stretch where nothing happens — passing a long jump with a fresh, playful, in-
     character remark — where the stock experience (and route callouts) leave the tunnel silent, and it
     does so without ever asserting a false game fact.**
+NN. **Persona speech arbiter — one Ship's-AI voice, one line at a time** (issue #146,
+    `covas/persona_speech.py` (new), `covas/app.py`, `covas/mixer/runtime.py`,
+    `covas/bootstrap.py`) — the persona (Ship's-AI) voice had **two uncoordinated producers** both
+    submitting to the same clean COVAS bus, which *mixes* concurrent audio: the app/conversation path
+    (`_speak` for replies, `_speak_proactive`/`_speak_proactive_line` for callouts — serialized
+    *among themselves* by `_proactive_lock` + the Idle-gate) and the audio layer's PERSONA ambient-cue
+    player (`_persona_chatter`, event-pump-driven, gated by **nothing the app knew about**). With no
+    shared serialization the two could start together and the companion talked over itself — an Immerse
+    regression. The fix is a single **`PersonaSpeechArbiter`**: a priority queue + one speaker thread
+    that is the *only* caller of the persona voice. Every persona line — replies (`REPLY`), proactive/
+    route callouts (`CALLOUT`), ambient musings (`AMBIENT`) — is **enqueued**; the speaker plays them
+    one at a time. Policy is **priority + freshness + preempt**, not naive FIFO: a newly-enqueued line
+    **preempts (cuts mid-word, via the SAME per-line `cancel` Event PTT barge-in uses)** the line in
+    progress when it *supersedes* it (fresher line on the same **subject key**, e.g. `route`), is a
+    **safety** subject (`danger`/`hazard` — the seam for #147 and the #149 long-jump TODO), carries a
+    producer **`preempt`** flag (contravene: new game state makes the current line wrong), or is simply
+    **higher priority**; an unrelated **equal/lower** line just **queues** (ordinary lines don't chop
+    each other off). A stale ambient cue past its **TTL** (`[audio].persona_ttl_seconds`, default 8s) is
+    **dropped, not spoken late**; the queue is **bounded** (`[audio].persona_queue_depth`, default 8) and
+    an overflow drops the lowest-priority line (logged, no silent cap). A PTT/user turn calls
+    `arbiter.flush()` from the existing `_interrupt` path — **cancel current + drop the queue** — so no
+    stale ambient plays after the Commander speaks. The module is **pure-ish and standalone** (stdlib
+    only, no mixer/TTS knowledge): each line carries a `speak(cancel)` thunk (the app supplies the real
+    persona TTS / crew-splitting reply path; the audio layer supplies the persona-on-bus blocking speak;
+    tests supply a fake) and the **clock is injected** for deterministic TTL. `_speak` still **blocks**
+    until its line is spoken and **re-raises** a real TTS failure (`Line.raise_if_error`), preserving the
+    "a dead TTS degrades to text, never crashes" contract (#90/#108); the speaker thread itself never
+    dies on a bad line. **Scope: persona voice ONLY** — cast/comms/carrier voices are different speakers
+    on different buses (radio *under* the AI voice is realistic) and are deliberately untouched; a
+    follow-up may "duck, don't hard-serialize" cast under the persona. **Downstream:** #131 (persona-cue
+    mis-voicing) and #137 (carrier captain) rebase on this; note #137's captain is on the **CAST** voice,
+    NOT the persona arbiter, though it shares `runtime.py` `on_event`. Offline-unit-tested with a fake
+    speaker + injected clock (`tests/test_persona_speech.py`): priority ordering, same-subject supersede
+    / contravene / higher-priority preempt vs equal-lower queue, TTL drop, PTT flush, bounded-overflow
+    eviction, fail-soft error capture, plus app-level no-regression (a single reply still speaks, a real
+    TTS failure still raises, `_interrupt` flushes the arbiter). On-hardware overlap→queue / mid-word
+    cut-off / PTT-flush cases are `MANUAL_TESTS.md` §18.5c; docs `docs/audio/ambient-audio.md`.
+    **Improvement thesis (Immerse + Foundation): the companion never talks over itself and always
+    surfaces the freshest, most important thing to say — a single arbitrated voice where EDCoPilot /
+    COVAS:NEXT let independent line producers collide on the same output.**
 
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**

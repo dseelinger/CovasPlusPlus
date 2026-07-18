@@ -137,6 +137,31 @@ rather than random:
 So a musing like *"nice to have some company out here"* comes from your companion, while station
 chatter comes from the anonymous radio cast — the perspective always matches the source.
 
+### One voice, one line at a time (the speech arbiter)
+
+Your companion has more than one reason to speak — a reply to you, a proactive or route **callout**,
+and its own ambient **musings** — and they can arrive at the same moment. Rather than let two of them
+play over each other on the COVAS bus, **every persona-voice line goes through a single speech
+arbiter** that speaks them one at a time, newest-and-most-important first:
+
+- **Priority.** A reply to *you* outranks a callout, which outranks an ambient musing. A lower line
+  waits its turn; it never makes a reply wait behind it.
+- **It cuts a line short when the new one makes it stale.** A fresher update on the **same subject**
+  (an updated route callout replacing the one being read), a **safety** line (e.g. a hazard warning),
+  or any **higher-priority** line **interrupts the line in progress mid-word** and speaks immediately —
+  it doesn't wait for an obsolete or now-wrong line to finish. An unrelated, equal-or-lower line simply
+  **queues**, so ordinary lines don't chop each other off.
+- **Stale musings are dropped, not spoken late.** An ambient musing that's been waiting behind other
+  speech longer than `[audio].persona_ttl_seconds` (default 8s) is dropped — a *"nice system"* remark
+  ten seconds after you've jumped away is just noise.
+- **You always have the floor.** Press push-to-talk and whatever's speaking stops, **and the queue is
+  flushed** — no stale musing plays after your turn.
+- The queue is bounded (`[audio].persona_queue_depth`, default 8); an event burst can't back up
+  minutes of speech.
+
+This is **persona voice only** — radioed cast/comms/carrier voices are separate speakers on their own
+buses and may still overlap the persona voice (radio chatter *under* your companion is realistic).
+
 !!! warning "This uses ElevenLabs credits"
     The cast now defaults to **ElevenLabs**, which burns credits on every comms/chatter line. To go
     back to the free, game-friendly local path, set `[audio.voices].cast_provider = "piper"` and add

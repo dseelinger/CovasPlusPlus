@@ -21,6 +21,7 @@ from typing import Callable, Optional
 
 from ..capabilities.base import HelpMeta, Slot
 from ..config import experimental
+from ..persona_speech import DEFAULT_AMBIENT_TTL_S, Priority
 from .buses import ALERT, AMBIENT, COMMS, COVAS, MUSIC
 from .carrier import CarrierPlayer, build_carrier_config, carrier_cues
 from .chatter import (
@@ -108,10 +109,16 @@ class AudioLayer:
         allow_comms_variants: bool = True,  # tiering (#84): False -> verbatim comms only, no LLM
         clock: Callable[[], float] = time.monotonic,
         log: Optional[Callable[[str], None]] = None,
+        persona_arbiter=None,  # noqa: ANN001 — PersonaSpeechArbiter (issue #146); None -> direct
     ) -> None:
         self.cfg = cfg
         self.mixer = mixer
         self.tts = tts
+        # The app's ONE persona speech arbiter (issue #146). When present, an ambient PERSONA cue
+        # is ENQUEUED here (AMBIENT priority + a short TTL) instead of spoken straight onto the
+        # COVAS bus — so it can never mix with a reply/callout. None (tests building the layer
+        # standalone) keeps the legacy direct `_speak_persona` path.
+        self._persona_arbiter = persona_arbiter
         self._ed_ctx = ed_ctx
         self._log = log or (lambda _m: None)
         # Drop-in content (C11): dropped-in SFX/music/line files overlay the shipped defaults. An
@@ -212,8 +219,10 @@ class AudioLayer:
         # "Our"-perspective musings (issue #57): a cue tagged voice_role=PERSONA is something the
         # companion itself notices, so it speaks in COVAS's OWN voice on the clean COVAS bus instead
         # of a random radioed cast voice. Same player shape (flavor generator + frequency gate) as
-        # ambient chatter, just a different `speak` seam.
-        self._persona_chatter = ChatterPlayer(self._speak_persona, generate=chatter_gen,
+        # ambient chatter, just a different `speak` seam: `_persona_enqueue` hands the line to the
+        # app's persona speech arbiter (issue #146) so it queues behind — and yields to — replies
+        # and callouts instead of mixing with them on the COVAS bus.
+        self._persona_chatter = ChatterPlayer(self._persona_enqueue, generate=chatter_gen,
                                                context=self._chatter_context,
                                                min_interval=self._chatter_interval, clock=clock)
         # Ambient crew chatter (issue #126): same flavor generator (cheap tier) + situation
@@ -477,11 +486,60 @@ class AudioLayer:
         window on the pool keeps those voices from clustering)."""
         return self._submit_voice(self._chatter_voices.random(), text, bus)
 
+    def _persona_ttl(self) -> float:
+        """Freshness window (seconds) for a queued ambient PERSONA musing (issue #146): a musing
+        that waited longer than this behind a reply/callout is DROPPED rather than spoken late (a
+        "nice system out here" line 10 s after you jumped away is noise). Read live from
+        `[audio].persona_ttl_seconds` so a Settings change applies to the next cue."""
+        return float((self.cfg.get("audio", {}) or {}).get("persona_ttl_seconds",
+                                                            DEFAULT_AMBIENT_TTL_S))
+
+    def _persona_enqueue(self, text: str, bus: str) -> bool:
+        """The ambient PERSONA-cue `speak` seam (issue #146): instead of speaking straight onto the
+        COVAS bus (which could MIX with a reply/callout), ENQUEUE the musing on the app's persona
+        speech arbiter at AMBIENT priority with a short TTL. Returns True when accepted (the cue's
+        frequency gate then advances) — the actual play happens later, one-line-at-a-time, on the
+        arbiter's speaker thread. With no arbiter wired (a standalone test layer) it falls back to
+        the legacy direct path so existing behaviour is unchanged."""
+        arb = self._persona_arbiter
+        if arb is None:
+            return self._speak_persona(text, bus)
+        try:
+            arb.enqueue(text, priority=Priority.AMBIENT, ttl=self._persona_ttl(),
+                        speak=lambda cancel: self._speak_persona_blocking(text, cancel, bus=bus))
+            return True
+        except Exception as e:  # noqa: BLE001 — an enqueue glitch just means no musing, never a crash
+            self._log(f"persona musing enqueue failed: {e}")
+            return False
+
+    def _speak_persona_blocking(self, text: str, cancel, bus: str = COVAS) -> None:  # noqa: ANN001
+        """Play an ambient PERSONA musing on `bus` and BLOCK until it finishes OR `cancel` fires —
+        the arbiter's speaker thread calls this so exactly one persona line sounds at a time and a
+        supersede/barge-in can cut it mid-word (issue #146). Mirrors `speak_crew`'s submit-then-
+        wait-on-cancel shape: synth + submit the whole clip, then wait its duration; if cancel
+        fires first, clear the bus to stop the audio immediately. Fails soft — a dead persona voice
+        degrades to silence, never a crash."""
+        try:
+            pcm, sr = self.tts.synth_pcm(text)
+            if not pcm or cancel.is_set():
+                return
+            buf = self.mixer.submit(bus, pcm16_to_float(pcm), sr)
+        except Exception as e:  # noqa: BLE001 — a dead persona voice degrades to nothing
+            self._log(f"persona musing failed: {e}")
+            return
+        sr_out = float(getattr(self.mixer, "sample_rate", 0) or sr or 16000)
+        duration = (len(buf) / sr_out) if sr_out else 0.0
+        if duration > 0 and cancel.wait(duration):
+            self.mixer.clear_bus(bus)  # barged in / superseded mid-line -> stop the rest now
+
     def _speak_persona(self, text: str, bus: str) -> bool:
         """Speak an "our"-perspective musing in COVAS's OWN persona voice, via the app's real TTS
         provider, on the clean COVAS bus — the attribution rule (issue #57): something WE notice
         comes from the companion, never an anonymous radioed cast voice. Uses `self.tts` (the same
-        provider as the companion's replies), mirroring the interdiction COVAS line. Fails soft."""
+        provider as the companion's replies), mirroring the interdiction COVAS line. Fails soft.
+
+        This is the LEGACY direct path, kept as the fallback for a layer built with no persona
+        arbiter (a standalone test); the live app routes PERSONA cues through `_persona_enqueue`."""
         try:
             speak_on_bus(self.mixer, self.tts, text, bus=bus)
             return True
