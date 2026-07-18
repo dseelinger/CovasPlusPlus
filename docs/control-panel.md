@@ -16,6 +16,19 @@ A small, muted **version tag** (`vX.Y.Z`) sits in the corner of every page — e
 glance which build you're on when comparing notes or filing a bug, without competing for attention
 with anything else on screen. The packaged app's window title carries the same version.
 
+## Panel zoom
+
+Every page supports browser-style zoom, including in the **packaged desktop app** where the
+window itself has no browser chrome to zoom with:
+
+- **Ctrl+`+`** zooms in, **Ctrl+`-`** zooms out, **Ctrl+`0`** resets to 100% — clamped 50%–200%.
+- **Ctrl+scroll** zooms in/out.
+- A small **`− 100% +`** cluster in the header does the same with the mouse; click the percentage
+  to reset.
+- The chosen zoom **persists** (per machine, via the browser's local storage) across page
+  navigation and app restarts, and is applied before the page paints — no flash of 100% on load.
+- The packaged window also supports trackpad/touch **pinch-to-zoom**.
+
 ## Type a prompt (no mic)
 
 Above the live log is a **text box with a ✈ send button**. Type a message and press **Enter** or

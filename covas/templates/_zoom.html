@@ -1,0 +1,99 @@
+{# Browser-style panel zoom (issue #116). ONE implementation, {% include %}'d into the <head> of
+   every standalone panel page — same shared-partial pattern _command_palette.html uses for the
+   voice/model picker, but placed in <head> (not at the end of <body>) so the anti-flash apply
+   below runs before the page paints.
+
+   Why CSS `zoom` and not `transform: scale`: both the packaged window (WebView2/Chromium) and a
+   source-run's browser (Chrome/Edge) are Chromium, and `zoom` reflows layout exactly like native
+   browser zoom — no scrollbar/hit-testing gymnastics `transform` would need.
+
+   Persistence is localStorage (per-machine, no server round-trip) — a pure view preference, not
+   a `config.toml`/settings_schema setting (see issue #116 "Decisions"). #}
+<script>
+// Applied synchronously, before <body> is parsed, so there's no flash of 100% on load/navigation.
+(function(){
+  var KEY = "covas.zoomFactor";
+  var f = parseFloat(localStorage.getItem(KEY));
+  if(!isFinite(f) || f < 0.5 || f > 2.0) f = 1.0;
+  document.documentElement.style.zoom = f;
+})();
+</script>
+<style>
+  /* Small header cluster, injected via JS below so no per-page header markup is needed. */
+  .zoomctl{display:flex;align-items:center;gap:2px;margin-left:8px;font-size:12px}
+  .zoomctl button{background:var(--btn-bg);color:var(--accent2);border:1px solid var(--edge);
+    border-radius:5px;padding:2px 8px;font-family:inherit;font-size:13px;line-height:1.4;cursor:pointer}
+  .zoomctl button:hover{background:var(--btn-hover)}
+  .zoomctl .zoom-pct{color:var(--muted);font-size:11px;min-width:36px;text-align:center;
+    cursor:pointer;user-select:none}
+  .zoomctl .zoom-pct:hover{color:var(--text)}
+</style>
+<script>
+(function(){
+  var KEY = "covas.zoomFactor";
+  var MIN = 0.5, MAX = 2.0, STEP = 0.1;
+
+  function current(){
+    var f = parseFloat(document.documentElement.style.zoom);
+    return isFinite(f) && f > 0 ? f : 1.0;
+  }
+
+  function clamp(f){
+    // Round to 1dp to avoid float drift (0.1 + 0.1 + ... != 0.3) across repeated steps.
+    return Math.round(Math.min(MAX, Math.max(MIN, f)) * 10) / 10;
+  }
+
+  function apply(f){
+    f = clamp(f);
+    document.documentElement.style.zoom = f;
+    try { localStorage.setItem(KEY, String(f)); } catch(e) { /* storage unavailable — zoom still works this session */ }
+    paint(f);
+    return f;
+  }
+
+  function paint(f){
+    var pct = document.querySelectorAll(".zoom-pct");
+    for(var i=0;i<pct.length;i++) pct[i].textContent = Math.round(f*100) + "%";
+  }
+
+  function zoomIn(){ apply(current() + STEP); }
+  function zoomOut(){ apply(current() - STEP); }
+  function zoomReset(){ apply(1.0); }
+
+  // Keyboard: Ctrl+=/+ in, Ctrl+- out, Ctrl+0 reset. preventDefault so the webview/browser
+  // doesn't act on its own native accelerator (or, in a real browser, double-zoom on top of ours).
+  document.addEventListener("keydown", function(e){
+    if(!e.ctrlKey || e.altKey || e.metaKey) return;
+    if(e.key === "=" || e.key === "+"){ e.preventDefault(); zoomIn(); }
+    else if(e.key === "-" || e.key === "_"){ e.preventDefault(); zoomOut(); }
+    else if(e.key === "0"){ e.preventDefault(); zoomReset(); }
+  }, true);
+
+  // Ctrl+mouse-wheel: the gesture users reach for first in any browser.
+  window.addEventListener("wheel", function(e){
+    if(!e.ctrlKey) return;
+    e.preventDefault();
+    if(e.deltaY < 0) zoomIn(); else if(e.deltaY > 0) zoomOut();
+  }, {passive:false});
+
+  // Header control cluster (discoverability for mouse-only users). Injected as the last child of
+  // <header> so it works across every page's header layout without per-page markup changes.
+  function injectControls(){
+    var header = document.querySelector("header");
+    if(!header) return;
+    var wrap = document.createElement("span");
+    wrap.className = "zoomctl";
+    wrap.innerHTML =
+      '<button type="button" class="zoom-out" title="Zoom out (Ctrl -)">−</button>' +
+      '<span class="zoom-pct" title="Reset zoom (Ctrl 0)">' + Math.round(current()*100) + '%</span>' +
+      '<button type="button" class="zoom-in" title="Zoom in (Ctrl +)">+</button>';
+    header.appendChild(wrap);
+    wrap.querySelector(".zoom-out").onclick = zoomOut;
+    wrap.querySelector(".zoom-in").onclick = zoomIn;
+    wrap.querySelector(".zoom-pct").onclick = zoomReset;
+  }
+
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", injectControls);
+  else injectControls();
+})();
+</script>

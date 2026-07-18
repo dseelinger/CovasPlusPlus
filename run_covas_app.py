@@ -177,8 +177,10 @@ def main() -> None:
     # The one and only window and start() for the session. A fresh install opens on the wizard
     # (`/setup`); the handoff below navigates the SAME window to the panel (`/`). A configured
     # install opens straight on the panel.
+    # zoomable=True (issue #116): native trackpad/touch pinch-zoom in the packaged WebView2
+    # window, alongside the in-page Ctrl+/-/0 and Ctrl+scroll zoom (_zoom.html).
     window = webview.create_window(f"COVAS++ v{__version__}", url=(panel_url if configured else wizard_url),
-                                   width=1200, height=820, min_size=(900, 640))
+                                   width=1200, height=820, min_size=(900, 640), zoomable=True)
 
     if configured:
         _install_quit_watch(state["core"], window)
