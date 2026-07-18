@@ -428,7 +428,13 @@ Notes:
 
 ### 5.3 Route callouts (N4 — `[route].enabled = true`)  🎮 ED
 > Plot a multi-jump galaxy-map route first (writes `NavRoute.json`). These go through the proactive path — spoken only when idle, cancelable, and silenced by the proactive mute too.
-- [ ] **Scoopable heads-up:** as you lock/enter the next jump, COVAS says whether the next star is **scoopable** ("Next star's scoopable." / "…isn't scoopable. Top off your fuel if you're low.").
+- [ ] **Scoopable heads-up:** as a target locks in, COVAS names whether the star you're **arriving at** is scoopable — never a bare "next star". Fly a route where the immediate destination is scoopable and the one after it isn't → hear the two-star line: "This star's scoopable — but the one after isn't, so top off here before you jump on."
+- [ ] **Arriving not scoopable:** plot a route where the immediate destination isn't scoopable → "Heads up — the star you're jumping to isn't scoopable." (clearly *this* jump's destination, not the one after).
+- [ ] **Both scoopable:** immediate destination and the one after are both scoopable → the brief "Next star's scoopable."
+- [ ] **No false "next star" while headed to a scoopable star:** confirm you never hear "isn't scoopable" while mid-hyperspace toward a star that **is** scoopable (the old off-by-one bug, #148) — speaking during hyperspace itself is fine/expected, just correct about which star.
+- [ ] **Hazard warning — neutron star (#147):** plot a route with a **neutron star** as the immediate next hop → on locking the target, hear "Heads up, Commander — next jump's a neutron star. Mind the exclusion zone, and no fuel there." **and no separate** "isn't scoopable" line right before/after it (supersede, not double up).
+- [ ] **Hazard warning — white dwarf (#147):** same with a **white dwarf** next hop → "Careful — a white dwarf next. Watch the jets; you can't scoop it." (also superseding the plain "not scoopable" line).
+- [ ] **Hazard toggle:** set `[route].callout_hazard = false` → flying toward a neutron star/white dwarf gets **no hazard warning**, but you still hear the plain "isn't scoopable" line (it's still non-scoopable) and normal scoopable callouts for other stars are unaffected.
 - [ ] **Jumps remaining:** every **Nth** jump (`[route].every_n`, default 5) it announces jumps remaining to the destination (singular "1 jump remaining" near the end).
 - [ ] **Arrival:** on reaching the final system it says "Arrived at <system>. Route complete." and stops.
 - [ ] **Replot:** plot a new route mid-flight → callouts follow the new route (counts reset).

@@ -366,7 +366,8 @@ See [Route callouts](elite/route-callouts.md). **Off by default.**
 |---------|---------|--------------|
 | `route.enabled` | `false` | Heads-ups while flying a plotted route |
 | `route.every_n` | `5` | Announce jumps-remaining every Nth jump |
-| `route.callout_scoopable` | `true` | Announce whether the next star is scoopable |
+| `route.callout_scoopable` | `true` | Announce whether the arriving star (and the one after it) is scoopable |
+| `route.callout_hazard` | `true` | Warn when the arriving star is a neutron star or white dwarf |
 | `route.callout_jumps_remaining` | `true` | Announce jumps remaining |
 | `route.callout_arrival` | `true` | Announce arrival at the destination |
 

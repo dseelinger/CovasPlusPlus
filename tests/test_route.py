@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from covas.capabilities.route_capability import RouteCalloutCapability, RouteConfig
-from covas.ed.route import RouteTracker, is_scoopable
+from covas.ed.route import RouteTracker, is_hazardous_star, is_scoopable
 
 
 # --- scoopable classification (KGBFOAM) ------------------------------------
@@ -28,6 +28,23 @@ def test_non_scoopable_classes(cls):
 def test_scoopable_is_case_insensitive_and_leading_letter():
     assert is_scoopable("k") is True
     assert is_scoopable("M_RedGiant") is True     # giants share the class letter, scoopable
+
+
+# --- hazardous classification (#147: neutron stars + white dwarfs) --------
+
+@pytest.mark.parametrize("cls,expected", [
+    ("N", "neutron star"), ("n", "neutron star"), ("NS", "neutron star"),
+    ("D", "white dwarf"), ("DA", "white dwarf"), ("DB", "white dwarf"),
+    ("DC", "white dwarf"), ("DAB", "white dwarf"), ("d", "white dwarf"),
+])
+def test_hazardous_classes(cls, expected):
+    assert is_hazardous_star(cls) == expected
+
+
+@pytest.mark.parametrize("cls", list("KGBFOAM") + ["L", "T", "Y", "H", "W", "C", "S", "AeBe",
+                                                     "", None])
+def test_non_hazardous_classes(cls):
+    assert is_hazardous_star(cls) is None
 
 
 # --- RouteTracker ----------------------------------------------------------
@@ -83,6 +100,37 @@ def test_tracker_step_for_returns_class():
     assert t.step_for("Nowhere") is None
 
 
+# --- RouteTracker.lookahead (#148: arriving vs. following, by position) ----
+
+def test_lookahead_reports_arriving_and_following_by_position():
+    t = RouteTracker()
+    t.load(_route(("Sol", "G"), ("A", "K"), ("B", "L"), ("Dest", "K")))
+    arriving, following = t.lookahead()
+    assert (arriving.system, arriving.star_class) == ("A", "K")
+    assert (following.system, following.star_class) == ("B", "L")
+
+
+def test_lookahead_advances_with_progress():
+    t = RouteTracker()
+    t.load(_route(("Sol", "G"), ("A", "K"), ("B", "L"), ("Dest", "K")))
+    t.on_jump("A")
+    arriving, following = t.lookahead()
+    assert arriving.system == "B" and following.system == "Dest"
+
+
+def test_lookahead_no_following_on_final_hop():
+    t = RouteTracker()
+    t.load(_route(("Sol", "G"), ("A", "K"), ("Dest", "K")))
+    t.on_jump("A")                                  # arriving at Dest next, nothing after it
+    arriving, following = t.lookahead()
+    assert arriving.system == "Dest" and following is None
+
+
+def test_lookahead_inactive_route_returns_none_none():
+    t = RouteTracker()
+    assert t.lookahead() == (None, None)
+
+
 # --- capability: callouts + gating -----------------------------------------
 
 class _Cap:
@@ -117,14 +165,8 @@ def _long_route(n=7):
 
 def test_scoopable_callout_on_target():
     c = _Cap(_long_route())
-    c.ev(event="FSDTarget", Name="S1")               # K -> scoopable
+    c.ev(event="FSDTarget", Name="S1")               # arriving = S1 (K) -> scoopable
     assert c.spoken == ["Next star's scoopable."]
-
-
-def test_non_scoopable_callout_on_target():
-    c = _Cap(_long_route())
-    c.ev(event="FSDTarget", Name="S3")               # N (neutron) -> not scoopable
-    assert len(c.spoken) == 1 and "isn't scoopable" in c.spoken[0]
 
 
 def test_target_uses_event_class_when_not_on_route():
@@ -133,11 +175,84 @@ def test_target_uses_event_class_when_not_on_route():
     assert c.spoken == ["Next star's scoopable."]
 
 
+def test_off_route_detour_not_scoopable_uses_event_class():
+    c = _Cap(_long_route())
+    c.ev(event="FSDTarget", Name="Detour", StarClass="L")   # off-route, non-scoopable, no hazard
+    assert c.spoken == ["Heads up — the star you're jumping to isn't scoopable."]
+
+
 def test_repeat_target_not_re_announced():
     c = _Cap(_long_route())
     c.ev(event="FSDTarget", Name="S1")
     c.ev(event="FSDTarget", Name="S1")               # same target again
     assert len(c.spoken) == 1
+
+
+# --- #148: wording anchored to route POSITION, not the FSDTarget event's Name -----
+# (FSDTarget locks the hop AFTER the one you're arriving at, so these fire on a target
+# name that's deliberately one hop past what the wording should describe.)
+
+def test_arriving_not_scoopable_names_this_jumps_destination():
+    # arriving (idx 1) = L, non-scoopable/non-hazard; following (idx 2) = K.
+    route = _route(("S0", "K"), ("S1", "L"), ("S2", "K"), ("S3", "K"))
+    c = _Cap(route)
+    c.ev(event="FSDTarget", Name="S2")               # the (buggy) far-ahead target name
+    assert c.spoken == ["Heads up — the star you're jumping to isn't scoopable."]
+
+
+def test_arriving_scoopable_following_not_gets_two_star_line():
+    # arriving (idx 1) = K, scoopable; following (idx 2) = L, not.
+    route = _route(("S0", "K"), ("S1", "K"), ("S2", "L"), ("S3", "K"))
+    c = _Cap(route)
+    c.ev(event="FSDTarget", Name="S2")
+    assert c.spoken == ["This star's scoopable — but the one after isn't, so top off here "
+                        "before you jump on."]
+
+
+def test_both_arriving_and_following_scoopable_gets_brief_line():
+    route = _route(("S0", "K"), ("S1", "K"), ("S2", "K"), ("S3", "K"))
+    c = _Cap(route)
+    c.ev(event="FSDTarget", Name="S2")
+    assert c.spoken == ["Next star's scoopable."]
+
+
+def test_final_hop_arriving_scoopable_no_following_star():
+    route = _route(("S0", "K"), ("S1", "K"))          # only one jump; nothing after it
+    c = _Cap(route)
+    c.ev(event="FSDTarget", Name="S1")
+    assert c.spoken == ["Next star's scoopable."]
+
+
+# --- #147: hazard warning (neutron star / white dwarf), supersedes "not scoopable" -----
+
+def test_hazard_neutron_star_supersedes_not_scoopable():
+    route = _route(("S0", "K"), ("S1", "N"), ("S2", "K"))
+    c = _Cap(route)
+    c.ev(event="FSDTarget", Name="S2")                # names the far hop; arriving (S1) is N
+    assert c.spoken == ["Heads up, Commander — next jump's a neutron star. "
+                        "Mind the exclusion zone, and no fuel there."]
+
+
+def test_hazard_white_dwarf_supersedes_not_scoopable():
+    route = _route(("S0", "K"), ("S1", "DA"), ("S2", "K"))
+    c = _Cap(route)
+    c.ev(event="FSDTarget", Name="S2")
+    assert c.spoken == ["Careful — a white dwarf next. Watch the jets; you can't scoop it."]
+
+
+def test_callout_hazard_toggle_off_falls_back_to_plain_not_scoopable():
+    route = _route(("S0", "K"), ("S1", "N"), ("S2", "K"))
+    c = _Cap(route, cfg=RouteConfig(enabled=True, every_n=2, callout_hazard=False))
+    c.ev(event="FSDTarget", Name="S2")
+    assert c.spoken == ["Heads up — the star you're jumping to isn't scoopable."]
+
+
+def test_hazard_fires_even_when_callout_scoopable_is_off():
+    route = _route(("S0", "K"), ("S1", "N"), ("S2", "K"))
+    c = _Cap(route, cfg=RouteConfig(enabled=True, every_n=2, callout_scoopable=False))
+    c.ev(event="FSDTarget", Name="S2")
+    assert c.spoken == ["Heads up, Commander — next jump's a neutron star. "
+                        "Mind the exclusion zone, and no fuel there."]
 
 
 def test_jumps_remaining_every_nth():
@@ -211,6 +326,8 @@ def test_no_tools_and_ambient():
 
 def test_config_from_cfg_defaults_and_clamps():
     d = RouteConfig.from_cfg({})
-    assert d.enabled is False and d.every_n == 5
-    clamped = RouteConfig.from_cfg({"route": {"enabled": True, "every_n": 0}})
+    assert d.enabled is False and d.every_n == 5 and d.callout_hazard is True
+    clamped = RouteConfig.from_cfg(
+        {"route": {"enabled": True, "every_n": 0, "callout_hazard": False}})
     assert clamped.every_n == 1                      # every_n floored to 1
+    assert clamped.callout_hazard is False
