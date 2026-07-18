@@ -1554,6 +1554,56 @@ The original seven-phase plan is done and tested:
     crew read scripted line packs; COVAS++ crew **improvise** — role-aware, situation-grounded,
     personality-consistent ambient lines — and can be spoken TO and answer back in their own voice.
     Generative presence, not a soundboard.**
+59. **Per-ship crew rosters** (issue #127, `covas/crew.py`, `covas/ed/loadout.py`, `covas/llm.py`,
+    `covas/app.py`, `covas/mixer/runtime.py`, `covas/bootstrap.py`, `covas/web.py`,
+    `covas/templates/crew.html`, `covas/settings_schema.py`, `config.toml`) — the crew roster gains a
+    **ship dimension**: each hull can carry its own full cast, and the roster that speaks/chatters/
+    answers is always the one for the ship the Commander is *flying*, switched automatically by the
+    journal. **Schema v2 (back-compat mandatory).** The `[crew].file` JSON grows from a bare list to
+    `{default: [members], ships: {"<ShipID>": {label, hull, members}}}`; a **bare list still parses**
+    as `default` (existing files load unchanged, the legacy `[crew].roster` config becomes `default`),
+    and **save always writes v2** so old files migrate on first save. A new pure `load_roster_file` /
+    `save_roster_file` layer (fail-soft: corrupt → config fallback) sits under the existing helpers;
+    each roster keeps the `_MAX_ROSTER` cap and atomic temp-then-replace write. **Active-ship key.**
+    `LoadoutSnapshot` gained a `ship_id: int | None` field (parsed from the `Loadout` event's
+    `ShipID`, the stable key `StoredShips` already uses) — a `ShipyardSwap` is followed by a fresh
+    `Loadout`, so keying "active ship" off the loadout snapshot covers swaps with no extra event
+    handling. **Resolution.** `load_members(cfg, ship_id=None)` returns the ship's roster when it has a
+    non-empty one, else `default`; `system_instruction`/`voice_ref_for`/`roster` all take the optional
+    id. **Threading the active ship (the crux).** Two seams, deliberately different: the **mixer** sites
+    (`speak_crew`, `_speak_crew_ambient`, `_crew_roster`) resolve it from their held `ed_ctx` via a
+    small fail-soft `crew.active_ship_id(ed_ctx)` helper (duck-typed on `loadout_snapshot`); the
+    **prompt** path can't — `build_system(cfg)` is called per-turn inside the provider with no
+    `ed_ctx` — so the App stamps a **runtime-only** `cfg["crew"]["_active_ship_id"]` before each LLM
+    turn (`crew.stamp_active_ship`) and `system_instruction` falls back to it when no explicit id is
+    passed. That key rides `app.cfg`, which is a **separate dict from `app.overrides`** (only overrides
+    is persisted by `save_overrides`), so it **can never leak into `overrides.json`**; and because
+    `build_system` re-runs per turn, a ship-dependent roster **re-caches the system block only on a
+    swap** (rare, accepted) and is otherwise as static as before — the prompt-cache guarantee holds
+    within a ship. Crew funcs stay cleanly unit-testable via the explicit `ship_id` param (tests never
+    touch the stamp). **Editor.** `/api/crew` grows a `fleet` dimension — the union of the current
+    Loadout ship (marked active) + `StoredShipsSnapshot` + any ship id already in the file (so a
+    file-known ship survives a stale/absent snapshot) — plus per-ship `rosters`; a ship selector +
+    **Copy crew from X** (deep copy, independent thereafter) let a second ship's cast be built fast,
+    and a per-ship save **preserves the other rosters** under the same whole-file 409 stale guard.
+    **Seat cap (§5, opt-in).** `crew.limit_to_seats` (bool, **default OFF**) caps a **per-ship** roster
+    at the hull's multicrew seat count, **reusing `nav.get_spec(resolve_ship(hull).id).crew`** (entry
+    56's bundled ship-spec data — no new data) with fail-soft fallback to `_MAX_ROSTER` on an unknown
+    hull; enforced both in the editor (add-button/copy) and at read time (belt-and-braces). The
+    **Default** roster is never seat-capped. **#124 interaction:** the voice-pairing input became
+    `crew.all_members(cfg)` (the union across every roster, deduped, uncapped) so one cache serves all
+    rosters and a swap never re-pairs. Non-goals held: journal-only fleet (no Inara/Coriolis), no
+    per-ship enable flag (`[crew].enabled` stays global), no auto roster on ship purchase (inherit
+    Default), no silent truncation (seat cap opt-in). Offline-unit-tested: schema v1→default / v2
+    round-trip / corrupt fallback, resolution (with/without a ship roster, runtime stamp), the
+    all-rosters union (uncapped), the active-ship helpers + stamp-never-in-overrides, `build_system`
+    per-ship, the seat cap (on/off/unknown-hull/Default-exempt), `LoadoutSnapshot.ship_id`, and the web
+    fleet-union + per-ship-save-preserves-others + editor seat cap (`tests/test_crew_per_ship.py`,
+    `tests/test_crew_per_ship_web.py`, 36 tests). Swap-ships-hear-the-crew-change + the seat-cap block
+    are `MANUAL_TESTS.md` §18.5g (HW-gated). Docs: `docs/using/crew.md`; help: the new
+    `crew.limit_to_seats` schema row. **Improvement thesis vs EDCoPilot/COVAS:NEXT: no competitor ties
+    crew to the hull you're flying — COVAS++ gives your exploration Phantom and your combat Chieftain
+    different crews, switched automatically by the journal the moment you swap ships.**
 
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**

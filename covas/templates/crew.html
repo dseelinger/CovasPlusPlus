@@ -54,6 +54,15 @@
       background:var(--warn-bg);color:var(--warn-text);font-size:13px;line-height:1.6}
   .conflict.show{display:block}
   .conflict button{margin-right:8px;margin-top:8px}
+  .shipbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;
+      padding-bottom:12px;border-bottom:1px solid var(--edge)}
+  .shipbar label{color:var(--muted);font-size:12px;letter-spacing:1px}
+  .shipbar select{min-width:220px}
+  .seats{color:var(--muted);font-size:12px}
+  .seats.full{color:var(--warn-text)}
+  .copybar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
+  .inherit{color:var(--muted);font-size:12px;margin:0 0 10px;font-style:italic}
+  .inherit.show{display:block}
 </style>
 </head>
 <body>
@@ -83,8 +92,23 @@
       specific cast voice.<br>
       The <b>Name</b> box also suggests your <b>hired NPC fighter pilots</b> (from your journal):
       pick one to <b>adopt</b> them — role and a generated personality are prefilled for you to edit.
-      Typing a custom name works exactly as before.
+      Typing a custom name works exactly as before.<br>
+      Rosters are <b>per-ship</b> (issue #127): pick a ship below to give it its own crew. The ship
+      you're flying uses its own roster; ships without one inherit <b>Default</b>. Seed a new ship
+      fast with <b>Copy crew from…</b>. Your fleet comes from your journal (owned + current ship).
     </div>
+    <div class="shipbar">
+      <label for="shipSel">EDITING ROSTER</label>
+      <select id="shipSel"></select>
+      <span class="seats" id="seats"></span>
+      <span class="copybar">
+        <label for="copyFrom">COPY CREW FROM</label>
+        <select id="copyFrom"></select>
+        <button class="small" id="copyBtn">COPY</button>
+      </span>
+    </div>
+    <p class="inherit" id="inherit">This ship currently inherits the <b>Default</b> roster — add a
+      character (or copy one in) to give it its own crew.</p>
     <datalist id="hiredList"></datalist>
     <ul id="list" style="margin-top:12px"></ul>
     <div class="empty" id="empty" style="display:none">No crew yet. Add a character to begin.</div>
@@ -109,6 +133,19 @@ let VERSION = null;   // content-hash of the roster file as we last loaded/saved
 let VOICES = [];      // [{ref,label}] voice options for the per-character dropdown
 let HIRED = [];       // [{name,combat_rank}] hired NPC pilots from the journal (#125) — datalist
 let PAIRINGS = {};    // {name -> voice display name} best-fit Auto pairings (#124)
+// Per-ship rosters (issue #127). MODEL is the in-memory truth for ALL rosters, so switching ships
+// preserves in-progress edits; SAVE persists only the SELECTED roster. "default" is the fallback
+// roster every ship inherits until it has its own.
+let MODEL = {default: [], ships: {}};   // {default:[member...], ships:{ship_id:[member...]}}
+let FLEET = [];        // [{ship_id,label,hull,has_roster,active,seats}] from the journal
+let LIMIT = false;     // crew.limit_to_seats — cap per-ship rosters at the hull's seat count
+let META = {};         // ship_id -> {label,seats,active}
+let SELECTED = "default";   // which roster the rows on screen belong to
+
+const isShip = () => SELECTED !== "default";
+const seatCap = () => (isShip() && LIMIT && META[SELECTED] && META[SELECTED].seats != null)
+  ? META[SELECTED].seats : null;
+function curRows(){ return MODEL.ships[SELECTED] || (SELECTED === "default" ? MODEL.default : []); }
 
 function flash(text, isErr){
   const el = $("msg");
@@ -193,21 +230,99 @@ function refreshCount(){
   const n = $("list").querySelectorAll("li.crew").length;
   $("count").textContent = n ? n + " character(s)" : "";
   $("empty").style.display = n ? "none" : "block";
+  const cap = seatCap();
+  const seatsEl = $("seats");
+  if (isShip() && META[SELECTED] && META[SELECTED].seats != null) {
+    seatsEl.textContent = cap != null ? `${n} of ${cap} seat(s)` : `${n} character(s) — ${META[SELECTED].seats} seats`;
+    seatsEl.classList.toggle("full", cap != null && n >= cap);
+  } else { seatsEl.textContent = ""; seatsEl.classList.remove("full"); }
+  // + Add character disables at the seat limit (per-ship, seat cap ON).
+  $("addRow").disabled = cap != null && n >= cap;
+  // Inherit hint: an EMPTY per-ship roster falls back to Default until it has a member.
+  $("inherit").classList.toggle("show", isShip() && n === 0);
 }
 
-function apply(data){          // fold a server snapshot into the UI
+function syncFromDOM(){        // capture the on-screen rows back into MODEL[SELECTED]
+  const rows = collect();
+  if (SELECTED === "default") MODEL.default = rows; else MODEL.ships[SELECTED] = rows;
+}
+
+function renderSelected(){     // draw MODEL[SELECTED] into the list
+  $("list").innerHTML = "";
+  for (const m of curRows()) addRow(m);
+  refreshCount();
+}
+
+function buildSelector(){      // Default + each fleet ship (active marked, seats shown)
+  const sel = $("shipSel");
+  const opts = [`<option value="default">Default${SELECTED==="default"?"":""}</option>`];
+  for (const f of FLEET){
+    const bits = [];
+    if (f.active) bits.push("active");
+    if (f.seats != null) bits.push(`${f.seats} seats`);
+    if (f.has_roster) bits.push("has crew");
+    const tag = bits.length ? ` — ${bits.join(", ")}` : "";
+    opts.push(`<option value="${esc(f.ship_id)}">${esc(f.label)}${tag}</option>`);
+  }
+  sel.innerHTML = opts.join("");
+  sel.value = SELECTED;
+}
+
+function rosterMembers(key){
+  return key === "default" ? MODEL.default : (MODEL.ships[key] || []);
+}
+
+function buildCopyOptions(){   // rosters WITH members, excluding the one being edited
+  const sel = $("copyFrom");
+  const src = [];
+  if (SELECTED !== "default" && rosterMembers("default").length) src.push(["default", "Default"]);
+  for (const f of FLEET){
+    if (f.ship_id === SELECTED) continue;
+    if (rosterMembers(f.ship_id).length) src.push([f.ship_id, f.label]);
+  }
+  sel.innerHTML = src.length
+    ? src.map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`).join("")
+    : `<option value="">(no rosters to copy)</option>`;
+  const none = src.length === 0;
+  sel.disabled = none; $("copyBtn").disabled = none;
+}
+
+function doCopy(){
+  const from = $("copyFrom").value;
+  if (!from) return;
+  syncFromDOM();
+  let members = rosterMembers(from).map(m => ({...m}));   // DEEP copy — independent thereafter
+  const cap = seatCap();
+  let note = "";
+  if (cap != null && members.length > cap){ members = members.slice(0, cap); note = ` (truncated to ${cap} seat(s))`; }
+  if (SELECTED === "default") MODEL.default = members; else MODEL.ships[SELECTED] = members;
+  renderSelected();
+  const label = from === "default" ? "Default" : (META[from] ? META[from].label : from);
+  flash(`Copied ${members.length} character(s) from ${label}${note}.`);
+}
+
+function foldMeta(data){       // shared fleet/meta/pairings refresh (GET + save response)
+  FLEET = data.fleet || [];
+  LIMIT = !!data.limit_to_seats;
+  META = {};
+  for (const f of FLEET) META[f.ship_id] = {label: f.label, seats: f.seats, active: f.active};
+  PAIRINGS = data.crew_pairings || {};
+}
+
+function apply(data){          // fold a full server snapshot into the UI (load / reload / conflict)
   VERSION = data.version;
   VOICES = data.voices || [];
   HIRED = data.hired || [];
-  PAIRINGS = data.crew_pairings || {};
+  foldMeta(data);
+  MODEL = {default: (data.members || []).slice(), ships: {}};
+  for (const [id, r] of Object.entries(data.rosters || {})) MODEL.ships[id] = (r.members || []).slice();
+  if (SELECTED !== "default" && !FLEET.some(f => f.ship_id === SELECTED)) SELECTED = "default";
   // Rebuild the shared datalist of hired pilots (#125) — plain <option>s, one per pilot name.
   $("hiredList").innerHTML = HIRED.map(h => `<option value="${esc(h.name)}">`).join("");
   $("fileName").textContent = data.name || "";
   $("offBanner").classList.toggle("show", data.enabled === false);
   $("conflict").classList.remove("show");
-  $("list").innerHTML = "";
-  for (const m of (data.members || [])) addRow(m);
-  refreshCount();
+  buildSelector(); buildCopyOptions(); renderSelected();
 }
 
 async function load(){
@@ -218,9 +333,13 @@ async function load(){
 }
 
 async function save(force){
+  syncFromDOM();
+  const body = { members: MODEL.ships[SELECTED] || (SELECTED === "default" ? MODEL.default : []),
+                 base_version: VERSION, force: !!force };
+  if (SELECTED !== "default") body.ship_id = SELECTED;
   const r = await fetch("/api/crew", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ members: collect(), base_version: VERSION, force: !!force }),
+    body: JSON.stringify(body),
   });
   const data = await r.json();
   if (r.status === 409) {          // file changed underneath us
@@ -230,11 +349,19 @@ async function save(force){
     return;
   }
   if (!r.ok) { flash(data.error || "save failed", true); return; }
-  apply(data);
+  // Preserve unsaved edits in OTHER rosters: only refresh VERSION/fleet/meta and reflect the
+  // just-saved roster back from the server (which may have seat-capped it), then re-render.
+  VERSION = data.version;
+  foldMeta(data);
+  if (SELECTED === "default") MODEL.default = (data.members || []).slice();
+  else MODEL.ships[SELECTED] = ((data.rosters || {})[SELECTED] || {members: []}).members.slice();
+  buildSelector(); buildCopyOptions(); renderSelected();
   flash("Saved.");
 }
 
-$("addRow").onclick = () => addRow();
+$("shipSel").onchange = () => { syncFromDOM(); SELECTED = $("shipSel").value; buildCopyOptions(); renderSelected(); };
+$("copyBtn").onclick = doCopy;
+$("addRow").onclick = () => { if (!$("addRow").disabled) addRow(); };
 $("save").onclick = () => save(false);
 $("reload").onclick = async () => { await load(); flash("Reloaded."); };
 $("reloadTheirs").onclick = () => {

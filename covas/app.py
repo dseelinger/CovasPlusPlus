@@ -1436,6 +1436,14 @@ class App:
             # recall never linger across turns.
             messages = self.history + [{"role": "user", "content": llm_text}]
 
+            # Active-ship crew roster (issue #127 §3): stamp the flown ship's id onto cfg so the
+            # per-turn build_system() inside the provider resolves THIS ship's crew roster. A single,
+            # clearly-commented point — the provider's build_system(cfg) has no ed_ctx, and cfg (not
+            # overrides) is what it reads, so this runtime-only key never persists to overrides.json.
+            # Fail-soft; no active ship / crew off -> the default roster.
+            from . import crew as _crew
+            _crew.stamp_active_ship(self.cfg, self.ed_ctx)
+
             self.set_state("Thinking")
 
             think = {"buf": "", "shown": False}

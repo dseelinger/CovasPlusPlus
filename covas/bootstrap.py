@@ -1373,7 +1373,9 @@ def pair_crew_voices(app: "App") -> None:
         from . import crew as crew_mod
         from . import elevenlabs as el
         from . import voice_pairing as vp
-        members = [m for m in crew_mod.load_members(app.cfg) if m.persona and not m.voice_ref]
+        # UNION across the default + every per-ship roster (issue #127 §6), deduped by name, so ONE
+        # pairing cache serves every roster and a ship swap never triggers a re-pair.
+        members = [m for m in crew_mod.all_members(app.cfg) if m.persona and not m.voice_ref]
         if not members:
             app._crew_voice_pairings = {}
             if app.audio is not None:

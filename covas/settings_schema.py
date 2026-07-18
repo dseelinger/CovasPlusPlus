@@ -522,6 +522,15 @@ SCHEMA: list[Setting] = [
             "layer + [audio.cues].flavor; paced by [crew].chatter_min/max_seconds). Off by default.",
             default=False, phrasings=("crew", "crew voices", "the crew"),
             example="turn crew on"),
+    Setting("crew.limit_to_seats", ("crew", "limit_to_seats"), "bool",
+            "Limit crew to ship seats", "Personality",
+            "Cap each SHIP-SPECIFIC crew roster at that hull's real multicrew SEAT count (from the "
+            "bundled ship-spec table) instead of the generic maximum — so a small hull can't carry a "
+            "full three-person cast. Per-ship rosters only; the Default roster (issue #127) is never "
+            "seat-capped. An unknown hull falls back to the generic cap. Off by default (opt-in "
+            "realism) — no existing roster is silently truncated.",
+            default=False, phrasings=("crew seats", "limit crew to seats", "seat cap"),
+            example="limit crew to ship seats"),
 
     # --- Elite Dangerous ---------------------------------------------------
     Setting("elite.enabled", ("elite", "enabled"), "bool",

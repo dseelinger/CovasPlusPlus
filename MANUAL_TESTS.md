@@ -1499,6 +1499,34 @@ on in config (or the Settings page) before testing.
   at all (it's generated-or-nothing, no canned pool). With `[crew].enabled = false`, neither crew
   chatter nor in-voice addressing occurs — replies are a single voice as before.
 
+### 18.5g Per-ship crew rosters (issue #127 — Crew tab)  🖥️ 🎮 🔊 HW
+> The Crew tab grows an **Editing roster** selector (Default + each fleet ship) and a **Copy crew
+> from…** control; the roster that speaks is the one for the ship you're flying. The fleet is read
+> from your journal (`Loadout` + `StoredShips`), so a real replay/game session is needed for the
+> ship list. Needs `[crew].enabled = true`; distinct voices need the bus mixer + a cast pool.
+- [ ] 🖥️ **Fleet appears in the selector:** with [Elite monitoring](docs/elite/monitoring.md) on and
+  a journal seen, open the Crew tab → the **Editing roster** selector lists **Default** plus your
+  owned ships, with the ship you're flying marked *active*. A ship you've never given a roster shows
+  the *"inherits Default"* hint when selected.
+- [ ] 🖥️ **Build a second ship's roster + copy:** select a non-active ship, click **Copy crew from…
+  → Default → COPY** → the Default cast is cloned in; edit one member and save. Confirm editing the
+  copy does **not** change Default (reselect Default → unchanged). `crew.json` now holds a `ships`
+  block keyed by ShipID.
+- [ ] 🎮 🔊 **Swap ships, hear the crew change:** give two ships different rosters (different
+  names/voices), then **swap ships in game** (`ShipyardSwap`, which is followed by a fresh
+  `Loadout`). Ask something that invites a crew line on each → the roster that answers/chatters is the
+  one for the ship you're now flying. The other ship's crew stays silent.
+- [ ] 🖥️ **Back-compat:** a pre-#127 `crew.json` (a bare JSON *list*) still loads as your Default
+  roster with no error; the first save rewrites it to the `{default, ships}` shape.
+- [ ] 🖥️ **File-known ship survives a stale snapshot:** with a ship roster already saved, restart
+  before docking anywhere your ships are stored (so `StoredShips` is stale/absent) → that ship is
+  **still selectable** in the editor (remembered from the file).
+- [ ] 🖥️ **Limit to seats blocks over-crewing:** turn **Limit crew to ship seats** ON (Settings →
+  Personality), select a **small-seat hull** (e.g. a **Sidewinder**, 1 seat) → the selector shows
+  **N of 1**, **+ Add character** disables at the seat count, and **Copy crew from…** truncates a
+  larger source to the seats (with a note). Confirm the **Default** roster is **not** capped, and
+  that turning the setting OFF restores the generic cap.
+
 ### 18.6 Drop-in content (C11)
 - [ ] On first run with the layer enabled, confirm the skeleton appears: **`audio/sfx/<cue>/`**,
   **`audio/music/<context>/`**, **`content/chatter/*.txt`**, **`content/interdiction_threat.txt`**,
