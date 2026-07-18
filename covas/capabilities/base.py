@@ -139,6 +139,23 @@ def _capability_help(cap: "Capability") -> Optional[HelpMeta]:
     return fn()
 
 
+def _capability_tools(cap: "Capability") -> list[dict]:
+    """The capability's advertised tool schemas — the ONE place the registry reads `tools()`.
+
+    A REACTOR-only capability (proactive callouts, route callouts, auto-reflexes) legitimately
+    exposes no LLM tools: it subscribes to the bus via `on_event` and contributes nothing to the
+    tool list. Such a capability that OMITS `tools()` entirely must still be safe to register —
+    the registry iterates `tools()` over EVERY capability on the hot path (`tools_for_level`,
+    every turn), so a missing method would otherwise AttributeError the whole turn (the latent
+    bug that reached #123's auto-reflex). So a missing `tools()` reads as an empty list here.
+    `register()` still rejects a *non-callable* `tools` attribute (a genuine mistake, not a
+    reactor), mirroring how it rejects incomplete help metadata at wiring time."""
+    fn = getattr(cap, "tools", None)
+    if fn is None:
+        return []
+    return list(fn())
+
+
 def group_of(meta: HelpMeta) -> str:
     """The group a capability belongs to for the help hierarchy, falling back to its category
     when it declares no group (so an ungrouped capability is its own singleton group)."""
@@ -162,6 +179,14 @@ class CapabilityRegistry:
         meta = _capability_help(capability)
         if meta is not None:
             validate_help_meta(meta)  # reject incomplete help metadata at wiring time
+        # A capability's `tools` must be callable if present — a reactor may OMIT it (treated as
+        # no tools), but a non-callable `tools` attribute is a wiring bug we reject loudly here
+        # rather than letting the next turn's tools() iteration AttributeError (the #123 lesson).
+        t = getattr(capability, "tools", None)
+        if t is not None and not callable(t):
+            raise ValueError(
+                f"{type(capability).__name__}.tools must be a method returning a list of tool "
+                "schemas (omit it for a reactor-only capability); got a non-callable attribute.")
         self._caps.append(capability)
         self._usage.append(0)
 
@@ -169,7 +194,7 @@ class CapabilityRegistry:
         """Every capability's tool schemas, in registration order."""
         out: list[dict] = []
         for cap in self._caps:
-            out.extend(cap.tools())
+            out.extend(_capability_tools(cap))
         return out
 
     def tools_for_level(self, level: object) -> list[dict]:
@@ -187,7 +212,7 @@ class CapabilityRegistry:
         out: list[dict] = []
         for cap in self._caps:
             if group_of_capability(cap) in allowed:
-                out.extend(cap.tools())
+                out.extend(_capability_tools(cap))
         return out
 
     def run_tool(self, name: str, inp: dict) -> str:
@@ -195,7 +220,7 @@ class CapabilityRegistry:
         string (the loop must survive any tool call, so we never raise). Usage of the
         owning capability is counted, so help can rank by what actually gets used."""
         for i, cap in enumerate(self._caps):
-            if any(t.get("name") == name for t in cap.tools()):
+            if any(t.get("name") == name for t in _capability_tools(cap)):
                 self._usage[i] += 1
                 return cap.run_tool(name, inp)
         return f"Unknown tool: {name}"

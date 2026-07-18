@@ -145,6 +145,95 @@ def test_real_capabilities_satisfy_the_contract():
         assert help_meta_problems(reg.help_entry_for(cat)) == []
 
 
+# --- 1f. tools() safety: a reactor capability never crashes the tool list --
+
+class _Reactor:
+    """A REACTOR-only capability — subscribes to the bus but exposes no LLM tools and no help,
+    like ProactiveCapability / RouteCalloutCapability / AutoReflexCapability. It deliberately
+    OMITS `tools()`; the registry must still aggregate cleanly (the #123 lesson: a registered
+    capability missing tools() used to AttributeError the next turn's tools_for_level)."""
+
+    def on_event(self, event):
+        pass
+
+    def run_tool(self, name, inp):
+        return ""
+
+
+def test_reactor_without_tools_registers_and_contributes_nothing():
+    from covas.tiering import resolve_level
+    reg = CapabilityRegistry()
+    reg.register(_Reactor())                              # must not raise at wiring time
+    reg.register(_complete_cap())                         # a real tool-bearing capability alongside
+    # The hot-path aggregators must NOT raise and must simply skip the reactor's (absent) tools.
+    assert [t["name"] for t in reg.tools()] == ["tool_outfitting"]
+    level = resolve_level({"llm": {"optimization_level": "Full"}})
+    assert isinstance(reg.tools_for_level(level), list)   # the per-turn call — never AttributeErrors
+    assert reg.run_tool("nope", {}) == "Unknown tool: nope"
+
+
+def test_register_rejects_a_non_callable_tools_attribute():
+    # A `tools` that isn't a method (e.g. someone wrote `tools = []`) is a wiring bug — caught
+    # loudly at registration, not silently on the next turn.
+    class _Bad:
+        tools = []          # not callable
+
+    with pytest.raises(ValueError):
+        CapabilityRegistry().register(_Bad())
+
+
+def test_real_app_registry_tool_aggregation_never_raises(tmp_path, monkeypatch):
+    """The guard the whole audit exists for: build the REAL App registry with as many capabilities
+    wired as an offline run allows (reactors included — proactive, route callouts, and, on Windows,
+    the auto-reflex layer), then assert the per-turn tool aggregation never raises for ANY registered
+    capability, and that every registered capability is tools()-safe."""
+    from covas.app import App
+    from covas.tiering import LEVEL_NAMES, resolve_level
+    from tests.fakes import FakeLLM, FakeSTT, FakeTTS
+
+    checklist = tmp_path / "checklist.md"
+    checklist.write_text("- [ ] Scoop fuel\n", encoding="utf-8")
+    monkeypatch.setenv("COVAS_DATA_DIR", str(tmp_path))   # journal/keys/etc. resolve under tmp
+    cfg = {
+        "anthropic": {"model": "claude-haiku-4-5", "max_tokens": 1024,
+                      "thinking": {"default": "Off"}, "cache_ttl": "1h"},
+        "web_search": {"enabled": False},
+        "personality": {"enabled": False},
+        "checklist": {"file": str(checklist)},
+        "conversation": {"max_turns": 20},
+        "logging": {"dir": str(tmp_path / "logs")},
+        "audio": {"sample_rate": 16000, "input_device": ""},
+        "sound_cues": {},
+        "keys": {"push_to_talk": "right ctrl"},
+        # Reactor-heavy + gated capabilities, so the registry carries the risky shapes:
+        "elite": {"enabled": True, "journal_dir": str(tmp_path)},
+        "proactive": {"enabled": True},          # reactor (has a mute tool)
+        "route": {"enabled": True},              # reactor (route callouts)
+        "reflex": {"enabled": True, "allowlist": ["chaff"], "auto": {"enabled": True,
+                   "chaff": {"enabled": True}}},  # auto-reflex reactor (tools-less) on Windows
+        "memory": {"enabled": True, "dir": str(tmp_path / "mem"), "cap": 100},
+        "route_plan": {"enabled": True},
+        "macros": {"enabled": True},
+        "hud": {"enabled": True},
+        # Flip on every experimental gate so the gated capabilities actually register (#123).
+        "experimental": {name: {"enabled": True} for name in
+                         ("trade_route", "macro", "auto_reflex", "hud", "crew", "music",
+                          "azure_tts", "cartesia_tts", "voice_activation")},
+    }
+    app = App(cfg, llm=FakeLLM(text="ok"), tts=FakeTTS(), stt=FakeSTT(text="hi"))
+
+    # Every registered capability is tools()-safe (callable or legitimately absent).
+    for cap in app.registry._caps:   # noqa: SLF001 — white-box: the registered set
+        t = getattr(cap, "tools", None)
+        assert t is None or callable(t), f"{type(cap).__name__}.tools is present but not callable"
+
+    # The aggregators used every turn never raise, across every tiering level.
+    assert isinstance(app.registry.tools(), list)
+    for level_name in LEVEL_NAMES:
+        lvl = resolve_level({"llm": {"optimization_level": level_name}})
+        assert isinstance(app.registry.tools_for_level(lvl), list)
+
+
 # --- 1e. group projection (the help hierarchy) -----------------------------
 
 def _grouped_registry():
