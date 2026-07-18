@@ -159,6 +159,12 @@ class EDContext:
         # unconfigured. Guarded by _lock; single-writer is the journal thread (voice CRUD also
         # mutates it via the accessors below, serialised by the same lock). Kept OUT of _FIELDS.
         self._owned_ships = None
+        # Per-ship loadout + engineering memory (issue #135): a persisted store keyed by the SAME
+        # journal ShipID the owned-ships registry uses, remembering HOW EACH OWNED SHIP is built
+        # (modules + applied engineering) so switching ships doesn't lose the prior one's config.
+        # A `ed.ship_loadouts.ShipLoadoutStore` (holds its own path + persistence), or None when
+        # unconfigured. Guarded by _lock; single-writer is the journal thread. Kept OUT of _FIELDS.
+        self._ship_loadouts = None
 
     def update(self, **changes) -> None:
         """Atomically set one or more fields. Unknown keys raise (fail loud) so a typo
@@ -331,6 +337,38 @@ class EDContext:
         with self._lock:
             reg = self._owned_ships
             return reg.remove_matching(query) if reg is not None else (False, [])
+
+    # -- per-ship loadout memory (issue #135) --------------------------------------------
+    def set_ship_loadout_store(self, store) -> None:
+        """Install the persisted per-ship loadout store (an `ed.ship_loadouts.ShipLoadoutStore`).
+        Called once at bootstrap after the file path is resolved; None clears it."""
+        with self._lock:
+            self._ship_loadouts = store
+
+    def capture_loadout(self, snapshot) -> bool:
+        """Remember the active ship's build in the per-ship store, keyed by its ShipID (and persist
+        on change). Returns True on a change; a no-op (False) when no store is installed or the
+        snapshot has no ShipID. Runs on the journal thread; the lock serialises it against the
+        engineering-planning read."""
+        with self._lock:
+            store = self._ship_loadouts
+            if store is None:
+                return False
+            return store.capture(snapshot)
+
+    def ship_loadout(self, ship_id) -> "object | None":
+        """The remembered `LoadoutSnapshot` for an owned ship's ShipID (accepts int or str), or None
+        when nothing is remembered for it / no store is installed. The rebuilt snapshot is a fresh
+        copy, so handing out the reference is thread-safe."""
+        with self._lock:
+            store = self._ship_loadouts
+            return store.get(ship_id) if store is not None else None
+
+    def remembered_ship_ids(self) -> list[str]:
+        """The ShipIDs with a remembered loadout (string keys). Empty when no store / nothing seen."""
+        with self._lock:
+            store = self._ship_loadouts
+            return store.ship_ids() if store is not None else []
 
     # -- engineer progress (issue #65) ---------------------------------------------------
     def update_engineer_progress(self, mapping: dict) -> None:

@@ -281,6 +281,10 @@ def apply_journal_event(ctx: EDContext, event: dict) -> dict:
         # Owned-ships identity (#134): the active ship is owned — reconcile it in (mark active,
         # fill type/name/ident) without clobbering a manual correction.
         ctx.reconcile_owned_from_loadout(loadout)
+        # Per-ship config memory (#135): remember THIS ship's full build (modules + engineering)
+        # under its ShipID, so switching ships doesn't lose the prior one's config. Same identity
+        # spine as the owned-ships reconcile above; fail-soft no-op when no store is installed.
+        ctx.capture_loadout(loadout)
     elif name == "StoredShips":                             # stored-ships inventory (#67)
         stored = parse_stored_ships(event)
         ctx.set_stored_ships(stored)

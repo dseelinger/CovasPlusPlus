@@ -591,6 +591,13 @@ limit_to_seats = false
 # Requires [elite].enabled (the ownership events come from the journal). Journal-derived per-user
 # data — never committed.
 registry_file = "owned_ships.json"
+# PER-SHIP CONFIG MEMORY (issue #135). Remembers HOW EACH OWNED SHIP is built — its modules and
+# applied engineering (blueprint / grade / experimental / modifiers) — keyed by the SAME journal
+# ShipID as the registry above, so switching ships doesn't lose the prior ship's config and it
+# survives restarts. Captured from every journal Loadout event. This is what grounds the
+# conversational engineering planning ("what should I engineer next on my Python", "what's left to
+# G5 my FSD") on the ship's REAL build. Journal-derived per-user data — never committed.
+loadouts_file = "ship_loadouts.json"
 
 
 [elevenlabs]

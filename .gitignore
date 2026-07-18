@@ -39,6 +39,9 @@ npc_crew.json
 # owned-ships registry (issue #134) — the Commander's fleet identity, folded from Shipyard
 # events + manual CRUD (ship names/idents are personal). Journal-derived; never committed.
 owned_ships.json
+# per-ship loadout + engineering memory (issue #135) — each owned ship's modules + applied
+# engineering, keyed by ShipID (personal build data). Journal-derived; never committed.
+ship_loadouts.json
 # auto-generated crew best-fit-voice pairing cache (issue #124) — mirrors the persona cache above
 # but keyed to the crew roster, so a roster edit never busts the shipped-persona cache.
 crew_voice_pairings.json
