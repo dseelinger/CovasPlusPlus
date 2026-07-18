@@ -364,6 +364,18 @@ def build_ed_monitoring(app: "App") -> None:
             get_materials=app.ed_ctx.materials_snapshot,
             get_progress=app.ed_ctx.engineer_progress,
             log=lambda m: app._log("engineering_plan", m)))
+        # Ship-metric queries (#139): "what's my current jump range", "top three small ships by
+        # jump range" — computed from each ship's remembered loadout (#135) + live cargo/fuel for the
+        # current ship, ranked over the owned fleet (#134). Metric-agnostic (a pluggable registry;
+        # jump range is the first metric), so future metrics (DPS, shields…) plug in with no change
+        # here. All getters are the live lock-protected EDContext accessors.
+        from .capabilities.ship_metrics_capability import ShipMetricsCapability
+        app.registry.register(ShipMetricsCapability(
+            get_owned=app.ed_ctx.owned_ships,
+            get_ship_loadout=app.ed_ctx.ship_loadout,
+            get_active_loadout=app.ed_ctx.loadout_snapshot,
+            get_live_state=app.ed_ctx.snapshot,
+            log=lambda m: app._log("ship_metrics", m)))
         # On-foot (Odyssey suit/weapon) engineering (#73): bundled reference for suits,
         # weapons, modifications and the 13 on-foot engineers. Joins the SAME live
         # EngineerProgress event (on-foot engineers share it) for grounded unlock status.

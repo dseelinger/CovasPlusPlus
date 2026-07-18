@@ -206,6 +206,16 @@ def _build_lookup() -> dict[str, ShipSpec]:
 _LOOKUP = _build_lookup()
 _BY_ID = {spec.id: spec for spec in ROSTER}
 _FAMILY_LOOKUP = {_norm(k): v for k, v in _FAMILIES.items()}
+# Journal ShipType symbol (e.g. "krait_mkii", "federation_corvette") -> canonical id. The journal
+# writes the FDev ed_symbol lowercased, which is exactly `spec.symbol` folded — so per-ship data
+# keyed on the journal ShipType (#134 owned ships, #135 loadouts) can look up its bundled spec.
+_BY_SYMBOL = {_norm(spec.symbol): spec.id for spec in ROSTER if spec.symbol}
+
+
+def id_from_journal_symbol(symbol: str) -> str | None:
+    """The canonical ship id for a raw journal ShipType symbol (case-insensitive), or None when the
+    roster doesn't know it (a brand-new hull not yet in the bundle). Pure/offline."""
+    return _BY_SYMBOL.get(_norm(symbol)) if symbol else None
 
 # Every canonical ship name, for the help subsystem's failure-recovery vocabulary.
 SHIP_NAMES: tuple[str, ...] = tuple(spec.name for spec in ROSTER)
