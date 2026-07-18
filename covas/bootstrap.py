@@ -13,7 +13,8 @@ verbatim with its body.
 
 The order + config-gating that used to spread across `App.__init__` is now the declarative
 `MANIFEST`; `wire(app)` derives the None-defaults from it, then builds in list order (ED
-monitoring before its journal consumers, the audio layer last). Adding capability #41 means
+monitoring before its journal consumers, the audio layer as the last registration). Adding
+capability #41 means
 adding one `build_x` function and one `Wiring` entry here — the orchestrator is not touched.
 """
 from __future__ import annotations
@@ -1267,7 +1268,9 @@ def build_voice_pairing(app: "App") -> None:
 
     Kick off the background pairing thread (never blocks startup). Gated by
     `app._voice_pairing_allowed`; skipped quietly otherwise. The pairing worker and the
-    apply/remember/reconcile helpers stay on `App` (the live-settings path drives them)."""
+    apply/remember/reconcile helpers live just below in this module; only the
+    `_voice_pairing_allowed` gate stays on `App` (`_after_settings_change` calls
+    `reconcile_persona_voice` on every live settings change)."""
     if not app._voice_pairing_allowed():
         return
     threading.Thread(target=lambda: pair_persona_voices(app), name="voice-pairing",
@@ -1286,10 +1289,11 @@ def load_piper_voice(app: "App", model_path: str):
     return PiperTTS(cfg)
 
 
-# The pairing WORKER + apply/remember/reconcile logic (App._voice_pairing_allowed, the gate, stays
-# on the app — it's read directly by a test and by build_voice_pairing). The worker runs in the
-# background at startup; reconcile_persona_voice runs from App._after_settings_change on every live
-# settings change (the split is construction-side; the behaviour is unchanged).
+# The pairing WORKER + apply/remember/reconcile logic moved here with the rest of the wiring; only
+# App._voice_pairing_allowed (the gate) stays on the app — it's read directly by a test and by
+# build_voice_pairing. The worker runs in the background at startup; reconcile_persona_voice runs
+# from App._after_settings_change on every live settings change (code moved; call sites and
+# behaviour unchanged).
 def pair_persona_voices(app: "App") -> None:
     """(moved from App._pair_persona_voices)
 
@@ -1413,9 +1417,14 @@ def reconcile_persona_voice(app: "App", before: dict) -> None:
 # ---- Manifest + entrypoint --------------------------------------------------
 @dataclass(frozen=True)
 class Wiring:
-    """One capability's wiring: the instance attr it binds (for the None default, or None when it
-    binds several / none), the config predicate that gates it (None = always on), and the builder
-    that constructs + registers it (each keeps its own fail-soft try/except)."""
+    """One capability's wiring. `attr` = the single instance attr the builder binds; wire()
+    pre-declares it None so it exists even when the gate is off. Use None when the row binds
+    several attrs (their defaults stay in App.__init__) — or when the attr must stay ABSENT
+    while gated off to match the pre-split surface (the Spansh search/planner rows: app.py
+    never pre-declared those, and nothing reads them ungated). `gate` = config predicate
+    (None = always on). `build` constructs + registers; gated builders keep their own
+    fail-soft guard, always-on ones raise into startup exactly as their inline predecessors
+    did."""
     attr: str | None
     gate: Callable[["App"], bool] | None
     build: Callable[["App"], None]
@@ -1423,8 +1432,10 @@ class Wiring:
 
 # Construction order is list order. It preserves the two real constraints: ED monitoring runs
 # BEFORE its journal consumers (carriers/CG are built inside build_ed_monitoring; the None-defaults
-# are set up-front so nothing is clobbered), and the audio layer is LAST (it needs the mixer,
-# providers and ED context). Adding a capability = one builder above + one entry here.
+# are set up-front so nothing is clobbered), and the audio layer is the LAST registration (it
+# needs the mixer, providers and ED context; voice-pairing after it registers nothing — it only
+# kicks off a background worker, matching the old __init__ tail). Adding a capability = one
+# builder above + one entry here.
 MANIFEST: tuple[Wiring, ...] = (
     Wiring(None,               None,                                                     build_help),
     Wiring(None,               lambda a: a.cfg.get("checklist", {}).get("file"),         build_checklist),
@@ -1452,16 +1463,17 @@ MANIFEST: tuple[Wiring, ...] = (
     Wiring(None,               lambda a: a.cfg.get("mining_helper", {}).get("enabled"),  build_mining_helper),
     Wiring("memory",           lambda a: a.cfg.get("memory", {}).get("enabled"),         build_memory),
     Wiring("hud",              None,                                                     build_hud),          # always wired
-    Wiring("audio",            lambda a: a.mixer is not None,                            build_audio_layer),  # LAST
+    Wiring("audio",            lambda a: a.mixer is not None,                            build_audio_layer),  # last registration
     Wiring(None,               None,                                                     build_voice_pairing),
 )
 
 
 def wire(app: "App") -> None:
     """Wire every capability onto `app`. Two-phase so ordering can't clobber a shared attr:
-    first derive the single-attr None-defaults from the manifest (replacing the old scattered
-    `self.X = None` pre-declarations), then build in list order — each builder keeps its own
-    fail-soft guard, so a capability that can't start just stays off."""
+    first derive the None-defaults for rows that declare an attr (replacing the old scattered
+    `self.X = None` pre-declarations; attr-less rows deliberately keep theirs absent when
+    gated off), then build in list order. Gated builders fail soft and just stay off;
+    always-on ones raise into startup, as before the split."""
     for w in MANIFEST:
         if w.attr:
             setattr(app, w.attr, None)

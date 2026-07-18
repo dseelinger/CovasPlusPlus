@@ -202,7 +202,6 @@ class App:
         # the legacy direct playback path, byte-for-byte unchanged. Built device-free here; the
         # device is opened in start(). Never built under mock (fakes make no sound).
         self.mixer = None
-        self.audio = None
         if self.cfg.get("audio", {}).get("enabled") and not self.mock:
             try:
                 from .mixer import BusMixer
