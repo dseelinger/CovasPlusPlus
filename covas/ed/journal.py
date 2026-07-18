@@ -84,6 +84,11 @@ def _load_game(e: dict) -> dict:
     ship = e.get("Ship_Localised") or e.get("Ship")
     if ship:
         patch["ship"] = _title(ship)
+    raw_symbol = e.get("Ship")
+    if raw_symbol:
+        # The RAW internal symbol (not localized/title-cased) — a stable lookup key for
+        # `ed.ships.ship_pad_size` (#117), unlike the display name above.
+        patch["ship_symbol"] = str(raw_symbol).strip()
     if e.get("ShipName"):
         patch["ship_name"] = e["ShipName"]
     if isinstance(e.get("FuelLevel"), (int, float)):
@@ -98,6 +103,10 @@ def _loadout(e: dict) -> dict:
     ship = e.get("Ship_Localised") or e.get("Ship")
     if ship:
         patch["ship"] = _title(ship)
+    raw_symbol = e.get("Ship")
+    if raw_symbol:
+        # See _load_game — the raw symbol is the ship_pad_size lookup key (#117).
+        patch["ship_symbol"] = str(raw_symbol).strip()
     if e.get("ShipName"):
         patch["ship_name"] = e["ShipName"]
     cap = e.get("FuelCapacity")

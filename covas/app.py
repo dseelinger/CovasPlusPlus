@@ -588,6 +588,15 @@ class App:
         except Exception:  # noqa: BLE001 — a fallback failure just means "unknown"
             return None
 
+    def _current_ship_pad_size(self) -> str | None:
+        """The landing-pad size ("S"/"M"/"L") the Commander's CURRENTLY-FLOWN ship needs, from
+        live ED context — or None when no ship has been seen yet / the symbol isn't recognized.
+        Backs the nav "match" pad option (#117); the capability applies the Large fallback."""
+        if self.ed_ctx is None:
+            return None
+        from .ed import ship_pad_size
+        return ship_pad_size(self.ed_ctx.snapshot().get("ship_symbol"))
+
     # ---- logging & status -------------------------------------------------
     def _open_log(self):
         d = Path(self.cfg["logging"]["dir"])

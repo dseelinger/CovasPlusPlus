@@ -962,6 +962,7 @@ def build_nav(app: "App") -> None:
         app.nav = FindClosestCapability(
             ncfg, http=RequestsHttp(),
             get_current_system=app._current_system,
+            get_current_ship_size=app._current_ship_pad_size,
             module_index=module_index,
             log=lambda msg: app._log("nav", msg))
         app.registry.register(app.nav)
@@ -1026,6 +1027,7 @@ def build_ship_nav(app: "App") -> None:
         app.ship_nav = FindClosestShipCapability(
             ncfg, http=RequestsHttp(),
             get_current_system=app._current_system,
+            get_current_ship_size=app._current_ship_pad_size,
             get_local_shipyard=lambda: read_shipyard_snapshot(shipyard_path),
             stock_lookup=stock_lookup,
             ship_index=ship_index,

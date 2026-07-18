@@ -28,6 +28,7 @@ network, and only once the module is resolved.
 | **Size** | *"a large multi-cannon"* | For modules that come in several sizes: small, medium, large, huge, or a class number |
 | **Mount** | *"a gimballed multi-cannon"* | For weapons: fixed, gimballed, or turreted |
 | **Landing pad** | *"somewhere with a large pad"* | Restrict to a pad size — small, medium, or large |
+| **Match my ship** | *"find the nearest fuel scoop for my current ship"* | One-off pad size = whatever ship you're CURRENTLY flying, read live from Elite Dangerous |
 
 If you name just *"multi-cannon,"* COVAS++ will ask for the size and mount rather than picking for
 you. Name a module that only comes one way (a fuel scoop of a given class) and it just searches.
@@ -44,8 +45,14 @@ you. Name a module that only comes one way (a fuel scoop of a given class) and i
 | Setting | What it does |
 |---------|--------------|
 | `nav.enabled` | Master switch for the outfitting (and ship) search |
-| `nav.default_pad_size` | Default landing-pad size your ship needs (override per search) |
+| `nav.default_pad_size` | Default landing-pad size your ship needs (`S`/`M`/`L`/`any`/**Match Current Ship Size**), override per search |
 | `nav.search_size` | How many nearby stations to fetch before picking the closest match |
 | `nav.require_confirmation` | Off by default: search immediately once resolved. On adds a separate "confirm" turn first |
+
+**Match Current Ship Size** filters using whatever ship you're CURRENTLY flying (read live from
+Elite Dangerous), instead of a fixed letter — a small ship sees more nearby outposts, a large ship
+still only sees stations it can actually land at. If the ship isn't known yet (before ED's first
+`Loadout` event, or an unrecognized hull), it falls back to **Large** — the conservative choice, so
+a search never sends you somewhere you can't dock.
 
 See the [Configuration reference](../configuration.md#navigation-search-nav-star_systems-search).

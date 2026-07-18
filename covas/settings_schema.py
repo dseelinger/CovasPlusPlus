@@ -30,7 +30,7 @@ THINKING_TIERS = ["Off", "Low", "Medium", "High", "Extra", "Max"]
 CACHE_TTLS = ["5m", "1h"]
 # Canonical tiers (issue #11) plus the Anthropic-flavored aliases the router still accepts.
 ROUTER_PINS = ["", "cheap", "standard", "premium", "haiku", "sonnet", "opus"]
-PAD_SIZES = ["S", "M", "L", "any"]
+PAD_SIZES = ["S", "M", "L", "any", "match"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
 LLM_PROVIDERS = ["anthropic", "openai", "gemini", "ollama"]
 # Capability/token optimization levels (issue #84): "auto" (per-provider default) + the 5 named
@@ -597,10 +597,14 @@ SCHEMA: list[Setting] = [
             default=True, phrasings=("find closest module", "module search")),
     Setting("nav.default_pad_size", ("nav", "default_pad_size"), "enum",
             "Default landing pad", "Navigation & search",
-            "Pad size your ship needs; a voice request can override per search.",
+            "Pad size your ship needs; a voice request can override per search. 'match' "
+            "(Match Current Ship Size) filters using whatever ship you're CURRENTLY flying, "
+            "read live from Elite Dangerous — falls back to Large if the ship isn't known yet "
+            "(e.g. before the first Loadout event), so a search never sends you somewhere you "
+            "can't dock.",
             default="L", options=PAD_SIZES,
             phrasings=("landing pad size", "pad size"),
-            example="set the pad size to medium"),
+            example="set the pad size to match my ship"),
     Setting("nav.search_size", ("nav", "search_size"), "int",
             "Module search size", "Navigation & search",
             "How many nearest stations to fetch before filtering to the closest match.",

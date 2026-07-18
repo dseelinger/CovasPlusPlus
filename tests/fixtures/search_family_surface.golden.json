@@ -22,7 +22,7 @@
             },
             "pad_size": {
               "type": "string",
-              "description": "Required landing-pad size (S/M/L) for the Commander's ship. Omit to use the configured default."
+              "description": "Required landing-pad size (S/M/L) for the Commander's ship, or 'match' to use whatever ship they're CURRENTLY flying (falls back to Large if unknown). Omit to use the configured default."
             }
           },
           "required": [
@@ -71,7 +71,7 @@
             "a pad size"
           ],
           "example": "somewhere with a large pad",
-          "help_text": "Restrict to stations with a given landing-pad size \u2014 small, medium, or large."
+          "help_text": "Restrict to stations with a given landing-pad size \u2014 small, medium, or large \u2014 or say 'match my ship' to use whatever ship you're currently flying for this one search."
         }
       ],
       "help_when_active": "Tell me the module \u2014 and its size or mount if I ask \u2014 and I'll find the nearest station that sells it."
@@ -230,7 +230,7 @@
             },
             "pad_size": {
               "type": "string",
-              "description": "Required landing-pad size (S/M/L) for the Commander's ship. Omit to use the configured default."
+              "description": "Required landing-pad size (S/M/L) for the Commander's ship, or 'match' to use whatever ship they're CURRENTLY flying (falls back to Large if unknown). Omit to use the configured default."
             }
           },
           "required": [
@@ -261,7 +261,7 @@
             "a pad size"
           ],
           "example": "somewhere with a large pad",
-          "help_text": "Restrict to stations with a given landing-pad size \u2014 small, medium, or large."
+          "help_text": "Restrict to stations with a given landing-pad size \u2014 small, medium, or large \u2014 or say 'match my ship' to use whatever ship you're currently flying for this one search."
         }
       ],
       "help_when_active": "Tell me the ship \u2014 and which model if I ask \u2014 and I'll find the nearest station that sells it."

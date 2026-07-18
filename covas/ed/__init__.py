@@ -21,6 +21,7 @@ from .journal import (JournalWatcher, apply_carrier_event, apply_journal_event,
                       parse_journal_line, resolve_journal_dir, srv_hull_transitions)
 from .route import RouteStep, RouteTracker, is_scoopable, read_navroute
 from .modes import (GAME_MODES, MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV)
+from .ships import ship_pad_size
 from .status import (StatusWatcher, apply_status, decode_flags, describe_transition,
                      flag_transitions, game_mode_from_flags, low_vital_transitions,
                      status_path)
@@ -61,5 +62,6 @@ __all__ = [
     "resolve_journal_dir",
     "RouteStep",
     "RouteTracker",
+    "ship_pad_size",
     "status_path",
 ]
