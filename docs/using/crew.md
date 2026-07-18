@@ -33,8 +33,10 @@ Open the control panel and click **🎙 crew**. Each character has three fields:
 - **Name** — how the companion refers to them, and the `[Name]` prefix it uses. Case-sensitive.
 - **Personality** *(optional)* — a short line of flavor ("Sharp-eyed sensor officer, terse and
   dry") that folds into the system prompt so the character stays consistent turn to turn.
-- **Voice** — leave on **Auto** to let COVAS++ pick a stable voice deterministically, or pin a
-  specific voice from your [cast pool](../audio/ambient-audio.md).
+- **Voice** — the same **searchable voice picker** (🔍 command palette + type-to-filter) the
+  Settings page uses, so voices look and behave identically everywhere (issue #120). Leave it on
+  **Auto (deterministic)** to let COVAS++ pick a stable voice, pin one from your
+  [cast pool](../audio/ambient-audio.md), or type a Piper `.onnx` path / custom id.
 
 Add characters, edit them, delete them, then **SAVE ROSTER**. The roster is stored in a small,
 git-ignored `crew.json` file (`[crew].file`) that the voice loop and the system prompt read live —

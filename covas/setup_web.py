@@ -71,7 +71,7 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
           * `llm_provider` / `tts_provider` selection to overrides,
           * each supplied per-section key (blank strings ignored, so a blank box never clobbers), and
           * the optional non-key provider fields the chosen LLM needs (OpenAI base_url + model,
-            Gemini model, Ollama host + model).
+            Gemini model).
         Whether that's ENOUGH to finish is decided provider-aware by `is_configured`, not here."""
         b = request.get_json(force=True) or {}
 
@@ -96,8 +96,6 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
                 ("openai_base_url", ("openai", "base_url")),
                 ("openai_model", ("openai", "model")),
                 ("gemini_model", ("gemini", "model")),
-                ("ollama_host", ("ollama", "host")),
-                ("ollama_model", ("ollama", "model")),
             ):
                 v = str(b.get(field) or "").strip()
                 if v:
@@ -211,9 +209,7 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
             st = firstrun.configured_status(cfg)
             need = []
             if not st["llm"]:
-                need.append(f"the {st['llm_provider']} LLM "
-                            + ("model (pull it in Ollama)" if st["llm_provider"] == "ollama"
-                               else "key"))
+                need.append(f"the {st['llm_provider']} LLM key")
             if not st["stt"]:
                 need.append("the speech-to-text model")
             return jsonify({"ok": False, "status": st,

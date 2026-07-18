@@ -18,6 +18,27 @@ from pathlib import Path
 import sounddevice as sd
 
 
+def list_piper_voices(voices_dir: str) -> list[dict]:
+    """Scan `voices_dir` for local Piper voices (issue #120): every ``*.onnx`` that has its sibling
+    ``*.onnx.json`` config beside it, as ``[{value: <onnx path>, label: <filename>}]`` sorted by
+    filename. PURE filesystem read (no `piper` import needed) and FAIL-SOFT: a blank / missing /
+    unreadable dir returns ``[]`` so the settings picker degrades to the type-a-path escape hatch.
+    Unit-tested offline against a temp dir."""
+    out: list[dict] = []
+    try:
+        if not voices_dir:
+            return []
+        d = Path(voices_dir)
+        if not d.is_dir():
+            return []
+        for onnx in sorted(d.glob("*.onnx")):
+            if onnx.with_name(onnx.name + ".json").exists():  # <name>.onnx.json sits beside it
+                out.append({"value": str(onnx), "label": onnx.name})
+    except Exception:  # noqa: BLE001 — a catalog scan must never raise (CLAUDE.md fail-soft)
+        return []
+    return out
+
+
 class PiperTTS:
     def __init__(self, cfg: dict, *, mixer=None, bus: str = "covas") -> None:  # noqa: ANN001
         # Import lazily so the cloud stack doesn't need piper installed.

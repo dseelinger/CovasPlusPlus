@@ -7,14 +7,12 @@ proves the imports really are lazy (the stub is only touched for its own branch)
 """
 from __future__ import annotations
 
-import importlib
 import sys
 import types
 
 import pytest
 
 from covas.providers import factory
-from covas.providers.ollama_llm import OllamaLLM
 
 
 def _stub_provider(monkeypatch, module_name: str, class_name: str):
@@ -35,30 +33,6 @@ def _stub_provider(monkeypatch, module_name: str, class_name: str):
 
 
 # --- make_llm --------------------------------------------------------------
-
-def test_make_llm_ollama_returns_ollama_instance():
-    # Real construction — OllamaLLM is offline-safe (no network until ping/stream).
-    cfg = {
-        "llm": {"provider": "ollama"},
-        "personality": {"enabled": False},
-        "ollama": {"model": "qwen3"},
-    }
-    llm = factory.make_llm(cfg)
-    assert isinstance(llm, OllamaLLM)
-    assert llm.model == "qwen3"
-
-
-def test_local_path_imports_without_anthropic(monkeypatch):
-    # Force a CLEAN re-import of the local LLM module chain with the cloud SDK
-    # made unimportable. ollama_llm pulls build_system from covas.llm; if covas.llm
-    # did a top-level `import anthropic`, this re-import would raise. Guards the
-    # decoupling that keeps the offline stack runnable without the cloud SDK.
-    monkeypatch.setitem(sys.modules, "anthropic", None)  # any `import anthropic` -> fails
-    for name in ("covas.providers.ollama_llm", "covas.llm"):
-        monkeypatch.delitem(sys.modules, name, raising=False)
-    mod = importlib.import_module("covas.providers.ollama_llm")
-    assert hasattr(mod, "OllamaLLM")
-
 
 def test_make_llm_anthropic_selected(monkeypatch):
     stub = _stub_provider(monkeypatch, "anthropic_llm", "AnthropicLLM")
@@ -81,7 +55,7 @@ def test_make_llm_unknown_raises_with_name():
         factory.make_llm({"llm": {"provider": "gpt4"}})
     msg = str(exc.value)
     assert "gpt4" in msg
-    assert "anthropic" in msg and "ollama" in msg  # tells the user the valid names
+    assert "anthropic" in msg and "gemini" in msg  # tells the user the valid names
 
 
 # --- make_tts --------------------------------------------------------------

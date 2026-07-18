@@ -38,6 +38,12 @@ Three equivalent ways, all writing the same `[hud].enabled` setting:
 Toggling applies live — no restart. When you turn it off the window disappears; turn it back on
 and it returns.
 
+!!! tip "Setup guide links on the Settings page"
+    Each of the three HUD toggles on the Settings page carries a **Setup guide →** link that jumps
+    straight to the matching section here — the 2D overlay (this section), the
+    [SteamVR overlay](#in-vr-the-in-headset-overlay), and the
+    [OpenKneeboard web HUD](#in-headset-without-steamvr-the-web-hud-openkneeboard).
+
 ## Where it sits
 
 The panel parks itself in the **top-right** corner. On Windows its background is fully

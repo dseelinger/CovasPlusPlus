@@ -56,14 +56,12 @@
   <div class="card">
     <h2>AI brain (LLM) <span class="req">required</span>
       <span class="badge off" id="bLlm">not ready</span></h2>
-    <div class="hint">Which model powers the conversation. Pick a cloud provider and paste its key,
-      or run a local model with Ollama.</div>
+    <div class="hint">Which model powers the conversation. Pick a cloud provider and paste its key.</div>
     <label class="f">LLM provider</label>
     <select id="llmProvider">
       <option value="anthropic">Anthropic — Claude</option>
       <option value="openai">OpenAI-compatible — OpenAI / Groq / DeepSeek / OpenRouter</option>
       <option value="gemini">Google Gemini</option>
-      <option value="ollama">Ollama — local model (advanced)</option>
     </select>
 
     <div class="pfields" id="llm_anthropic">
@@ -102,15 +100,6 @@
       <input type="text" id="gemini_model" placeholder="gemini-flash-lite-latest" autocomplete="off">
     </div>
 
-    <div class="pfields" id="llm_ollama">
-      <div class="hint"><b>Advanced / local.</b> Runs a model on THIS PC with no key — but a good model
-        competes with Elite for your GPU, so it's best out-of-game. Install <a href="https://ollama.com" target="_blank">Ollama</a>,
-        then <code>ollama pull</code> a model. Needs the Ollama server running.</div>
-      <label class="f">Ollama host</label>
-      <input type="text" id="ollama_host" placeholder="http://localhost:11434" autocomplete="off">
-      <label class="f">Model (must be pulled)</label>
-      <input type="text" id="ollama_model" placeholder="e.g. qwen3" autocomplete="off">
-    </div>
 
     <button id="saveLlm">Save AI provider</button>
     <div class="msg" id="llmMsg"></div>
@@ -234,7 +223,7 @@ async function jpost(url, body){
 function showGroup(prefix, provider, providers){
   providers.forEach(p => $(prefix+"_"+p).classList.toggle("show", p===provider));
 }
-const LLM_PROVIDERS = ["anthropic","openai","gemini","ollama"];
+const LLM_PROVIDERS = ["anthropic","openai","gemini"];
 const TTS_PROVIDERS = ["edge","elevenlabs","azure","openai","cartesia","piper"];
 
 $("llmProvider").onchange = e => showGroup("llm", e.target.value, LLM_PROVIDERS);
@@ -284,13 +273,10 @@ $("saveLlm").onclick = async () => {
     body.openai_model = $("openai_model").value;
   }
   if(provider === "gemini"){ body.keys.gemini = $("k_gemini").value; body.gemini_model = $("gemini_model").value; }
-  if(provider === "ollama"){ body.ollama_host = $("ollama_host").value; body.ollama_model = $("ollama_model").value; }
   const {ok,data} = await jpost("/api/setup/keys", body);
   if(!ok || !data.ok){ msg("llmMsg",(data&&data.error)||"save failed", false); return; }
   const ready = data.status && data.status.llm;
-  msg("llmMsg", ready ? "Saved — provider ready." :
-      (provider==="ollama" ? "Saved. Pull/start the model so Ollama can reach it." :
-       "Saved. Enter a valid key to continue."), ready);
+  msg("llmMsg", ready ? "Saved — provider ready." : "Saved. Enter a valid key to continue.", ready);
   refresh();
 };
 

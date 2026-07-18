@@ -121,7 +121,7 @@ def test_retry_event_shape():
     assert ev == {"provider": "OpenAI", "attempt": 2, "attempts": 4,
                   "delay": 1.0, "reason": "HTTP 503"}
     # No status on the exception -> fall back to the class name, still a usable log reason.
-    assert retry_event("Ollama", 1, 3, 0.5, ConnectionError())["reason"] == "ConnectionError"
+    assert retry_event("Gemini", 1, 3, 0.5, ConnectionError())["reason"] == "ConnectionError"
 
 
 def test_exhausts_retries_and_marks_degraded():
@@ -190,7 +190,7 @@ def test_provider_error_from_connect_propagates_untouched_no_retry():
 
     def connect():
         calls["n"] += 1
-        raise ProviderError("Ollama LLM 404: model not found", provider="Ollama",
+        raise ProviderError("Gemini LLM 404: model not found", provider="Gemini",
                             status=404, retryable=False)
 
     with pytest.raises(ProviderError) as ei:

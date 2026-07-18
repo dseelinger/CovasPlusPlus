@@ -98,7 +98,11 @@ play session**:
   you **jump** — the liner captain here sounds the same all the way through, a different captain in
   the next system sounds different.
 - **Players** keep their voice for the whole session (the last 25 commanders are remembered), so a
-  wing or an operation keeps stable per-person voices.
+  wing or an operation keeps stable per-person voices. To **pin** a fixed voice for direct player
+  DMs, set the **Player-DM voice** on the Settings page: it's the same **searchable voice dropdown**
+  (🔍 command palette + type-to-filter) the provider voice fields use — pick a voice from your
+  ElevenLabs library, or type a Piper `.onnx` path / any voice id. Blank keeps the random-per-session
+  behavior above.
 - **Chatter** picks a fresh random voice per line, so the background radio sounds like many people.
 
 ### Variety — no shuffled soundboard

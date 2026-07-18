@@ -51,7 +51,7 @@ def _selftest() -> int:
         # doesn't prove they're bundled. Import each so a missing one fails the FROZEN build.
         "covas.providers.edge_tts", "covas.providers.azure_tts", "covas.providers.openai_tts",
         "covas.providers.cartesia_tts", "covas.providers.piper_tts", "covas.providers.elevenlabs_tts",
-        "covas.providers.openai_llm", "covas.providers.gemini_llm", "covas.providers.ollama_llm",
+        "covas.providers.openai_llm", "covas.providers.gemini_llm",
     ]
     for m in mods:
         importlib.import_module(m)

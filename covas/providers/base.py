@@ -31,9 +31,11 @@ NORMALIZES its native API onto this one contract so `app.py` never special-cases
   * **Fail soft** — a provider/tool error must not crash the loop; the app already guards, but
     don't swallow so much that a misconfig is undiagnosable.
 
-In-game policy (issue #11): any CLOUD LLM (Anthropic today; OpenAI/Gemini next) is fine on the
-in-game path — the router tiers it for cost. Only LOCAL models (Ollama) are kept off the in-game
-path, because a useful local model fights Elite Dangerous for the GPU, not because of the API.
+In-game policy (issue #11): every LLM here is a CLOUD provider (Anthropic today; OpenAI/Gemini too)
+and is fine on the in-game path — the router tiers it for cost. Cost is handled by that cloud
+tiering, NOT by a local LLM: a useful local model fights Elite Dangerous for the GPU, so COVAS++
+runs no local LLM at all (issue #128). The only local ML is CPU-side (Piper TTS, Whisper STT), which
+doesn't contend with the game's rendering.
 """
 from __future__ import annotations
 

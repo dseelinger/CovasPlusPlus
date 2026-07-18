@@ -10,7 +10,7 @@ and the command-palette pickers (#94). Each option is a small dict:
 similar entries are distinguishable.
 
 FAIL-SOFT is the whole point (CLAUDE.md): `resolve()` NEVER raises. On any failure — offline, no key,
-unreachable Ollama, a bad base_url — it returns ``(None, "<reason>")`` and the caller degrades to
+a bad base_url — it returns ``(None, "<reason>")`` and the caller degrades to
 free-text with the current value preserved (an editable combobox, never an empty/blocking dropdown).
 The network lives in the provider fetchers (each already split into a pure parse + a thin fetch);
 this module only wires sentinel → fetcher and swallows errors. That keeps it unit-testable offline by
@@ -97,6 +97,15 @@ def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
         if source == schema.OPT_INPUT_DEVICES:
             return _dedup_input_devices(firstrun.list_input_devices()), None
 
+        # --- local Piper voices (#120) — scan the dir of the configured voice, no network, no key ---
+        if source == schema.OPT_PIPER_VOICES:
+            from pathlib import Path
+
+            from .providers.piper_tts import list_piper_voices
+            model = str(_cfg(cfg, "piper", "model") or "").strip()
+            voices_dir = str(Path(model).parent) if model else ""
+            return list_piper_voices(voices_dir), None
+
         # --- LLM model catalogs ---
         if source == schema.OPT_OPENAI_MODELS:
             from .providers.openai_llm import list_openai_models, _DEFAULT_BASE_URL
@@ -113,11 +122,6 @@ def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
             if not key:
                 return None, "no Gemini key"
             return _ids(list_gemini_models(url, key)), None
-
-        if source == schema.OPT_OLLAMA_MODELS:
-            from .providers.ollama_llm import list_ollama_models
-            host = _cfg(cfg, "ollama", "host") or "http://localhost:11434"
-            return _ids(list_ollama_models(host)), None
 
         if source == schema.OPT_ANTHROPIC_MODELS_LIVE:
             # Prefer the live list; fall back to the static available_models so this never comes back

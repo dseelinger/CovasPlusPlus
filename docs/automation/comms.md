@@ -67,7 +67,9 @@ Dangerous (a HOTAS/mouse-only bind can't be pressed):
   **currently-selected** comms channel — perfectly fine for the common local-chat case. If you've
   bound keys that switch channels, put their ED action tokens in `channel_local` / `channel_wing` /
   `channel_squadron` / `channel_direct` and COVAS will switch for you. An unbound-but-configured key
-  fails soft with a spoken *"bind it in-game."*
+  fails soft with a spoken *"bind it in-game."* These four binds (and `settle_seconds`) are on the
+  **Settings page** under **Comms** and are voice-settable (*"set the squadron chat bind to …"*), so
+  you no longer have to hand-edit `config.toml` to point *"send to my squadron"* at the right channel.
 
 ## Settings
 

@@ -20,13 +20,12 @@ open issue there, not from the prompt pack.
 .venv\Scripts\python.exe check_setup.py     # environment health
 .venv\Scripts\python.exe run_covas.py        # headless voice loop
 .venv\Scripts\python.exe run_covas_ui.py     # + localhost control panel
-python poc_local_loop.py                      # offline POC (Ollama + Piper + Whisper)
 python -m compileall covas                    # fast sanity check after edits (recursive)
 pytest                                        # UNIT tests only — offline, free, run often
-pytest -m "integration and local"            # free integration (Ollama/Piper/Whisper/audio)
+pytest -m "integration and local"            # free integration (Piper/Whisper/audio)
 pytest -m "integration and paid"             # deliberate, COSTS money (Anthropic/ElevenLabs)
 ```
-Ship-critical paths (audio devices, Ollama server, ElevenLabs) need Doug's machine —
+Ship-critical paths (audio devices, ElevenLabs) need Doug's machine —
 you generally **cannot** run the full loop in CI/sandbox. Byte-compile, add unit tests
 for pure logic (parsing, routing, checklist ops), and state clearly what needs manual
 on-hardware testing.
@@ -34,13 +33,14 @@ on-hardware testing.
 ## Architecture (where things live)
 - `covas/app.py` — orchestration: PTT handling, threading, cancellation, worker loop.
 - `covas/providers/` — the swappable seam. `base.py` = Protocols (LLM/TTS/STT);
-  `factory.py` builds the one named in config. The in-game LLM path is **provider-agnostic**
-  (issue #11): any CLOUD LLM is fine there — Anthropic (`anthropic_llm`) today, OpenAI/Gemini
-  next — and the router picks a canonical tier (cheap/standard/premium) that each provider's
-  `[<provider>].tiers` map turns into a model id. Only LOCAL models (`ollama_llm`) stay OFF the
-  in-game path — a useful local model competes with ED for the GPU (not an API limitation), so
-  it's for offline/out-of-game use. TTS = `edge_tts` (default) / `azure_tts` / `openai_tts` /
-  `cartesia_tts` (persona) / `elevenlabs_tts` / local `piper_tts`; `whisper_stt` wraps STT.
+  `factory.py` builds the one named in config. The LLM path is **provider-agnostic**
+  (issue #11): every LLM provider is a CLOUD one — Anthropic (`anthropic_llm`), OpenAI-compatible
+  (`openai_llm`), Gemini (`gemini_llm`) — and the router picks a canonical tier (cheap/standard/
+  premium) that each provider's `[<provider>].tiers` map turns into a model id. There is **no local
+  LLM** (issue #128 removed Ollama): cost is handled by cloud tiering, not a local model, because a
+  useful local model would fight ED for the GPU. TTS = `edge_tts` (default) / `azure_tts` /
+  `openai_tts` / `cartesia_tts` (persona) / `elevenlabs_tts` / local `piper_tts`; `whisper_stt`
+  wraps STT (CPU-only). Local ML is CPU-side (Piper, Whisper) and never contends with the game.
 - `covas/llm.py` — Anthropic streaming (prompt caching + tools live here).
 - `covas/checklist.py` — the checklist model; tools exposed to the LLM.
 - `covas/events.py` — `EventBus` (thread-safe pub/sub). This is the spine; new inputs
@@ -56,7 +56,6 @@ on-hardware testing.
   voice-authored named macros.
 - `covas/comms/` + `covas/nav/` — in-game chat (local/wing) and route/activity planning.
 - `covas/memory/` + `covas/cg/` — durable-fact recall and Community Goal tracking.
-- `poc_local_loop.py` — standalone offline proof of concept.
 
 ## Conventions
 - **Python 3.11+, standard library first.** Current deps in `requirements.txt`; add a
@@ -66,7 +65,7 @@ on-hardware testing.
 - **Capabilities over loop edits.** New features (ED context, keybinds) should be
   self-contained modules that register tools/handlers, not new branches inside `app.py`.
 - **Tests: unit by default, integration opt-in.** Bare `pytest` must stay offline and
-  free — no network, API, ElevenLabs, Ollama, or audio. Achieve that by injecting
+  free — no network, API, ElevenLabs, or audio. Achieve that by injecting
   dependencies (components take provider instances; the factory builds real ones only at
   the app entry, tests pass fakes from `tests/fakes.py`). Anything hitting a real service
   is `@pytest.mark.integration` plus `local` (free) or `paid` (costs money), and is

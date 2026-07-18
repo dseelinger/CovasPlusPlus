@@ -24,7 +24,7 @@ from typing import Any, Optional
 # an English companion. small.en is the shipped default the first-run wizard installs.
 WHISPER_SIZES = ["tiny", "tiny.en", "base", "base.en", "small", "small.en",
                  "medium", "medium.en", "large-v3"]
-WHISPER_DEVICES = ["cpu", "cuda"]
+WHISPER_DEVICES = ["cpu"]  # CPU-only (issue #128): no local GPU ML compute competes with ED
 WHISPER_COMPUTE = ["int8", "float16", "float32"]
 THINKING_TIERS = ["Off", "Low", "Medium", "High", "Extra", "Max"]
 CACHE_TTLS = ["5m", "1h"]
@@ -32,7 +32,7 @@ CACHE_TTLS = ["5m", "1h"]
 ROUTER_PINS = ["", "cheap", "standard", "premium", "haiku", "sonnet", "opus"]
 PAD_SIZES = ["S", "M", "L", "any"]
 EL_FORMATS = ["pcm_16000", "pcm_22050", "pcm_24000", "mp3_44100_128"]
-LLM_PROVIDERS = ["anthropic", "openai", "gemini", "ollama"]
+LLM_PROVIDERS = ["anthropic", "openai", "gemini"]
 # Capability/token optimization levels (issue #84): "auto" (per-provider default) + the 5 named
 # budget presets, richest -> leanest. Mirrors covas/tiering.py LEVEL_NAMES (a unit test asserts the
 # two stay in lock-step so this list can't drift from the real levels).
@@ -69,7 +69,6 @@ LLM_PANELS: dict[str, ProviderPanel] = {
     "anthropic": ProviderPanel(("anthropic.model",), supports_thinking=True),
     "openai": ProviderPanel(("openai.base_url", "openai.model"), readonly=("openai.base_url",)),
     "gemini": ProviderPanel(("gemini.model",)),
-    "ollama": ProviderPanel(("ollama.model",)),
 }
 
 TTS_PANELS: dict[str, ProviderPanel] = {
@@ -98,12 +97,12 @@ OPT_EL_VOICES = "@elevenlabs_voices"    # live ElevenLabs voice ids
 # valid, and the current value is never lost when the fetch fails/offline/no-key.
 OPT_OPENAI_MODELS = "@openai_models"        # GET {openai.base_url}/models (OpenAI/Groq/DeepSeek/OpenRouter)
 OPT_GEMINI_MODELS = "@gemini_models"        # GET {gemini.base_url}/models (#91 reuse)
-OPT_OLLAMA_MODELS = "@ollama_models"        # GET {ollama.host}/api/tags (locally-pulled)
 OPT_ANTHROPIC_MODELS_LIVE = "@anthropic_models_live"  # GET /v1/models, static available_models fallback
 OPT_OPENAI_BASE_URLS = "@openai_base_urls"  # preset OpenAI/Groq/DeepSeek/OpenRouter + Custom…
 OPT_EDGE_VOICES = "@edge_voices"            # list_edge_voices() — no key (#88)
 OPT_AZURE_VOICES = "@azure_voices"          # list_azure_voices(key, region) — key+region gated (#88)
 OPT_CARTESIA_VOICES = "@cartesia_voices"    # GET {cartesia.base_url}/voices — key gated
+OPT_PIPER_VOICES = "@piper_voices"          # scan the local Piper voices dir for *.onnx (#120) — no key
 OPT_INPUT_DEVICES = "@input_devices"        # firstrun.list_input_devices() — local, no key (#89)
 
 # Small static option vocabularies for TTS model/voice fields (issue #92).
@@ -116,8 +115,8 @@ CARTESIA_MODELS = ["sonic-2", "sonic", "sonic-turbo"]
 # escape hatch). Used by validate_value so a custom base_url or an unlisted-but-valid model/voice id
 # is never rejected — the UI flags it as unsupported instead of blocking the save.
 _COMBOBOX_SOURCES = frozenset({
-    OPT_OPENAI_MODELS, OPT_GEMINI_MODELS, OPT_OLLAMA_MODELS, OPT_ANTHROPIC_MODELS_LIVE,
-    OPT_OPENAI_BASE_URLS, OPT_EDGE_VOICES, OPT_AZURE_VOICES, OPT_CARTESIA_VOICES,
+    OPT_OPENAI_MODELS, OPT_GEMINI_MODELS, OPT_ANTHROPIC_MODELS_LIVE,
+    OPT_OPENAI_BASE_URLS, OPT_EDGE_VOICES, OPT_AZURE_VOICES, OPT_CARTESIA_VOICES, OPT_PIPER_VOICES,
     # The mic picker (#89) is a combobox too: a saved device may be unplugged when the page loads,
     # and blank = system default — both must stay valid rather than be rejected against a live list.
     OPT_INPUT_DEVICES,
@@ -142,6 +141,8 @@ class Setting:
     phrasings: tuple = ()             # spoken names for the voice layer
     example: str = ""                 # example spoken command
     hidden: bool = False              # tracked + settable, but not shown as a row
+    allow_custom: bool = False        # enum: accept a value outside options (like a combobox source)
+    doc_url: Optional[str] = None     # optional "Setup guide →" link shown under the help (#121)
 
 
 # The schema. Order here is the order groups first appear in the web page.
@@ -151,8 +152,8 @@ SCHEMA: list[Setting] = [
     Setting("llm.provider", ("llm", "provider"), "enum",
             "LLM provider", "Providers",
             "Which LLM answers. anthropic (cloud, Claude), openai (any OpenAI-compatible cloud: "
-            "OpenAI/Groq/DeepSeek/OpenRouter), gemini (Google Gemini native — function calling + "
-            "Search grounding), or ollama (local, out-of-game only).",
+            "OpenAI/Groq/DeepSeek/OpenRouter), or gemini (Google Gemini native — function calling + "
+            "Search grounding). All cloud: cost is handled by the tiering router, not a local model.",
             default="anthropic", options=LLM_PROVIDERS,
             phrasings=("llm provider",)),
     Setting("openai.base_url", ("openai", "base_url"), "enum",
@@ -175,12 +176,6 @@ SCHEMA: list[Setting] = [
             "(Flash-Lite/Flash/Pro aliases) live in [gemini.tiers] in config.toml.",
             default="gemini-flash-lite-latest", options_source=OPT_GEMINI_MODELS,
             phrasings=("gemini model",)),
-    Setting("ollama.model", ("ollama", "model"), "enum",
-            "Ollama model", "Providers",
-            "Local model when LLM provider = ollama (out-of-game only). Pick from your locally-pulled "
-            "models or type a tag you'll `ollama pull`, e.g. qwen3 or qwen3:32b.",
-            default="qwen3", options_source=OPT_OLLAMA_MODELS,
-            phrasings=("ollama model", "local model")),
     Setting("tts.provider", ("tts", "provider"), "enum",
             "TTS provider", "Providers",
             "Which voice speaks. edge (free edge-tts neural voices — the default; no SLA, falls "
@@ -250,12 +245,14 @@ SCHEMA: list[Setting] = [
             "Cartesia language", "Providers",
             "Synthesis language (BCP-47 primary subtag) for the Cartesia voice, e.g. en.",
             default="en", phrasings=("cartesia language",)),
-    Setting("piper.model", ("piper", "model"), "path",
+    Setting("piper.model", ("piper", "model"), "enum",
             "Piper voice", "Providers",
-            "Local Piper voice .onnx path when TTS provider = piper (offline, free). Download one "
+            "Local Piper voice .onnx path when TTS provider = piper (offline, free). Pick from the "
+            "voices found next to your current one, or type a path (the escape hatch). Download voices "
             "with `python -m piper.download_voices en_US-lessac-medium`; the .onnx.json must sit "
             "beside it. Relative paths resolve against the project root.",
-            default="", phrasings=("piper voice", "piper model", "local voice")),
+            default="", options_source=OPT_PIPER_VOICES, allow_custom=True,
+            phrasings=("piper voice", "piper model", "local voice")),
 
     # --- Language model ----------------------------------------------------
     Setting("anthropic.model", ("anthropic", "model"), "enum",
@@ -486,13 +483,13 @@ SCHEMA: list[Setting] = [
             example="set the whisper model to medium"),
     Setting("whisper.device", ("whisper", "device"), "enum",
             "Whisper device", "Speech-to-text",
-            "cpu is safe everywhere; cuda needs an NVIDIA GPU.",
+            "Whisper runs on the CPU — no GPU needed, and nothing competes with Elite for the GPU.",
             default="cpu", options=WHISPER_DEVICES,
             phrasings=("whisper device",),
             example="set the whisper device to cpu"),
     Setting("whisper.compute_type", ("whisper", "compute_type"), "enum",
             "Whisper compute type", "Speech-to-text",
-            "int8 = fast + low memory on CPU; float16 for cuda.",
+            "int8 = fast + low memory on CPU (the recommended default).",
             default="int8", options=WHISPER_COMPUTE,
             phrasings=("whisper compute type",)),
     Setting("whisper.language", ("whisper", "language"), "string",
@@ -808,6 +805,32 @@ SCHEMA: list[Setting] = [
             "Open-comms bind", "Comms",
             "ED action token that opens the chat text box (bind it to a KEY in-game).",
             default="QuickCommsPanel", phrasings=("comms open bind",)),
+    Setting("comms_send.channel_local", ("comms_send", "channel_local"), "string",
+            "Local chat bind", "Comms",
+            "ED action token that selects the local chat channel before sending. Blank = send on "
+            "your currently-selected channel. Bind it to a key in Elite Dangerous.",
+            default="", phrasings=("local chat bind", "local comms bind")),
+    Setting("comms_send.channel_wing", ("comms_send", "channel_wing"), "string",
+            "Wing chat bind", "Comms",
+            "ED action token that selects the wing chat channel before sending. Blank = send on "
+            "your currently-selected channel. Bind it to a key in Elite Dangerous.",
+            default="", phrasings=("wing chat bind", "wing comms bind")),
+    Setting("comms_send.channel_squadron", ("comms_send", "channel_squadron"), "string",
+            "Squadron chat bind", "Comms",
+            "ED action token that selects the squadron chat channel before sending. Blank = send on "
+            "your currently-selected channel. Bind it to a key in Elite Dangerous.",
+            default="", phrasings=("squadron chat bind", "squadron comms bind")),
+    Setting("comms_send.channel_direct", ("comms_send", "channel_direct"), "string",
+            "Direct-message bind", "Comms",
+            "ED action token that selects the direct-message chat channel before sending. Blank = send "
+            "on your currently-selected channel. Bind it to a key in Elite Dangerous.",
+            default="", phrasings=("direct message bind", "direct chat bind", "dm bind")),
+    Setting("comms_send.settle_seconds", ("comms_send", "settle_seconds"), "float",
+            "Comms settle delay", "Comms",
+            "Pause after focusing the chat box, selecting a channel, or pasting, so the field keeps up "
+            "before the next keystroke. Raise it if messages come out garbled.",
+            default=0.15, min=0.0, max=2.0, unit="s",
+            phrasings=("comms settle delay", "comms settle seconds")),
 
     # --- Sound cues --------------------------------------------------------
     Setting("audio.thinking_bed", ("audio", "thinking_bed"), "bool",
@@ -889,11 +912,13 @@ SCHEMA: list[Setting] = [
             "ElevenLabs library (minus the COVAS voice). Off = a single voice unless you set a pool.",
             default=True, phrasings=("random voices", "random elevenlabs voices", "random cast"),
             example="turn random voices off"),
-    Setting("audio.voices.player_ref", ("audio", "voices", "player_ref"), "string",
+    Setting("audio.voices.player_ref", ("audio", "voices", "player_ref"), "enum",
             "Player-DM voice", "Ambient audio",
-            "Fixed voice for direct player DMs — a Piper .onnx path or an ElevenLabs voice id. "
+            "Fixed voice for direct player DMs. Pick a voice from your ElevenLabs library, or type a "
+            "Piper .onnx path / any voice id (the escape hatch). "
             "Blank = each player keeps a random session voice (last 25 remembered).",
-            default="", phrasings=("player dm voice", "player comms voice")),
+            default="", options_source=OPT_EL_VOICES, allow_custom=True,
+            phrasings=("player dm voice", "player comms voice")),
     Setting("audio.chatter.min_seconds", ("audio", "chatter", "min_seconds"), "float",
             "Chatter min gap", "Ambient audio",
             "Shortest gap between space-chatter lines, used in the BUSIEST populated systems. "
@@ -921,14 +946,16 @@ SCHEMA: list[Setting] = [
             "current checklist step, and route progress. Off by default; needs a desktop "
             "(no effect headless).",
             default=False, phrasings=("hud", "the hud", "overlay", "hud overlay"),
-            example="turn the HUD on"),
+            example="turn the HUD on",
+            doc_url="https://dseelinger.github.io/CovasPlusPlus/using/hud/#turning-it-on-and-off"),
     Setting("hud.vr_enabled", ("hud", "vr_enabled"), "bool",
             "VR HUD overlay", "Companion HUD",
             "Show the same HUD as a true in-headset SteamVR overlay floating in the cockpit. Off "
             "by default; needs SteamVR running and Elite Dangerous rendering through it — nothing "
             "to install. Fails soft with no VR runtime (the panel simply doesn't appear).",
             default=False, phrasings=("vr hud", "the vr hud", "vr overlay", "headset hud"),
-            example="turn the VR HUD on"),
+            example="turn the VR HUD on",
+            doc_url="https://dseelinger.github.io/CovasPlusPlus/using/hud/#in-vr-the-in-headset-overlay"),
     Setting("hud.web_enabled", ("hud", "web_enabled"), "bool",
             "Web HUD (OpenKneeboard)", "Companion HUD",
             "Serve the same HUD as a transparent web page at /hud for OpenKneeboard's Web "
@@ -938,7 +965,9 @@ SCHEMA: list[Setting] = [
             "Independent of the desktop and SteamVR HUDs.",
             default=False,
             phrasings=("web hud", "the web hud", "kneeboard hud", "openkneeboard hud"),
-            example="turn the web HUD on"),
+            example="turn the web HUD on",
+            doc_url="https://dseelinger.github.io/CovasPlusPlus/using/hud/"
+                    "#in-headset-without-steamvr-the-web-hud-openkneeboard"),
     Setting("hud.vr_placement", ("hud", "vr_placement"), "enum",
             "VR HUD placement", "Companion HUD",
             "Where the VR panel sits: 'world' (cockpit-fixed, parked in front — the comfortable "
@@ -1001,12 +1030,10 @@ SCHEMA: list[Setting] = [
             "Port the local control panel serves on. Restart to apply.",
             default=8765, min=1, max=65535, phrasings=("control panel port",)),
 
-    # --- Developer ---------------------------------------------------------
-    Setting("dev.mock", ("dev", "mock"), "bool",
-            "Dev mock mode", "Developer",
-            "Swap LLM/TTS/STT for fakes: exercise the loop with zero API calls. Restart to apply.",
-            default=False, phrasings=("dev mock", "mock mode"),
-            example="turn mock mode on"),
+    # NOTE: dev mock mode (`[dev].mock`) is intentionally NOT a Setting (issue #130) — it swaps the
+    # LLM/TTS/STT for fakes, useful only for tests/dev, never for an end user. The mechanism stays
+    # (config.toml `[dev] mock = true`, `COVAS_MOCK=1`, `config.mock_enabled`, `app.self.mock`); it's
+    # just not on the Settings page or voice-toggleable.
 ]
 
 # Fast lookup by dotted key. Also guards against a duplicate key slipping in.
@@ -1050,8 +1077,10 @@ def is_overridden(overrides: dict, setting: Setting) -> bool:
 def is_combobox(setting: Setting) -> bool:
     """Whether an enum is an EDITABLE combobox (issue #92): its dropdown is a discovery aid, but a
     value OUTSIDE the fetched list stays valid (the custom / at-your-own-risk escape hatch). Only the
-    fetched-catalog sources are open; static enums and the strict ElevenLabs/anthropic lists are not."""
-    return setting.options_source in _COMBOBOX_SOURCES
+    fetched-catalog sources are open; static enums and the strict ElevenLabs/anthropic lists are not.
+    A per-setting `allow_custom` (issue #120: the Player-DM voice picks from ElevenLabs but must also
+    accept a typed Piper .onnx path / unlisted id) opens an otherwise-strict source the same way."""
+    return setting.options_source in _COMBOBOX_SOURCES or setting.allow_custom
 
 
 def resolve_options(setting: Setting, dynamic: Optional[dict] = None) -> Optional[list]:
@@ -1149,6 +1178,7 @@ def field_payload(cfg: dict, overrides: dict, s: Setting,
         "type": s.type,
         "label": s.label,
         "help": s.help,
+        "doc_url": s.doc_url,
         "options": resolve_options(s, dynamic),
         "options_source": s.options_source,
         "combobox": is_combobox(s),

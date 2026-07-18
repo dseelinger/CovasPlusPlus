@@ -266,9 +266,10 @@ flavor           = false
 # Local speech-to-text (faster-whisper). Bigger model = more accurate, slower.
 # Options: tiny, base, small, medium, large-v3.  base/small/medium are the sweet spots.
 model       = "small"
-# "cpu" is safe everywhere. If you have an NVIDIA GPU we can switch to "cuda" later.
+# Whisper runs on the CPU (issue #128) — no GPU needed, and nothing here competes with Elite for
+# the GPU. Leave device = "cpu".
 device      = "cpu"
-# int8 = fast + low memory on CPU. (float16 for cuda.)
+# int8 = fast + low memory on CPU (the recommended default).
 compute_type = "int8"
 language    = "en"       # force English; set "" to auto-detect
 # Where faster-whisper caches downloaded weights. Blank = the default HuggingFace cache
@@ -1190,15 +1191,14 @@ theme = "dark"
 
 # ============================================================================
 #  PROVIDERS — the swappable pieces of the voice loop (see covas/providers).
-#  Cloud defaults preserve current behavior; the local POC forces ollama+piper.
 # ============================================================================
 
 [llm]
 # Which LLM answers. "anthropic" (cloud, Claude — the default), "openai" (any OpenAI-compatible
-# cloud endpoint: OpenAI/Groq/DeepSeek/OpenRouter — see [openai]), "gemini" (Google Gemini native
-# API, function calling + Search grounding — see [gemini]), or "ollama" (local, e.g. Qwen —
-# OUT-OF-GAME only; a local model competes with ED for the GPU). Cloud providers are fine in-game
-# and are tiered by the cost router (see [router]).
+# cloud endpoint: OpenAI/Groq/DeepSeek/OpenRouter — see [openai]), or "gemini" (Google Gemini native
+# API, function calling + Search grounding — see [gemini]). All are CLOUD providers, fine in-game and
+# tiered by the cost router (see [router]) — cost is handled by that tiering, NOT a local LLM (a
+# useful local model would compete with Elite Dangerous for the GPU).
 provider = "anthropic"
 # Capability/token OPTIMIZATION LEVEL (issue #84). COVAS advertises ~47 tools every turn (~10.4K
 # tokens of tool schemas). That's fine on a prompt-caching, high-TPM endpoint but fatal on a low-TPM
@@ -1298,13 +1298,6 @@ cheap    = "gemini-flash-lite-latest"
 standard = "gemini-flash-latest"
 premium  = "gemini-pro-latest"
 
-[ollama]
-# Local LLM via Ollama. Start it with `ollama serve`; pull a model first.
-host        = "http://localhost:11434"
-model       = "qwen3"      # set to your exact `ollama list` tag, e.g. "qwen3:32b"
-temperature = 0.7
-think       = true          # route <think>/thinking output away from speech
-
 [tts]
 # Which voice speaks (COVAS's OWN persona voice). "edge" (FREE neural voices via edge-tts — see
 # [edge] below; the default), "elevenlabs" (cloud, premium), or "piper" (local, offline, free).
@@ -1398,8 +1391,8 @@ language = "en"
 
 
 [dev]
-# Dev-mode mock. When ON, the LLM/TTS/STT are swapped for fakes (canned text, no
-# audio) so you can exercise the full push-to-talk loop while iterating on code
-# with ZERO API calls and zero cost. Setting the env var overrides this for a
+# Dev-mode mock — DEV/TEST ONLY, not shown in the Settings UI (issue #130). When ON, the LLM/TTS/STT
+# are swapped for fakes (canned text, no audio) so you can exercise the full push-to-talk loop while
+# iterating on code with ZERO API calls and zero cost. Setting the env var overrides this for a
 # one-off run (PowerShell: $env:COVAS_MOCK=1). Leave OFF for real use.
 mock = false

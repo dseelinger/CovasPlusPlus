@@ -109,19 +109,6 @@ function flash(text, isErr){
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-function voiceOptions(sel){
-  // "Auto" (value "") plus every available cast voice; keep an unknown saved ref selectable.
-  let opts = `<option value="">Auto (deterministic)</option>`;
-  let known = false;
-  for (const v of VOICES){
-    const on = v.ref === sel ? " selected" : "";
-    if (v.ref === sel) known = true;
-    opts += `<option value="${esc(v.ref)}"${on}>${esc(v.label)}</option>`;
-  }
-  if (sel && !known) opts += `<option value="${esc(sel)}" selected>${esc(sel)} (saved)</option>`;
-  return opts;
-}
-
 function addRow(member){
   const m = member || {name:"", persona:"", voice_ref:""};
   const li = document.createElement("li");
@@ -129,10 +116,23 @@ function addRow(member){
   li.innerHTML = `
     <div class="nameRow">
       <input class="cName" placeholder="Name — e.g. Nyx" value="${esc(m.name)}">
-      <select class="cVoice">${voiceOptions(m.voice_ref || "")}</select>
+      <span class="cVoiceSlot"></span>
       <button class="small danger del">DELETE</button>
     </div>
     <textarea class="cPersona" placeholder="Personality (optional) — e.g. Sharp-eyed sensor officer, terse and dry.">${esc(m.persona)}</textarea>`;
+  // ONE reusable voice picker (issue #120) — the SAME searchable control the Settings page uses,
+  // instead of a bespoke <select>. "" = Auto (deterministic); a saved ref stays selectable even if
+  // it's an unlisted id / Piper .onnx path (allowCustom).
+  const picker = buildVoicePicker({
+    value: m.voice_ref || "",
+    label: "voice",
+    allowCustom: true,
+    blankLabel: "Auto (deterministic)",
+    options: VOICES.map(v => ({value: v.ref, label: v.label, meta: ""})),
+    onChange: () => {},   // value is read from the control at collect() time
+  });
+  picker.classList.add("cVoice");
+  li.querySelector(".cVoiceSlot").replaceWith(picker);
   li.querySelector(".del").onclick = () => { li.remove(); refreshCount(); };
   $("list").appendChild(li);
   $("empty").style.display = "none";
@@ -201,5 +201,7 @@ $("overwrite").onclick = () => save(true);
 
 load();
 </script>
+{% include "_command_palette.html" %}
+{% include "_voice_picker.html" %}
 </body>
 </html>

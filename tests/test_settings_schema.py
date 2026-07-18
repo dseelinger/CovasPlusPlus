@@ -145,6 +145,33 @@ def test_enum_with_unresolved_dynamic_source_type_checks_only():
     assert err is None and val == "some-voice-id"
 
 
+# --- comms channel-select binds (issue #129) --------------------------------
+
+def test_comms_channel_binds_exposed_under_comms_like_open_bind():
+    """The four per-channel selects (incl. squadron) sit in the schema under "Comms" as string
+    binds, mirroring comms_send.open_bind, so they're UI- and voice-settable (issue #129)."""
+    open_bind = s.by_key["comms_send.open_bind"]
+    for key in ("comms_send.channel_local", "comms_send.channel_wing",
+                "comms_send.channel_squadron", "comms_send.channel_direct"):
+        st = s.by_key[key]
+        assert st.group == open_bind.group == "Comms"
+        assert st.type == "string" and st.default == ""      # blank = current channel
+        assert st.phrasings                                  # voice-settable
+        # validate/update round-trips like open_bind: any token string is accepted verbatim, and
+        # blank stays valid.
+        assert s.validate_value(st, "SelectTargetWing") == ("SelectTargetWing", None)
+        assert s.validate_value(st, "") == ("", None)
+        assert s.set_value({}, st, "TokenX") == {"comms_send": {key.split(".")[1]: "TokenX"}}
+
+
+def test_comms_settle_seconds_is_a_bounded_comms_float():
+    ss = s.by_key["comms_send.settle_seconds"]
+    assert ss.group == "Comms" and ss.type == "float" and ss.default == 0.15
+    assert s.validate_value(ss, 0.5) == (0.5, None)
+    assert s.validate_value(ss, 2.5)[0] is None               # over the 2s max
+    assert s.validate_value(ss, -0.1)[0] is None              # below 0
+
+
 # --- value helpers ---------------------------------------------------------
 
 def test_set_value_builds_nested_patch():
@@ -168,3 +195,26 @@ def test_public_schema_folds_in_value_and_overridden_flag():
     assert flat["web_search.enabled"]["overridden"] is True
     # hidden settings (voice_name) are not exposed as rows
     assert "elevenlabs.voice_name" not in flat
+
+
+# ---- doc_url "Setup guide →" links (issue #121) ----------------------------
+def test_doc_url_round_trips_into_the_payload():
+    """A Setting's optional doc_url surfaces in the field payload alongside help; None when unset."""
+    with_doc = s.Setting("x.y", ("x", "y"), "bool", "X", "G", "help", default=False,
+                          doc_url="https://example.test/guide#anchor")
+    without = s.Setting("x.z", ("x", "z"), "bool", "X", "G", "help", default=False)
+    assert s.field_payload({}, {}, with_doc)["doc_url"] == "https://example.test/guide#anchor"
+    assert s.field_payload({}, {}, without)["doc_url"] is None
+
+
+def test_hud_rows_carry_setup_guide_doc_urls():
+    """The three Companion-HUD toggles link to the published hud.md setup sections (verified slugs)."""
+    base = "https://dseelinger.github.io/CovasPlusPlus/using/hud/"
+    expected = {
+        "hud.enabled": base + "#turning-it-on-and-off",
+        "hud.vr_enabled": base + "#in-vr-the-in-headset-overlay",
+        "hud.web_enabled": base + "#in-headset-without-steamvr-the-web-hud-openkneeboard",
+    }
+    for key, url in expected.items():
+        assert s.by_key[key].doc_url == url
+        assert s.field_payload({}, {}, s.by_key[key])["doc_url"] == url

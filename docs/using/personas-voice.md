@@ -107,7 +107,7 @@ carries an out-of-range speed across.
 
 Prefer a **free, fully-local voice** with no external service at all? Switch `[tts].provider` to
 **Piper**. Piper runs on your CPU alongside the game at no cost — the voice is good, if not quite as
-smooth as ElevenLabs. See [Install & setup](../getting-started/install.md#run-fully-local-no-cloud).
+smooth as ElevenLabs. See [Install & setup](../getting-started/install.md#local-cpu-only-speech).
 
 ### Free neural voices via Edge (`edge`)
 

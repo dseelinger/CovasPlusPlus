@@ -66,14 +66,17 @@ model** (speech-to-text) and a **Personality** toggle.
   (there's a `change ⚙` link on each block). The quick card then re-renders to match.
 - **Anthropic (Claude)** — a **model** dropdown plus a **Thinking depth** control. Thinking is
   Anthropic-only for now; other LLM providers simply don't show it.
-- **OpenAI-compatible / Gemini / Ollama** — an editable **model** combobox: pick from the endpoint's
+- **OpenAI-compatible / Gemini** — an editable **model** combobox: pick from the endpoint's
   live catalog, or type any model id (free text is always accepted). If the catalog can't be
   fetched (no key, offline), it quietly degrades to a plain text box with your current value kept.
 - **ElevenLabs** — **model**, a searchable **voice** picker (with the type-to-filter box and 🔍
   search palette), and a **voice speed** slider. The voice/model lists are fetched from ElevenLabs
   **only when ElevenLabs is the active TTS provider**.
-- **Edge / Azure / OpenAI / Cartesia / Piper** — each shows its own voice fields (an Edge/Azure/
-  Cartesia voice combobox, the OpenAI TTS model/voice, a local Piper `.onnx` path, etc.).
+- **Edge / Azure / OpenAI / Cartesia / Piper** — each shows its voice through the **same searchable
+  voice picker** (issue #120): every provider voice, the local **Piper** `.onnx` voice (picked from
+  the voices found next to your current one, or typed), the **Player-DM voice**, and the crew page's
+  per-character voice all use one identical control — 🔍 command palette + type-to-filter, with the
+  current value always visible and a typed custom value always accepted.
 
 Every control writes straight to `overrides.json` through the same validated schema the Settings
 page and voice commands use, so nothing here can drift from the rest of the app.
@@ -97,14 +100,19 @@ inline help:
   (`config.toml` stays pristine).
 - **Per-setting reset** — a changed setting shows a **Reset** button that reverts it to the default
   and drops it from the overrides.
+- **Setup guide links** — settings whose payoff needs a one-time setup carry a **Setup guide →**
+  link under their help that opens the relevant docs section in a new tab. The three **Companion
+  HUD** toggles use it today — the 2D overlay, the SteamVR overlay, and the OpenKneeboard web HUD
+  each link straight to their [HUD setup](using/hud.md) section, so the fiddly bits are one click
+  from the toggle.
 - **Validation** — out-of-range or unknown values are rejected rather than saved.
 - **Applies live** — a saved change takes effect immediately, no relaunch. Switching your **LLM or
   TTS provider** (or its model/voice/base URL) hot-swaps it for the **next turn** — an in-flight
   turn finishes on the previous one, and a failed switch keeps the working provider and tells you.
   Changing the **talk/cancel/reflex keys** or the **microphone** rebinds them in place; the Whisper
   model, activation mode, bus volumes, and toggles all reload immediately. The only exceptions that
-  still need a restart are `audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`, and
-  `dev.mock` (see the Configuration reference).
+  still need a restart are `audio.enabled`, `audio.mix_sample_rate`, and `ui.host`/`ui.port`
+  (see the Configuration reference).
 
 Everything here is the **same schema** the [voice settings](using/settings.md) use, so the two never
 disagree.

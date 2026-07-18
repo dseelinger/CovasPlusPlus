@@ -16,8 +16,8 @@ settings, with **relative paths** so your checkout stays portable. Anything you 
     finishes on the previous one); change the **talk/cancel/reflex keys**, the **microphone**, the
     Whisper model, the activation mode, bus volumes, or any toggle and it applies in place. Only a
     tiny set needs a restart: `audio.enabled` and `audio.mix_sample_rate` (they open the shared
-    audio device at launch), `ui.host` / `ui.port` (the control panel binds at launch), and
-    `dev.mock`. A failed provider switch is fail-soft — COVAS++ keeps the working one and says so.
+    audio device at launch) and `ui.host` / `ui.port` (the control panel binds at launch). A failed
+    provider switch is fail-soft — COVAS++ keeps the working one and says so.
 
 !!! note "Upgrades pick up new defaults automatically"
     In a packaged install your editable `config.toml` lives in the writable data dir
@@ -88,8 +88,8 @@ Local speech recognition (faster-whisper) — nothing leaves your machine.
 | Setting | Default | What it does |
 |---------|---------|--------------|
 | `whisper.model` | `small` | Model size: `tiny`, `base`, `small`, `medium`, `large-v3` (bigger = more accurate, slower) |
-| `whisper.device` | `cpu` | `cpu` (safe everywhere) or `cuda` (needs an NVIDIA GPU) |
-| `whisper.compute_type` | `int8` | `int8` (fast/low memory on CPU), `float16`, or `float32` |
+| `whisper.device` | `cpu` | CPU-only — no GPU needed, and nothing competes with Elite for the GPU |
+| `whisper.compute_type` | `int8` | `int8` (fast/low memory on CPU — the recommended default) |
 | `whisper.language` | `en` | Force a language code, or blank to auto-detect |
 
 ## Language model (`[anthropic]`)
@@ -559,7 +559,7 @@ See [Companion HUD](using/hud.md). **Off by default.**
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `llm.provider` | `anthropic` | `anthropic` (cloud, Claude), `openai` (any OpenAI-compatible cloud — OpenAI/Groq/DeepSeek/OpenRouter), `gemini` (Google Gemini native — function calling + Search grounding), or `ollama` (local, out-of-game only) |
+| `llm.provider` | `anthropic` | `anthropic` (cloud, Claude), `openai` (any OpenAI-compatible cloud — OpenAI/Groq/DeepSeek/OpenRouter), or `gemini` (Google Gemini native — function calling + Search grounding). All cloud — cost is handled by the tiering router, not a local model |
 | `llm.slow_warning_seconds` | `30` | If a turn goes this long with no spoken reply (slow provider, retry/backoff, hung connection), COVAS speaks a plain-language "the AI service is being slow, still trying" heads-up in the **current voice**. `0` disables it |
 | `llm.speak_config_errors` | `true` | On a **misconfiguration** (bad model id, wrong/missing API key, bad endpoint), speak a short "I can't reach `<provider>` — check the AI settings" heads-up naming the likely fix, on **every** failed turn. `false` = keep the old silent cue+log-only behavior for these |
 | `llm.retry.enabled` | `true` | Retry transient provider errors (overload/rate-limit/5xx, connection/timeout) with backoff before giving up. `false` = a single try, no retry |
@@ -569,19 +569,18 @@ See [Companion HUD](using/hud.md). **Off by default.**
 | `llm.retry.jitter` | `0.25` | Add up to this fraction of the delay at random, so retries don't stampede a recovering server |
 | `openai.base_url` / `.model` | OpenAI / `gpt-4o-mini` | OpenAI-compatible `chat/completions` endpoint + the model used when `llm.provider = "openai"`; `[openai.tiers]` ships **unset**, so every router tier reuses `.model` (a bare model swap to Groq/DeepSeek/OpenRouter just works) unless you set distinct per-tier ids there |
 | `gemini.model` | `gemini-flash-lite-latest` | Gemini model when `llm.provider = "gemini"` and the router is off; per-tier models (Flash-Lite cheap, Flash standard, Pro depth) live in `[gemini.tiers]`. Ships the **deprecation-proof `-latest` aliases** (`gemini-flash-lite-latest` / `gemini-flash-latest` / `gemini-pro-latest`) that always resolve to Google's current GA model per class — safer than a concrete id that gets retired (see the [changelog](https://ai.google.dev/gemini-api/docs/changelog)). You can still type a concrete id from the [live list](https://ai.google.dev/gemini-api/docs/models); `check_setup.py` warns if a **concrete** id isn't live (aliases are always accepted) |
-| `ollama.model` | `qwen3` | Local model when `llm.provider = "ollama"` (out-of-game only); pick from your locally-pulled models (`GET /api/tags`) or type a tag to `ollama pull` |
 | `tts.provider` | `edge` | `edge` (free neural, no key/SLA — the default), `azure` (official Azure Neural, free tier + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud, premium), or `piper` (local, free) |
 | `edge.voice` | `en-US-AriaNeural` | Edge voice ShortName when `tts.provider = "edge"` |
 | `azure.region` / `azure.voice` / `azure.style` | `eastus` / `en-US-AriaNeural` / *(blank)* | Azure Neural region, voice ShortName, and optional SSML style when `tts.provider = "azure"` |
 | `openai_tts.base_url` / `.model` / `.voice` / `.instructions` | OpenAI / `gpt-4o-mini-tts` / `alloy` / *(blank)* | OpenAI-compatible endpoint, model, voice, and optional tone steer when `tts.provider = "openai"` |
 | `cartesia.model` / `.voice` / `.language` | `sonic-2` / *(blank)* / `en` | Cartesia Sonic model, voice id, and language when `tts.provider = "cartesia"` (persona-only) |
-| `dev.mock` | `false` | Swap LLM/TTS/STT for fakes — exercise the loop with zero API calls (restart to apply) |
+| `dev.mock` | `false` | **Dev/test only** — swap LLM/TTS/STT for fakes to exercise the loop with zero API calls. Set it here or via `COVAS_MOCK=1` before launch; it is **not** on the Settings page or voice-settable (issue #130) |
 
 > **Pick, don't type — fetched dropdowns (issue #92 / #88).** On the Settings page most model-id and
 > endpoint fields are **editable comboboxes**: a dropdown populated from the provider's *live* catalog
 > plus free-text for anything custom. `openai.model` / `openai_tts` follow `GET {base_url}/models` for
 > the active endpoint (OpenAI/Groq/DeepSeek/OpenRouter — the model list refetches when you change the
-> base URL); `gemini.model` uses Google's `GET /v1beta/models`; `ollama.model` uses `GET /api/tags`;
+> base URL); `gemini.model` uses Google's `GET /v1beta/models`;
 > `edge.voice` / `azure.voice` / `cartesia.voice` fetch each provider's voice catalog (Edge needs no
 > key; Azure needs the key + region; Cartesia needs the key). The base-URL fields offer the four known
 > presets + a custom entry. A value **outside** the fetched list is still accepted — flagged *"custom

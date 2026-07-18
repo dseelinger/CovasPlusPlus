@@ -252,4 +252,17 @@ def test_restart_and_live_are_disjoint_in_intent():
     assert "audio.enabled" in RESTART_REQUIRED
     assert "audio" in LIVE_SECTIONS
     assert "ui" not in LIVE_SECTIONS and {"ui.host", "ui.port"} <= RESTART_REQUIRED
-    assert "dev" not in LIVE_SECTIONS and "dev.mock" in RESTART_REQUIRED
+    assert "dev" not in LIVE_SECTIONS  # dev/test-only; not a UI setting (issue #130)
+
+
+def test_dev_mock_not_a_setting_but_mechanism_lives(monkeypatch):
+    """Issue #130: `dev.mock` is NOT a UI Setting (can't creep back onto the Settings page or be
+    voice-toggled), but the underlying mechanism (`config.mock_enabled` on `[dev].mock`) is intact."""
+    from covas.config import mock_enabled
+    monkeypatch.delenv("COVAS_MOCK", raising=False)  # isolate from the env override
+    assert "dev.mock" not in schema.by_key           # gone from the schema entirely
+    assert not any(s.group == "Developer" for s in schema.SCHEMA)  # empty group removed too
+    assert "dev.mock" not in RESTART_REQUIRED         # and off the restart-required list
+    # The mechanism still reads [dev].mock from config (COVAS_MOCK env override tested elsewhere).
+    assert mock_enabled({"dev": {"mock": True}}) is True
+    assert mock_enabled({"dev": {"mock": False}}) is False

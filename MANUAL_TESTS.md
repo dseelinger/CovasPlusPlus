@@ -55,7 +55,7 @@ Notes:
 Capabilities are gated in **`config.toml`** (edit freely) or **`overrides.json`** (what the panel
 writes). The Settings page (§14.2) can also flip these; **most settings now apply live** (issue #90
 — providers, keys, mic, Whisper, volumes, toggles) with only a tiny `RESTART_REQUIRED` set needing a
-relaunch (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`, `dev.mock` — see §14.3).
+relaunch (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port` — see §14.3).
 Confirm each before running its section (as shipped,
 **everything defaults ON** so the app shows full functionality out of the box):
 - [ ] `[elite].enabled = true` — ED journal/Status monitoring. **Required by** proactive/route callouts, the keybind + honk combat guard, carriers, community goals, and the live "current system" used by every search. (§5, §6, §7, §8, §9, §10)
@@ -298,7 +298,7 @@ Notes:
 > - **Always-fail** (for "Exhausted → degraded"): point `[openai].base_url` at an endpoint that returns
 >   5xx/429 (e.g. `https://httpstat.us/529`), or at an unroutable host/port to force a **connection timeout**.
 > - Or temporarily lower `[llm.retry].max_total_wait` / raise `attempts` to watch the backoff.
-> - **Note:** retry logging is wired for the raw providers (**openai / gemini / ollama**). The default
+> - **Note:** retry logging is wired for the raw providers (**openai / gemini**). The default
 >   **Anthropic** provider retries *inside its own SDK*, which is silent to the COVAS log — so use the
 >   OpenAI stub above to see the retry lines.
 - [ ] **Retry then recover:** with the flaky stub (fails twice then succeeds), one turn **still answers** —
@@ -439,6 +439,7 @@ Notes:
 ## 5a. Companion HUD overlay (issue #47 — `[hud].enabled`)  🖥️ 🔊 HW 🎮 ED
 > A transparent, always-on-top 2D overlay of the companion's own state. **Off by default**; the toggle applies **live** (no restart, unlike other capability toggles). Cannot be exercised offline/headless — needs Doug's desktop. Run ED **borderless/windowed** so an always-on-top window can float over it (full-screen exclusive can cover any overlay — expected).
 - [ ] **Toggle on — Settings page:** flip **Companion HUD overlay** on the [Settings page](docs/using/hud.md) → a small panel appears **top-right**, background fully transparent (desktop/game shows through), staying **on top**.
+- [ ] **Setup guide → links (issue #121):** on the Settings page, each of the **three** Companion-HUD rows (**Companion HUD overlay**, **VR HUD overlay**, **Web HUD (OpenKneeboard)**) shows a **Setup guide →** link under its help. Clicking each opens the published HUD doc **in a new tab** at the right section — the 2D-overlay row → *Turning it on and off*, VR row → *In VR — the in-headset overlay*, web row → *In-headset without SteamVR — the web HUD*. No non-HUD row shows a Setup-guide link. The link survives a settings **filter/search** (it's still there after clearing the filter).
 - [ ] **Toggle on — voice:** with the HUD off, say *"turn the HUD on"* → the panel appears (settings-by-voice path). *"Turn the HUD off"* → it disappears. Toggling is live (no restart).
 - [ ] **Voice-loop state row:** hold PTT → the state row tracks **Listening → Thinking → Speaking → Idle** as you talk and COVAS replies.
 - [ ] **Checklist row:** with a checklist loaded, the row shows your next pending item + count (e.g. *"…  (2/10 done)"*); mark it done by voice → the row advances to the next pending item.
@@ -639,6 +640,7 @@ Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_
 - [ ] **Longer message + channel:** *"Message my wing: forming up at the nav beacon."* → reads it back as wing chat; confirm → it sends. (If you set `channel_wing`, verify it switches to the wing tab first.)
 - [ ] **Multi-line / dictation artefacts:** a message that transcribes with a line break sends as a **single line** (no early send).
 - [ ] **Unbound open key:** with **Quick Comms Panel** NOT bound to a key, ask to send → spoken *"bind QuickCommsPanel to a key…"*; nothing sends.
+- [ ] **Channel binds on the Settings page (issue #129):** Settings → **Comms** shows **Local / Wing / Squadron / Direct-message chat bind** fields (plus **Comms settle delay**). Set **Squadron chat bind** to your ED squadron-chat action token and SAVE → *"message my squadron: forming up"* → read-back → *"send it"* lands in **squadron** chat, no restart. Also voice-settable: *"set the squadron chat bind to &lt;token&gt;"*. Leaving a field blank sends on the current channel (unchanged).
 - [ ] **Configured-but-unbound channel key:** set `channel_wing` to a token you haven't bound → asking to message the wing is refused with a *"bind it in-game"* message; nothing sends.
 - [ ] **Expiry:** compose, wait past `confirm_window` (default 60 s), say "confirm" → *"that message expired for safety"*; nothing sends.
 - [ ] **Hard abort:** say *"abort"* → releases any held key (shared executor with keybinds/honk).
@@ -1055,7 +1057,7 @@ Notes:
 > On the **Settings** page the model-id and endpoint fields are editable comboboxes: a dropdown fed
 > from the provider's LIVE catalog plus free-text for anything custom. `requires:` the relevant
 > provider key/endpoint for the list to actually populate (OpenAI/Groq key for `openai.model`, Gemini
-> key for `gemini.model`, a running Ollama for `ollama.model`, Azure key+region for `azure.voice`,
+> key for `gemini.model`, Azure key+region for `azure.voice`,
 > Cartesia key for `cartesia.voice`; Edge needs no key). Verify in BOTH the browser (`run_covas_ui.py`)
 > and the packaged native window.
 - [ ] **Base-URL presets:** the **OpenAI LLM base URL** field offers the four presets
@@ -1064,8 +1066,7 @@ Notes:
 - [ ] **Model list populates:** with an OpenAI (or Groq/OpenRouter) key set, open **OpenAI LLM model**
       → the datalist lists that endpoint's models; the row footer shows a count. Change the **base URL**
       to another preset → the model list **refetches** for the new endpoint.
-- [ ] **Gemini / Ollama:** with a Gemini key, **Gemini model** lists Google's live models; with Ollama
-      running, **Ollama model** lists your locally-pulled tags.
+- [ ] **Gemini:** with a Gemini key, **Gemini model** lists Google's live models.
 - [ ] **Edge/Azure/Cartesia voices:** **Edge voice** populates with no key; **Azure voice** populates
       once the Azure key + region are set; **Cartesia voice** once the Cartesia key is set.
 - [ ] **Custom value accepted + flagged:** type a model/voice id NOT in the list → it's kept (flagged
@@ -1074,6 +1075,27 @@ Notes:
       the **current value** and lets you type — the footer reads *"catalog unavailable (…) — type a
       value"*; never an empty or blocking dropdown, and the existing value is never lost.
 
+### 14.1e One reusable voice picker everywhere (issue #120)  🌐 PANEL 🌍 NET
+> Every voice field — provider voices, the Player-DM voice, the Piper voice, the crew per-character
+> voice — renders through the SAME searchable control: a `<select>` (current value always visible) +
+> the 🔍 command palette + the type-to-filter box. Verify in BOTH the browser and the native window.
+- [ ] **Player-DM voice is searchable:** Settings → Ambient audio → **Player-DM voice** is a dropdown,
+      not a bare text box. With an ElevenLabs key, the 🔍 palette lists your library voices; type to
+      filter, pick one → saves. It sits **beside** a leading **"(random session voice)"** = blank.
+- [ ] **Custom path / id accepted (allowCustom):** open its 🔍 palette, type a Piper `.onnx` path (or
+      any unlisted id) → the **"custom"** entry appears at the top; pick it → it's saved and stays the
+      selected value on reload. Clear it back to blank → random-per-session behavior returns.
+- [ ] **Piper voice is searchable too:** set `[tts].provider = piper`, point **Piper voice** at a voice
+      in a folder of `.onnx` files → the picker lists the **other `.onnx` voices in that folder**
+      (each with its sibling `.onnx.json`); typing a custom path still works; an empty/missing folder
+      degrades to type-a-path (no error).
+- [ ] **Identical to a provider voice field:** compare the Player-DM voice side-by-side with the
+      **ElevenLabs voice** field — same look and behavior (the ElevenLabs one just doesn't allow a
+      custom id).
+- [ ] **Crew page reuses the SAME control:** the **🎙 crew** page's per-character **Voice** is the same
+      searchable picker (🔍 + filter), with **"Auto (deterministic)"** = blank; pick/search/type a
+      custom voice, **SAVE ROSTER**, reload → the choice persists.
+
 ### 14.2 Settings page (N1) — http://127.0.0.1:8765/settings
 - [ ] The page renders **grouped sections** with the **right control per type** (toggles, dropdowns, number/sliders, text/path) and inline help.
 - [ ] **Frequency-first ordering (issue #80):** the grouped sections/cards are ordered **most-used first** — provider, voice, and speed near the top; rarely-touched advanced/dev options lower — so common controls are reachable without scrolling past niche settings.
@@ -1081,11 +1103,13 @@ Notes:
 - [ ] **Change + save:** change a value → the **save bar** appears with a count; **SAVE CHANGES** → 📋 written to `overrides.json` (config.toml stays pristine).
 - [ ] **Per-setting reset:** a changed (overridden) setting shows **RESET** → click it → reverts to default and drops from `overrides.json`.
 - [ ] **Validation:** try an out-of-range number (e.g. voice speed 3.0, above the 2.0 max) → rejected client-side / server-side, not written.
-- [ ] **Live where supported:** change the **Whisper model** → the log notes the model reloaded (no restart). Most settings now apply live — see §14.2a; only the `RESTART_REQUIRED` set (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`, `dev.mock`) needs a relaunch.
+- [ ] **Live where supported:** change the **Whisper model** → the log notes the model reloaded (no restart). Most settings now apply live — see §14.2a; only the `RESTART_REQUIRED` set (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port`) needs a relaunch.
+- [ ] **No Dev-mock setting in the UI (issue #130):** the Settings page has **no "Dev mock mode" row** and **no "Developer" group**; voice *"turn mock mode on"* does nothing. The mechanism still works out of band: launch with `[dev] mock = true` in `config.toml` (or `$env:COVAS_MOCK=1`) → the startup log prints `Dev mock ON …` and a turn runs with fakes (no API calls).
 
 ### 14.2a Settings apply LIVE — hot-swap providers & keys (issue #90)  🔊 HW 🌐 PANEL 🌍 NET
 > #90 makes almost every Settings change take effect **without a restart**.
 - [ ] **Switch the LLM provider live:** on the Settings page change **LLM provider** (e.g. anthropic → gemini, with that provider's key set) and **SAVE CHANGES**. The log shows `LLM now: <provider> / <model>`. Speak a turn → the **next** turn is answered by the new provider (check the router/usage line), **no restart**. A turn already in flight when you saved finishes on the old provider.
+- [ ] **No Ollama, no GPU option (issue #128):** the **LLM provider** dropdown offers exactly **Anthropic / OpenAI-compatible / Gemini** — **no "Ollama"** entry, and there's no Ollama model field. The **Whisper device** row shows **cpu only** (no `cuda`), and its help mentions no GPU. Voice command *"turn on ollama"* / *"set the whisper device to cuda"* does nothing (not a valid setting/option).
 - [ ] **Switch the TTS provider/voice live:** change **TTS provider** (e.g. edge → elevenlabs, or just a different voice) and SAVE → the log shows `Voice now: <provider>` and the next spoken reply uses the new voice. The mixer is **not** rebuilt.
 - [ ] **Ambient audio follows the swap (issue #90 review):** with the **bus mixer + audio layer ON**, switch the TTS voice/provider and SAVE, then trigger an ambient/comms line (or a persona musing) → it speaks in the **new** voice, not the old one (no half-swap). Likewise, switching the **LLM** keeps opt-in chatter-flavor / comms-variants generating on the new provider (canned/verbatim lines are unaffected).
 - [ ] **Failed switch is fail-soft:** switch to a provider whose key is missing/bad and SAVE → the log shows `Couldn't switch … keeping the previous one`, and the next turn **still works** on the previous provider (no dead loop).
@@ -1137,6 +1161,24 @@ Notes:
       setting changes; open/navigate to a page and it shows the new theme.
 - [ ] **REVERT restores the saved theme:** change the Theme dropdown to preview a different look, then
       click **REVERT** (don't save) → the page snaps back to the saved theme.
+
+### 14.2f Settings left-nav scrollspy (issue #119)  🌐 PANEL
+> The left group nav highlights the section you're in — by scroll, and (while editing) by the focused
+> control. Standard docs-site behaviour on a long page. JS-only; verify in the browser + native window.
+- [ ] **Scroll tracks the section:** open Settings and scroll slowly top→bottom → **exactly one** nav
+      entry is highlighted at a time (accent text + a 2px accent left-border + subtle bg, clearly
+      distinct from hover), and it's the section currently at the **top of the content area** (just
+      below the sticky header). The active entry carries `aria-current="location"`.
+- [ ] **Focus overrides scroll:** without scrolling, **Tab** (or click) into a control several sections
+      down → that control's section highlights immediately, overriding the scroll highlight; it stays
+      until your next scroll, which hands the highlight back to scroll tracking.
+- [ ] **Click jumps cleanly:** click a nav entry → it highlights **immediately** and the page scrolls
+      to that section (landing below the sticky header), with no flicker through the passed sections.
+- [ ] **Filter never highlights a hidden group:** type in **Filter settings…** to hide some sections →
+      the hidden groups also drop from the nav, and the highlight only ever lands on a **visible**
+      section (never a filtered-out one). Clear the filter → all nav entries return.
+- [ ] **Long nav stays usable:** shrink the window so the 28-group nav overflows → the active entry
+      scrolls into view in the nav as it changes.
 
 ### 14.3 Personality tab (N7)
 - [ ] **Persona picker:** the Personality tab lists personas; selecting one shows a **preview**. Pick a different persona → the next reply's **voice/register changes**.
@@ -1519,7 +1561,7 @@ Notes:
 - [ ] **Frozen self-test (build machine):** `.\build.ps1 -Installer -SelfTest` → the freeze
   completes and the frozen `COVAS++.exe --selftest` prints `SELFTEST OK …incl. …edge_tts` and exits
   0. A missing bundle fails the build **loudly** instead of shipping. This proves `edge_tts` /
-  `aiohttp` **and** `covas.providers.{edge_tts,azure_tts,openai_tts,cartesia_tts,piper_tts,elevenlabs_tts,openai_llm,gemini_llm,ollama_llm}`
+  `aiohttp` **and** `covas.providers.{edge_tts,azure_tts,openai_tts,cartesia_tts,piper_tts,elevenlabs_tts,openai_llm,gemini_llm}`
   are all in the bundle.
 - [ ] 📋 **Size delta:** note the onedir folder MB and `COVAS++ Setup.exe` MB the build prints; the
   `aiohttp` stack (~10 pkgs) should add only a few MB next to av/onnxruntime — record here: ____.
@@ -1546,9 +1588,9 @@ Notes:
 > On a machine with none of the dev state — that absence *is* the test. The wizard must let you
 > finish with ANY supported LLM + TTS, **not** only Anthropic + ElevenLabs.
 - [ ] First launch (empty `%APPDATA%\COVAS++`) opens the **setup wizard**, not the panel.
-- [ ] **LLM provider picker** offers **Anthropic / OpenAI-compatible / Gemini / Ollama**; selecting one
-      reveals just its fields (Anthropic → key; OpenAI → endpoint preset + model + key; Gemini → key
-      (+ model); Ollama → host + model, no key). The **"AI ready"** badge names the chosen provider.
+- [ ] **LLM provider picker** offers **Anthropic / OpenAI-compatible / Gemini** (all cloud); selecting
+      one reveals just its fields (Anthropic → key; OpenAI → endpoint preset + model + key; Gemini →
+      key (+ model)). The **"AI ready"** badge names the chosen provider.
 - [ ] **TTS provider picker** offers **Edge (free, no key) / ElevenLabs / Azure / OpenAI / Cartesia /
       Piper**; selecting one reveals just its fields. Edge/Piper show **no key field**.
 - [ ] **Non-Anthropic + non-ElevenLabs onboarding (the key case): pick Gemini (or OpenRouter) + Edge**,
