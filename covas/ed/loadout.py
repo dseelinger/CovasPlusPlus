@@ -65,10 +65,13 @@ class ShipModule:
 @dataclass(frozen=True)
 class LoadoutSnapshot:
     """The whole ship as of the last `Loadout` event. `ship` is the internal hull symbol
-    ("corsair"); `ship_name`/`ship_ident` are the Commander's own labels."""
+    ("corsair"); `ship_name`/`ship_ident` are the Commander's own labels. `ship_id` is the
+    journal's stable per-hull id (`ShipID`) — the same key `StoredShips` uses — so the ACTIVE
+    ship can be matched against a per-ship crew roster (issue #127)."""
     ship: str | None = None
     ship_name: str | None = None
     ship_ident: str | None = None
+    ship_id: int | None = None
     max_jump_range: float | None = None
     cargo_capacity: int | None = None
     fuel_capacity: float | None = None
@@ -157,6 +160,7 @@ def parse_loadout(event: dict) -> LoadoutSnapshot:
         ship=str(event.get("Ship") or "").strip() or None,
         ship_name=ship_name,
         ship_ident=str(event.get("ShipIdent") or "").strip() or None,
+        ship_id=_i(event.get("ShipID")),
         max_jump_range=_f(event.get("MaxJumpRange")),
         cargo_capacity=_i(event.get("CargoCapacity")),
         fuel_capacity=fuel_capacity,

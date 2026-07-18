@@ -502,6 +502,17 @@ voice_pairings_file = "crew_voice_pairings.json"
 # Requires [crew].enabled + the ambient audio layer ([audio].enabled + [audio.cues].enabled).
 chatter_min_seconds = 180.0
 chatter_max_seconds = 600.0
+# PER-SHIP CREW ROSTERS (issue #127). The roster file above becomes per-ship: each ship you own can
+# carry its OWN full cast, keyed by the journal ShipID, seeded fast with "Copy crew from ship X" in
+# the editor. The ship you're actually flying (from the live Loadout) picks its own roster; ships
+# without one inherit the Default roster (today's single roster — existing files load unchanged). The
+# fleet comes from YOUR journal only (StoredShips + Loadout), no Inara/Coriolis.
+# LIMIT_TO_SEATS (§5, DEFAULT OFF — opt-in realism): when ON, a PER-SHIP roster is capped at that
+# hull's real multicrew SEAT count (from the bundled ship-spec table) instead of the generic 12, so
+# a Sidewinder can't carry a three-person cast. The Default roster is never seat-capped. Unknown hull
+# / no spec falls back to the generic cap (never blocks). Off by default, so no roster is silently
+# truncated.
+limit_to_seats = false
 
 
 [elevenlabs]

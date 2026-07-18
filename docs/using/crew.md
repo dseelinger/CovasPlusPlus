@@ -54,6 +54,67 @@ rewrite it the once, when you save a change — they don't add per-turn cost.
 You can still use the legacy inline `[crew].roster = ["Nyx", "Vela"]` list in `config.toml`
 (names only). It's used only when no `crew.json` exists; the Crew tab supersedes it.
 
+## A crew for each ship
+
+Rosters are **per-ship**. Your exploration Phantom can carry a quiet science team while your combat
+Chieftain carries a gunner and a fighter jockey — and COVAS++ switches between them **automatically**
+the moment you swap ships in game. No competitor ties the crew to the hull you're flying.
+
+At the top of the Crew tab is an **Editing roster** selector:
+
+- **Default** — today's single roster. Every ship inherits it *until* you give that ship its own
+  crew, so nothing about existing setups changes: leave everything on Default and it behaves exactly
+  as before.
+- **each ship in your fleet** — the ship you're currently flying is marked *active*. Pick one to edit
+  **that ship's** roster. An empty per-ship roster shows a hint that the ship is currently inheriting
+  Default; add a character (or copy one in) to give it its own crew.
+
+**Your fleet comes from your own journal** — the ship you're flying (from the live `Loadout`) plus
+every ship you own (`StoredShips`). No Inara, no Coriolis, no network. A ship you've already built a
+roster for stays selectable even when the fleet snapshot is stale or absent (the roster file
+remembers it), so you're never locked out of editing a roster because you haven't docked somewhere
+your ships are stored.
+
+### Copy crew from another ship
+
+Building a second ship's cast from scratch is tedious, so **Copy crew from…** seeds it: pick any
+roster that has members (Default included) and click **COPY** to clone its characters into the ship
+you're editing. It's a **plain deep copy** — the two rosters are independent afterwards, so editing
+one never changes the other.
+
+### Which roster speaks
+
+The roster that speaks, chatters, and answers is **always the one for the ship you're actually
+flying**. COVAS++ reads the active ship from the journal's `Loadout` (a `ShipyardSwap` is always
+followed by a fresh `Loadout`, so swaps are picked up with no extra setup). A ship with no roster of
+its own falls back to Default.
+
+!!! note "Prompt cache on a swap"
+    A character's personas fold into the *static*, cached part of the prompt. Swapping to a ship with
+    a **different** roster rewrites that cached block **once** (the next reply after the swap) — rare
+    and cheap. Within a ship, the instruction is exactly as static as before, so ordinary turn-to-turn
+    conversation never re-pays for it.
+
+### Limit a ship's crew to its seats
+
+A Sidewinder shouldn't carry a three-person cast. The **Limit crew to ship seats** checkbox
+(Settings → **Personality**, **off by default**) caps each **per-ship** roster at that hull's real
+**multicrew seat count** — the same fixed per-hull stat the [ship spec](../elite/ship-specs.md) tool
+reports (a Sidewinder seats 1, a Krait Phantom 2, an Anaconda 4). With it on:
+
+- the ship selector shows **N of ⟨seats⟩**, and **+ Add character** stops at the seat limit,
+- **Copy crew from…** truncates to the target ship's seats (with a note) when the source has more,
+- a roster authored before you turned the setting on is trimmed to the seats when it next speaks.
+
+It applies to **per-ship rosters only** — the **Default** roster isn't tied to any hull, so it keeps
+the generic cap. An unknown or brand-new hull with no bundled seat data falls back to the generic cap
+rather than blocking you. Off by default, so no roster is ever silently truncated.
+
+```toml
+[crew]
+limit_to_seats = false   # opt-in: cap a ship's crew at its multicrew seat count
+```
+
 ## Adopting your hired NPC fighter pilots
 
 If you've **hired an NPC fighter pilot** in game (from a Crew Lounge), COVAS++ can turn that pilot

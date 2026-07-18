@@ -662,11 +662,13 @@ def create_app(core) -> Flask:
         best-fit pairing (issue #124) — so the editor can render "Auto — currently: <voice name>"
         instead of the plain "Auto (deterministic)". Members with an explicit voice_ref, or with
         no pairing yet (background worker hasn't finished / LLM off / no persona), are omitted —
-        the client falls back to the plain label. Never raises (a missing app attr degrades to {})."""
+        the client falls back to the plain label. Iterates the UNION across every roster (issue
+        #127) so a member seen only on a per-ship roster still gets its pairing label. Never raises
+        (a missing app attr degrades to {})."""
         pairings = getattr(core, "_crew_voice_pairings", {}) or {}
         names = getattr(core, "_voice_names", {}) or {}
         out: dict[str, str] = {}
-        for m in crew_mod.load_members(core.cfg):
+        for m in crew_mod.all_members(core.cfg):
             if m.voice_ref:
                 continue
             vid = pairings.get(m.name.strip().lower())
@@ -674,15 +676,77 @@ def create_app(core) -> Flask:
                 out[m.name] = names.get(vid, vid)
         return out
 
+    def _crew_limit_to_seats() -> bool:
+        return bool((core.cfg.get("crew", {}) or {}).get("limit_to_seats", False))
+
+    def _fleet_label(display: str, name) -> str:
+        """A readable fleet label — the hull display name plus the Commander's ship name in quotes
+        when set: 'Krait Phantom "Persephone"'."""
+        disp = str(display or "").strip() or "Unknown ship"
+        nm = str(name or "").strip()
+        return f'{disp} "{nm}"' if nm else disp
+
+    def _crew_fleet(rfile) -> list[dict]:
+        """The Commander's fleet dimension for the editor (issue #127 §3): the UNION of the current
+        Loadout ship (marked `active`), every ship in the StoredShips snapshot, and any ship id
+        already present in the roster file — so a file-known ship stays selectable even when the
+        StoredShips snapshot is stale/absent. Each entry is `{ship_id, label, has_roster, active,
+        seats}` (`seats` = the hull's multicrew capacity, or null when unknown). Fail-soft: a missing
+        ed_ctx / snapshot simply contributes fewer ships (the file-known ones still appear)."""
+        from .ed.stored import _prettify_ship
+        ctx = getattr(core, "ed_ctx", None)
+        entries: dict[str, dict] = {}   # ship_id -> {label, hull, active}
+        if ctx is not None:
+            try:
+                lo = ctx.loadout_snapshot()
+            except Exception:  # noqa: BLE001
+                lo = None
+            if lo is not None and getattr(lo, "ship_id", None) is not None:
+                entries[str(lo.ship_id)] = {
+                    "label": _fleet_label(_prettify_ship(lo.ship or ""), lo.ship_name),
+                    "hull": lo.ship or "", "active": True}
+            try:
+                ss = ctx.stored_ships_snapshot()
+            except Exception:  # noqa: BLE001
+                ss = None
+            for s in (ss.ships if ss is not None else ()):
+                if s.ship_id is None:
+                    continue
+                sid = str(s.ship_id)
+                if sid in entries:
+                    continue                             # the Loadout (active) entry wins
+                entries[sid] = {"label": _fleet_label(s.display, s.name),
+                                "hull": s.ship_type or "", "active": False}
+        for sid, sr in rfile.ships.items():
+            if sid not in entries:                       # file-known ship the journal didn't list
+                entries[sid] = {"label": sr.label or f"Ship {sid}", "hull": sr.hull,
+                                "active": False}
+        fleet: list[dict] = []
+        for sid, e in entries.items():
+            hull = e["hull"] or (rfile.ships[sid].hull if sid in rfile.ships else "")
+            sr = rfile.ships.get(sid)
+            fleet.append({"ship_id": sid, "label": e["label"], "hull": hull,
+                          "has_roster": bool(sr and sr.members), "active": e["active"],
+                          "seats": crew_mod.seats_for_hull(hull)})
+        fleet.sort(key=lambda f: (not f["active"], f["label"].lower()))
+        return fleet
+
     def _crew_snapshot() -> dict:
-        """The roster + voice options + hired pilots + version, re-read from the shared file so the
-        content-hash `version` and the returned members always describe the same on-disk state."""
+        """The roster file (default + per-ship rosters) + the fleet + voice options + hired pilots +
+        version, re-read from the shared file so the content-hash `version` and the returned rosters
+        always describe the same on-disk state. `members` is the DEFAULT roster (back-compat); the
+        per-ship rosters ride in `rosters` keyed by ship id (issue #127)."""
         path = _crew_path()
-        members = crew_mod.load_members(core.cfg)
-        return {"members": [m.to_dict() for m in members], "voices": _crew_voices(),
+        rfile = crew_mod.load_roster_file(core.cfg)
+        rosters = {sid: {"members": [m.to_dict() for m in sr.members], "label": sr.label,
+                         "hull": sr.hull, "seats": crew_mod.seats_for_hull(sr.hull)}
+                   for sid, sr in rfile.ships.items()}
+        return {"members": [m.to_dict() for m in rfile.default], "voices": _crew_voices(),
                 "hired": _crew_hired(),
                 "enabled": crew_mod.is_enabled(core.cfg),
                 "crew_pairings": _crew_pairings_display(),
+                "rosters": rosters, "fleet": _crew_fleet(rfile),
+                "limit_to_seats": _crew_limit_to_seats(),
                 "version": _file_version(path) if path else "",
                 "name": path.name if path else ""}
 
@@ -731,9 +795,12 @@ def create_app(core) -> Flask:
 
     @flask_app.route("/api/crew", methods=["POST"])
     def crew_save():
-        """Save the whole roster back to [crew].file. Refuses (409) when the file changed since the
+        """Save ONE roster (Default, or the ship named by `ship_id`) back into the v2 [crew].file,
+        PRESERVING every other roster (issue #127). Refuses (409) when the file changed since the
         client loaded it (a hand-edit / voice write landed) unless `force` is set — the response
-        carries the current roster so the client can reload-vs-overwrite instead of clobbering."""
+        carries the current state so the client can reload-vs-overwrite instead of clobbering. A
+        per-ship save refreshes that ship's label/hull from the journal when known and, when the
+        seat cap is on, truncates the roster to the hull's seats."""
         path = _crew_path()
         if path is None:
             return jsonify({"ok": False, "error": "no crew file configured"}), 400
@@ -745,9 +812,30 @@ def create_app(core) -> Flask:
         if not isinstance(raw, list):
             return jsonify({"ok": False, "error": "members must be a list"}), 400
         members = [m for m in (crew_mod.CrewMember.from_obj(o) for o in raw) if m is not None]
-        crew_mod.save_members(path, members)
+        rfile = crew_mod.load_roster_file(core.cfg)
+        target = str(b.get("ship_id") or "").strip()
+        if not target or target == "default":
+            new = crew_mod.RosterFile(default=tuple(members), ships=dict(rfile.ships))
+            where = ""
+        else:
+            fleet = {f["ship_id"]: f for f in _crew_fleet(rfile)}
+            existing = rfile.ships.get(target)
+            info = fleet.get(target, {})
+            label = str(info.get("label") or (existing.label if existing else "")).strip()
+            # Prefer a live hull from the journal fleet; keep the file's when the snapshot is stale.
+            hull = str(info.get("hull") or (existing.hull if existing else "")).strip()
+            if _crew_limit_to_seats():                    # editor-side seat cap (§5)
+                seats = crew_mod.seats_for_hull(hull)
+                if seats is not None:
+                    members = members[:seats]
+            ships = dict(rfile.ships)
+            ships[target] = crew_mod.ShipRoster(label=label, hull=hull, members=tuple(members))
+            new = crew_mod.RosterFile(default=tuple(rfile.default), ships=ships)
+            where = info.get("label") or f"ship {target}"
+        crew_mod.save_roster_file(path, new)
+        scope = f"for {where} " if where else ""
         core.bus.publish({"type": "log", "who": "system",
-                          "text": f"Crew roster updated from the web editor "
+                          "text": f"Crew roster {scope}updated from the web editor "
                                   f"({len(members)} character(s))."})
         # Re-run the crew best-fit voice pairing in the BACKGROUND (issue #124) — a save with no
         # persona changes is a cache hit (no LLM call); an edited/added persona recomputes. Never

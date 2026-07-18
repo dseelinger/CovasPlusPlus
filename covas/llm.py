@@ -47,20 +47,24 @@ _CURRENCY_GUARDRAIL = (
 )
 
 
-def build_system(cfg: dict) -> str | None:
+def build_system(cfg: dict, ship_id: str | None = None) -> str | None:
     """The composed system prompt: `personality.compose_system` (Base + Persona + Campaign)
     when personality is ON (N7), plus STATIC always-on fragments — the ship-spec grounding
     guardrail (issue #83), the currency grounding guardrail (issue #101), and, when CREW voicing
-    is on ([crew].enabled, issue #69), the crew line-prefix instruction.
+    is on ([crew].enabled, issue #69), the crew line-prefix instruction for the ACTIVE ship's roster.
 
     The static fragments apply even with personality OFF (otherwise there'd be no system prompt to
     carry the guardrails) and are constant for a given config, so they ride the cached prefix and
-    never bust the prompt cache turn-to-turn (only the once when a setting/roster changes)."""
+    never bust the prompt cache turn-to-turn (only the once when a setting/roster changes).
+
+    `ship_id` selects the crew roster (issue #127): when omitted, `system_instruction` falls back to
+    the runtime active-ship stamp on `cfg`, so the per-turn `build_system(cfg)` call in the provider
+    picks up the flown ship's roster and re-caches the system block only on a ship SWAP."""
     from .crew import system_instruction
     from .personality import compose_system
 
     parts = [compose_system(cfg), _SHIP_SPEC_GUARDRAIL, _CURRENCY_GUARDRAIL,
-             system_instruction(cfg)]
+             system_instruction(cfg, ship_id)]
     joined = "\n\n".join(p for p in parts if p)
     return joined or None
 

@@ -370,8 +370,10 @@ class AudioLayer:
             from .. import crew as crew_mod  # local import: keep the mixer package cycle-free
             # Precedence (issue #124): an EXPLICIT [crew].file voice_ref always wins; failing that,
             # a best-fit CREW PAIRING for this name (from the background LLM casting worker); only
-            # with neither does for_crew() fall through to the deterministic assign(name).
-            ref = (crew_mod.voice_ref_for(self.cfg, name)
+            # with neither does for_crew() fall through to the deterministic assign(name). The
+            # voice_ref is read from the ACTIVE ship's roster (issue #127) so a pinned voice tracks
+            # the ship you're flying.
+            ref = (crew_mod.voice_ref_for(self.cfg, name, crew_mod.active_ship_id(self._ed_ctx))
                   or self._crew_pairings.get(str(name or "").strip().lower(), ""))
             voice = self._cast.for_crew(name, ref)
             pcm, sr = self._cast.synth(voice, text)
@@ -402,7 +404,9 @@ class AudioLayer:
             from .. import crew as crew_mod  # local import: keep the mixer package cycle-free
             if not crew_mod.is_enabled(self.cfg):
                 return []
-            return crew_mod.load_members(self.cfg)
+            # The ACTIVE ship's roster (issue #127): the fighter pilot you adopted onto the
+            # Chieftain doesn't chatter on the Phantom.
+            return crew_mod.load_members(self.cfg, crew_mod.active_ship_id(self._ed_ctx))
         except Exception as e:  # noqa: BLE001 — a roster read glitch just means no crew line
             self._log(f"crew roster read failed: {e}")
             return []
@@ -416,7 +420,7 @@ class AudioLayer:
         must not stall waiting for the clip to finish. Fail soft."""
         try:
             from .. import crew as crew_mod  # local import: keep the mixer package cycle-free
-            ref = (crew_mod.voice_ref_for(self.cfg, name)
+            ref = (crew_mod.voice_ref_for(self.cfg, name, crew_mod.active_ship_id(self._ed_ctx))
                   or self._crew_pairings.get(str(name or "").strip().lower(), ""))
             voice = self._cast.for_crew(name, ref)
         except Exception as e:  # noqa: BLE001 — a voice-resolve glitch degrades to silence

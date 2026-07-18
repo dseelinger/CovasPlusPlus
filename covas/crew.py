@@ -42,7 +42,7 @@ from __future__ import annotations
 import json
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -206,26 +206,59 @@ def voice_pairings_file(cfg: dict) -> Path:
     return Path(raw or "crew_voice_pairings.json")
 
 
-def _dedupe(members: list[CrewMember]) -> list[CrewMember]:
-    """First-wins de-dupe by (case-sensitive) name, capped at `_MAX_ROSTER` — a stable, bounded
-    roster so the cached instruction can't balloon from a copy-paste."""
+def _dedupe(members: list[CrewMember], cap: Optional[int] = _MAX_ROSTER) -> list[CrewMember]:
+    """First-wins de-dupe by (case-sensitive) name, capped at `cap` (default `_MAX_ROSTER`) — a
+    stable, bounded roster so the cached instruction can't balloon from a copy-paste. `cap=None`
+    leaves the list uncapped (used by `all_members`, whose union spans several rosters)."""
     out: list[CrewMember] = []
     seen: set[str] = set()
     for m in members:
         if m.name not in seen:
             seen.add(m.name)
             out.append(m)
-    return out[:_MAX_ROSTER]
+    return out if cap is None else out[:cap]
 
 
-def load_members(cfg: dict) -> list[CrewMember]:
-    """The current crew CAST, fail-soft. Prefers the JSON roster file (`[crew].file`); when it's
-    absent or unreadable, falls back to the legacy in-config `[crew].roster` (names or member
-    tables) so existing setups keep working. Order is preserved (file order, then de-duped) so the
-    derived system instruction is byte-stable for a given saved roster — the prompt-cache guarantee.
+def _members_from(raw: object) -> list[CrewMember]:
+    """A JSON list of member entries -> de-duped, capped `CrewMember`s (fail-soft: junk dropped)."""
+    seq = raw if isinstance(raw, list) else []
+    return _dedupe([m for m in (CrewMember.from_obj(o) for o in seq) if m is not None])
 
-    A corrupt file degrades to the config fallback rather than crashing the reply loop (fail soft),
-    exactly like the rest of the voice path."""
+
+# ---- roster file schema v2 (issue #127) ---------------------------------------------------
+# The roster file grows a SECOND dimension: a `default` roster (today's single cast, unchanged)
+# plus per-ship rosters keyed by the journal ShipID. A ship the Commander is flying uses its own
+# roster when one exists (non-empty); otherwise it inherits `default`. Back-compat is mandatory:
+# a bare JSON LIST (the pre-#127 file) still loads as `{default: <list>, ships: {}}`, and save
+# ALWAYS writes v2 so old files migrate the first time they're saved.
+
+@dataclass(frozen=True)
+class ShipRoster:
+    """One ship's crew roster in the v2 file. `label` is a display-only string refreshed from the
+    journal (hull type + player name) so the editor stays readable when the fleet snapshot is
+    stale; `hull` is the raw journal ship symbol (e.g. "krait_light"), kept so the seat cap
+    (issue #127 §5) can resolve the hull's multicrew seat count without a live snapshot."""
+    label: str = ""
+    hull: str = ""
+    members: tuple[CrewMember, ...] = ()
+
+
+@dataclass(frozen=True)
+class RosterFile:
+    """The whole crew roster file, structured. `default` is the fallback cast every ship inherits
+    until it has its own; `ships` maps a stringified journal ShipID to that ship's `ShipRoster`."""
+    default: tuple[CrewMember, ...] = ()
+    ships: dict[str, ShipRoster] = field(default_factory=dict)
+
+
+def load_roster_file(cfg: dict) -> RosterFile:
+    """Parse the crew roster file (`[crew].file`) into a `RosterFile`, fail-soft.
+
+    Back-compat: a bare JSON LIST (the pre-#127 shape) parses as `default` with no per-ship
+    rosters; the legacy in-config `[crew].roster` is the `default` when there's no file. A dict is
+    read as v2 (`{default: [...], ships: {"<id>": {label, hull, members}}}`). A corrupt / unreadable
+    file degrades to the config fallback rather than crashing the reply loop — exactly like the rest
+    of the voice path. Each roster is de-duped and capped independently."""
     path = roster_file(cfg)
     if path is not None and path.exists():
         try:
@@ -233,52 +266,207 @@ def load_members(cfg: dict) -> list[CrewMember]:
         except (OSError, json.JSONDecodeError, ValueError) as e:
             _warn(f"could not read crew roster {path} ({e}); using config fallback")
         else:
-            if isinstance(data, list):
-                members = [m for m in (CrewMember.from_obj(o) for o in data) if m is not None]
-                return _dedupe(members)
-            _warn(f"crew roster {path} is not a JSON list; using config fallback")
+            if isinstance(data, list):                       # v1 bare list -> default roster
+                return RosterFile(default=tuple(_members_from(data)))
+            if isinstance(data, dict):                       # v2 {default, ships}
+                default = _members_from(data.get("default"))
+                ships: dict[str, ShipRoster] = {}
+                raw_ships = data.get("ships")
+                if isinstance(raw_ships, dict):
+                    for sid, entry in raw_ships.items():
+                        key = str(sid).strip()
+                        if not key or not isinstance(entry, dict):
+                            continue
+                        ships[key] = ShipRoster(
+                            label=str(entry.get("label", "") or "").strip(),
+                            hull=str(entry.get("hull", "") or "").strip(),
+                            members=tuple(_members_from(entry.get("members"))))
+                return RosterFile(default=tuple(default), ships=ships)
+            _warn(f"crew roster {path} is neither a JSON list nor object; using config fallback")
     raw = (cfg.get("crew", {}) or {}).get("roster", []) or []
-    members = [m for m in (CrewMember.from_obj(o) for o in raw) if m is not None]
-    return _dedupe(members)
+    return RosterFile(default=tuple(_members_from(raw)))
 
 
-def save_members(path: Path | str, members: list[CrewMember]) -> None:
-    """Persist the whole roster to the JSON file atomically (temp-then-replace, so a crash
-    mid-write can't corrupt the existing roster), fail-soft on I/O error — mirrors MemoryStore."""
+def save_roster_file(path: Path | str, rfile: RosterFile) -> None:
+    """Persist the whole v2 roster file atomically (temp-then-replace, so a crash mid-write can't
+    corrupt it), fail-soft on I/O error — mirrors MemoryStore / `save_members`. ALWAYS writes v2,
+    so a legacy bare-list file migrates on the first save. Empty per-ship rosters are dropped so an
+    inherited ship leaves no clutter."""
     p = Path(path)
-    clean = _dedupe([m for m in members if m.name.strip()])
+    default = _dedupe([m for m in rfile.default if m.name.strip()])
+    ships_out: dict[str, dict] = {}
+    for sid, sr in rfile.ships.items():
+        members = _dedupe([m for m in sr.members if m.name.strip()])
+        if not members:
+            continue                                        # inherited ship: no roster stored
+        ships_out[str(sid)] = {"label": sr.label, "hull": sr.hull,
+                               "members": [m.to_dict() for m in members]}
+    body = {"default": [m.to_dict() for m in default], "ships": ships_out}
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
-        body = json.dumps([m.to_dict() for m in clean], ensure_ascii=False, indent=2)
         tmp = p.with_suffix(p.suffix + ".tmp")
-        tmp.write_text(body + "\n", encoding="utf-8")
+        tmp.write_text(json.dumps(body, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         tmp.replace(p)  # atomic on the same filesystem
     except OSError as e:
         _warn(f"could not save crew roster {p} ({e})")
 
 
-def roster(cfg: dict) -> list[str]:
-    """The crew names (from the roster file or the legacy config list) — a HINT the model reaches
-    for. A free-form name the model invents still gets a voice, so this is purely advisory."""
-    return [m.name for m in load_members(cfg)]
+def _effective_ship_id(cfg: dict, ship_id: Optional[str]) -> Optional[str]:
+    """The active ship id for a roster lookup: the EXPLICIT `ship_id` when given, else the
+    RUNTIME-only key the App stamps onto cfg (`crew._active_ship_id`, issue #127 §3) so the prompt
+    path can resolve the active roster without threading an `ed_ctx` through every provider. A blank
+    / missing value -> None (the `default` roster). The stamp lives on `app.cfg`, which is NEVER the
+    persisted overrides object, so it can't leak into overrides.json."""
+    if ship_id is not None:
+        s = str(ship_id).strip()
+        return s or None
+    raw = (cfg.get("crew", {}) or {}).get("_active_ship_id")
+    s = str(raw).strip() if raw is not None else ""
+    return s or None
 
 
-def voice_ref_for(cfg: dict, name: str) -> str:
-    """The EXPLICIT voice_ref configured for crew member `name`, or '' when the member is unknown or
-    left on auto-assign. Case-sensitive to match the `[Name]` identity key. Used by the audio layer
-    to override the deterministic auto voice (issue #70) while falling back to it when blank."""
+def _limit_to_seats(cfg: dict) -> bool:
+    """Whether the optional per-ship seat cap (issue #127 §5) is ON. DEFAULT OFF (opt-in realism)."""
+    return bool((cfg.get("crew", {}) or {}).get("limit_to_seats", False))
+
+
+def seats_for_hull(hull: str) -> Optional[int]:
+    """The multicrew SEAT count for a raw journal hull symbol (e.g. "krait_light" -> 2), via the
+    bundled ship-spec table (`nav.get_spec(resolve_ship(hull).id).crew`), or None when the hull
+    can't be resolved / has no bundled spec. Fail-soft: any lookup miss -> None, and the caller
+    falls back to the generic `_MAX_ROSTER`. Pure + offline (bundled data only)."""
+    sym = str(hull or "").strip()
+    if not sym:
+        return None
+    try:
+        from .nav import get_spec, resolve_ship
+        outcome = resolve_ship(sym)
+        if getattr(outcome, "kind", "") != "resolved":
+            return None
+        spec = get_spec(outcome.id)
+        return int(spec.crew) if spec is not None else None
+    except Exception as e:  # noqa: BLE001 — seat lookup is advisory; never crash a read
+        _warn(f"seat lookup failed for hull {sym!r} ({e})")
+        return None
+
+
+def _cap_to_seats(members: list[CrewMember], cfg: dict, hull: str) -> list[CrewMember]:
+    """Truncate a PER-SHIP roster to the hull's seat count when the seat cap is ON (issue #127 §5) —
+    the belt-and-braces read-time guard so a roster authored before the setting was enabled can't
+    over-speak. Fail-soft: cap off, or an unknown hull / no spec, leaves the roster untouched."""
+    if not _limit_to_seats(cfg):
+        return members
+    seats = seats_for_hull(hull)
+    return members[:seats] if seats is not None else members
+
+
+def load_members(cfg: dict, ship_id: Optional[str] = None) -> list[CrewMember]:
+    """The ACTIVE crew CAST for the flown ship, fail-soft. Resolves the roster for `ship_id` (a
+    stringified journal ShipID) when that ship has a NON-EMPTY roster; otherwise the `default`
+    roster (issue #127). `ship_id=None` falls back to the App's runtime stamp (`_effective_ship_id`)
+    so the prompt path picks up the active ship without an explicit argument; tests always pass the
+    explicit id. When the seat cap is on (§5), a per-ship roster is truncated at read time to its
+    hull's seats. Order is preserved so the derived system instruction is byte-stable for a given
+    saved roster within one ship — the prompt-cache guarantee (a ship SWAP busts it once, by design).
+
+    A corrupt file degrades to the config fallback rather than crashing the reply loop."""
+    rfile = load_roster_file(cfg)
+    sid = _effective_ship_id(cfg, ship_id)
+    if sid is not None:
+        sr = rfile.ships.get(sid)
+        if sr is not None and sr.members:
+            return _cap_to_seats(list(sr.members), cfg, sr.hull)
+    return list(rfile.default)
+
+
+def all_members(cfg: dict) -> list[CrewMember]:
+    """The UNION of every crew member across the `default` roster and ALL per-ship rosters, deduped
+    by (case-sensitive) name, first-wins (issue #127 §6). Uncapped — it spans several rosters — so
+    the #124 voice-pairing input covers every character; one cache then serves every roster and a
+    ship swap never triggers a re-pair. Fail-soft (a bad file -> the config fallback via
+    `load_roster_file`)."""
+    rfile = load_roster_file(cfg)
+    combined = list(rfile.default)
+    for sr in rfile.ships.values():
+        combined.extend(sr.members)
+    return _dedupe(combined, cap=None)
+
+
+def save_members(path: Path | str, members: list[CrewMember]) -> None:
+    """Persist ONLY the `default` roster (legacy helper, kept for the tests and any caller that just
+    wants the single cast). Preserves any existing per-ship rosters by round-tripping the file
+    first. Writes v2 atomically. For a per-ship save use `save_roster_file`."""
+    p = Path(path)
+    existing = RosterFile()
+    if p.exists():
+        try:
+            data = json.loads(p.read_text(encoding="utf-8") or "[]")
+            if isinstance(data, dict):
+                existing = load_roster_file({"crew": {"file": str(p)}})
+        except (OSError, json.JSONDecodeError, ValueError):
+            existing = RosterFile()
+    save_roster_file(p, RosterFile(default=tuple(members), ships=dict(existing.ships)))
+
+
+def active_ship_id(ed_ctx) -> Optional[str]:  # noqa: ANN001 — duck-typed on `loadout_snapshot`
+    """The stringified journal ShipID of the ship the Commander is currently flying, from the live
+    Loadout snapshot on `ed_ctx`, or None when there's no context / no loadout seen yet / no id.
+    Fail-soft and duck-typed (any object with `loadout_snapshot()` works, so it's trivially
+    testable). The single active-ship resolver the mixer crew sites share (issue #127 §3)."""
+    try:
+        snap = ed_ctx.loadout_snapshot() if ed_ctx is not None else None
+        sid = getattr(snap, "ship_id", None) if snap is not None else None
+        return str(sid) if sid is not None else None
+    except Exception:  # noqa: BLE001 — a context glitch just means "no active ship" (-> default)
+        return None
+
+
+def stamp_active_ship(cfg: dict, ed_ctx) -> None:  # noqa: ANN001 — duck-typed on `loadout_snapshot`
+    """Stamp the active ship id onto a RUNTIME-only cfg key (`crew._active_ship_id`) so
+    `build_system`/`system_instruction` — which only receive `cfg`, not `ed_ctx` — resolve the
+    active roster per turn (issue #127 §3). Called by the App just before each LLM turn.
+
+    Safe by construction: this writes to `app.cfg`, which is a SEPARATE dict from `app.overrides`
+    (only the latter is persisted by `save_overrides`), so the transient key can never leak into
+    overrides.json. Fail-soft — any glitch leaves the previous stamp untouched."""
+    try:
+        sid = active_ship_id(ed_ctx)
+        crew_cfg = cfg.setdefault("crew", {}) if isinstance(cfg, dict) else None
+        if not isinstance(crew_cfg, dict):
+            return
+        if sid is None:
+            crew_cfg.pop("_active_ship_id", None)
+        else:
+            crew_cfg["_active_ship_id"] = sid
+    except Exception:  # noqa: BLE001 — stamping is best-effort; never break the reply loop
+        pass
+
+
+def roster(cfg: dict, ship_id: Optional[str] = None) -> list[str]:
+    """The ACTIVE crew names (from the resolved per-ship or default roster) — a HINT the model
+    reaches for. A free-form name the model invents still gets a voice, so this is purely advisory."""
+    return [m.name for m in load_members(cfg, ship_id)]
+
+
+def voice_ref_for(cfg: dict, name: str, ship_id: Optional[str] = None) -> str:
+    """The EXPLICIT voice_ref configured for crew member `name` in the ACTIVE roster, or '' when the
+    member is unknown or left on auto-assign. Case-sensitive to match the `[Name]` identity key.
+    Used by the audio layer to override the deterministic auto voice (issue #70) while falling back
+    to it when blank. `ship_id` selects the active ship's roster (issue #127)."""
     key = str(name or "").strip()
-    for m in load_members(cfg):
+    for m in load_members(cfg, ship_id):
         if m.name == key:
             return m.voice_ref
     return ""
 
 
-def system_instruction(cfg: dict) -> Optional[str]:
+def system_instruction(cfg: dict, ship_id: Optional[str] = None) -> Optional[str]:
     """The STATIC crew instruction folded into the cached system prefix when crew is enabled, else
-    None. It's a constant for a given saved roster (the only variable), so it never busts the prompt
-    cache turn-to-turn — the cache only rewrites the once when the setting or roster changes.
-    Returns None when crew is off (nothing added, prefix unchanged).
+    None. It's a constant for a given ACTIVE roster, so it never busts the prompt cache turn-to-turn
+    within one ship — the cache only rewrites the once when the setting or roster changes, or when
+    the Commander SWAPS to a ship with a different roster (issue #127, an accepted per-swap cost).
+    Returns None when crew is off (nothing added, prefix unchanged). `ship_id` selects the active
+    ship's roster; when None it falls back to the App's runtime stamp (`_effective_ship_id`).
 
     Each member's `persona` (issue #70) is woven in as a short "Name (Role) — persona." clause so
     the model voices a consistent character playing a consistent FUNCTION; a member with a `role`
@@ -288,7 +476,7 @@ def system_instruction(cfg: dict) -> Optional[str]:
     name)."""
     if not is_enabled(cfg):
         return None
-    members = load_members(cfg)
+    members = load_members(cfg, ship_id)
     names = [m.name for m in members]
     crew_line = (
         f" Your crew: {', '.join(names)}." if names else
