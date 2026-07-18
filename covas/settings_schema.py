@@ -509,8 +509,9 @@ SCHEMA: list[Setting] = [
             "Interactive crew", "Personality",
             "Let replies voice a NAMED crew member: the model may start a line with '[Name]' and "
             "that line is spoken in its own distinct, radio-filtered voice (the ship persona still "
-            "speaks every unprefixed line). Define each character's personality and voice on the "
-            "Crew tab of the control panel. Off by default.",
+            "speaks every unprefixed line). Define each character's role, personality, and voice on "
+            "the Crew tab of the control panel — where you can also ADOPT a hired NPC fighter pilot "
+            "from your journal (name + role + a generated personality). Off by default.",
             default=False, phrasings=("crew", "crew voices", "the crew"),
             example="turn crew on"),
 

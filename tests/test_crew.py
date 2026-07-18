@@ -304,6 +304,47 @@ def test_system_instruction_omits_persona_clause_when_none_have_one():
     assert "In character:" not in inst and "Nyx" in inst
 
 
+# ============================================================================================
+# 3c. Crew ROLE (issue #125) — the free-text function label on CrewMember + its prompt weaving
+# ============================================================================================
+
+def test_crew_member_role_round_trips_through_dict():
+    m = crew.CrewMember.from_obj({"name": "Zeta", "persona": "Cool.", "voice_ref": "V",
+                                  "role": " Fighter pilot "})
+    assert m == crew.CrewMember("Zeta", "Cool.", "V", "Fighter pilot")   # trimmed
+    assert m.to_dict() == {"name": "Zeta", "persona": "Cool.", "voice_ref": "V",
+                           "role": "Fighter pilot"}
+
+
+def test_crew_member_legacy_dict_without_role_loads_with_blank_role():
+    m = crew.CrewMember.from_obj({"name": "Nyx", "persona": "Terse."})   # pre-#125 shape
+    assert m.role == "" and m == crew.CrewMember("Nyx", "Terse.")
+
+
+def test_crew_member_role_is_capped():
+    big = "r" * 999
+    assert len(crew.CrewMember.from_obj({"name": "N", "role": big}).role) == crew._MAX_ROLE
+
+
+def test_system_instruction_weaves_role_and_persona():
+    cfg = {"crew": {"enabled": True,
+                    "roster": [{"name": "Zeta", "role": "Fighter pilot", "persona": "Cool head"}]}}
+    inst = crew.system_instruction(cfg)
+    assert "Zeta (Fighter pilot) — Cool head." in inst
+
+
+def test_system_instruction_weaves_role_only_when_no_persona():
+    cfg = {"crew": {"enabled": True, "roster": [{"name": "Zeta", "role": "Fighter pilot"}]}}
+    inst = crew.system_instruction(cfg)
+    assert "In character: Zeta (Fighter pilot)." in inst
+
+
+def test_system_instruction_no_character_clause_when_neither_role_nor_persona():
+    cfg = {"crew": {"enabled": True, "roster": [{"name": "Zeta"}]}}
+    inst = crew.system_instruction(cfg)
+    assert "In character:" not in inst and "Zeta" in inst
+
+
 def test_voice_ref_for_returns_explicit_ref_else_blank(tmp_path):
     import json
     f = tmp_path / "crew.json"

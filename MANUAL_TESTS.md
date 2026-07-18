@@ -1429,6 +1429,31 @@ on in config (or the Settings page) before testing.
 - [ ] 🖥️ **Disabled banner:** with `[crew].enabled = false`, the Crew tab shows a banner noting crew
   won't speak until enabled, but the roster still saves/loads.
 
+### 18.5d Crew role + adopt a hired NPC pilot (issue #125 — Crew tab)  🖥️ 🎮 🔊
+> Adds a **Role** field to every crew row, and lets the **Name** box suggest — and **adopt** — your
+> actual hired NPC fighter pilots from the journal. Needs `[elite].enabled = true` for the
+> suggestions; hiring a fighter pilot in game (or replaying a journal containing `CrewHire` /
+> `NpcCrewPaidWage` events) is what populates them.
+- [ ] 🖥️ **Role weaves into character:** on the Crew tab, give a character a **Role** (e.g.
+  *Quartermaster*) and save. With crew on, invite them in conversation → they answer *in that role*,
+  not just their temperament. (Role also shows in the static crew instruction as
+  `"Name (Role) — persona."`.)
+- [ ] 🖥️ **Legacy roster still loads:** an existing `crew.json` written before this change (no
+  `role` key) loads with a blank Role and no error.
+- [ ] 🎮 **Hired pilot appears in the datalist:** in game, hire an NPC **fighter pilot** from a Crew
+  Lounge (or replay a journal with a `CrewHire`/`NpcCrewPaidWage`), then open the Crew tab and click
+  the **Name** box → the pilot's name appears as a suggestion. (Confirm `npc_crew.json` appears in
+  the data dir, git-ignored.)
+- [ ] 🖥️ **Adopt prefills + generates:** pick the hired pilot from the Name suggestions → **Role**
+  fills to *Fighter pilot* and a short **personality** is generated in the box (one cheap-tier call).
+  Edit or clear the text, then **SAVE ROSTER**. Typing a *custom* name (not a hired pilot) still
+  works exactly as before — no prefill.
+- [ ] 🔊 **Hear the role in a reply:** with crew on and the adopted pilot saved, ask something that
+  invites them (e.g. *"have my fighter pilot call it out"*) → the reply reflects their **Fighter
+  pilot** role, in their voice.
+- [ ] 🖥️ **Suggest fail-soft:** with no API key / network, adopting a pilot still fills a canned
+  personality ("Steady in the seat; professional and brief on comms.") instead of erroring.
+
 ### 18.6 Drop-in content (C11)
 - [ ] On first run with the layer enabled, confirm the skeleton appears: **`audio/sfx/<cue>/`**,
   **`audio/music/<context>/`**, **`content/chatter/*.txt`**, **`content/interdiction_threat.txt`**,

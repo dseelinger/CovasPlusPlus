@@ -274,6 +274,13 @@ def build_ed_monitoring(app: "App") -> None:
         el = app.cfg.get("elite", {})
         jdir = resolve_journal_dir(app.cfg)
         app.ed_ctx = EDContext(recent_maxlen=int(el.get("recent_events_kept", 25)))
+        # Hired NPC-crew registry (issue #125): load the persisted seen-set (path resolved under the
+        # data dir by config) so the journal watcher can accumulate the Commander's fighter pilots
+        # and the Crew editor can offer them to adopt. Fail-soft: a missing file loads empty.
+        from .ed.npc_crew import NpcCrewRegistry
+        _npc_reg_path = str((app.cfg.get("crew", {}) or {}).get("npc_registry_file", "") or "").strip()
+        if _npc_reg_path:
+            app.ed_ctx.set_npc_crew_registry(NpcCrewRegistry.load(_npc_reg_path))
         app.registry.register(EDContextCapability(app.ed_ctx))
         # On-foot / SRV / exobiology read tools (#54): situational awareness in the modes
         # ED context was silent in. Same live EDContext, mode-specific read answers.

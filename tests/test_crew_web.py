@@ -156,6 +156,27 @@ def test_a_successful_save_publishes_a_sync_event(client):
     assert any("Crew roster updated from the web editor" in e.get("text", "") for e in events)
 
 
+# --- hired NPC pilots + adopt suggestion (issue #125) ------------------------------------------
+
+def test_get_includes_hired_empty_when_elite_off(client):
+    c, _core = client
+    # With elite monitoring off there's no registry, so the datalist source is simply empty.
+    assert _state(c)["hired"] == []
+
+
+def test_suggest_persona_returns_editable_text(client):
+    c, _core = client
+    r = c.post("/api/crew/suggest_persona", json={"name": "Zeta", "combat_rank": 5})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["ok"] and isinstance(body["persona"], str) and body["persona"].strip()
+
+
+def test_suggest_persona_requires_a_name(client):
+    c, _core = client
+    assert c.post("/api/crew/suggest_persona", json={"name": "  "}).status_code == 400
+
+
 # --- template + config guard -------------------------------------------------------------------
 
 def test_crew_page_renders_the_editor(client):
