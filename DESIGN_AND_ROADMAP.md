@@ -414,6 +414,113 @@ the rendering surface differs:
   `covas.spec` collects it (bundling `openvr_api.dll`) **only when present**, so a freeze without
   it still succeeds. Off by default (`[hud].vr_enabled = false`).
 
+### 3.8.1 The VR-HUD placement model (issue #145 — umbrella for #140–#144)
+
+A single hands-on VR session surfaced five symptoms (#140–#144) that read as independent bugs but
+share one root: the placement controls (enable, pin, nudges, offset, tilt) were each added on their
+own, without one coherent model of "where is the HUD and how do I move it" for a Commander wearing
+a headset. This subsection **is** that model; the five fixes conform to it rather than patching
+symptoms separately.
+
+**Runtime reality first.** The first-party overlay is a SteamVR `IVROverlay` app — it exists only
+inside a SteamVR session. On OpenComposite / VDXR / Virtual Desktop's native OpenXR (including the
+maintainer's own daily rig), SteamVR is not the compositor and the overlay *structurally cannot
+attach*; those rigs are served by the #103 web-HUD path (`/hud` in OpenKneeboard), whose placement
+is done in OpenKneeboard and is out of scope here. Two consequences shape everything below:
+"not in SteamVR right now" is a **normal, recoverable state** — never an error and never terminal —
+and hands-on testing of this model requires deliberately switching the rig into SteamVR mode
+(Valve DLL + Virtual Desktop's SteamVR mode), so hardware confirmations are batched, not casual.
+
+**1. Lifecycle — attach is retryable; only true absence is terminal.**
+
+- **Attach-only, preserved.** The overlay never launches SteamVR; `openvr.init(VRApplication_Overlay)`
+  stays gated on a **fresh** `_steamvr_running()` check at each attempt.
+- **Two failure classes, and every failure names its reason.** *TRANSIENT* — retryable: SteamVR not
+  running yet; init/attach failed despite SteamVR up; HMD pose not yet valid. *PERMANENT* — don't
+  retry this session: `openvr` not importable (the binding simply isn't installed). A transient
+  failure must **not** latch: the one-shot creation latch (`_vr_view_tried` in
+  `hud_capability.py`) may only stick on the permanent class, so a later **enable, settings
+  reconcile, or pin** re-attempts creation with a fresh `_steamvr_running()` check. Net behavior:
+  start SteamVR *after* COVAS++, then "turn the VR HUD on" / "pin the HUD here" brings the overlay
+  up — no restart. A light re-check at user-command time is enough; no background poll is required
+  (though one is permissible later).
+- **Spoken, specific reasons.** The Commander is in a headset and cannot read logs, so every
+  distinct cause gets its own spoken line: *not enabled* / *SteamVR not running* (naming the
+  OpenComposite/VDXR limitation and pointing at the web-HUD path) / *openvr missing* / *attach
+  failed* (brief detail) / *couldn't read the headset pose — try again*. One generic "isn't
+  running" collapsing five causes is the anti-pattern #140 removes.
+- **Pin implies show.** "Pin the HUD here" with the VR HUD off means "show the HUD where I'm
+  looking": it enables (`[hud].vr_enabled`), reconciles, then pins — one command matching intent.
+  If it still can't attach, it falls through to the specific reason above.
+
+**2. Command routing — a placement verb makes bare "HUD" unambiguous.**
+
+Look-to-place is a **VR-only** action: you cannot "pin here" the 2D desktop window or the
+OpenKneeboard web page. Therefore any *pin / place / position … here/there* phrasing over "HUD" —
+**with or without the word "VR"** — is unambiguously the VR HUD: it routes to `adjust_vr_hud`
+(`pin_here`) and must **never** resolve through the settings phrase-matcher, where the three HUD
+surfaces' overlapping phrasings would produce the multi-HUD "did you mean…?" list. Defensively, if
+a placement-verb phrase ever reaches settings matching, the settings path declines in favor of the
+placement tool rather than emitting `_ambiguous`. Plain toggles are untouched: exact "hud" still
+maps to `hud.enabled` ("exact wins"), and genuinely ambiguous *toggle* requests still
+disambiguate. This is the rule #141 implements.
+
+**3. Transform correctness — one pitch convention, enforced at one place.**
+
+The convention is the one `VrPlacement.pitch_deg` documents: **positive `pitch_deg` = top leans
+TOWARD the viewer** (a low panel angles up to face you). Both writers of pitch — `_pin_to_gaze`
+(`pitch_deg = −e` for gaze elevation `e`) and the `tilt_up`/`tilt_down` nudges — feed the single
+reader, `resolve_transform`; because they share that one source, pin and nudges *cannot* disagree.
+The observed inversion (a look-down pin tilts the top away; "tilt up" leans away) means the Rx
+sign in `resolve_transform`'s `local` block contradicts the docstring — so the fix (#142) is a
+**single sign inversion at that shared source**, never per-caller sign flips (which would fix the
+pin and leave the nudges inverted, or vice versa). The position math is correct and untouched:
+`hmd_pitch_deg` (up-positive) and the `forward = d·cos(e)` / `up = d·sin(e)` split stay as they
+are. Direction-asserting unit tests (a positive `pitch_deg` tips the panel's top toward the
+viewer; a look-down pin fixture yields top-toward) pin the convention so a sign can't silently
+regress again.
+
+**4. Truthfulness — no invented actions.**
+
+The app's grounding discipline (never invent facts) extends to actions: COVAS **never narrates a
+completed side-effecting HUD change unless the `adjust_vr_hud` tool actually ran**, and the spoken
+confirmation **relays the tool's real return** — not a free-generated "corrected/done". If no tool
+ran, or it errored, the reply says so. The general rule, which #143 enforces (system-prompt / tool
+guidance plus routing corrective phrasing like "it's tilted the wrong way, fix it" to the tool):
+**a completed-action claim requires a real tool call**, for any side-effecting capability, not
+just the HUD.
+
+**5. Positioning — world-lock, three distinct axes, and recentre as the missing primitive.**
+
+- **Modes.** `world` (cockpit-fixed, the default) vs `head` (locked to the view). World stays the
+  default: a glanceable panel should hold still in the cockpit rather than swim with every head
+  movement; `head` remains the opt-in for "always in view".
+- **Three axes with distinct roles.** `yaw_deg` is the *heading* the panel sits on (a pin sets it
+  to your gaze heading); `offset_x_m` is a *lateral slide within that yawed frame*; `pitch_deg` is
+  *tilt*. After a pin, the gaze fully determines the direction, so `offset_x` is recentred to
+  **0.0 — correctly**.
+- **The consequence users hit (#144).** A *world-locked* panel that reads "off to the left" after
+  you turn your head is a **yaw** phenomenon: the panel is exactly where it was pinned; *you*
+  turned. `offset_x` reading 0.0 is right, and zeroing it (today's `center` action) is a no-op for
+  this symptom. "The lateral offset is broken" is the natural — wrong — conclusion when no control
+  addresses the actual axis.
+- **Recentre is the missing primitive.** A first-class horizontal **recentre** snaps `yaw_deg` to
+  the *current* HMD heading while keeping distance, height, tilt, size, and curvature — distinct
+  from zeroing `offset_x`. Voice first ("centre/recentre the HUD on me"); a bindable trigger can
+  follow. Most "it's off-centre" complaints collapse into this one action; a full re-pin remains
+  the way to also recapture *elevation*.
+
+**Triage — real vs. perceived (finalised).** The reporter's own caveat ("might just be VR
+fatigue") was checked against the code before designing fixes:
+
+| Issue | Verdict |
+|-------|---------|
+| #140 late-SteamVR one-shot latch | **Real code work** (latch, typed reasons, pin-implies-show) — code-provable, fatigue-independent |
+| #141 placement verb → settings-ambiguous | **Real code work** (routing rule §2) — code-provable |
+| #142 tilt sign inverted | **Real** — fix the sign at `resolve_transform` (§3); **one** hardware confirmation of direction (pin + tilt in the same SteamVR-mode pass) |
+| #143 fabricated "corrected" confirmation | **Real code work** (grounding rule §4 + corrective-phrase routing) |
+| #144 lateral offset "no effect" / off-centre | The real gap is **no recentre**, *not* a broken offset — 0.0 post-pin is correct (§5). Do **not** over-engineer the offset path; a fresh, rested repro (does 0 → 1.0 visibly slide the shown panel?) feeds the final live-apply call, but the recentre lands either way |
+
 ### 3.9 Turn machinery — shared `_run_turn`, typed input, and provider resilience (issues #76, #97, #108)
 
 Two changes to the worker turn, both keeping the fail-soft discipline of principle #6:
@@ -1958,6 +2065,30 @@ The original seven-phase plan is done and tested:
     a crewed home that greets you by name the instant you drop in and sees you off as you leave —
     configurable in the UI, deferential to its owner — where EDCoPilot/COVAS:NEXT carrier chatter is
     generic and never anchored to those exact arrival/departure beats.**
+
+NN. **VR-HUD placement model — design decision** (issue #145, umbrella for #140–#144; §3.8.1) —
+    design-only, no code: one coherent model of "where is the HUD and how do I move it" for a
+    Commander in a headset, replacing five independently-added controls whose seams showed up as
+    five bug reports from a single VR session. The model (full text in §3.8.1): **(1) lifecycle** —
+    attach-only preserved; failures are classed TRANSIENT (SteamVR not up yet, attach glitch, HMD
+    pose invalid → retry on the next enable/reconcile/pin with a fresh `_steamvr_running()` check;
+    never latched by `_vr_view_tried`) vs PERMANENT (`openvr` not importable → latch); every
+    failure speaks its specific reason (the Commander can't read logs); "pin here" with the HUD off
+    enables-and-pins in one step. **(2) routing** — pin/place/position-*here* is VR-only, so bare
+    "HUD" under a placement verb is unambiguously the VR HUD: always `adjust_vr_hud`, never the
+    settings matcher's multi-HUD ambiguous list (exact "hud" toggles unchanged). **(3) transform**
+    — ONE pitch convention (positive `pitch_deg` = top toward you) enforced at the single shared
+    reader `resolve_transform`; #142 is a one-line Rx sign fix there, never per-caller, guarded by
+    direction-asserting tests. **(4) truthfulness** — a completed-action claim requires a real tool
+    call; HUD confirmations relay `adjust_vr_hud`'s actual return (generalising no-invented-facts
+    to no-invented-actions). **(5) positioning** — `world` stays the default; yaw (heading) vs
+    `offset_x` (lateral slide in the yawed frame) vs pitch (tilt) have distinct roles; a
+    world-locked panel "off to the left, offset 0.0" is a *yaw* symptom and 0.0 is correct, so the
+    missing primitive is a horizontal **recentre** (snap `vr_yaw_deg` to the current HMD heading,
+    keep everything else) — distinct from zeroing `offset_x`. Triage finalised: #140/#141/#143
+    real code work; #142 real (one hardware direction check); #144 = "add recentre", not "fix the
+    offset". The SteamVR-mode requirement + OpenComposite→web-HUD (#103) split is restated in
+    `docs/using/hud.md`. Pillar: **Immerse** / Foundation.
 
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
