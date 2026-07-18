@@ -77,6 +77,13 @@ A `Capability` is a small class exposing:
 
 `app.py` shrinks to: capture → STT → build messages (+ capability context) → Router picks provider → stream → capabilities handle tool calls → TTS. Adding a feature = dropping in a new `Capability`, not editing the loop.
 
+### 3.3.1 Capability wiring — `covas/bootstrap.py` (issue #113)
+The registry keeps capabilities out of the *loop*, but their **construction** still accreted in `app.py` — every `_start_X` builder, the `None` pre-declarations, and the opt-in gate block. Issue #113 lifts all of that into `covas/bootstrap.py`, leaving `app.py` with only the voice loop, live-settings reconcile, and lifecycle (≈3,100 → ≤1,800 lines).
+
+- **Per-capability builders.** Each `_start_X` body becomes a free `build_x(app)` function — verbatim except `self` → `app`, so every fail-soft `try/except` guard, log line, and construction detail is unchanged. The App instance is passed in wherever the method used to reach `self`, so shared mutable state (the one `KeyExecutor`, the keybind abort `Event`, the `WindowFocuser`, the parsed `.binds`, the event pump, the ED context) keeps living on `App` and is reached through `app` exactly as before — the *sharing* is untouched, only the *file* changes.
+- **Declarative manifest.** A frozen `Wiring(attr, gate, build)` list encodes construction order and config-gating in one place. `wire(app)` derives the single-attr `None`-defaults from it, then builds in list order — preserving the two real constraints (ED monitoring before its journal consumers carriers/CG; the audio layer last among capability registrations). `App.__init__` collapses the old gated block + inline constructions into one `bootstrap.wire(self)` call.
+- **The honest boundary.** Live-settings/reconcile/reload methods (`_reload_llm`/`_reload_tts`, `_reconcile_hud`, `reload_audio_content`, …) and the pairing gate `_voice_pairing_allowed` stay on `App`; the shared handles stay on `App`. A capability that needs a *bespoke* new lifecycle/reconcile method still touches `app.py` — but the common build-register-maybe-gate shape now touches only `bootstrap.py`. Zero behavior change; pure module split.
+
 ### 3.4 Refactor sequence (low-risk, incremental)
 1. Extract `LLMProvider`/`TTSProvider`/`STTProvider` protocols; make current Anthropic/ElevenLabs/Whisper code implement them. No behavior change — pure seams.
 2. Introduce the provider factory + `[llm]`/`[tts]`/`[stt]` config sections (defaulting to today's services).
