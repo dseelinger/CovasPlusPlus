@@ -23,8 +23,21 @@ def _load(name: str) -> list[dict]:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))["results"]
 
 
+def _fresh_sell(results: list[dict]) -> list[dict]:
+    """Stamp the non-carrier sell stations with a current timestamp so the 'fresh' quote stays
+    within the freshness window no matter when the suite runs. The fixture's carrier quotes keep
+    their real 2020 dates (they're dropped as transient anyway); pinning fixed dates on the real
+    stations would silently re-stale as the calendar advances past them (that drift is exactly
+    what this guards against)."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00")
+    for r in results:
+        if r.get("type") != "Drake-Class Carrier":
+            r["market_updated_at"] = now
+    return results
+
+
 HOTSPOTS = (200, {"results": _load("spansh_hotspots_painite.json")})
-SELL = (200, {"results": _load("spansh_sell_painite.json")})
+SELL = (200, {"results": _fresh_sell(_load("spansh_sell_painite.json"))})
 
 
 class _FakeHttp:
