@@ -1877,6 +1877,16 @@ class App:
         except Exception:  # noqa: BLE001 — barge-in teardown must never break the voice loop
             pass
 
+    def _fail_cue_to_idle(self, extra: str = "") -> None:
+        """Return to Idle after a failed / empty / errored turn AND actually play the `failure`
+        cue. ORDER IS LOAD-BEARING: set_state('Idle') stops the thinking bed via stop_loop(),
+        which clear_bus()'es the shared 'alert' bus — and clear_bus drops EVERY pending source on
+        it. So a `failed` cue submitted BEFORE the transition (the old order) is wiped before it
+        sounds; the bed and one-shot cues share that bus. Playing it AFTER, onto the now-clean bus,
+        is what makes it audible — this is why the shipped failure cue was silent out of the box."""
+        self.set_state("Idle", extra)
+        self.cues.play("failed")
+
     # ---- PTT / cancel handlers -------------------------------------------
     def on_ptt_down(self) -> None:
         self._ptt_t0 = time.monotonic()
@@ -2006,8 +2016,7 @@ class App:
                 # Empty OR whitespace-only transcription (silence, or a barge-in that caught
                 # near-silence). Drop it — sending an empty/whitespace user turn 400s the API
                 # ("messages … must have non-empty content") and poisons later turns.
-                self.cues.play("failed")
-                self.set_state("Idle", "(no speech detected)")
+                self._fail_cue_to_idle("(no speech detected)")
                 return
 
             action = PhraseSpotter.from_cfg(self.cfg).match(text)
@@ -2031,8 +2040,7 @@ class App:
                 pass
             self.set_state("Idle")
         except Exception as e:  # noqa: BLE001 — keep the loop alive on any failure
-            self.cues.play("failed")
-            self.set_state("Idle", f"reflex error: {e}")
+            self._fail_cue_to_idle(f"reflex error: {e}")
 
     # ---- hands-free / VAD listen (issue #63) ------------------------------
     def _on_vad_speech_start(self) -> None:
@@ -2488,8 +2496,7 @@ class App:
                 # Empty OR whitespace-only transcription (silence, or a barge-in that caught
                 # near-silence). Drop it — sending an empty/whitespace user turn 400s the API
                 # ("messages … must have non-empty content") and poisons later turns.
-                self.cues.play("failed")
-                self.set_state("Idle", "(no speech detected)")
+                self._fail_cue_to_idle("(no speech detected)")
                 return
 
             # Wake-word gate (issue #64). ONLY the hands-free path is gated (``wake_gated``);
@@ -2509,8 +2516,7 @@ class App:
                         return
                     text = res.text  # run the turn on the stripped command
         except Exception as e:  # noqa: BLE001 — a transcription/gate failure must not crash the loop
-            self.cues.play("failed")
-            self.set_state("Idle", f"error: {e}")
+            self._fail_cue_to_idle(f"error: {e}")
             return
         # Post-transcription: hand off to the shared turn logic (issue #76). _run_turn owns its own
         # fail-soft guard plus the #97 retry/watchdog, so this STT try only has to cover transcription.
@@ -2623,8 +2629,7 @@ class App:
                 # phrase ("use opus", "think hard"): the router already applied the tier, and
                 # sending an empty user turn 400s the API ("messages must have non-empty
                 # content"). Acknowledge and return without touching history.
-                self.cues.play("failed")
-                self.set_state("Idle", "(nothing to answer)")
+                self._fail_cue_to_idle("(nothing to answer)")
                 return
             # Build THIS call's messages WITHOUT mutating stored history. A cancelled, errored,
             # or empty-reply turn must leave NO trace: an orphaned user turn (appended before the
@@ -2708,8 +2713,7 @@ class App:
                 self.set_state("Idle", "cancelled")
                 return
             if not reply.strip():
-                self.cues.play("failed")
-                self.set_state("Idle", "(empty reply)")
+                self._fail_cue_to_idle("(empty reply)")
                 return                      # history untouched — no orphaned user turn
 
             # Success: commit the user+assistant pair atomically. Persist the CLEAN user_text
@@ -2737,15 +2741,15 @@ class App:
         except Exception as e:  # noqa: BLE001 — keep the loop alive on any failure
             if watchdog is not None:
                 watchdog.disarm()  # idempotent — the stream's finally already ran on most paths
-            self.cues.play("failed")
             # Issue #97: a transient/overloaded provider (exhausted retries, connection drop, 529)
             # earns an in-character, provider-named spoken heads-up instead of a bare error; any
             # other failure just degrades soft as before. Never another LLM call — the LLM is what's
             # down. History is untouched here (the commit is after a successful reply), so a failed
-            # turn leaves NO orphan.
+            # turn leaves NO orphan. The failure cue plays AFTER the Idle transition (via
+            # _fail_cue_to_idle) so stop_loop's alert-bus clear can't drop it.
             if _retry.is_degraded_error(e):
                 self._speak_degraded(e, cancel, tts=tts, text_only=text_only)
-            self.set_state("Idle", f"error: {e}")
+            self._fail_cue_to_idle(f"error: {e}")
 
     # ---- provider reliability (issue #97) ---------------------------------
     def _arm_latency_watchdog(self, cancel: threading.Event, *, tts=None,  # noqa: ANN001

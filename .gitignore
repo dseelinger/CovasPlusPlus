@@ -85,3 +85,6 @@ Thumbs.db
 #     working state, not source — kept out of the repo. ---
 .muster/
 *.muster.json
+
+# Local journal-injection scratch for manual event testing (see inject_event notes) — never tracked.
+_fakejournal/

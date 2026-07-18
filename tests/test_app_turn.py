@@ -750,3 +750,41 @@ def test_latency_watchdog_disabled_when_threshold_zero(tmp_path):
     wd.disarm()
     assert app.tts.spoken == []
 
+
+
+class _CueSpy:
+    """Records the ORDER of cue calls so a test can assert the failure cue is emitted AFTER the
+    bus-clearing Idle transition (issue: shipped failure cue was silent — see _fail_cue_to_idle)."""
+
+    def __init__(self):
+        self.calls = []
+
+    def play(self, name, wait=False):
+        self.calls.append(("play", name))
+
+    def stop_loop(self):
+        self.calls.append(("stop_loop",))
+
+    def start_loop(self, name):
+        self.calls.append(("start_loop", name))
+
+    def stop(self):
+        self.calls.append(("stop",))
+
+
+def test_failure_cue_plays_after_the_idle_transition_not_before(tmp_path):
+    """Regression: on no-speech the `failed` cue was submitted BEFORE set_state('Idle'), whose
+    stop_loop() clear_bus()'d the shared alert bus and dropped it — so the shipped failure cue was
+    silent out of the box. It must be played AFTER the transition, with no bus clear following."""
+    app = _make_app(tmp_path, stt=FakeSTT(text="   "), llm=FakeLLM(text="x"), tts=FakeTTS())
+    spy = _CueSpy()
+    app.cues = spy
+    app._process(object(), threading.Event())   # whitespace transcript -> no-speech path
+
+    assert ("play", "failed") in spy.calls                       # the cue was played at all
+    play_idx = spy.calls.index(("play", "failed"))
+    clearing = {"stop_loop", "stop"}
+    # Nothing clears the alert bus AFTER the cue is submitted (that's what used to drop it)...
+    assert not any(c[0] in clearing for c in spy.calls[play_idx + 1:])
+    # ...and the Idle transition's clear happened BEFORE it, proving the fixed order.
+    assert any(c[0] in clearing for c in spy.calls[:play_idx])
