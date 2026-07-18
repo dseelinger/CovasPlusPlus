@@ -1,0 +1,103 @@
+{# ONE reusable searchable voice picker (issue #120). {% include %}'d into every page that picks a
+   voice — the Settings page (settings.html) and the Crew page (crew.html) — so there is exactly ONE
+   voice UI, not several divergent ones. Renders a native <select> (the current value is ALWAYS
+   visible and selectable, even when it's an unlisted/custom id) + the 🔍 command-palette search
+   (issue #94) + the #26 type-to-filter box. Depends on the global `openPalette` from
+   `_command_palette.html`, so include that too.
+
+   Fail-soft (CLAUDE.md): options may load async (a catalog fetch) or be empty (offline / no key) —
+   the current pick never disappears, and with `allowCustom` the palette lets you type a custom value
+   (a Piper .onnx path, an unlisted id).
+
+   API (global): buildVoicePicker(opts) -> HTMLElement (the control container; has a `.value` getter)
+     opts = {
+       value:       current value (string; "" allowed)
+       label:       field label, used for the palette title + control titles
+       allowCustom: bool — may the palette accept a typed, unlisted value? (default false)
+       blankLabel:  if set, a leading option with value "" and this label (e.g. "(random)")
+       options:     [{value,label,meta}] preloaded options (optional)
+       loadOptions: async () => [{value,label,meta}] — fetched lazily to fill the list (optional)
+       onChange:    (value) => void — fired when the selection changes
+     } #}
+<style>
+  .vpick{flex:1;display:flex;align-items:center;gap:8px;justify-content:flex-end}
+  .vpick select{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);
+    border-radius:5px;padding:7px 9px;font-family:inherit;font-size:13px;min-width:160px}
+  .vpick .pickbtn{background:transparent;color:var(--muted);border:1px solid var(--edge);
+    border-radius:5px;padding:6px 9px;font-size:13px;cursor:pointer;flex:0 0 auto}
+  .vpick .pickbtn:hover{color:var(--text);border-color:var(--accent2)}
+  .vpick input.voicefilter{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);
+    border-radius:5px;padding:7px 9px;font-family:inherit;min-width:110px;max-width:150px;font-size:12px}
+</style>
+<script>
+(function(){
+  // A compact text box that filters a native <select>'s options by case-insensitive substring of the
+  // visible label. 3+ chars filters; fewer (or empty) restores the full list (issue #26). The
+  // selected option always stays visible so the current pick can't disappear behind the filter.
+  function voiceFilter(sel){
+    const f=document.createElement("input");
+    f.type="text"; f.className="voicefilter"; f.autocomplete="off"; f.spellcheck=false;
+    f.placeholder="Filter…";
+    f.oninput=()=>{
+      const q=f.value.trim().toLowerCase();
+      const active=q.length>=3;
+      for(const o of sel.options) o.hidden = active && !o.selected && !o.textContent.toLowerCase().includes(q);
+    };
+    return f;
+  }
+
+  window.buildVoicePicker = function(opts){
+    const label = opts.label || "voice";
+    const allowCustom = !!opts.allowCustom;
+    const hasBlank = (opts.blankLabel != null);
+    let current = (opts.value == null) ? "" : String(opts.value);
+    let items = (opts.options || []).slice();   // [{value,label,meta}], latest known list
+
+    const wrap = document.createElement("div"); wrap.className = "vpick";
+    const sel = document.createElement("select");
+
+    function optLabel(o){ return o.meta ? (o.label + " — " + o.meta) : (o.label || o.value); }
+    function rebuild(){
+      sel.innerHTML = "";
+      const seen = new Set();
+      if(hasBlank){ sel.appendChild(new Option(opts.blankLabel, "")); seen.add(""); }
+      for(const o of items){
+        if(seen.has(o.value)) continue;
+        sel.appendChild(new Option(optLabel(o), o.value)); seen.add(o.value);
+      }
+      // Current value ALWAYS reachable — even an unlisted/custom id or a not-yet-loaded value.
+      if(!seen.has(current)){
+        sel.appendChild(new Option(current==="" ? "(none)" : current+" (custom)", current));
+      }
+      sel.value = current;
+    }
+    rebuild();
+    sel.onchange = ()=>{ current = sel.value; if(opts.onChange) opts.onChange(current); };
+
+    const search = document.createElement("button");
+    search.type="button"; search.className="pickbtn"; search.textContent="🔍";
+    search.title="Search "+label;
+    search.onclick = ()=> openPalette({
+      title: "Search "+label,
+      items: items.map(o=>({value:o.value, label:o.label, meta:o.meta||""})),
+      current: current,
+      allowCustom: allowCustom,
+      onPick: (val)=>{ current = val; rebuild(); if(opts.onChange) opts.onChange(val); },
+    });
+
+    wrap.appendChild(search);
+    wrap.appendChild(voiceFilter(sel));
+    wrap.appendChild(sel);
+
+    if(opts.loadOptions){
+      Promise.resolve(opts.loadOptions())
+        .then(list=>{ items = (list||[]).slice(); rebuild(); })
+        .catch(()=>{ /* fail-soft: keep the current value + whatever we already had */ });
+    }
+
+    Object.defineProperty(wrap, "value", { get: ()=> sel.value });
+    wrap._select = sel;
+    return wrap;
+  };
+})();
+</script>

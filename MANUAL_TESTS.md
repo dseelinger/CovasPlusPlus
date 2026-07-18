@@ -1073,6 +1073,27 @@ Notes:
       the **current value** and lets you type — the footer reads *"catalog unavailable (…) — type a
       value"*; never an empty or blocking dropdown, and the existing value is never lost.
 
+### 14.1e One reusable voice picker everywhere (issue #120)  🌐 PANEL 🌍 NET
+> Every voice field — provider voices, the Player-DM voice, the Piper voice, the crew per-character
+> voice — renders through the SAME searchable control: a `<select>` (current value always visible) +
+> the 🔍 command palette + the type-to-filter box. Verify in BOTH the browser and the native window.
+- [ ] **Player-DM voice is searchable:** Settings → Ambient audio → **Player-DM voice** is a dropdown,
+      not a bare text box. With an ElevenLabs key, the 🔍 palette lists your library voices; type to
+      filter, pick one → saves. It sits **beside** a leading **"(random session voice)"** = blank.
+- [ ] **Custom path / id accepted (allowCustom):** open its 🔍 palette, type a Piper `.onnx` path (or
+      any unlisted id) → the **"custom"** entry appears at the top; pick it → it's saved and stays the
+      selected value on reload. Clear it back to blank → random-per-session behavior returns.
+- [ ] **Piper voice is searchable too:** set `[tts].provider = piper`, point **Piper voice** at a voice
+      in a folder of `.onnx` files → the picker lists the **other `.onnx` voices in that folder**
+      (each with its sibling `.onnx.json`); typing a custom path still works; an empty/missing folder
+      degrades to type-a-path (no error).
+- [ ] **Identical to a provider voice field:** compare the Player-DM voice side-by-side with the
+      **ElevenLabs voice** field — same look and behavior (the ElevenLabs one just doesn't allow a
+      custom id).
+- [ ] **Crew page reuses the SAME control:** the **🎙 crew** page's per-character **Voice** is the same
+      searchable picker (🔍 + filter), with **"Auto (deterministic)"** = blank; pick/search/type a
+      custom voice, **SAVE ROSTER**, reload → the choice persists.
+
 ### 14.2 Settings page (N1) — http://127.0.0.1:8765/settings
 - [ ] The page renders **grouped sections** with the **right control per type** (toggles, dropdowns, number/sliders, text/path) and inline help.
 - [ ] **Frequency-first ordering (issue #80):** the grouped sections/cards are ordered **most-used first** — provider, voice, and speed near the top; rarely-touched advanced/dev options lower — so common controls are reachable without scrolling past niche settings.

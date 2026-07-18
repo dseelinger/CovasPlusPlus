@@ -97,6 +97,15 @@ def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
         if source == schema.OPT_INPUT_DEVICES:
             return _dedup_input_devices(firstrun.list_input_devices()), None
 
+        # --- local Piper voices (#120) — scan the dir of the configured voice, no network, no key ---
+        if source == schema.OPT_PIPER_VOICES:
+            from pathlib import Path
+
+            from .providers.piper_tts import list_piper_voices
+            model = str(_cfg(cfg, "piper", "model") or "").strip()
+            voices_dir = str(Path(model).parent) if model else ""
+            return list_piper_voices(voices_dir), None
+
         # --- LLM model catalogs ---
         if source == schema.OPT_OPENAI_MODELS:
             from .providers.openai_llm import list_openai_models, _DEFAULT_BASE_URL

@@ -1452,6 +1452,29 @@ The original seven-phase plan is done and tested:
     neither exposes a curate-your-own-soundscape drop-in surface at all; this makes COVAS++ the only
     one where the ENTIRE ambient library — SFX, music, chatter, interdiction lines — is tunable in a
     tight drop-a-file → click → hear-it loop with the game running, zero restart friction.**
+56. **One reusable searchable voice picker** (issue #120, `covas/templates/_voice_picker.html` (new),
+    `covas/templates/settings.html`, `covas/templates/crew.html`, `covas/settings_schema.py`,
+    `covas/catalog.py`, `covas/web.py`, `covas/providers/piper_tts.py`) — the searchable voice control
+    (🔍 command palette + type-to-filter + a `<select>` that always shows the current value) was
+    assembled inline in the Settings renderer for the ElevenLabs field only; the Player-DM voice was a
+    bare text box, the Piper voice a hand-typed `.onnx` path, and the crew page a divergent plain
+    `<select>` — three different voice UIs. This factors ONE `buildVoicePicker(opts)` into a shared
+    `{% include %}` partial (like `_command_palette.html`) that both the Settings page and the Crew
+    page render every voice field through — identical look and behaviour, current-value-always-visible,
+    fail-soft, and a per-field `allowCustom` (so a Piper path / unlisted id stays typeable). Schema:
+    `audio.voices.player_ref` becomes an `@elevenlabs_voices` enum with a new per-`Setting`
+    `allow_custom` flag (decision (a) — the DM cast is drawn from ElevenLabs, and the flag keeps the
+    Piper-path escape hatch valid server-side without loosening the strict ElevenLabs `voice_id`
+    field); `is_combobox` now also opens an `allow_custom` setting. A new **`@piper_voices`** catalog
+    source (`list_piper_voices` scans the configured voice's directory for `*.onnx` with a sibling
+    `*.onnx.json`, fail-soft to `[]`) makes `piper.model` a searchable enum too. Offline-unit-tested:
+    the `@piper_voices` resolver (temp dir + fail-soft), the `player_ref` / `piper.model` combobox
+    round-trips accepting an EL id, a Piper path, and blank (`tests/test_catalog.py`); the browser
+    interaction (search + pick + custom path + blank + crew reuse) is `MANUAL_TESTS.md` §14.1e. Docs:
+    `docs/audio/ambient-audio.md`, `docs/using/crew.md`, `docs/control-panel.md`. **Improvement thesis
+    vs EDCoPilot/COVAS:NEXT: one consistent, discoverable voice-casting control everywhere — no
+    memorizing ids or hand-typing `.onnx` paths — with a real escape hatch, across a genuinely
+    multi-provider cast the competitors don't offer.**
 
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**

@@ -102,6 +102,7 @@ OPT_OPENAI_BASE_URLS = "@openai_base_urls"  # preset OpenAI/Groq/DeepSeek/OpenRo
 OPT_EDGE_VOICES = "@edge_voices"            # list_edge_voices() — no key (#88)
 OPT_AZURE_VOICES = "@azure_voices"          # list_azure_voices(key, region) — key+region gated (#88)
 OPT_CARTESIA_VOICES = "@cartesia_voices"    # GET {cartesia.base_url}/voices — key gated
+OPT_PIPER_VOICES = "@piper_voices"          # scan the local Piper voices dir for *.onnx (#120) — no key
 OPT_INPUT_DEVICES = "@input_devices"        # firstrun.list_input_devices() — local, no key (#89)
 
 # Small static option vocabularies for TTS model/voice fields (issue #92).
@@ -115,7 +116,7 @@ CARTESIA_MODELS = ["sonic-2", "sonic", "sonic-turbo"]
 # is never rejected — the UI flags it as unsupported instead of blocking the save.
 _COMBOBOX_SOURCES = frozenset({
     OPT_OPENAI_MODELS, OPT_GEMINI_MODELS, OPT_ANTHROPIC_MODELS_LIVE,
-    OPT_OPENAI_BASE_URLS, OPT_EDGE_VOICES, OPT_AZURE_VOICES, OPT_CARTESIA_VOICES,
+    OPT_OPENAI_BASE_URLS, OPT_EDGE_VOICES, OPT_AZURE_VOICES, OPT_CARTESIA_VOICES, OPT_PIPER_VOICES,
     # The mic picker (#89) is a combobox too: a saved device may be unplugged when the page loads,
     # and blank = system default — both must stay valid rather than be rejected against a live list.
     OPT_INPUT_DEVICES,
@@ -140,6 +141,7 @@ class Setting:
     phrasings: tuple = ()             # spoken names for the voice layer
     example: str = ""                 # example spoken command
     hidden: bool = False              # tracked + settable, but not shown as a row
+    allow_custom: bool = False        # enum: accept a value outside options (like a combobox source)
 
 
 # The schema. Order here is the order groups first appear in the web page.
@@ -242,12 +244,14 @@ SCHEMA: list[Setting] = [
             "Cartesia language", "Providers",
             "Synthesis language (BCP-47 primary subtag) for the Cartesia voice, e.g. en.",
             default="en", phrasings=("cartesia language",)),
-    Setting("piper.model", ("piper", "model"), "path",
+    Setting("piper.model", ("piper", "model"), "enum",
             "Piper voice", "Providers",
-            "Local Piper voice .onnx path when TTS provider = piper (offline, free). Download one "
+            "Local Piper voice .onnx path when TTS provider = piper (offline, free). Pick from the "
+            "voices found next to your current one, or type a path (the escape hatch). Download voices "
             "with `python -m piper.download_voices en_US-lessac-medium`; the .onnx.json must sit "
             "beside it. Relative paths resolve against the project root.",
-            default="", phrasings=("piper voice", "piper model", "local voice")),
+            default="", options_source=OPT_PIPER_VOICES, allow_custom=True,
+            phrasings=("piper voice", "piper model", "local voice")),
 
     # --- Language model ----------------------------------------------------
     Setting("anthropic.model", ("anthropic", "model"), "enum",
@@ -881,11 +885,13 @@ SCHEMA: list[Setting] = [
             "ElevenLabs library (minus the COVAS voice). Off = a single voice unless you set a pool.",
             default=True, phrasings=("random voices", "random elevenlabs voices", "random cast"),
             example="turn random voices off"),
-    Setting("audio.voices.player_ref", ("audio", "voices", "player_ref"), "string",
+    Setting("audio.voices.player_ref", ("audio", "voices", "player_ref"), "enum",
             "Player-DM voice", "Ambient audio",
-            "Fixed voice for direct player DMs — a Piper .onnx path or an ElevenLabs voice id. "
+            "Fixed voice for direct player DMs. Pick a voice from your ElevenLabs library, or type a "
+            "Piper .onnx path / any voice id (the escape hatch). "
             "Blank = each player keeps a random session voice (last 25 remembered).",
-            default="", phrasings=("player dm voice", "player comms voice")),
+            default="", options_source=OPT_EL_VOICES, allow_custom=True,
+            phrasings=("player dm voice", "player comms voice")),
     Setting("audio.chatter.min_seconds", ("audio", "chatter", "min_seconds"), "float",
             "Chatter min gap", "Ambient audio",
             "Shortest gap between space-chatter lines, used in the BUSIEST populated systems. "
@@ -1040,8 +1046,10 @@ def is_overridden(overrides: dict, setting: Setting) -> bool:
 def is_combobox(setting: Setting) -> bool:
     """Whether an enum is an EDITABLE combobox (issue #92): its dropdown is a discovery aid, but a
     value OUTSIDE the fetched list stays valid (the custom / at-your-own-risk escape hatch). Only the
-    fetched-catalog sources are open; static enums and the strict ElevenLabs/anthropic lists are not."""
-    return setting.options_source in _COMBOBOX_SOURCES
+    fetched-catalog sources are open; static enums and the strict ElevenLabs/anthropic lists are not.
+    A per-setting `allow_custom` (issue #120: the Player-DM voice picks from ElevenLabs but must also
+    accept a typed Piper .onnx path / unlisted id) opens an otherwise-strict source the same way."""
+    return setting.options_source in _COMBOBOX_SOURCES or setting.allow_custom
 
 
 def resolve_options(setting: Setting, dynamic: Optional[dict] = None) -> Optional[list]:

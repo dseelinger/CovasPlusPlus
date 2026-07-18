@@ -72,8 +72,11 @@ model** (speech-to-text) and a **Personality** toggle.
 - **ElevenLabs** — **model**, a searchable **voice** picker (with the type-to-filter box and 🔍
   search palette), and a **voice speed** slider. The voice/model lists are fetched from ElevenLabs
   **only when ElevenLabs is the active TTS provider**.
-- **Edge / Azure / OpenAI / Cartesia / Piper** — each shows its own voice fields (an Edge/Azure/
-  Cartesia voice combobox, the OpenAI TTS model/voice, a local Piper `.onnx` path, etc.).
+- **Edge / Azure / OpenAI / Cartesia / Piper** — each shows its voice through the **same searchable
+  voice picker** (issue #120): every provider voice, the local **Piper** `.onnx` voice (picked from
+  the voices found next to your current one, or typed), the **Player-DM voice**, and the crew page's
+  per-character voice all use one identical control — 🔍 command palette + type-to-filter, with the
+  current value always visible and a typed custom value always accepted.
 
 Every control writes straight to `overrides.json` through the same validated schema the Settings
 page and voice commands use, so nothing here can drift from the rest of the app.

@@ -7,6 +7,8 @@ fake payload, and a fetch failure degrades to (None, reason) so the UI keeps fre
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from covas import catalog
@@ -73,6 +75,60 @@ def test_input_device_setting_is_editable_combobox():
     s = schema.by_key["audio.input_device"]
     assert s.options_source == schema.OPT_INPUT_DEVICES
     assert schema.is_combobox(s)
+
+
+# ---- Piper voices picker (issue #120) --------------------------------------
+def test_piper_voices_scans_onnx_with_sibling_json(tmp_path):
+    """`@piper_voices` lists each *.onnx that has its sibling *.onnx.json beside it (the config)."""
+    from covas.providers.piper_tts import list_piper_voices
+    (tmp_path / "en_US-lessac-medium.onnx").write_bytes(b"")
+    (tmp_path / "en_US-lessac-medium.onnx.json").write_text("{}")
+    (tmp_path / "orphan.onnx").write_bytes(b"")           # no sibling json -> excluded
+    (tmp_path / "notes.txt").write_text("x")              # not an onnx -> excluded
+    got = list_piper_voices(str(tmp_path))
+    assert [o["label"] for o in got] == ["en_US-lessac-medium.onnx"]
+    assert got[0]["value"].endswith("en_US-lessac-medium.onnx")
+
+
+def test_piper_voices_fail_soft_on_missing_or_blank_dir():
+    """No dir / blank / unreadable -> [] (never raises), so the picker degrades to type-a-path."""
+    from covas.providers.piper_tts import list_piper_voices
+    assert list_piper_voices("") == []
+    assert list_piper_voices(str(Path("no") / "such" / "dir")) == []
+
+
+def test_piper_voices_resolve_uses_configured_voice_dir(tmp_path):
+    """catalog.resolve(@piper_voices) scans the directory of the configured [piper].model, fail-soft."""
+    (tmp_path / "a.onnx").write_bytes(b"")
+    (tmp_path / "a.onnx.json").write_text("{}")
+    opts, err = catalog.resolve(schema.OPT_PIPER_VOICES,
+                                {"piper": {"model": str(tmp_path / "a.onnx")}})
+    assert err is None and [o["label"] for o in opts] == ["a.onnx"]
+    # No configured voice -> empty list, still no error (fail-soft).
+    assert catalog.resolve(schema.OPT_PIPER_VOICES, {"piper": {"model": ""}}) == ([], None)
+
+
+def test_piper_voice_field_is_searchable_custom_combobox():
+    """piper.model is now an enum backed by @piper_voices, and accepts a custom typed path (#120)."""
+    s = schema.by_key["piper.model"]
+    assert s.type == "enum" and s.options_source == schema.OPT_PIPER_VOICES
+    assert schema.is_combobox(s)  # a typed .onnx path (outside the scan) stays valid
+    val, err = schema.validate_value(s, "voices/custom.onnx")
+    assert err is None and val == "voices/custom.onnx"
+
+
+# ---- Player-DM voice picker (issue #120) -----------------------------------
+def test_player_dm_voice_is_searchable_enum_accepting_custom():
+    """audio.voices.player_ref: an @elevenlabs_voices enum that still validates an EL id, a Piper
+    path, and blank (=random) — its validator is combobox-lenient (allow_custom), not strict."""
+    s = schema.by_key["audio.voices.player_ref"]
+    assert s.type == "enum" and s.options_source == schema.OPT_EL_VOICES
+    assert schema.is_combobox(s)          # not strict server-side
+    for probe in ("EXAVITQu4vr4xnSDxMaL",       # a real ElevenLabs voice id
+                  "voices/dm.onnx",             # a Piper .onnx path
+                  ""):                          # blank = random session voice
+        val, err = schema.validate_value(s, probe)
+        assert err is None and val == probe
     # blank (system default) and an unlisted name are both accepted (combobox type-check only).
     assert schema.validate_value(s, "") == ("", None)
     assert schema.validate_value(s, "Some Unplugged Mic") == ("Some Unplugged Mic", None)

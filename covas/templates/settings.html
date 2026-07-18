@@ -209,6 +209,10 @@ function buildControl(control, s){
     control.appendChild(t); return;
   }
   if(s.type==="enum"){
+    // ONE reusable voice picker (issue #120): every voice field — provider voices, the Player-DM
+    // voice, the Piper voice path — renders through buildVoicePicker (select + 🔍 palette + filter),
+    // the SAME control the crew page uses. Route here before the generic combobox/select paths.
+    if(isVoiceField(s)){ control.appendChild(makeVoicePicker(s)); return; }
     // Editable combobox for fetched-catalog sources (issue #92): pick from the live list OR type a
     // custom value. Everything else stays a strict <select>.
     if(s.combobox){ control.appendChild(buildCombo(s)); return; }
@@ -258,6 +262,43 @@ function buildControl(control, s){
   inp.placeholder = s.type==="path" ? "(default location)" : "";
   inp.oninput=()=>edit(s.key, inp.value);
   control.appendChild(inp);
+}
+
+// A voice field is any enum backed by a "*_voices" catalog/live source (elevenlabs/edge/azure/
+// cartesia/piper + the Player-DM voice) or a static voice list (openai_tts.voice). All of them render
+// through the ONE shared buildVoicePicker (issue #120).
+function isVoiceField(s){
+  return s.type==="enum" && (
+    (s.options_source && s.options_source.indexOf("voices")>=0) ||
+    (s.options && /\.voice$/.test(s.key)));
+}
+
+// ElevenLabs voices as picker options (from the /api/elevenlabs fetch; [] until/if it loads).
+function elVoiceOptions(){
+  return (EL && EL.voices) ? EL.voices.map(v=>({value:v.voice_id,
+    label:v.name||v.voice_id, meta:v.category||""})) : [];
+}
+
+// Wire one voice field to the shared picker. Options come from EL (elevenlabs), a lazy catalog fetch
+// (edge/azure/cartesia/piper — fail-soft), or a static list (openai). allowCustom mirrors the
+// server-side combobox flag so a Piper path / unlisted id stays typeable; the Player-DM voice gets a
+// leading blank = "random session voice".
+function makeVoicePicker(s){
+  const srcIsEL = s.options_source==="@elevenlabs_voices";
+  const srcIsCatalog = !!s.options_source && !srcIsEL;
+  let options = [], loadOptions = null;
+  if(srcIsEL) options = elVoiceOptions();
+  else if(srcIsCatalog) loadOptions = async ()=>{ const {options:o}=await fetchCatalog(s.options_source, null); return o||[]; };
+  else if(s.options) options = s.options.map(v=>({value:v, label:(v||"(none)"), meta:""}));
+  return buildVoicePicker({
+    value: s.value,
+    label: s.label,
+    allowCustom: !!s.combobox,
+    blankLabel: s.key==="audio.voices.player_ref" ? "(random session voice)" : null,
+    options: options,
+    loadOptions: loadOptions,
+    onChange: (val)=> edit(s.key, val),
+  });
 }
 
 // A compact text box that filters a native <select>'s options by case-insensitive substring of the
@@ -617,5 +658,6 @@ $("search").oninput=filter;
 load();
 </script>
 {% include "_command_palette.html" %}
+{% include "_voice_picker.html" %}
 </body>
 </html>
