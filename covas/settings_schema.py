@@ -914,6 +914,16 @@ SCHEMA: list[Setting] = [
             "to install. Fails soft with no VR runtime (the panel simply doesn't appear).",
             default=False, phrasings=("vr hud", "the vr hud", "vr overlay", "headset hud"),
             example="turn the VR HUD on"),
+    Setting("hud.web_enabled", ("hud", "web_enabled"), "bool",
+            "Web HUD (OpenKneeboard)", "Companion HUD",
+            "Serve the same HUD as a transparent web page at /hud for OpenKneeboard's Web "
+            "Dashboard tab, so it composites in-headset on ANY OpenXR runtime "
+            "(OpenComposite / VDXR / Virtual Desktop), not just SteamVR. Off by default; needs the "
+            "control panel running (run_covas_ui.py) and a one-time OpenKneeboard tab setup. "
+            "Independent of the desktop and SteamVR HUDs.",
+            default=False,
+            phrasings=("web hud", "the web hud", "kneeboard hud", "openkneeboard hud"),
+            example="turn the web HUD on"),
     Setting("hud.vr_placement", ("hud", "vr_placement"), "enum",
             "VR HUD placement", "Companion HUD",
             "Where the VR panel sits: 'world' (cockpit-fixed, parked in front — the comfortable "

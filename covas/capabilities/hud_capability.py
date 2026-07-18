@@ -406,6 +406,38 @@ def make_view(snapshot_provider: Callable[[], HudSnapshot],
     return None
 
 
+class WebHudView:
+    """The web HUD 'surface' for the surface-agnostic reconcile contract (issue #103).
+
+    Deliberately trivial, and that's the design: the transparent `/hud` page is served by Flask
+    whether or not anything watches it, and its visibility is decided entirely by the
+    `[hud].web_enabled` flag that `/api/hud` reads (off => the page renders empty). So this view
+    holds NO resources — it exists only to satisfy `_reconcile_surface`'s show/hide/close contract
+    and to log, once per enable, the URL to paste into OpenKneeboard's Web Dashboard tab.
+
+    Built by a factory that returns None when the control panel isn't running — the web HUD needs
+    `run_covas_ui.py` (headless `run_covas.py` starts no Flask server), so a None keeps the surface
+    off with the standard "unavailable" log rather than failing silently."""
+
+    def __init__(self, url: str, *, log: Optional[Callable[[str], None]] = None) -> None:
+        self._url = url
+        self._log = log
+        self._announced = False   # log the paste-in URL once per enable, not every reconcile
+
+    def show(self) -> None:
+        if not self._announced:
+            self._announced = True
+            if self._log is not None:
+                self._log(f"Web HUD live — add this as an OpenKneeboard Web Dashboard tab: "
+                          f"{self._url}")
+
+    def hide(self) -> None:
+        self._announced = False   # re-announce the URL if it's turned back on
+
+    def close(self) -> None:
+        self._announced = False
+
+
 class HudCapability:
     """Wires the model + view(s) to the app: always registered, drives the overlay off the bus.
 
@@ -438,6 +470,8 @@ class HudCapability:
         view_factory: Callable[[Callable[[], HudSnapshot]], Optional["HudView"]] = make_view,
         vr_is_enabled: Optional[Callable[[], bool]] = None,
         vr_view_factory: Optional[Callable[[Callable[[], HudSnapshot]], Optional[object]]] = None,
+        web_is_enabled: Optional[Callable[[], bool]] = None,
+        web_view_factory: Optional[Callable[[Callable[[], HudSnapshot]], Optional[object]]] = None,
         log: Optional[Callable[[str], None]] = None,
     ) -> None:
         self.model = model
@@ -445,11 +479,15 @@ class HudCapability:
         self._view_factory = view_factory
         self._vr_is_enabled = vr_is_enabled or (lambda: False)
         self._vr_view_factory = vr_view_factory
+        self._web_is_enabled = web_is_enabled or (lambda: False)
+        self._web_view_factory = web_view_factory
         self._log = log
         self._view: Optional[HudView] = None
         self._view_tried = False  # don't re-attempt a failed/headless window every settings change
         self._vr_view: Optional[object] = None
         self._vr_view_tried = False
+        self._web_view: Optional[object] = None
+        self._web_view_tried = False
         self._reconcile()          # show at startup if already enabled
 
     # -- capability interface ----------------------------------------------------------
@@ -461,13 +499,17 @@ class HudCapability:
             category="the HUD",
             group="settings",
             one_liner=("I can show a small always-on-top overlay with my current state, your "
-                       "active checklist step, and your route progress — on your desktop or, in "
-                       "VR, floating in the cockpit. Off by default."),
+                       "active checklist step, and your route progress — on your desktop, in VR "
+                       "floating in the cockpit, or as a transparent web page for OpenKneeboard. "
+                       "Off by default."),
             example="turn the HUD on",
             help_when_active=("Say 'turn the HUD on' or 'off' — it's a glanceable panel showing "
                               "whether I'm listening or speaking, your current checklist item, "
                               "and jumps remaining on your route. In VR, turn the VR HUD on for "
-                              "the same panel as a SteamVR overlay in the headset."),
+                              "the same panel as a SteamVR overlay in the headset. On a non-SteamVR "
+                              "rig (OpenComposite / VDXR / Virtual Desktop), turn the web HUD on and "
+                              "point OpenKneeboard's Web Dashboard at /hud for the same panel "
+                              "in-headset (needs the control panel running)."),
         )
 
     def on_event(self, event: dict) -> None:
@@ -514,9 +556,16 @@ class HudCapability:
             self._logline(f"VR HUD pin failed: {e}")
             return None
 
+    def on_web_ui_ready(self) -> None:
+        """The control panel (Flask) has come up after startup. Clear the web surface's one-shot
+        'tried' latch and reconcile, so a web HUD enabled BEFORE the server existed (e.g. on at
+        startup) gets one more chance to attach now that /hud is actually served (#103)."""
+        self._web_view_tried = False
+        self._reconcile()
+
     def shutdown(self) -> None:
-        """Tear both overlays down on app exit (idempotent)."""
-        for attr in ("_view", "_vr_view"):
+        """Tear every overlay down on app exit (idempotent)."""
+        for attr in ("_view", "_vr_view", "_web_view"):
             view = getattr(self, attr)
             if view is not None:
                 try:
@@ -537,6 +586,12 @@ class HudCapability:
             self._reconcile_surface(
                 "_vr_view", "_vr_view_tried", self._vr_is_enabled, self._vr_view_factory,
                 label="VR HUD", unavailable="no VR runtime is available (openvr / SteamVR absent)")
+        if self._web_view_factory is not None:
+            self._reconcile_surface(
+                "_web_view", "_web_view_tried", self._web_is_enabled, self._web_view_factory,
+                label="Web HUD",
+                unavailable="the control panel isn't running (start run_covas_ui.py, not "
+                            "run_covas.py, so /hud can be served)")
 
     def _reconcile_surface(self, view_attr: str, tried_attr: str,
                            is_enabled: Callable[[], bool], factory, *,

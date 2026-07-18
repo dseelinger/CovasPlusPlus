@@ -1134,12 +1134,26 @@ enabled = false
 # only shows if SteamVR is ALREADY running and never launches it, so leaving this on under VDXR /
 # OpenComposite / flat desktop is harmless (it just stays off — no SteamVR gets dragged up). FAILS
 # SOFT with no VR: if SteamVR isn't running it simply doesn't appear — no error, the 2D HUD (if
-# enabled) still works. Quest players on the native Oculus runtime / OpenComposite are covered by
-# capturing the 2D window with OpenKneeboard/OVR Toolkit (see docs/using/hud.md).
+# enabled) still works. Quest players on OpenComposite / VDXR / Virtual Desktop (no SteamVR) can
+# get the HUD in-headset via the transparent WEB HUD below and OpenKneeboard (see
+# docs/using/hud.md) — NOT OVR Toolkit, which is itself a SteamVR-only overlay app.
 #
 # NOTE: releases up to v0.12.0 were frozen WITHOUT the openvr binding, so this setting did
 # nothing at all in them regardless of your VR setup.
 vr_enabled = false
+
+# Web HUD (issue #103, epic #40) — the SAME four-field HUD served as a transparent web page at
+# http://<ui host:port>/hud, for OpenKneeboard's Web Dashboard tab. OpenKneeboard is an OpenXR
+# API layer in-process to the game, so its Chromium tab composites over Elite Dangerous on ANY
+# runtime — OpenComposite / VDXR / Virtual Desktop — where a separate-process SteamVR overlay
+# (vr_enabled above) structurally cannot. The page is transparent by construction: only the text
+# and panel border draw over your cockpit, no opaque capture rectangle.
+#
+# DEFAULT OFF. Needs the CONTROL PANEL running (run_covas_ui.py, not the headless run_covas.py —
+# there's no web server to serve /hud otherwise) and a one-time OpenKneeboard setup (add a Web
+# Dashboard tab pointing at /hud). Turning it OFF blanks the page in-headset with no OpenKneeboard
+# interaction. Independent of `enabled` and `vr_enabled`: run any, all, or none.
+web_enabled = false
 # Where the panel sits: "world" (cockpit-fixed, parked in front of the seated origin — the
 # comfortable default) or "head" (locked to your view, follows where you look).
 vr_placement = "world"

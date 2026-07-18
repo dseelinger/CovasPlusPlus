@@ -1,0 +1,107 @@
+<!--
+  Transparent companion HUD for OpenKneeboard's Web Dashboard tab (issue #103).
+
+  Third rendering surface for the ONE HudModel snapshot (desktop tkinter + SteamVR overlay are
+  the other two). OpenKneeboard is an OpenXR API layer in-process to the game, so its embedded
+  Chromium composites this page's real RGBA alpha over Elite Dangerous on ANY runtime
+  (OpenComposite / VDXR / Virtual Desktop) — where a separate-process SteamVR overlay can't.
+
+  SELF-CONTAINED BY REQUIREMENT: no CDN, no external font, no remote asset. Chromium here has no
+  guaranteed network, and the page must stay offline-first. Inline CSS/JS + system font stack.
+
+  TRANSPARENT BY CONSTRUCTION: html/body background is transparent — that is the whole point;
+  only the panel and its text draw over the cockpit. When [hud].web_enabled is off (or there's no
+  HUD), /api/hud reports {"enabled": false} and the page renders empty, so nothing floats.
+
+  Polls /api/hud every 400 ms — matching the desktop (HudView.POLL_MS) and SteamVR
+  (VrHudView.POLL_S) cadences. A dumb poller: no SSE, no interactivity (the HUD is a view).
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COVAS++ HUD</title>
+<style>
+  /* Palette shared with the other two surfaces (vr_hud.py:120-126) so all three read as one
+     product: cyan state headline, ED-orange accent bar, near-black translucent panel. */
+  :root {
+    --bg: rgba(11, 15, 20, 0.86);
+    --accent: #ff7100;   /* ED orange */
+    --state: #00e5e5;    /* cyan */
+    --check: #e0e0e0;
+    --route: #c8c8c8;
+    --call: #9aa0a6;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;   /* OpenKneeboard composites this alpha in-headset */
+  }
+  #panel {
+    display: none;             /* hidden until /api/hud says enabled */
+    box-sizing: border-box;
+    max-width: 520px;
+    margin: 8px;
+    padding: 10px 14px 12px;
+    background: var(--bg);
+    border-top: 3px solid var(--accent);
+    border-radius: 6px;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    color: var(--check);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    line-height: 1.35;
+  }
+  .row { display: none; margin: 2px 0; }        /* each row collapses when its text is empty */
+  .row.show { display: block; }
+  #state {
+    color: var(--state);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 1.05rem;
+  }
+  #checklist { color: var(--check); font-weight: 600; }
+  #route { color: var(--route); }
+  #callout { color: var(--call); font-style: italic; }
+</style>
+
+<div id="panel">
+  <div class="row" id="state"></div>
+  <div class="row" id="checklist"></div>
+  <div class="row" id="route"></div>
+  <div class="row" id="callout"></div>
+</div>
+
+<script>
+  // A row shows only when it has text — mirrors HudView._set_row (hud_capability.py) so the three
+  // surfaces collapse empty rows identically. Never throws on a bad payload (defensive: the page
+  // must degrade to blank, never error, over an unreliable embedded browser).
+  function setRow(id, text) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var t = (text == null) ? "" : String(text);
+    el.textContent = t;
+    el.classList.toggle("show", t.length > 0);
+  }
+
+  function apply(data) {
+    var panel = document.getElementById("panel");
+    if (!data || !data.enabled) {
+      panel.style.display = "none";   // off / no HUD => fully transparent, nothing composites
+      return;
+    }
+    setRow("state", data.voice_state);
+    setRow("checklist", data.checklist);
+    setRow("route", data.route);
+    setRow("callout", data.callout);
+    panel.style.display = "block";
+  }
+
+  function tick() {
+    fetch("/api/hud", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(apply)
+      .catch(function () { /* transient fetch failure: keep the last frame, try again next tick */ });
+  }
+
+  tick();
+  setInterval(tick, 400);   // 2.5 req/s against localhost JSON — free next to the game
+</script>
