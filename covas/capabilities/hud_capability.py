@@ -32,6 +32,7 @@ display, or any Tk error degrades to "no overlay", never a crash of the voice lo
 """
 from __future__ import annotations
 
+import re
 import threading
 from dataclasses import dataclass
 from typing import Callable, Optional
@@ -66,11 +67,44 @@ class HudSnapshot:
     callout: Optional[str] = None
 
 
+# Inline Markdown the checklist/callout source text may legitimately contain (it comes from the
+# user's checklist file or LLM-authored prose) but that none of the three HUD surfaces render —
+# web `hud.html` stays on the safe `textContent` path (never innerHTML), tkinter paints a plain
+# label, and the SteamVR overlay rasterizes through a bitmap font. So literal `**`/`` ` ``/`_`
+# glyphs would otherwise show verbatim in every surface (issue #122). Stripped once here, in the
+# shared adapter, rather than per-surface.
+_MD_LEADING_RE = re.compile(r"^\s*(?:[-*+]\s+|#{1,6}\s+)")          # "- ", "# ", "## foo" ...
+_MD_BOLD_RE = re.compile(r"\*\*(.+?)\*\*|__(.+?)__")                # **bold** / __bold__
+_MD_ITALIC_RE = re.compile(
+    r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)|(?<!_)_(?!_)(.+?)(?<!_)_(?!_)")  # *em* / _em_
+_MD_CODE_RE = re.compile(r"`([^`]*)`")                              # `code`
+
+
+def _plain(text: Optional[str]) -> Optional[str]:
+    """Strip inline Markdown to plain prose for the HUD (issue #122): bold/italic emphasis,
+    inline code backticks, and a leading list/heading marker collapse to readable text so
+    'Elvira Martuuk - **Location:** ...' shows as 'Elvira Martuuk - Location: ...' instead of
+    with literal asterisks. Pure, and must NEVER raise — a regex glitch falls back to the raw
+    string, matching the HUD's fail-soft rule (a display glitch degrades, it never crashes the
+    loop). `None`/empty pass through unchanged."""
+    if not text:
+        return text
+    try:
+        result = _MD_LEADING_RE.sub("", text)
+        result = _MD_BOLD_RE.sub(lambda m: m.group(1) or m.group(2) or "", result)
+        result = _MD_ITALIC_RE.sub(lambda m: m.group(1) or m.group(2) or "", result)
+        result = _MD_CODE_RE.sub(lambda m: m.group(1), result)
+        return result
+    except Exception:  # noqa: BLE001 — a regex glitch must not blank or crash the HUD row
+        return text
+
+
 def checklist_line(checklist) -> Optional[str]:
     """The current checklist step for the HUD: the first PENDING item plus a done/total count
     ('Scan the nav beacon  (3/10 done)'), or None when there's nothing to show. Pure over a
     `Checklist`-like object (anything with `next_pending`); reads the file fresh so a hand-edit
-    or a voice update shows up live. Never raises — a checklist glitch just blanks the row."""
+    or a voice update shows up live. Never raises — a checklist glitch just blanks the row.
+    Markdown in the item text (bold/italic/code/list markers) is stripped for the HUD (#122)."""
     try:
         pending, done, total = checklist.next_pending(1)
     except Exception:  # noqa: BLE001 — the HUD must survive a checklist read error
@@ -80,7 +114,7 @@ def checklist_line(checklist) -> Optional[str]:
     if not pending:
         return f"All {total} items done"
     _num, text = pending[0]
-    return f"{text}  ({done}/{total} done)"
+    return f"{_plain(text)}  ({done}/{total} done)"
 
 
 class HudModel:
@@ -147,7 +181,7 @@ class HudModel:
                 line = text[len(prefix):].strip()
                 if line:
                     with self._lock:
-                        self._callout = line
+                        self._callout = _plain(line)  # strip Markdown for the HUD row (#122)
                 return
 
     def _on_ed_event(self, event: dict) -> None:

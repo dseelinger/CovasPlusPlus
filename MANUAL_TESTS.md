@@ -442,6 +442,7 @@ Notes:
 - [ ] **Toggle on — voice:** with the HUD off, say *"turn the HUD on"* → the panel appears (settings-by-voice path). *"Turn the HUD off"* → it disappears. Toggling is live (no restart).
 - [ ] **Voice-loop state row:** hold PTT → the state row tracks **Listening → Thinking → Speaking → Idle** as you talk and COVAS replies.
 - [ ] **Checklist row:** with a checklist loaded, the row shows your next pending item + count (e.g. *"…  (2/10 done)"*); mark it done by voice → the row advances to the next pending item.
+- [ ] **Markdown is stripped, not shown literally (issue #122):** add a checklist item containing Markdown (e.g. `**Location:** Long Sight Base`) → the row shows clean prose (`Location: Long Sight Base  (…)`) with **no literal asterisks/backticks**.
 - [ ] **Route row:** plot a multi-jump route (writes `NavRoute.json`) → the row shows **"N jumps to <dest>"**; lock the next jump → it appends **scoopable / NOT scoopable**; each jump decrements the count; arrival shows **"Arrived at <dest>"**.
 - [ ] **Callout row:** trigger a proactive or route callout (§5.2/§5.3) → the last-callout row shows that line.
 - [ ] **Click-through (Windows):** move the mouse over the panel and click → the click lands on the window/game **behind** it (the HUD is non-interactive).

@@ -10,7 +10,7 @@ driven off crafted bus events + injected fakes and asserted on the snapshot.
 from __future__ import annotations
 
 from covas.capabilities.hud_capability import (
-    HudCapability, HudModel, HudSnapshot, checklist_line, make_view,
+    HudCapability, HudModel, HudSnapshot, _plain, checklist_line, make_view,
 )
 
 
@@ -71,6 +71,48 @@ def test_checklist_line_survives_a_raising_checklist():
         def next_pending(self, count=1):
             raise RuntimeError("disk gone")
     assert checklist_line(Boom()) is None
+
+
+def test_checklist_line_strips_markdown_from_the_item_text():
+    chk = FakeChecklist(pending=[(1, "Elvira Martuuk - **Location:** Long Sight Base")],
+                        done=78, total=661)
+    assert checklist_line(chk) == "Elvira Martuuk - Location: Long Sight Base  (78/661 done)"
+
+
+# --- _plain (Markdown stripping for the HUD, issue #122) -------------------
+
+def test_plain_strips_bold_asterisks_and_underscores():
+    assert _plain("**Location:** foo") == "Location: foo"
+    assert _plain("__Location:__ foo") == "Location: foo"
+
+
+def test_plain_strips_inline_code_backticks():
+    assert _plain("run `code` now") == "run code now"
+
+
+def test_plain_strips_italic_asterisks_and_underscores():
+    assert _plain("*em*") == "em"
+    assert _plain("_em_") == "em"
+
+
+def test_plain_strips_leading_list_and_heading_markers():
+    assert _plain("- Scan the beacon") == "Scan the beacon"
+    assert _plain("# Heading") == "Heading"
+    assert _plain("## Heading") == "Heading"
+
+
+def test_plain_leaves_a_plain_string_unchanged():
+    assert _plain("Dock at Jameson Memorial") == "Dock at Jameson Memorial"
+
+
+def test_plain_handles_none_and_empty():
+    assert _plain(None) is None
+    assert _plain("") == ""
+
+
+def test_plain_never_raises_on_odd_input():
+    # An unbalanced/degenerate marker set must fall back gracefully, never raise.
+    _plain("** unbalanced * markers ` here")
 
 
 # --- voice-loop state (status events) --------------------------------------
@@ -197,6 +239,13 @@ def test_route_callout_line_is_captured():
     m = _model()
     m.on_event({"type": "log", "who": "COVAS", "text": "(route) 2 jumps remaining to Colonia."})
     assert m.snapshot().callout == "2 jumps remaining to Colonia."
+
+
+def test_proactive_callout_strips_markdown():
+    m = _model()
+    m.on_event({"type": "log", "who": "COVAS",
+                "text": "(proactive) **Warning:** fuel is `low`."})
+    assert m.snapshot().callout == "Warning: fuel is low."
 
 
 def test_normal_reply_is_not_treated_as_a_callout():

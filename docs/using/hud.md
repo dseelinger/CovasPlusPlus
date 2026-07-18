@@ -26,6 +26,10 @@ This is the axis where the HUD beats the competition: EDCoPilot's and COVAS:NEXT
 mirror ship/EDMC telemetry, whereas this shows **the companion's own state, your checklist, and
 your route** — a purpose-built minimal panel, not a generic instrument dump.
 
+The checklist and callout rows are shown as **plain prose** — any Markdown in the source text
+(`**bold**`, `` `code` ``, a leading `- ` list marker, and so on) is stripped before it reaches
+the panel, so it reads cleanly across all three surfaces instead of showing literal asterisks.
+
 ## Turning it on and off
 
 Three equivalent ways, all writing the same `[hud].enabled` setting:
