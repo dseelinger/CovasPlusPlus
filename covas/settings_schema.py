@@ -594,8 +594,15 @@ SCHEMA: list[Setting] = [
             phrasings=("route callout cadence", "jumps remaining cadence")),
     Setting("route.callout_scoopable", ("route", "callout_scoopable"), "bool",
             "Announce scoopable star", "Route callouts",
-            "Call out whether the next star can be fuel-scooped as you lock each jump.",
+            "Call out whether the star you're arriving at can be fuel-scooped (and the one "
+            "after it, when that's the useful thing to know).",
             default=True, phrasings=("scoopable callouts", "scoopable star callout")),
+    Setting("route.callout_hazard", ("route", "callout_hazard"), "bool",
+            "Announce hazard star", "Route callouts",
+            "Warn when the arriving star is a neutron star or white dwarf (exclusion-zone "
+            "jets, can't be scooped). Replaces the plain 'not scoopable' line for those.",
+            default=True, phrasings=("hazard callouts", "neutron star warning",
+                                      "white dwarf warning")),
     Setting("route.callout_jumps_remaining", ("route", "callout_jumps_remaining"), "bool",
             "Announce jumps remaining", "Route callouts",
             "Call out jumps remaining to the destination, every Nth jump.",

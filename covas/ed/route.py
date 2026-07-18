@@ -6,9 +6,10 @@ then emits a bare `NavRoute` event when it's (re)plotted and `NavRouteClear` whe
 progress along it is followed via `FSDJump`.
 
 `RouteTracker` is the PURE state machine over that: load a route, advance on each jump,
-answer "how many jumps left / what's the destination / is the next star scoopable". No I/O,
-no threads — the capability wires it to the bus and the `read_navroute` file read. Kept pure
-so the cadence and scoopable logic are unit-testable offline (DESIGN §9).
+answer "how many jumps left / what's the destination / is the next star scoopable /
+hazardous / which star am I arriving at vs. the one after". No I/O, no threads — the
+capability wires it to the bus and the `read_navroute` file read. Kept pure so the cadence,
+scoopable/hazard logic, and route-position look-ahead are unit-testable offline (DESIGN §9).
 """
 from __future__ import annotations
 
@@ -23,6 +24,12 @@ SCOOPABLE_CLASSES = frozenset("KGBFOAM")
 # Classes whose first letter is scoopable but which AREN'T (Herbig Ae/Be starts with 'A').
 _NON_SCOOPABLE_EXACT = frozenset({"AEBE"})
 
+# Hazardous classes (#147) — exclusion zones with damaging jets, and (like all non-KGBFOAM
+# stars) not scoopable. Matched on the leading class letter, same as `is_scoopable`: Neutron
+# stars ('N', 'NS', ...) and White Dwarfs ('D', 'DA', 'DB', 'DC', 'DAB', ...). Black holes ('H')
+# are a real hazard too but rare on plotted routes — out of scope here, trivial follow-on.
+_HAZARD_NAMES = {"N": "neutron star", "D": "white dwarf"}
+
 
 def is_scoopable(star_class: str | None) -> bool:
     """Whether a star of `star_class` can be fuel-scooped (KGBFOAM). Matches on the leading
@@ -31,6 +38,17 @@ def is_scoopable(star_class: str | None) -> bool:
     if not c or c in _NON_SCOOPABLE_EXACT:
         return False
     return c[0] in SCOOPABLE_CLASSES
+
+
+def is_hazardous_star(star_class: str | None) -> str | None:
+    """Whether a star of `star_class` is a jets/exclusion-zone hazard worth a heads-up before
+    the Commander drops in. Returns a human-readable name ("neutron star" / "white dwarf") for
+    the callout to speak, or None if it isn't one of those two. Matches on the leading class
+    letter, mirroring `is_scoopable`. Empty/unknown -> not hazardous."""
+    c = str(star_class or "").strip().upper()
+    if not c:
+        return None
+    return _HAZARD_NAMES.get(c[0])
 
 
 def read_navroute(journal_dir: str | Path) -> dict | None:
@@ -117,3 +135,18 @@ class RouteTracker:
             if step.system.lower() == s:
                 return step
         return None
+
+    def lookahead(self) -> tuple[RouteStep | None, RouteStep | None]:
+        """The star the Commander is ARRIVING at this jump (the next hop not yet arrived at)
+        and the one AFTER it, purely by route position (`_idx` + the step list) — never by
+        matching a possibly-ambiguous event target name (#148: `FSDTarget` locks one hop ahead
+        of the pilot's actual next arrival, so trusting its `Name` for "next star" is wrong).
+
+        Returns `(None, None)` with no active route; `(arriving, None)` when arriving is the
+        final destination (nothing after it); both populated otherwise.
+        """
+        if not self.active:
+            return None, None
+        arriving = self._route[self._idx + 1] if self._idx + 1 < len(self._route) else None
+        following = self._route[self._idx + 2] if self._idx + 2 < len(self._route) else None
+        return arriving, following

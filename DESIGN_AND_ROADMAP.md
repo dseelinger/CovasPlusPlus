@@ -76,7 +76,7 @@ The empirical check on the frame: if a shipped capability fits no pillar, either
 | `LocationCarrierCapability` | where's my carrier / copy current system |
 | `CGCapability` | community-goals lookup (journal + optional Inara) |
 | `ProactiveCapability` | spoken danger / event callouts |
-| `RouteCalloutCapability` | jumps-remaining route callouts |
+| `RouteCalloutCapability` | jumps-remaining, scoopable/hazard-star route callouts |
 | `FindClosestCapability` | nearest station selling a module |
 | `FindClosestShipCapability` | nearest shipyard stocking a hull |
 | `SystemSearchCapability` | star-system search (Spansh) |
@@ -1315,7 +1315,13 @@ The original seven-phase plan is done and tested:
 8. **Voice search & help subsystem** — templated `HelpCapability` (idle + failure-recovery) on one unified registry with a structural help-metadata contract; a shared typed Spansh client (`search/spansh.py`, outfitting refactored onto it); and five LLM-native category capabilities — star systems, stations, minor factions, signals, misc — with offline fuzzy resolution for factions/systems (§3.5). *(Search Prompts 1–6 merged, including the voice-polish pass: refinement re-query, error-mode wiring, low-confidence confirmation.)*
 9. **Settings** — one schema as source of truth, projected to both the web settings page (N1) and the voice `SettingsCapability` (N2).
 10. **Location & carrier commands** (N3) — copy current system; owned-carrier tracking pinned to `CarrierID`; the "already there → don't copy" rule.
-11. **Route callouts** (N4) — scoopable-star + jumps-remaining via the proactive path.
+11. **Route callouts** (N4) — scoopable-star + jumps-remaining via the proactive path. *Hazard
+    warning + off-by-one fix (#147/#148):* `RouteTracker.lookahead()` reports the star the
+    Commander is arriving at this jump vs. the one after, purely by route position — `FSDTarget`
+    locks the route's NEXT waypoint around the time the pilot is arriving at the CURRENT one, so
+    the callout no longer trusts the event's `Name` to say which star is "next." A neutron-star/
+    white-dwarf arrival gets a hazard warning (`[route].callout_hazard`) that supersedes the plain
+    "not scoopable" line for the same star.
 12. **Auto-honk** (N5, §6).
 13. **Community Goals** (N6) — journal-primary with the Inara feed for completeness.
 14. **Personality tab, voice speed & log filter** (N7). *Persona-voice rebalance (issue #98):* the shared **Base** was reworked so the voice persists in EVERY reply — the old "lead with the answer / drop the bit if they want it flat" default was reading as "flatten on most turns," so it's replaced with "the persona is HOW you say things, stay in character even when brief and *especially* when you can't help," a can't-fly-the-ship decline reframed as an in-character performance, a thinking-step instruction to *preserve* the voice rather than optimize it away (still cost-gated, no always-on thinking), and per-persona brevity/energy leans. The non-negotiables are untouched: no invented data, TTS-friendly output, and an explicit "just give it to me straight" escape hatch. **Persona-body contract:** each preset body now carries verbal tics + short in-character example lines (can't-do / a number / danger) as plain prose; the single `> *"…"*` blockquote remains a **UI-only preview** stripped by `parse_presets`/`_split_preview` before the model sees it — so examples live in the body, never the preview. Custom-persona authoring guidance (`docs/using/personas-voice.md`) matches. *Normalized voice speed (issue #99):* voice speed is no longer hardwired to ElevenLabs (old cap 1.0–1.2). It's now **one canonical normalized `[tts].speed`** (0.5–2.0, 1.0 = normal) that a pure `covas/tts_speed.py` maps into EACH provider's native mechanism and clamps to that backend's real range — ElevenLabs `voice_settings.speed` 0.7–1.2 (widened so COVAS can slow below normal), OpenAI `speed` 0.25–4.0, Edge/Azure signed-percent SSML/`rate`, Cartesia's `[-1,1]` `__experimental_controls.speed`, and Piper's **inverse** `length_scale`. Verified against provider docs (same rigor as #91). Because only the normalized value is stored and each adapter caps at synth time, an out-of-range value is safely capped (never sent raw to error the API) and a provider switch can't carry a bad value across. `web.py`'s quick-control `speed` and the voice command target `[tts].speed`; legacy `[elevenlabs].speed` remains a read-fallback for old configs.

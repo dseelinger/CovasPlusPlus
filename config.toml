@@ -741,8 +741,12 @@ SrvHullLow       = true   # SRV hull dropped below 30%
 [route]
 # Route callouts (N4) — proactive heads-ups while flying a plotted galaxy-map route. Reads the
 # jump list (with star classes) from NavRoute.json and follows progress via FSDJump. Announces:
-#   * whether the NEXT star is SCOOPABLE (KGBFOAM) as you lock each jump — so you don't arrive
-#     low on fuel at an unscoopable star;
+#   * whether the star you're ARRIVING at is SCOOPABLE (KGBFOAM) — and the one AFTER it, when
+#     that's the useful two-star statement (#148) — so you don't arrive low on fuel at an
+#     unscoopable star;
+#   * a hazard warning when the arriving star is a NEUTRON STAR or WHITE DWARF (#147) — both
+#     have exclusion-zone jets and can't be scooped; this REPLACES the plain "not scoopable"
+#     line for those, no redundant pair;
 #   * jumps remaining to the destination, every Nth jump;
 #   * arrival at the final system.
 # These go through the proactive path: spoken only when idle (never over you), a push-to-talk
@@ -757,6 +761,10 @@ every_n = 5
 callout_scoopable       = true
 callout_jumps_remaining = true
 callout_arrival         = true
+# Warn on a neutron star / white dwarf next (#147). Default ON since the request is to be
+# warned, but neutron-highway flyers deliberately route through them for the FSD supercharge
+# and may want it quieter — turn off if that's you.
+callout_hazard          = true
 
 
 [keybinds]

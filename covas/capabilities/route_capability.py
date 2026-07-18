@@ -1,19 +1,27 @@
-"""Route callouts — proactive heads-ups while flying a plotted route (N4).
+"""Route callouts — proactive heads-ups while flying a plotted route (N4, #147, #148).
 
 When Elite Dangerous monitoring is on, the journal watcher publishes `ed_event`s on the bus.
 This capability reacts to the route-relevant ones and volunteers SHORT, DETERMINISTIC spoken
-lines — is the next star scoopable, how many jumps remain, arrival at the destination —
-WITHOUT a push-to-talk press:
+lines — is the arriving star scoopable (and the one after it), is it a hazard, how many jumps
+remain, arrival at the destination — WITHOUT a push-to-talk press:
 
   * `NavRoute` / `NavRouteClear` -> (re)load or drop the plotted route (from NavRoute.json).
-  * `FSDTarget` -> the next system is locked in; announce whether its star is scoopable.
+  * `FSDTarget` -> a new target locked in; announce the arriving star's hazard/scoopable
+                   status (and the FOLLOWING star's, when that's the useful thing to know).
   * `FSDJump`   -> advance progress; every Nth jump announce jumps remaining, and announce
                    arrival at the final system.
+
+`FSDTarget` locks the route's NEXT waypoint around the time the Commander is actually in
+transit to / arriving at the CURRENT one (#148) — so the callout never trusts the event's
+`Name` to say which star is "next". Instead it anchors wording to `RouteTracker.lookahead()`,
+which reports the arriving star vs. the one after purely by route position.
 
 Unlike generic proactive callouts these are FACTUAL, so they're spoken verbatim (no LLM cost
 or embellishment) through the app's proactive line path — which means they inherit the same
 guarantees: they only speak when Idle (never over the Commander), a PTT press cancels one, and
-they honour the proactive mute. Everything is injected so the default test run is offline.
+they honour the proactive mute. Speaking during hyperspace is fine/desired — nothing here
+delays for timing, only for the Idle/mute gates above. Everything is injected so the default
+test run is offline.
 
 Off by default ([route].enabled = false).
 """
@@ -22,7 +30,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from ..ed.route import RouteTracker, is_scoopable
+from ..ed.route import RouteTracker, is_hazardous_star, is_scoopable
+
+# Hazard warning lines (#147) — named per `is_hazardous_star`'s return value. These SUPERSEDE
+# the plain "not scoopable" line for the same star (N/D are also non-scoopable; the warning
+# already implies "no fuel here"), so a hazardous star never gets a redundant back-to-back pair.
+_HAZARD_LINES = {
+    "neutron star": ("Heads up, Commander — next jump's a neutron star. "
+                      "Mind the exclusion zone, and no fuel there."),
+    "white dwarf": "Careful — a white dwarf next. Watch the jets; you can't scoop it.",
+}
 
 
 @dataclass(frozen=True)
@@ -34,6 +51,7 @@ class RouteConfig:
     callout_scoopable: bool = True
     callout_jumps_remaining: bool = True
     callout_arrival: bool = True
+    callout_hazard: bool = True      # neutron star / white dwarf heads-up (#147)
 
     @classmethod
     def from_cfg(cls, cfg: dict) -> "RouteConfig":
@@ -45,6 +63,7 @@ class RouteConfig:
             callout_scoopable=bool(r.get("callout_scoopable", True)),
             callout_jumps_remaining=bool(r.get("callout_jumps_remaining", True)),
             callout_arrival=bool(r.get("callout_arrival", True)),
+            callout_hazard=bool(r.get("callout_hazard", True)),
         )
 
 
@@ -120,21 +139,47 @@ class RouteCalloutCapability:
                       f"{self._tracker.destination}")
 
     def _on_target(self, event: dict) -> None:
-        if not self._cfg.callout_scoopable or not self._tracker.active:
+        if not self._tracker.active:
             return
         target = event.get("Name")                       # FSDTarget uses 'Name', not 'StarSystem'
         if not target or target == self._last_target:     # already announced this target
             return
-        # Prefer the class from the plotted route (NavRoute.json); fall back to the event's.
-        step = self._tracker.step_for(target)
-        star_class = step.star_class if step else event.get("StarClass")
-        if not star_class:
-            return
         self._last_target = target
-        if is_scoopable(star_class):
-            self._emit("Next star's scoopable.")
+
+        if self._tracker.step_for(target) is None:
+            # Off-route detour (manually targeted, not on the plotted route) — no route
+            # position to anchor "arriving"/"following" to, so fall back to a single-star line
+            # about the event's own class, as before #148.
+            star_class = event.get("StarClass")
+            if star_class:
+                self._announce_star(star_class)
+            return
+
+        # On-route: never trust WHICH star this event names (#148 — FSDTarget locks one hop
+        # ahead of the pilot's actual next arrival). Anchor to the tracker's own position instead.
+        arriving, following = self._tracker.lookahead()
+        if arriving is None:
+            return
+        self._announce_star(arriving.star_class,
+                             following.star_class if following else None)
+
+    def _announce_star(self, arriving_class: str, following_class: str | None = None) -> None:
+        """Speak the hazard/scoopable callout for the arriving star (and the following one,
+        when that's the useful two-star statement). Hazard supersedes scoopable for the same
+        star — never a redundant "not scoopable" right after naming the hazard."""
+        hazard = is_hazardous_star(arriving_class) if self._cfg.callout_hazard else None
+        if hazard:
+            self._emit(_HAZARD_LINES[hazard])
+            return
+        if not self._cfg.callout_scoopable:
+            return
+        if not is_scoopable(arriving_class):
+            self._emit("Heads up — the star you're jumping to isn't scoopable.")
+        elif following_class is not None and not is_scoopable(following_class):
+            self._emit("This star's scoopable — but the one after isn't, so top off here "
+                        "before you jump on.")
         else:
-            self._emit("Heads up — the next star isn't scoopable. Top off your fuel if you're low.")
+            self._emit("Next star's scoopable.")
 
     def _on_jump(self, event: dict) -> None:
         system = event.get("StarSystem")
