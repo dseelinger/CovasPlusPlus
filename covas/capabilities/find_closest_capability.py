@@ -88,6 +88,52 @@ class NavConfig:
         )
 
 
+# ---- helpers shared by BOTH find-closest tools (module + ship) -----------------------------
+# The two classes stay separate (different request paths, outcomes, and gates) but their small
+# private helpers were byte-identical pairs — they live here once instead.
+
+
+def _make_logline(log: Callable[[str], None] | None) -> Callable[[str], None]:
+    """Bind the optional log seam once; None -> a no-op."""
+    return log if log is not None else (lambda msg: None)
+
+
+def _pad_constraint(inp: dict, default: str) -> str | None:
+    """The pad constraint for this search: the tool arg if given, else the config
+    default. 'any' / 'none' / '' disables it."""
+    raw = inp.get("pad_size")
+    pad = str(raw).strip() if raw is not None else default
+    if not pad or pad.lower() in ("any", "none", "n/a"):
+        return None
+    return pad
+
+
+def _live_extra_names(idx: object | None, logline: Callable[[str], None],
+                      label: str) -> tuple[str, ...]:
+    """Newly-released names from the live index (empty until its background fetch lands, or
+    if it's absent/unreachable). Fail-soft — a broken index never blocks a lookup; resolution
+    just uses the bundled taxonomy/roster."""
+    if idx is None:
+        return ()
+    try:
+        return tuple(idx.extra_names())
+    except Exception as e:  # noqa: BLE001 — the live index is a bonus, never fatal
+        logline(f"{label} unavailable: {e}")
+        return ()
+
+
+def _say_unknown(o, noun: str) -> str:
+    if o.suggestions:
+        return (f"I don't recognize '{o.query}' as a {noun}. Did you mean "
+                f"{sup.or_list(o.suggestions)}?")
+    return (f"I don't recognize '{o.query}' as a {noun}. Tell me the {noun} name another "
+            "way.")
+
+
+def _say_ambiguous(o, plural: str) -> str:
+    return f"That could be a few {plural} — {sup.or_list(o.candidates)}. Which one?"
+
+
 # ==========================================================================================
 # Find closest MODULE — find_closest_module (bespoke: nav/closest.py + confirmation turn-gate)
 # ==========================================================================================
@@ -230,6 +276,7 @@ class FindClosestCapability:
         # code change. None -> bundled taxonomy only (the default; keeps tests offline).
         self._module_index = module_index
         self._log = log
+        self._logline = _make_logline(log)
         self._tool = _build_tool(config.require_confirmation)
         # Confirmation turn-gate (only used when require_confirmation is on): _turn counts
         # Commander utterances (advanced by new_turn()); _armed_turn is the turn a resolve
@@ -305,14 +352,14 @@ class FindClosestCapability:
 
         # Fold in any modules the live index learned Spansh knows but the bundle doesn't. Only
         # pass the kwarg when there ARE extras, so the injected resolve seam stays simple.
-        extra = self._extra_names()
+        extra = _live_extra_names(self._module_index, self._logline, "module index")
         outcome = (self._resolve(module, inp.get("size"), inp.get("mount"), extra_names=extra)
                    if extra else self._resolve(module, inp.get("size"), inp.get("mount")))
 
         if isinstance(outcome, Unknown):
-            return self._say_unknown(outcome)
+            return _say_unknown(outcome, "module")
         if isinstance(outcome, Ambiguous):
-            return self._say_ambiguous(outcome)
+            return _say_ambiguous(outcome, "modules")
         if isinstance(outcome, NeedAttrs):
             return self._say_need_attrs(outcome)
         if isinstance(outcome, Resolved):
@@ -345,16 +392,6 @@ class FindClosestCapability:
         return (f"Resolved to {resolved.label}. Say 'confirm' on a separate command and I'll "
                 f"find the closest station that sells it. (Say 'cancel' to drop it.)")
 
-    def _say_unknown(self, o: Unknown) -> str:
-        if o.suggestions:
-            return (f"I don't recognize '{o.query}' as a module. Did you mean "
-                    f"{sup.or_list(o.suggestions)}?")
-        return (f"I don't recognize '{o.query}' as a module. Tell me the module name another "
-                "way.")
-
-    def _say_ambiguous(self, o: Ambiguous) -> str:
-        return (f"That could be a few modules — {sup.or_list(o.candidates)}. Which one?")
-
     def _say_need_attrs(self, o: NeedAttrs) -> str:
         asks: list[str] = []
         for attr in o.missing:
@@ -369,7 +406,7 @@ class FindClosestCapability:
     def _do_search(self, resolved: Resolved, inp: dict) -> str:
         """The one networked step — fires exactly once, only on RESOLVED + confirmed."""
         system = self._current_system() if self._current_system is not None else None
-        pad = self._pad_size(inp)
+        pad = _pad_constraint(inp, self._cfg.default_pad_size)
         try:
             result = self._search(
                 resolved, system, self._http,
@@ -416,15 +453,6 @@ class FindClosestCapability:
         return line
 
     # -- helpers ----------------------------------------------------------------------
-    def _pad_size(self, inp: dict) -> str | None:
-        """The pad constraint for this search: the tool arg if given, else the config
-        default. 'any' / 'none' / '' disables it."""
-        raw = inp.get("pad_size")
-        pad = str(raw).strip() if raw is not None else self._cfg.default_pad_size
-        if not pad or pad.lower() in ("any", "none", "n/a"):
-            return None
-        return pad
-
     def _copy(self, text: str) -> bool:
         try:
             self._clipboard(text)
@@ -432,23 +460,6 @@ class FindClosestCapability:
         except Exception as e:  # noqa: BLE001 — clipboard is a convenience, never fatal
             self._logline(f"clipboard copy failed: {e}")
             return False
-
-    def _extra_names(self) -> tuple[str, ...]:
-        """Newly-released module names from the live index (empty until its background fetch
-        lands, or if it's absent/unreachable). Fail-soft — a broken index never blocks a lookup;
-        resolution just uses the bundled taxonomy."""
-        idx = self._module_index
-        if idx is None:
-            return ()
-        try:
-            return tuple(idx.extra_names())
-        except Exception as e:  # noqa: BLE001 — the live taxonomy is a bonus, never fatal
-            self._logline(f"module index unavailable: {e}")
-            return ()
-
-    def _logline(self, msg: str) -> None:
-        if self._log is not None:
-            self._log(msg)
 
 
 # ==========================================================================================
@@ -550,6 +561,7 @@ class FindClosestShipCapability:
         # change. None -> bundled roster only (the default; keeps tests offline).
         self._ship_index = ship_index
         self._log = log
+        self._logline = _make_logline(log)
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:
@@ -608,30 +620,21 @@ class FindClosestShipCapability:
 
         # Fold in any hulls the live index learned Spansh knows but the bundle doesn't. Only
         # pass the kwarg when there ARE extras, so the injected resolve seam stays simple.
-        extra = self._extra_names()
+        extra = _live_extra_names(self._ship_index, self._logline, "ship index")
         outcome = self._resolve(ship, extra_names=extra) if extra else self._resolve(ship)
 
         if isinstance(outcome, UnknownShip):
-            return self._say_unknown(outcome)
+            return _say_unknown(outcome, "ship")
         if isinstance(outcome, AmbiguousShip):
-            return self._say_ambiguous(outcome)
+            return _say_ambiguous(outcome, "ships")
         if isinstance(outcome, ResolvedShip):
             return self._do_search(outcome, inp)
         return "I couldn't interpret that ship — try naming it another way."
 
-    def _say_unknown(self, o: UnknownShip) -> str:
-        if o.suggestions:
-            return (f"I don't recognize '{o.query}' as a ship. Did you mean "
-                    f"{sup.or_list(o.suggestions)}?")
-        return (f"I don't recognize '{o.query}' as a ship. Tell me the ship name another way.")
-
-    def _say_ambiguous(self, o: AmbiguousShip) -> str:
-        return f"That could be a few ships — {sup.or_list(o.candidates)}. Which one?"
-
     def _do_search(self, resolved: ResolvedShip, inp: dict) -> str:
         """The one networked step — fires as soon as a ship resolves to a single model."""
         system = self._current_system() if self._current_system is not None else None
-        pad = self._pad_size(inp)
+        pad = _pad_constraint(inp, self._cfg.default_pad_size)
         # Only pass the stock seam when it exists, so injected `search` fakes without the
         # kwarg keep working (the extra_names pattern).
         kwargs: dict = {}
@@ -702,29 +705,3 @@ class FindClosestShipCapability:
         except Exception as e:  # noqa: BLE001 — ground truth is a bonus, never fatal
             self._logline(f"local shipyard snapshot unavailable: {e}")
             return None
-
-    def _extra_names(self) -> tuple[str, ...]:
-        """Newly-released ship names from the live index (empty until its background fetch
-        lands, or if it's absent/unreachable). Fail-soft — a broken index never blocks a
-        lookup; resolution just uses the bundled roster."""
-        idx = self._ship_index
-        if idx is None:
-            return ()
-        try:
-            return tuple(idx.extra_names())
-        except Exception as e:  # noqa: BLE001 — the live roster is a bonus, never fatal
-            self._logline(f"ship index unavailable: {e}")
-            return ()
-
-    def _pad_size(self, inp: dict) -> str | None:
-        """The pad constraint for this search: the tool arg if given, else the config default.
-        'any' / 'none' / '' disables it."""
-        raw = inp.get("pad_size")
-        pad = str(raw).strip() if raw is not None else self._cfg.default_pad_size
-        if not pad or pad.lower() in ("any", "none", "n/a"):
-            return None
-        return pad
-
-    def _logline(self, msg: str) -> None:
-        if self._log is not None:
-            self._log(msg)
