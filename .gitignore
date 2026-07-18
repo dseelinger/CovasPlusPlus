@@ -88,3 +88,6 @@ Thumbs.db
 
 # Local journal-injection scratch for manual event testing (see inject_event notes) — never tracked.
 _fakejournal/
+
+# Local scratch folder for untracked working files — never tracked.
+ignored/
