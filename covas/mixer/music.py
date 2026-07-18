@@ -171,6 +171,14 @@ class MusicDirector:
         m = cfg.get("music", {}) or {}
         return cls(MusicLibrary.from_cfg(cfg), enabled=bool(m.get("enabled", False)))
 
+    def set_library(self, library: MusicLibrary) -> None:
+        """Swap the track library WITHOUT touching the current context/track/rotation (live drop-in
+        content reload, issue #110). The currently-playing track keeps playing and an in-progress
+        crossfade is never interrupted — new tracks are picked up only on the NEXT genuine context
+        change (a same-context `update()` still returns None). A single attribute rebind, so a
+        concurrent `update()` reader sees the old or the new library, never a torn one."""
+        self._lib = library
+
     @property
     def current_track(self) -> Optional[str]:
         return self._track

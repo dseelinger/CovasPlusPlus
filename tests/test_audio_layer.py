@@ -69,6 +69,76 @@ def test_set_providers_respects_tier_gate():
     assert layer._comms._generate is None
 
 
+# ---- live ambient-content reload (issue #110) ----------------------------------------------
+
+def _write(path, text=""):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def test_reload_content_swaps_cues_music_and_interdiction(tmp_path):
+    """A live reload re-overlays the registry's SFX/chatter cues, swaps the music library, and
+    swaps the interdiction sting/threat — all on the SAME composed objects (no restart)."""
+    from covas.mixer import load_content
+    layer, _tts, _mix = _layer(interdiction={"enabled": True})
+    _write(tmp_path / "content" / "chatter" / "station_traffic.txt", "Fresh traffic line.\n")
+    _write(tmp_path / "audio" / "sfx" / "thargoid_voices" / "t.wav")
+    _write(tmp_path / "audio" / "music" / "populated" / "p.ogg")
+    _write(tmp_path / "content" / "interdiction_threat.txt", "New threat.\n")
+    _write(tmp_path / "audio" / "sfx" / "interdiction_sting" / "boom.wav")
+
+    counts = layer.reload_content(load_content(tmp_path))
+
+    assert layer._registry.get("station_traffic").phrasings == ("Fresh traffic line.",)  # noqa: SLF001
+    assert len(layer._registry.get("thargoid_voices").samples) == 1                        # noqa: SLF001
+    assert any(t.endswith("p.ogg") for t in layer._music._lib.tracks_for("populated"))     # noqa: SLF001
+    assert layer._interdiction._threat == ("New threat.",)                                 # noqa: SLF001
+    assert any(s.endswith("boom.wav") for s in layer._interdiction._sting_samples)         # noqa: SLF001
+    assert counts == {"sfx": 2, "music": 1, "chatter": 1, "threat": 1}
+    # carrier cues (no drop-in content) survive the registry swap
+    assert layer._registry.get("carrier_captain_welcome") is not None                      # noqa: SLF001
+
+
+def test_reload_content_preserves_governor_cooldown(tmp_path):
+    """Live state survives the swap: a cue that JUST fired stays in its cooldown after a reload —
+    the reload must not re-arm it (cooldowns key by cue name on the shared governor)."""
+    from covas.mixer import load_content
+    layer, _tts, _mix = _layer()
+    cue = layer._registry.get("station_traffic")            # noqa: SLF001
+    layer._governor.mark_fired(cue, 100.0)                  # noqa: SLF001 — pretend it just played
+    assert "station_traffic" in layer._governor._last_cue   # noqa: SLF001
+    layer.reload_content(load_content(tmp_path))             # empty tree -> default pools
+    assert layer._governor._last_cue.get("station_traffic") == 100.0  # noqa: SLF001 — cooldown kept
+
+
+def test_reload_content_preserves_music_track(tmp_path):
+    """An in-progress music track is not interrupted by a reload — only the library is swapped."""
+    from covas.mixer import load_content
+    layer, _tts, _mix = _layer()
+    layer.music_on = True
+    layer._music._enabled = True                            # noqa: SLF001
+    _write(tmp_path / "audio" / "music" / "populated" / "p.ogg")
+    layer.reload_content(load_content(tmp_path))
+    layer._music.update({"populated"})                      # noqa: SLF001 — start a track
+    playing = layer._music.current_track                    # noqa: SLF001
+    assert playing is not None
+    # a second reload (new library) must not restart the current track
+    _write(tmp_path / "audio" / "music" / "populated" / "p2.ogg")
+    layer.reload_content(load_content(tmp_path))
+    assert layer._music.update({"populated"}) is None       # noqa: SLF001 — same context, keep playing
+    assert layer._music.current_track == playing            # noqa: SLF001
+
+
+def test_reload_content_empty_falls_back_to_default_pools(tmp_path):
+    """An emptied content tree falls the chatter cues back to their shipped default pools live."""
+    from covas.mixer import load_content
+    from covas.mixer.chatter import chatter_cues
+    layer, _tts, _mix = _layer()
+    default = next(c.phrasings for c in chatter_cues() if c.name == "station_traffic")
+    layer.reload_content(load_content(tmp_path))             # nothing dropped in
+    assert layer._registry.get("station_traffic").phrasings == default  # noqa: SLF001
+
+
 def test_layer_ignores_non_ed_events():
     layer, tts, _ = _layer()
     layer.on_event({"type": "log", "text": "hi"})

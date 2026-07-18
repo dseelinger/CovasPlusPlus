@@ -269,13 +269,17 @@ def create_app(core) -> Flask:
 
     @flask_app.route("/api/cues/reload", methods=["POST"])
     def cues_reload():
-        """Re-scan the cue folders and hot-swap the preloaded set — no restart (issue #109).
-        The open→drop-files→reload flow this mirrors: `cues_open` above surfaces the folder;
-        this re-reads it. Fail-soft: `CuePlayer.reload()` never raises (a bad/missing file is
-        skipped), and if the audio layer never came up (`core.cues` absent) we still return 200
-        with all-zero counts rather than 500."""
+        """Re-scan the drop-in folders and hot-swap live — no restart. Covers BOTH surfaces:
+        the turn-stage cues (issue #109, `CuePlayer.reload` -> `counts`) AND the C11 ambient
+        content — SFX/music/chatter/threat (issue #110, `App.reload_audio_content` -> `content`).
+        The open→drop-files→reload flow this mirrors: `cues_open` above surfaces the folder; this
+        re-reads it. Fail-soft: each side never raises (a bad/missing file is skipped), and if a
+        side never came up (`core.cues` / the audio layer absent) it returns empty counts for that
+        side rather than 500ing."""
         counts = core.cues.reload() if getattr(core, "cues", None) is not None else {}
-        return jsonify({"ok": True, "counts": counts})
+        content = (core.reload_audio_content()
+                   if hasattr(core, "reload_audio_content") else {})
+        return jsonify({"ok": True, "counts": counts, "content": content})
 
     @flask_app.route("/api/schema")
     def api_schema():

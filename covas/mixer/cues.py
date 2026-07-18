@@ -152,6 +152,28 @@ class CueRegistry:
         self._cues.append(cue)
         self._by_name[name] = cue
 
+    def replace_all(self, cues: Iterable[Cue]) -> None:
+        """Atomically swap the ENTIRE cue set (live drop-in content reload, issue #110). Builds a
+        fresh, fully-validated list+index and only then rebinds — the read-path attribute
+        (`_cues`) LAST — so a concurrent lock-free reader (`eligible()` on the event-pump thread)
+        sees the whole old set or the whole new one, never a torn one, and no new lock is needed
+        (mirrors the atomic-rebind precedent in `CuePlayer.reload`, issue #109). All-or-nothing:
+        the same completeness + no-duplicate-name contract as `register()`, so a bad new set raises
+        BEFORE any rebind and leaves the current set intact."""
+        fresh: list[Cue] = []
+        by_name: dict[str, Cue] = {}
+        for cue in cues or []:
+            validate_cue(cue)
+            name = str(cue.name or "").strip()
+            if not name:
+                raise ValueError("cue has no name")
+            if name in by_name:
+                raise ValueError(f"duplicate cue name: {name!r}")
+            fresh.append(cue)
+            by_name[name] = cue
+        self._by_name = by_name
+        self._cues = fresh  # atomic rebind of the read-path attribute — see docstring
+
     def cues(self) -> list[Cue]:
         """All registered cues, in registration order."""
         return list(self._cues)

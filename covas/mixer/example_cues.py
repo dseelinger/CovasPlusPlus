@@ -107,6 +107,17 @@ class InterdictionCue:
     def set_enabled(self, on: bool) -> None:
         self._enabled = bool(on)
 
+    def set_content(self, *, sting_samples: tuple[str, ...] = (),
+                    threat_lines: Optional[tuple[str, ...]] = None) -> None:
+        """Swap the drop-in sting-sample set and threat pool WITHOUT resetting the rotation
+        counters or the shared governor (live drop-in content reload, issue #110), so a live reload
+        can't re-arm a just-fired interdiction or make it repeat a line. `threat_lines=None` leaves
+        the current pool unchanged; an empty `sting_samples` falls back to the single `sting` (as at
+        construction). Attribute rebinds only, safe against a concurrent `layers()` read."""
+        self._sting_samples = tuple(sting_samples)
+        if threat_lines is not None:
+            self._threat = tuple(threat_lines)
+
     def _governor_cue(self) -> Cue:
         return Cue("interdiction", ALERT, frozenset(), cooldown_s=self._cooldown_s)
 

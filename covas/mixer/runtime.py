@@ -230,6 +230,51 @@ class AudioLayer:
         web/settings readout can show what still needs content."""
         return content_status(self._content)
 
+    def reload_content(self, content: ContentBundle) -> dict:
+        """Hot-swap the C11 drop-in ambient content (SFX samples, music tracks, chatter phrasings,
+        interdiction sting/threat) into the ALREADY-COMPOSED layer — no restart (issue #110,
+        follow-up to #109). Symmetric with `__init__`, which already takes a pre-scanned bundle; the
+        app does the folder scan (keeping the `[audio].content_root` seam at the app boundary) and
+        hands the fresh bundle here.
+
+        The turn-stage cues reload via a single lock-free dict rebind (`CuePlayer.reload`); this
+        content is instead woven into composed objects that HOLD LIVE STATE, so the swap rebuilds
+        each AROUND that state rather than replacing the object:
+          * the registry's SFX/chatter cues are re-overlaid and ATOMICALLY replaced (the carrier
+            cues, which carry no drop-in content, are preserved) — the SAME registry the driver
+            reads, so the governor's cooldowns and the Chatter/Sfx player rotation + the chatter
+            frequency gate (all keyed by cue name / kept on the same player instances) are untouched;
+          * the MusicDirector keeps its current context/track/rotation (an in-progress crossfade is
+            not interrupted) and only its LIBRARY is swapped, so new tracks apply on the next context
+            change while the current one plays on;
+          * the interdiction cue keeps its rotation + governor and only its sting-sample set and
+            threat pool are swapped.
+        Fail-soft: never raises into the caller (a bad bundle leaves the live content in place).
+        Returns per-category counts for a confirmation message."""
+        try:
+            audio = self.cfg.get("audio", {}) or {}
+            # 1. Cue registry: re-overlay SFX + chatter onto fresh cue defs, keep the carrier cues.
+            overlaid = overlay_cues(list(chatter_cues()) + list(sfx_cues(self.cfg)), content)
+            self._registry.replace_all(list(overlaid) + list(carrier_cues()))
+            # 2. Music: swap the library, keep the director's live context/track/rotation.
+            self._music.set_library(merged_music_library(self.cfg, content))
+            # 3. Interdiction: swap sting-sample set + threat pool, keep rotation + governor. A
+            #    None threat pool falls back to the shipped defaults, matching __init__.
+            self._interdiction.set_content(
+                sting_samples=tuple(content.sfx.get("interdiction_sting", [])),
+                threat_lines=threat_lines(content, DEFAULT_THREAT_LINES))
+            self._content = content
+            self._log(status_summary(content))
+        except Exception as e:  # noqa: BLE001 — a reload must never take down the loop
+            self._log(f"ambient content reload failed: {e}")
+            return {}
+        return {
+            "sfx": sum(len(v) for v in content.sfx.values()),
+            "music": sum(len(v) for v in content.music.values()),
+            "chatter": sum(len(v) for v in content.chatter.values()),
+            "threat": len(content.threat),
+        }
+
     # -- system arrival: population (chatter scaling) + comms re-casting --------
     def _note_arrival(self, event: dict) -> None:
         """Fold a system-arrival event: remember the system's Population (drives chatter frequency)
