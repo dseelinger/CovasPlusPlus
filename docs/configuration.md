@@ -263,7 +263,10 @@ There is **no `[sound_cues]` config section**: cues are resolved by folder. Cue 
 `listen`, `processing`, `completed`, `failure`, and `thinking`, each a folder holding any number of
 audio files (a random one plays). COVAS++ ships originals under `covas/assets/cues/<type>/`; drop
 your own into `<data dir>/sounds/<type>/` to replace a type's default set (use **Open cues folder**
-in the control panel). Empty a folder to fall back; the app runs fine either way.
+in the control panel). Empty a folder to fall back; the app runs fine either way. Click **Reload
+cues** afterward to pick the change up **live** — no restart — via `CuePlayer.reload()`
+(`POST /api/cues/reload`), which re-scans the folders and atomically hot-swaps the preloaded set,
+reporting per-type counts.
 
 The `thinking` type is special: it's a soft bed that **loops** while COVAS transcribes/thinks/
 searches (issue #5), filling the wait between "prompt received" and "reply starts," and stops the

@@ -70,6 +70,13 @@ To use your **own** cues, click **Open cues folder** in the control panel (or op
 - While a type's folder holds **≥1 file**, your set **replaces** the shipped default for that type.
 - Empty the folder to fall back to the default; with neither, that cue is simply silent.
 
+Click **Reload cues** next to it to pick up the change **without restarting** — it re-scans every
+`sounds/<type>/` folder and reports what it found (e.g. "reloaded — 3 failure, 1 thinking"), so a
+file you just dropped in (or removed) joins the rotation on your very next press. This covers the
+cue types above (`listen`/`processing`/`completed`/`failure`/`thinking`); the separate ambient
+drop-in content described in [Ambient audio](../audio/ambient-audio.md#drop-in-content) (SFX,
+music, chatter) still needs a restart to pick up changes.
+
 In a source run the data dir is the project root (so the folder is `./sounds/<type>/`, git-ignored);
 a packaged build uses `%APPDATA%\COVAS++\sounds\`. Supported formats: `.wav`, `.ogg`, `.flac`, `.mp3`
 (mp3 depends on your libsndfile build).

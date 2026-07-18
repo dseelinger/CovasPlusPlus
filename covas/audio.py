@@ -97,6 +97,7 @@ class CuePlayer:
     def __init__(self, cfg: dict, *, mixer=None, bus: str = "alert",
                  sleep=None) -> None:  # noqa: ANN001
         self.cues: dict[str, list[tuple[np.ndarray, int]]] = {}
+        self._cfg = cfg  # kept so reload() can recompute cue_roots() without a restart (issue #109)
         self._mixer = mixer
         self._bus = bus
         self._mix_sr = int((cfg.get("audio", {}) or {}).get("mix_sample_rate", 16000))
@@ -107,20 +108,35 @@ class CuePlayer:
         self._loop_lock = threading.Lock()
         self._loop_thread: threading.Thread | None = None
         self._loop_stop: threading.Event | None = None
-        user_base, asset_base = cue_roots(cfg)
+        self.reload()
+
+    def reload(self) -> dict[str, int]:
+        """Re-scan the cue folders and hot-swap the preloaded set — no restart (issue #109).
+        Rebuilds a fresh ``{type: [(data, sr), …]}`` dict and ATOMICALLY rebinds ``self.cues`` to
+        it (a single reference rebind is atomic in CPython, so a reader in flight — `play()` /
+        `_loop_worker()`, both lock-free `.get()` reads — sees the whole old dict or the whole new
+        one, never a torn one; a reader that already grabbed `(data, sr)` for the current clip is
+        unaffected. No new lock needed). Returns per-type counts for a confirmation message.
+        Fail-soft: a bad/missing file is skipped, an empty user folder falls back to the bundled
+        default (as at startup), and a deleted folder is recreated (`ensure_cue_skeleton` is
+        idempotent, so re-running it here is safe)."""
+        user_base, asset_base = cue_roots(self._cfg)
         try:
             ensure_cue_skeleton(user_base)
-        except Exception:  # noqa: BLE001 — skeleton creation must never block startup
+        except Exception:  # noqa: BLE001 — skeleton creation must never block a reload
             pass
+        fresh: dict[str, list[tuple[np.ndarray, int]]] = {}
         for ctype in CUE_TYPES:
             loaded = []
             for p in resolve_cue_files(ctype, user_base=user_base, asset_base=asset_base):
                 try:
                     data, sr = sf.read(p, dtype="float32", always_2d=False)
                     loaded.append((data, sr))
-                except Exception:  # noqa: BLE001 — a missing/bad cue must not break startup
+                except Exception:  # noqa: BLE001 — a missing/bad cue must not break the reload
                     pass
-            self.cues[ctype] = loaded
+            fresh[ctype] = loaded
+        self.cues = fresh  # atomic rebind — see docstring
+        return {k: len(v) for k, v in fresh.items()}
 
     def play(self, name: str, wait: bool = False) -> None:
         group = self.cues.get(_CUE_ALIASES.get(name, name)) or []

@@ -6,6 +6,8 @@ resolved set. Playback is exercised through a stub mixer so no audio device is o
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import soundfile as sf
 
@@ -221,6 +223,65 @@ def test_stop_loop_without_running_is_safe(tmp_path, monkeypatch):
     p = _player_with(tmp_path, monkeypatch, user_files={}, asset_files={"thinking": [100]})
     p.stop_loop()                             # nothing running -> no error, no submit
     assert p._mixer.submitted == []
+
+
+# ---- reload(): re-scan + hot-swap without rebuilding the player (issue #109) -----------------
+def test_reload_picks_up_an_added_and_a_removed_file(tmp_path, monkeypatch):
+    """Dropping a new file into the user override folder and reloading joins the rotation; a file
+    removed afterward drops out — all via the SAME CuePlayer instance, no restart."""
+    p = _player_with(tmp_path, monkeypatch,
+                     user_files={"listen": [200]}, asset_files={"listen": [900]})
+    assert len(p.cues["listen"]) == 1           # the one user file (override wins)
+
+    data_root = tmp_path / "data"
+    added = _wav(data_root / "sounds" / "listen" / "u1.wav", freq=300)
+    counts = p.reload()
+    assert counts["listen"] == 2
+    assert len(p.cues["listen"]) == 2
+
+    Path(added).unlink()
+    counts = p.reload()
+    assert counts["listen"] == 1
+    assert len(p.cues["listen"]) == 1
+
+
+def test_reload_falls_back_to_default_when_user_folder_emptied(tmp_path, monkeypatch):
+    p = _player_with(tmp_path, monkeypatch,
+                     user_files={"completed": [700]}, asset_files={"completed": [400, 500]})
+    assert len(p.cues["completed"]) == 1        # user override active
+
+    data_root = tmp_path / "data"
+    for f in (data_root / "sounds" / "completed").iterdir():
+        f.unlink()
+    counts = p.reload()
+    assert counts["completed"] == 2             # empty override -> falls back to the 2 defaults
+    assert len(p.cues["completed"]) == 2
+
+
+def test_reload_skips_a_bad_file_without_crashing(tmp_path, monkeypatch):
+    p = _player_with(tmp_path, monkeypatch,
+                     user_files={"failure": [250]}, asset_files={})
+    assert len(p.cues["failure"]) == 1
+
+    data_root = tmp_path / "data"
+    bad = data_root / "sounds" / "failure" / "corrupt.wav"
+    bad.write_bytes(b"not a real wav file")
+    counts = p.reload()
+    assert counts["failure"] == 1               # the corrupt file was skipped, the good one kept
+    assert len(p.cues["failure"]) == 1
+
+
+def test_reload_recreates_a_deleted_user_folder(tmp_path, monkeypatch):
+    """A folder deleted out from under the player is recreated (ensure_cue_skeleton runs in
+    reload too), so a subsequent drop-in still has somewhere to land."""
+    import shutil
+
+    p = _player_with(tmp_path, monkeypatch, user_files={"thinking": [120]}, asset_files={})
+    data_root = tmp_path / "data"
+    shutil.rmtree(data_root / "sounds" / "thinking")
+    counts = p.reload()
+    assert counts["thinking"] == 0
+    assert (data_root / "sounds" / "thinking").is_dir()   # skeleton recreated
 
 
 def test_stop_also_stops_the_loop(tmp_path, monkeypatch):

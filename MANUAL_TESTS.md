@@ -106,6 +106,14 @@ Notes:
       the press-to-talk cue now plays **your** files and **varies** across presses (your set
       **replaced** the default; any count works).
 - [ ] **Fallback:** empty `sounds/listen/` again, restart → the **shipped default** `listen` cue returns.
+- [ ] **Reload without restart (issue #109):** trigger a **failure** cue and note the sound. Click
+      **Open cues folder**, drop a new `.wav` into `sounds/failure/`. Click **Reload cues** →
+      the message shows a per-type count (e.g. "reloaded — 3 failure, 1 thinking"). Trigger a
+      failure again → the new clip is in rotation, **no restart**. Remove all files from
+      `sounds/failure/`, click **Reload cues** again → falls back to the shipped default cue live.
+      Drop a deliberately corrupt file into any type's folder and reload → no crash, other cues
+      still play. (The separate ambient drop-in content — SFX/music/chatter under `audio/`/
+      `content/`, §18 — is **not** covered by this button and still needs a restart.)
 - [ ] **Interdiction sting default:** with `[audio.interdiction].enabled` and no user sting, an
       interdiction plays the shipped original **sting** (not silence).
 - [ ] **Thinking bed fills the wait (issue #5):** ask a slow question (*"Give me the full history of

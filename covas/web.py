@@ -267,6 +267,16 @@ def create_app(core) -> Flask:
             pass
         return jsonify({"ok": True, "path": str(user_base), "opened": opened})
 
+    @flask_app.route("/api/cues/reload", methods=["POST"])
+    def cues_reload():
+        """Re-scan the cue folders and hot-swap the preloaded set — no restart (issue #109).
+        The open→drop-files→reload flow this mirrors: `cues_open` above surfaces the folder;
+        this re-reads it. Fail-soft: `CuePlayer.reload()` never raises (a bad/missing file is
+        skipped), and if the audio layer never came up (`core.cues` absent) we still return 200
+        with all-zero counts rather than 500."""
+        counts = core.cues.reload() if getattr(core, "cues", None) is not None else {}
+        return jsonify({"ok": True, "counts": counts})
+
     @flask_app.route("/api/schema")
     def api_schema():
         # Models are resolved server-side (cheap, from config). ElevenLabs voice/

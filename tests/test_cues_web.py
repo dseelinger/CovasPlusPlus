@@ -2,21 +2,27 @@
 
 The route opens <data_dir>/sounds after ensuring the per-type skeleton, and reports the path so
 the client can show it even when the OS can't open a file manager (non-Windows / headless).
+
+Also covers #109: the sibling "Reload cues" endpoint that re-scans + hot-swaps a live CuePlayer
+without a restart.
 """
 from __future__ import annotations
 
 import covas.web as web
-from covas.audio import CUE_TYPES
+from covas.audio import CUE_TYPES, CuePlayer
 
 
 class _StubCore:
-    def __init__(self, tmp_path):
+    def __init__(self, tmp_path, *, with_cues=False):
         # content_root is the C11/I8 test seam: sounds land under it, not the repo.
         self.cfg = {"audio": {"content_root": str(tmp_path)}}
+        # A real CuePlayer (no mixer -> legacy sd path, never opened since we never call play())
+        # so /api/cues/reload has something to reload against, mirroring the app's own wiring.
+        self.cues = CuePlayer(self.cfg) if with_cues else None
 
 
-def _client(tmp_path):
-    app = web.create_app(_StubCore(tmp_path))
+def _client(tmp_path, *, with_cues=False):
+    app = web.create_app(_StubCore(tmp_path, with_cues=with_cues))
     app.testing = True
     return app.test_client()
 
@@ -41,3 +47,19 @@ def test_open_cues_fail_soft_when_os_cannot_open(tmp_path, monkeypatch):
     monkeypatch.setattr("os.startfile", _boom, raising=False)
     body = _client(tmp_path).post("/api/cues/open").get_json()
     assert body["ok"] and body["opened"] is False and body["path"]  # still returns the path
+
+
+# ---- #109: /api/cues/reload — pairs with open, no restart needed to pick up a drop-in ---------
+def test_reload_cues_reports_per_type_counts(tmp_path):
+    r = _client(tmp_path, with_cues=True).post("/api/cues/reload")
+    body = r.get_json()
+    assert r.status_code == 200 and body["ok"]
+    assert set(body["counts"]) == set(CUE_TYPES)   # every cue type reported, even at 0
+
+
+def test_reload_cues_fail_soft_when_no_cue_player_wired(tmp_path):
+    """core.cues can be absent (e.g. the audio layer never started) — the endpoint still 200s
+    with empty counts rather than 500ing."""
+    r = _client(tmp_path, with_cues=False).post("/api/cues/reload")
+    body = r.get_json()
+    assert r.status_code == 200 and body["ok"] and body["counts"] == {}
