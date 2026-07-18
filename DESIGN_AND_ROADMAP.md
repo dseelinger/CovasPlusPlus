@@ -1906,6 +1906,30 @@ NN. **Persona speech arbiter — one Ship's-AI voice, one line at a time** (issu
     surfaces the freshest, most important thing to say — a single arbitrated voice where EDCoPilot /
     COVAS:NEXT let independent line producers collide on the same output.**
 
+NN. **Voice-attribution rule — persona voice is Commander-directed only, never a broadcast** (issue
+    #131, `covas/mixer/chatter.py`) — tightens the #57 attribution seam (entry 39) with the missing
+    *phrasing* rule: a `voice_role=PERSONA` cue is spoken in COVAS's OWN voice on the clean bus, so
+    **every line it carries must be a private aside TO the Commander — never an outward greeting,
+    hail, or broadcast that reads as another party talking.** The shipped `populated_musing` cue
+    violated this on two counts: its pool led with *"Nice to have some company out here"* (an outward
+    greeting to an arrival, not the ship's AI addressing its Commander), and it was `fact_bearing=False`,
+    so the LLM could *generate* further broadcast-flavored lines in the persona voice. Fix: the pool is
+    rewritten as unambiguous Commander-directed asides (*"Feels good to have people around us again,
+    Commander." / "Somewhere lived-in for a change — I'll take it."*) and the cue is made **pool-only**
+    (`fact_bearing=True`), the safe default for any PERSONA-voiced cue — the LLM can no longer speak an
+    unvetted line in COVAS's voice; anything broadcast-flavored stays on the COMMS bus with a radioed
+    cast voice (the sibling `station_traffic`/`system_patrol`/`market_buzz` cues). Audit of every
+    `voice_role=PERSONA` cue in `covas/mixer/`: `populated_musing` is the only PERSONA *chatter* cue
+    (fixed here); the interdiction COVAS threat line (`example_cues.py` `DEFAULT_THREAT_LINES`) is
+    already Commander-directed (*"Hostile on our tail — shields up."*) and pool-only by construction
+    (no LLM path), so it is correct as-is. Offline-unit-tested: `populated_musing` is pool-only so the
+    generator is never reached, the pool carries no greeting/broadcast phrasing, and any future PERSONA
+    chatter cue must also be pool-only (`tests/test_space_chatter.py`); on-hardware listen-check is
+    `MANUAL_TESTS.md` §18.5a; docs `docs/audio/ambient-audio.md` ("Perspective" section). **Improvement
+    thesis (Immerse): the ship's AI never breaks character by radioing a greeting into the void — its
+    voice is reserved for speaking to you, which is exactly the fiction a companion should protect and
+    where a mis-attributed line does the most damage.**
+
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 

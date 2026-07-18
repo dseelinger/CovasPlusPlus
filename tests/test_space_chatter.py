@@ -60,6 +60,50 @@ def test_every_chatter_cue_requires_populated():
         assert cue.eligible_states == frozenset({"populated"})
 
 
+# ---- voice attribution: the PERSONA voice is Commander-directed & pool-only (issue #131) ----
+
+def _cue(name):
+    return {c.name: c for c in chatter_cues()}[name]
+
+
+def test_persona_musing_is_pool_only_so_the_llm_cannot_voice_covas():
+    # The persona (COVAS) voice must speak ONLY vetted Commander-directed asides. fact_bearing=True
+    # keeps `populated_musing` pool-only, so the LLM can never generate a broadcast-flavored line in
+    # COVAS's own voice (issue #131).
+    musing = _cue("populated_musing")
+    assert musing.fact_bearing is True
+    assert musing.phrasings                       # a non-empty curated pool remains
+
+    # Belt-and-braces: even wired to a generator, a fact_bearing cue never reaches it.
+    calls = []
+    player = ChatterPlayer(_Speak(), generate=lambda p: calls.append(p) or "an invented broadcast")
+    text, source = player.line_for(musing)
+    assert source == "pool" and text in musing.phrasings
+    assert calls == []
+
+
+def test_persona_musing_pool_has_no_broadcast_or_greeting_phrasing():
+    # The old outward greeting is gone, and no line reads as a broadcast/greeting to another party.
+    musing = _cue("populated_musing")
+    assert "Nice to have some company out here." not in musing.phrasings
+    banned = ("nice to have some company", "hello", "greetings", "welcome", "anyone out there",
+              "come in", "do you copy", "this is")
+    for line in musing.phrasings:
+        low = line.lower()
+        for phrase in banned:
+            assert phrase not in low, f"{line!r} reads as a broadcast/greeting, not an aside"
+
+
+def test_only_persona_cue_is_the_commander_directed_musing():
+    # If a future PERSONA-voiced chatter cue is added it must also be pool-only, so the LLM can never
+    # speak an unvetted line in COVAS's own voice (issue #131). Guards against regression.
+    from covas.mixer.cues import PERSONA
+    persona_cues = [c for c in chatter_cues() if c.voice_role == PERSONA]
+    assert [c.name for c in persona_cues] == ["populated_musing"]
+    for c in persona_cues:
+        assert c.fact_bearing is True
+
+
 # ---- fact gating: fact_bearing NEVER routes to the LLM -------------------------------------
 
 def test_fact_bearing_cue_never_calls_the_generator():

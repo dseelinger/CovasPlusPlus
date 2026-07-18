@@ -294,11 +294,15 @@ class ChatterPlayer:
 # POPULATED-ONLY: every chatter cue is eligible only in an inhabited system (Population > 0). The
 # ambient radio buzz is the sound of *other people* — station traffic, patrols, market talk — so
 # out in the empty black there is deliberately nothing to say. The ambient lines ride the Comms bus
-# (radio-flavored) with a random cast voice; the `populated_musing` cue is different — it's the
-# COMPANION'S OWN observation ("nice to have some company out here"), an "our"-perspective line, so
-# it's tagged `voice_role=PERSONA` and the audio layer speaks it in COVAS's own voice on the clean
-# COVAS bus (issue #57). All are throttled by their own cooldown plus the global C3 governor, then
-# frequency-gated + population-scaled by `chatter_interval` (see ChatterPlayer.min_interval).
+# (radio-flavored) with a random cast voice; the `populated_musing` cue is different — it's a
+# private aside the companion speaks TO the Commander ("feels good to have people around us again"),
+# an "our"-perspective line, so it's tagged `voice_role=PERSONA` and the audio layer speaks it in
+# COVAS's own voice on the clean COVAS bus (issue #57). VOICE-ATTRIBUTION RULE (issue #131): the
+# persona voice speaks ONLY Commander-directed lines — never a broadcast or a greeting that reads as
+# another party — so this cue is pool-only (fact_bearing=True) and its pool is written as asides to
+# the Commander; anything outward/broadcast-flavored stays on the COMMS bus with a cast voice above.
+# All are throttled by their own cooldown plus the global C3 governor, then frequency-gated +
+# population-scaled by `chatter_interval` (see ChatterPlayer.min_interval).
 def chatter_cues() -> list[Cue]:
     return [
         Cue(
@@ -327,14 +331,18 @@ def chatter_cues() -> list[Cue]:
             ),
         ),
         Cue(
-            # OUR-perspective: the companion musing to the Commander -> persona voice, clean bus.
+            # OUR-perspective: the companion musing TO the Commander -> persona voice, clean bus.
+            # POOL-ONLY (fact_bearing=True, issue #131): the persona voice speaks only Commander-
+            # directed asides, never a broadcast/greeting that reads as another party. Every line
+            # below is a private aside to the Commander; keeping it pool-only stops the LLM
+            # reintroducing an outward, broadcast-flavored line in COVAS's own voice.
             "populated_musing", COVAS, {POPULATED}, cooldown_s=150.0,
             voice_role=PERSONA,
-            fact_bearing=False,   # pure atmosphere -> LLM permitted (validated), pool fallback
+            fact_bearing=True,   # pool-only: NO LLM generation in the persona voice (issue #131)
             phrasings=(
-                "Nice to have some company out here.",
-                "Feels good to be somewhere lived-in.",
-                "Always a buzz around people.",
+                "Feels good to have people around us again, Commander.",
+                "Somewhere lived-in for a change — I'll take it.",
+                "Plenty of neighbours about. Good to have you back among them.",
             ),
         ),
     ]

@@ -1501,11 +1501,18 @@ on in config (or the Settings page) before testing.
   lines **spread across many voices** and you should **not** hear the same handful of voices repeat
   back-to-back (no "shuffled soundboard" feel). The bigger your ElevenLabs library, the more variety.
 - [ ] 🔊 **Perspective (attribution):** when the **companion muses about the world** (an
-  "our"-perspective line like *"nice to have some company out here"*), it's spoken in **your
-  companion's OWN voice, clean** (the same voice as its replies), **not** a random radioed cast
-  voice — and it does **not** carry the radio/static comms treatment. By contrast, **station
+  "our"-perspective line like *"feels good to have people around us again, Commander"*), it's spoken
+  in **your companion's OWN voice, clean** (the same voice as its replies), **not** a random radioed
+  cast voice — and it does **not** carry the radio/static comms treatment. By contrast, **station
   traffic / patrol / market** ambient lines come from a **random radioed cast voice** on the
   comms bus. Confirm the perspective always matches the source.
+- [ ] 🎮 **Persona voice = Commander-directed only, never a broadcast (issue #131):** sit in a
+  **populated** system until the `populated_musing` line fires in COVAS's own voice → it must sound
+  like COVAS speaking **an aside TO you** (*"feels good to have people around us again, Commander"* /
+  *"somewhere lived-in for a change — I'll take it"*), **not** an outward greeting/broadcast that
+  reads as another ship radioing in. There must be **no** *"nice to have some company out here"*-style
+  hail in the persona voice. Broadcast-flavored chatter (traffic/patrol/market "some company on the
+  scope") should only ever come over the **COMMS bus in a radioed cast voice**, never in COVAS's voice.
 
 ### 18.5c Persona speech arbiter — queue, preempt, flush (issue #146)  🎮 ED 🔊 HW
 > The Ship's-AI (persona) voice now plays **one line at a time** through a single arbiter, so a
