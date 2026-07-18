@@ -41,6 +41,52 @@ from .base import HelpMeta, Slot
 
 
 # ==========================================================================================
+# Shared planner shell
+# ==========================================================================================
+class _PlannerBase:
+    """The shell the three planners share: the injected seams (`http`, `get_current_system`,
+    `plotter`, `clipboard`, `sleep`, `log` — all so the default test run is offline), the
+    fail-soft `run_tool` wrapper, and the log helper. A subclass sets `_TOOL_NAME` /
+    `_ERROR_LABEL` and brings its `_handle` (plus `tools()` / `help_meta()`)."""
+    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
+    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
+    TIERING_GROUP = "search"
+
+    _TOOL_NAME: str          # the one tool the subclass advertises
+    _ERROR_LABEL: str        # "<label> error: {e}" for the fail-soft guard
+
+    def __init__(self, config, *,
+                 http: Http | None = None,
+                 get_current_system: Callable[[], str | None] | None = None,
+                 plotter: RoutePlotter | None = None,
+                 clipboard: Callable[[str], None] = _default_copy,
+                 sleep: Callable[[float], None] = time.sleep,
+                 log: Callable[[str], None] | None = None) -> None:
+        self._cfg = config
+        self._http = http if http is not None else RequestsHttp()
+        self._current_system = get_current_system
+        self._plotter = plotter if plotter is not None else RoutePlotter(clipboard=clipboard, log=log)
+        self._sleep = sleep
+        self._log = log
+
+    def run_tool(self, name: str, inp: dict) -> str:
+        if name != self._TOOL_NAME:
+            return f"Unknown tool: {name}"
+        try:
+            return self._handle(inp)
+        except Exception as e:  # noqa: BLE001 — the voice loop must survive any tool error
+            self._logline(f"error: {e}")
+            return f"{self._ERROR_LABEL} error: {e}"
+
+    def _handle(self, inp: dict) -> str:  # pragma: no cover — subclasses always override
+        raise NotImplementedError
+
+    def _logline(self, msg: str) -> None:
+        if self._log is not None:
+            self._log(msg)
+
+
+# ==========================================================================================
 # Trade route — plan_trade_route (#41)
 # ==========================================================================================
 _TRADE_TOOL = "plan_trade_route"
@@ -110,34 +156,21 @@ _TRADE_SCHEMA_PROPS = {
 }
 
 
-class RoutePlanCapability:
+class RoutePlanCapability(_PlannerBase):
     """Advertises `plan_trade_route` and runs it over the shared route client + plot seam.
 
     STANDALONE by design (issue #111): the async submit-and-poll route client + RoutePlotter
     handoff don't fit the synchronous slot-search family."""
-    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
-    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
-    TIERING_GROUP = "search"
+    _TOOL_NAME = _TRADE_TOOL
+    _ERROR_LABEL = "Trade-route"
 
-    def __init__(
-        self,
-        config: RoutePlanConfig,
-        *,
-        http: Http | None = None,
-        get_current_system: Callable[[], str | None] | None = None,
-        get_current_station: Callable[[], str | None] | None = None,
-        plotter: RoutePlotter | None = None,
-        clipboard: Callable[[str], None] = _default_copy,
-        sleep: Callable[[float], None] = time.sleep,
-        log: Callable[[str], None] | None = None,
-    ) -> None:
-        self._cfg = config
-        self._http = http if http is not None else RequestsHttp()
-        self._current_system = get_current_system
+    def __init__(self, config: RoutePlanConfig, *,
+                 get_current_station: Callable[[], str | None] | None = None,
+                 **seams) -> None:
+        # The one seam only the trade planner needs (the start defaults to the docked
+        # station); everything else is the shared planner shell.
+        super().__init__(config, **seams)
         self._current_station = get_current_station
-        self._plotter = plotter if plotter is not None else RoutePlotter(clipboard=clipboard, log=log)
-        self._sleep = sleep
-        self._log = log
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:
@@ -171,15 +204,6 @@ class RoutePlanCapability:
             help_when_active=("Tell me your cargo capacity, jump range, and budget, and I'll plan "
                               "a trade loop from the station you're docked at."),
         )
-
-    def run_tool(self, name: str, inp: dict) -> str:
-        if name != _TRADE_TOOL:
-            return f"Unknown tool: {name}"
-        try:
-            return self._handle(inp)
-        except Exception as e:  # noqa: BLE001 — the voice loop must survive any tool error
-            self._logline(f"error: {e}")
-            return f"Trade-route error: {e}"
 
     # -- dialog -----------------------------------------------------------------------
     def _handle(self, inp: dict) -> str:
@@ -262,10 +286,6 @@ class RoutePlanCapability:
                 f"{hop.destination_station} in {hop.destination_system} for about "
                 f"{hop.profit_per_unit:,} a ton{tag}.")
 
-    def _logline(self, msg: str) -> None:
-        if self._log is not None:
-            self._log(msg)
-
 
 # ==========================================================================================
 # Neutron / long-range route — plot_neutron_route (#43)
@@ -325,32 +345,13 @@ _NEUTRON_SCHEMA_PROPS = {
 }
 
 
-class NeutronPlanCapability:
+class NeutronPlanCapability(_PlannerBase):
     """Advertises `plot_neutron_route` and runs it over the shared galaxy plotter + plot seam.
 
     STANDALONE by design (issue #111): the async galaxy plotter (submit-and-poll) + RoutePlotter
     handoff don't fit the synchronous slot-search family."""
-    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
-    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
-    TIERING_GROUP = "search"
-
-    def __init__(
-        self,
-        config: NeutronPlanConfig,
-        *,
-        http: Http | None = None,
-        get_current_system: Callable[[], str | None] | None = None,
-        plotter: RoutePlotter | None = None,
-        clipboard: Callable[[str], None] = _default_copy,
-        sleep: Callable[[float], None] = time.sleep,
-        log: Callable[[str], None] | None = None,
-    ) -> None:
-        self._cfg = config
-        self._http = http if http is not None else RequestsHttp()
-        self._current_system = get_current_system
-        self._plotter = plotter if plotter is not None else RoutePlotter(clipboard=clipboard, log=log)
-        self._sleep = sleep
-        self._log = log
+    _TOOL_NAME = _NEUTRON_TOOL
+    _ERROR_LABEL = "Neutron-route"
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:
@@ -384,15 +385,6 @@ class NeutronPlanCapability:
                               "long-range neutron route and copy the first waypoint for the galaxy "
                               "map."),
         )
-
-    def run_tool(self, name: str, inp: dict) -> str:
-        if name != _NEUTRON_TOOL:
-            return f"Unknown tool: {name}"
-        try:
-            return self._handle(inp)
-        except Exception as e:  # noqa: BLE001 — the voice loop must survive any tool error
-            self._logline(f"error: {e}")
-            return f"Neutron-route error: {e}"
 
     # -- dialog -----------------------------------------------------------------------
     def _handle(self, inp: dict) -> str:
@@ -450,10 +442,6 @@ class NeutronPlanCapability:
         self._logline(f"neutron route {from_system} -> {to_system}: {total_jumps} jumps, "
                       f"{count} waypoints, first -> {first}")
         return f"{line} {plot}"
-
-    def _logline(self, msg: str) -> None:
-        if self._log is not None:
-            self._log(msg)
 
 
 # ==========================================================================================
@@ -516,32 +504,13 @@ _RICHES_SCHEMA_PROPS = {
 }
 
 
-class RichesPlanCapability:
+class RichesPlanCapability(_PlannerBase):
     """Advertises `plan_riches_route` and runs it over the shared route client + plot seam.
 
     STANDALONE by design (issue #111): the async Road-to-Riches route client + RoutePlotter
     handoff don't fit the synchronous slot-search family."""
-    # Tiering group (issue #84): the token-budget cluster this capability's tools belong
-    # to; the level filter (covas/tiering.py) keeps or drops the whole group as a unit.
-    TIERING_GROUP = "search"
-
-    def __init__(
-        self,
-        config: RichesPlanConfig,
-        *,
-        http: Http | None = None,
-        get_current_system: Callable[[], str | None] | None = None,
-        plotter: RoutePlotter | None = None,
-        clipboard: Callable[[str], None] = _default_copy,
-        sleep: Callable[[float], None] = time.sleep,
-        log: Callable[[str], None] | None = None,
-    ) -> None:
-        self._cfg = config
-        self._http = http if http is not None else RequestsHttp()
-        self._current_system = get_current_system
-        self._plotter = plotter if plotter is not None else RoutePlotter(clipboard=clipboard, log=log)
-        self._sleep = sleep
-        self._log = log
+    _TOOL_NAME = _RICHES_TOOL
+    _ERROR_LABEL = "Road-to-Riches"
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:
@@ -574,15 +543,6 @@ class RichesPlanCapability:
             help_when_active=("Tell me your jump range and I'll plan a Road to Riches from your "
                               "current system — nearby systems with high-value bodies to scan."),
         )
-
-    def run_tool(self, name: str, inp: dict) -> str:
-        if name != _RICHES_TOOL:
-            return f"Unknown tool: {name}"
-        try:
-            return self._handle(inp)
-        except Exception as e:  # noqa: BLE001 — the voice loop must survive any tool error
-            self._logline(f"error: {e}")
-            return f"Road-to-Riches error: {e}"
 
     # -- dialog -----------------------------------------------------------------------
     def _handle(self, inp: dict) -> str:
@@ -628,7 +588,3 @@ class RichesPlanCapability:
         self._logline(f"riches route: {len(systems)} systems, first -> {first.system} "
                       f"({first.body_count} bodies)")
         return f"{line} {plot}"
-
-    def _logline(self, msg: str) -> None:
-        if self._log is not None:
-            self._log(msg)
