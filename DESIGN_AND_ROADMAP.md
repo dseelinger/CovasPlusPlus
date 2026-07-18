@@ -1828,6 +1828,43 @@ NN. **Place-aware & visit-history callouts** (issue #138, `covas/ed/visit_ledger
     workshop and you've been here ten times today is context- and memory-aware in a way a stock event
     announcer isn't — and every place name and count is a grounded fact, never invented.**
 
+NN. **Creative long-hyperspace flavor remark** (issue #149, `covas/capabilities/long_jump_capability.py`
+    (new), `covas/ed/route.py`, `covas/capabilities/proactive_capability.py`, `covas/app.py`) —
+    hyperspace is dead air, and a longer-than-normal jump is one of the few moments talking during the
+    tunnel is welcome, so COVAS fills it with ONE short, LLM-varied, in-character remark (the reporter's
+    examples: *"I wonder if a Thargoid is in our future," "orange sidewinders"* — long jumps are the
+    folkloric setup for a Thargoid hyperdiction). **Detection is a PURE, offline-testable gate.**
+    `StartJump(JumpType="Hyperspace")` carries the destination + star class but NO distance, and
+    `FSDJump`'s `JumpDist` only lands on ARRIVAL (too late for a mid-jump line) — but NavRoute.json's
+    entries carry each system's `StarPos` [x,y,z]. New `ed/route.py` helpers `route_coords(navroute)`,
+    `jump_distance(coords, from, to)` (Euclidean ly, None when either system is off-route), and
+    `is_long_jump(distance, threshold)` compute the distance of the jump you're mid-way through at
+    StartJump time and gate it against a configurable threshold (`[proactive].long_jump_ly`, default
+    **50 ly** — most non-explorer builds jump well under it, so only a genuinely long hop trips it).
+    A REACTOR-only `LongJumpCapability` (no tools / no HelpMeta, like the route callouts) watches the
+    bus for StartJump — the journal publishes every event on the bus, so it reaches `on_event` even
+    though `journal.py` doesn't context-handle StartJump — measures the jump, and on a long one asks
+    the app to speak. **It rides the SAME proactive machinery** (`_speak_proactive`/`_proactive_worker`
+    gained a `prompt_override` kwarg): cheap tier, never over a user turn, honouring proactive
+    enable/mute/tier, but with a DISTINCT flavor prompt (`build_long_jump_prompt`) that asks for pure
+    atmosphere — `fact_bearing=False`, asserts NO game facts, never the same line twice, and the
+    distance is offered only as mood, never quoted. It shares the proactive policy for its gate
+    (`should_long_jump`/`mark_long_jump`) with its OWN dedicated cooldown (`[proactive].long_jump_cooldown`,
+    default 300s) so back-to-back long hops on a highway don't each get a line, and the cooldown is
+    armed only when the line actually started (a busy-app skip retries later, not swallowed). Fail-soft:
+    no LLM / proactive disabled / muted / unplotted route → simply silent. **TODO (noted in the code,
+    not built): when #146's speech queue lands (Wave 3), a real callout/warning should PREEMPT this
+    lowest-priority flavor line** — that belongs in the queue, not here. Offline-unit-tested: the
+    distance-from-coords helper + the threshold gate (fires at/past, silent below/unknown), and the
+    capability's on_event (fires on a long jump, silent on short / unplotted / non-hyperspace, honours
+    enable/mute/toggle, the dedicated cooldown, and the busy-app retry), plus the flavor prompt asserts
+    no facts (`tests/test_route.py`, `tests/test_long_jump_capability.py`, additions to
+    `tests/test_proactive.py`); on-hardware long-jump timing + varied phrasing is `MANUAL_TESTS.md`
+    §5.2c. Docs `docs/elite/proactive-callouts.md`. **Improvement thesis (Immerse): the companion feels
+    alive in the one stretch where nothing happens — passing a long jump with a fresh, playful, in-
+    character remark — where the stock experience (and route callouts) leave the tunnel silent, and it
+    does so without ever asserting a false game fact.**
+
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 

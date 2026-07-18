@@ -754,6 +754,18 @@ visit_ledger_file = "visit_ledger.json"
 # over and over, a place/history remark rides a callout at most once per this many seconds. Separate
 # from the per-event cooldown above so ordinary callouts stay responsive while colour stays rare.
 place_cooldown = 900
+# LONG-HYPERSPACE flavor remark (issue #149). When a plotted jump is longer than normal, the
+# companion passes the tunnel time with ONE short, LLM-varied, in-character remark (Thargoid /
+# hyperdiction folklore is fair game). Pure atmosphere — it asserts no game facts. Rides the same
+# proactive path, so it honours the enable switch, mute, and tier just like every other callout.
+long_jump_enabled = true
+# "Longer than normal" threshold, in light-years. Most non-explorer builds jump well under this, so
+# only a genuinely long hop trips it — ordinary jumps stay silent. Raise it if you fly a long-range
+# explorer and want only your very longest jumps to trigger a line.
+long_jump_ly = 50.0
+# At most one long-jump remark per this many seconds (its own cooldown, so back-to-back long hops
+# on a highway don't each get a line).
+long_jump_cooldown = 300
 # Per-event whitelist: only events set true here are ever announced. Add ED event names
 # (journal events like FSDJump/Docked/MissionCompleted/Died, or status transitions like
 # LowFuel/Overheating) to extend; set false to silence one. This table REPLACES the

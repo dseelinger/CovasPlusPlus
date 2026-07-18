@@ -9,7 +9,8 @@ from __future__ import annotations
 import pytest
 
 from covas.capabilities.route_capability import RouteCalloutCapability, RouteConfig
-from covas.ed.route import RouteTracker, is_hazardous_star, is_scoopable
+from covas.ed.route import (RouteTracker, is_hazardous_star, is_long_jump, is_scoopable,
+                            jump_distance, route_coords)
 
 
 # --- scoopable classification (KGBFOAM) ------------------------------------
@@ -45,6 +46,57 @@ def test_hazardous_classes(cls, expected):
                                                      "", None])
 def test_non_hazardous_classes(cls):
     assert is_hazardous_star(cls) is None
+
+
+# --- plotted-jump distance + long-jump threshold (#149) --------------------
+
+def _route_with_pos(*triples) -> dict:
+    """(system, star_class, [x,y,z]) entries."""
+    return {"event": "NavRoute",
+            "Route": [{"StarSystem": s, "StarClass": c, "StarPos": pos} for s, c, pos in triples]}
+
+
+def test_route_coords_maps_normalized_names_to_positions():
+    coords = route_coords(_route_with_pos(("Sol", "G", [0.0, 0.0, 0.0]),
+                                          ("Deciat", "K", [3.0, 4.0, 0.0])))
+    assert coords["sol"] == (0.0, 0.0, 0.0)
+    assert coords["deciat"] == (3.0, 4.0, 0.0)
+
+
+def test_route_coords_skips_malformed_entries_and_none():
+    assert route_coords(None) == {}
+    coords = route_coords({"Route": [{"StarSystem": "A"},                       # no StarPos
+                                     {"StarPos": [1, 2, 3]},                     # no name
+                                     {"StarSystem": "B", "StarPos": [1, 2]},     # wrong length
+                                     {"StarSystem": "C", "StarPos": ["x", 1, 2]}, # non-numeric
+                                     {"StarSystem": "Good", "StarPos": [1, 2, 3]}]})
+    assert set(coords) == {"good"}
+
+
+def test_jump_distance_euclidean():
+    coords = route_coords(_route_with_pos(("Sol", "G", [0.0, 0.0, 0.0]),
+                                          ("Dest", "K", [3.0, 4.0, 0.0])))
+    assert jump_distance(coords, "Sol", "Dest") == 5.0
+    assert jump_distance(coords, "sol", "DEST") == 5.0        # name lookup is normalized
+
+
+def test_jump_distance_none_when_system_missing():
+    coords = route_coords(_route_with_pos(("Sol", "G", [0.0, 0.0, 0.0])))
+    assert jump_distance(coords, "Sol", "Unknown") is None
+    assert jump_distance(coords, "Unknown", "Sol") is None
+    assert jump_distance(coords, None, "Sol") is None
+
+
+@pytest.mark.parametrize("dist,threshold,expected", [
+    (60.0, 50.0, True),      # past the threshold
+    (50.0, 50.0, True),      # exactly at it fires
+    (49.9, 50.0, False),     # below stays silent
+    (0.0, 50.0, False),
+    (None, 50.0, False),     # unknown distance -> silent
+    (True, 50.0, False),     # bool is not a distance
+])
+def test_is_long_jump_threshold(dist, threshold, expected):
+    assert is_long_jump(dist, threshold) is expected
 
 
 # --- RouteTracker ----------------------------------------------------------

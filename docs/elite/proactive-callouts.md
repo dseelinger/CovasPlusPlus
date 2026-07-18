@@ -57,6 +57,26 @@ voices them, it never makes them up.
     a round-number milestone, or an unusually busy day) and ride a **dedicated cooldown**
     (`proactive.place_cooldown`), so a busy engineering session never narrates every dock.
 
+## A remark to pass a long jump
+
+Hyperspace is dead air — and a **longer-than-normal** jump is one of the few moments talking during
+the tunnel is genuinely welcome. When a plotted jump is long, COVAS++ fills the wait with **one
+short, in-character, LLM-varied** remark: *"I wonder if a Thargoid's in our future,"* *"let's hope
+we don't run into any orange sidewinders."* (Long jumps are the folkloric setup for a Thargoid
+**hyperdiction** — perfect flavor.)
+
+- It's **pure atmosphere** — light, speculative, and it asserts **no game facts** (it never claims
+  something *is* actually out there).
+- It's **varied** — LLM-generated with no fixed pool, so you won't hear the same line twice.
+- It only fires past a **distance threshold** (`proactive.long_jump_ly`, default 50 ly), so ordinary
+  short jumps stay quiet, and it rides its own cooldown (`proactive.long_jump_cooldown`) so a run of
+  long hops on a highway doesn't each get a line.
+- It honours the same rules as every callout: proactive enable, mute, tier, and never over your turn.
+
+!!! note "Needs a plotted route"
+    The distance is read from your plotted route (`NavRoute.json`). A jump the game hasn't plotted
+    coordinates for simply stays silent — fail-soft, never a wrong guess.
+
 ## It never talks over you
 
 - A callout is spoken **only when the loop is idle** — if you're mid-conversation, it waits.
@@ -83,6 +103,9 @@ Say **"stop the callouts"** (or "be quiet," "no more announcements") and it goes
 | `proactive.max_tokens` | Reply length cap for a callout (it's one sentence — keep it tight) |
 | `proactive.place_cooldown` | How long before another place-aware / visit-history remark may ride a callout |
 | `proactive.visit_ledger_file` | Where the private per-location arrival log lives (blank disables it) |
+| `proactive.long_jump_enabled` | Whether a longer-than-normal jump gets a flavor remark |
+| `proactive.long_jump_ly` | How far (ly) a plotted jump must be to count as "longer than normal" |
+| `proactive.long_jump_cooldown` | Minimum seconds between two long-jump remarks |
 | `[proactive.events]` | Per-event whitelist — only events set `true` are ever announced |
 
 See the [Configuration reference](../configuration.md#proactive-callouts-proactive) for the full

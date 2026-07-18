@@ -505,6 +505,7 @@ def build_proactive(app: "App") -> None:
     events to capability on_event hooks. Fail soft: a startup problem just leaves
     callouts off. Proactive needs ED monitoring for its events — warn (don't fail) if
     that's not on, since the two are independently toggled."""
+    app.long_jump = None  # (#149) declared before the try so a mid-build failure leaves it defined
     try:
         from .capabilities.proactive_capability import (ProactiveCapability,
                                                         ProactivePolicy)
@@ -513,6 +514,21 @@ def build_proactive(app: "App") -> None:
             policy, app._speak_proactive,
             log=lambda reason: app._log("proactive", reason))
         app.registry.register(app.proactive)
+        # Long-hyperspace flavor remark (issue #149): a reactor-only capability sharing the proactive
+        # policy (enable/mute + its own long-jump cooldown). It watches StartJump(Hyperspace), gates
+        # on the plotted jump distance from NavRoute.json coords, and speaks a pure-flavor line via
+        # the proactive path with a prompt OVERRIDE (no place enrichment, asserts no game facts).
+        from .capabilities.long_jump_capability import LongJumpCapability
+        from .ed import read_navroute, resolve_journal_dir
+        _jdir = resolve_journal_dir(app.cfg)
+        app.long_jump = LongJumpCapability(
+            policy,
+            speak=lambda event, prompt: app._speak_proactive(
+                "StartJump", event, prompt_override=prompt),
+            load_navroute=lambda: read_navroute(_jdir),
+            current_system=app._current_system,
+            log=lambda m: app._log("long-jump", m))
+        app.registry.register(app.long_jump)
         app._start_event_pump()
         if app.ed_ctx is None:
             app.bus.publish({"type": "log", "who": "system", "text":

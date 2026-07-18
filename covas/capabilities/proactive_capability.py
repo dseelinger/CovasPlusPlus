@@ -54,6 +54,13 @@ DEFAULT_MAX_TOKENS = 120
 # base repeatedly, so place-aware enrichment is gated FAR longer than the normal per-event cooldown
 # — occasional colour, not narration of every dock. Separate axis from the per-event cooldown.
 DEFAULT_PLACE_COOLDOWN = 900.0
+# Long-hyperspace flavor remark (#149). "Longer than normal" = the plotted jump distance is at or
+# beyond this many light-years. Most non-explorer builds jump well under 50 ly, and even engineered
+# explorers only exceed it on their longest hops, so 50 ly reliably marks an above-average jump
+# without firing on routine ones. The remark rides its own cooldown so back-to-back long hops on a
+# highway don't each get a line.
+DEFAULT_LONG_JUMP_LY = 50.0
+DEFAULT_LONG_JUMP_COOLDOWN = 300.0
 
 
 @dataclass(frozen=True)
@@ -65,6 +72,9 @@ class ProactiveConfig:
     min_interval: float = DEFAULT_MIN_INTERVAL
     max_tokens: int = DEFAULT_MAX_TOKENS
     place_cooldown: float = DEFAULT_PLACE_COOLDOWN
+    long_jump_enabled: bool = True
+    long_jump_ly: float = DEFAULT_LONG_JUMP_LY
+    long_jump_cooldown: float = DEFAULT_LONG_JUMP_COOLDOWN
     events: dict[str, bool] = field(default_factory=lambda: dict(DEFAULT_EVENTS))
 
     @classmethod
@@ -84,6 +94,9 @@ class ProactiveConfig:
             min_interval=float(p.get("min_interval", d.min_interval)),
             max_tokens=int(p.get("max_tokens", d.max_tokens)),
             place_cooldown=float(p.get("place_cooldown", d.place_cooldown)),
+            long_jump_enabled=bool(p.get("long_jump_enabled", d.long_jump_enabled)),
+            long_jump_ly=float(p.get("long_jump_ly", d.long_jump_ly)),
+            long_jump_cooldown=float(p.get("long_jump_cooldown", d.long_jump_cooldown)),
             events=events,
         )
 
@@ -160,6 +173,30 @@ class ProactivePolicy:
     def mark_place_remark(self, now: float) -> None:
         """Arm the place cooldown after a place/history remark was included at `now`."""
         self._last_place = now
+
+    # -- dedicated long-jump flavor gate (#149) ---------------------------------------
+    def should_long_jump(self, now: float) -> tuple[bool, str]:
+        """Whether a long-hyperspace flavor remark may fire at `now`. Honours the SAME master
+        switches as every other callout — proactive enable + runtime mute — plus its own enable and
+        a dedicated long-jump cooldown, and shares the global `min_interval` so it can't stack on
+        another callout. Pure; never mutates. The caller has already checked the jump is long."""
+        c = self.cfg
+        if not c.enabled:
+            return False, "proactive disabled"
+        if self._muted:
+            return False, "muted"
+        if not c.long_jump_enabled:
+            return False, "long-jump flavor off"
+        if now - self._last_any < c.min_interval:
+            return False, f"global cooldown ({c.min_interval:.0f}s)"
+        if now - self._last_long_jump < c.long_jump_cooldown:
+            return False, f"long-jump cooldown ({c.long_jump_cooldown:.0f}s)"
+        return True, "long jump"
+
+    def mark_long_jump(self, now: float) -> None:
+        """Arm the long-jump cooldown (and the global interval) after a flavor remark fired."""
+        self._last_long_jump = now
+        self._last_any = now
 
 
 # Mute/unmute exposed as LLM tools so "COVAS, stop the callouts" works by voice — the

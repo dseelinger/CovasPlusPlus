@@ -585,6 +585,23 @@ SCHEMA: list[Setting] = [
             "carrier, 'tenth time here today') may ride an arrival callout. Keeps them occasional.",
             default=900, min=0, max=7200, unit="s",
             phrasings=("place callout cooldown", "history callout cooldown")),
+    Setting("proactive.long_jump_enabled", ("proactive", "long_jump_enabled"), "bool",
+            "Long-jump flavor remark", "Proactive callouts",
+            "On a longer-than-normal hyperspace jump, pass the tunnel time with a short, varied, "
+            "in-character remark. Pure atmosphere — asserts no game facts.",
+            default=True, phrasings=("long jump remark", "hyperspace flavor")),
+    Setting("proactive.long_jump_ly", ("proactive", "long_jump_ly"), "float",
+            "Long-jump threshold", "Proactive callouts",
+            "How far (light-years) a plotted jump must be to count as 'longer than normal' and "
+            "trigger a flavor remark. Ordinary shorter jumps stay quiet.",
+            default=50.0, min=10.0, max=500.0, unit="ly",
+            phrasings=("long jump distance", "long jump threshold")),
+    Setting("proactive.long_jump_cooldown", ("proactive", "long_jump_cooldown"), "int",
+            "Long-jump remark cooldown", "Proactive callouts",
+            "At most one long-jump flavor remark per this many seconds, so back-to-back long hops "
+            "don't each get a line.",
+            default=300, min=0, max=3600, unit="s",
+            phrasings=("long jump cooldown",)),
 
     # --- Route callouts ----------------------------------------------------
     Setting("route.enabled", ("route", "enabled"), "bool",
