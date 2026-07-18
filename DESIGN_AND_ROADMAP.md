@@ -291,7 +291,7 @@ the rendering surface differs:
   `covas.spec` collects it (bundling `openvr_api.dll`) **only when present**, so a freeze without
   it still succeeds. Off by default (`[hud].vr_enabled = false`).
 
-### 3.9 Turn machinery — shared `_run_turn`, typed input, and provider resilience (issues #76, #97)
+### 3.9 Turn machinery — shared `_run_turn`, typed input, and provider resilience (issues #76, #97, #108)
 
 Two changes to the worker turn, both keeping the fail-soft discipline of principle #6:
 
@@ -318,6 +318,26 @@ Two changes to the worker turn, both keeping the fail-soft discipline of princip
   line if a turn goes silent, and **exhausted retries** speak a provider-named "…is overloaded…"
   line while the log records the precise reason. Retries happen **before** the atomic user+assistant
   history commit, so a degraded turn leaves no orphan.
+
+- **Misconfiguration voice (#108) — the THIRD branch the #97 split left silent.** `is_degraded_error`
+  covers *retryable* failures; everything else fell through to a silent cue+log. That swept in a
+  distinct, user-fixable case: a bad model id (404), a wrong/missing key (401/403), or a bad request
+  (400/422) — persistent, not a "bad minute", and entirely the Commander's to fix in Settings. Step
+  one made these errors STRUCTURED: every raw-`requests` provider's non-retryable connect branch (and
+  the Anthropic keyless case in `llm.py`) now raises `ProviderError(status=…, retryable=False)`
+  instead of a bare `RuntimeError`, so the real HTTP status survives to the app (the Anthropic SDK
+  path already carried `.status_code` on `APIStatusError`). `_retry.is_config_error` classifies a
+  fail-fast `ProviderError`/status-carrying exception whose status is in `{400, 401, 403, 404, 422}`;
+  `_retry.config_hint` maps that status to which knob to check (key vs. model vs. generic). The
+  failure handler in `app.py` adds a third branch alongside `is_degraded_error`:
+  `elif is_config_error(e): self._speak_misconfig(e, …)` — a sibling of `_speak_degraded` that speaks
+  *"I can't reach `<provider>`, Commander — `<hint>`. Check the AI settings."* on **every** failed
+  turn (deliberately NOT rate-limited — unlike a transient blip, a misconfiguration doesn't clear
+  itself, and each failed turn was a deliberate PTT that got no answer), degrades to a logged line in
+  text-only mode, and never calls the LLM to narrate its own outage. `[llm].speak_config_errors`
+  (default `true`) can turn the spoken line off while the log line still fires. An **unclassified**
+  exception (no status at all — a tool bug, a code crash) deliberately stays on the old silent
+  cue+log path, so a code bug is never misdiagnosed as a settings problem.
 
 ### 3.10 Live-apply component lifecycle — hot-swap on a settings change (issue #90)
 

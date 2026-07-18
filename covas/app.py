@@ -2803,13 +2803,19 @@ class App:
             if watchdog is not None:
                 watchdog.disarm()  # idempotent — the stream's finally already ran on most paths
             # Issue #97: a transient/overloaded provider (exhausted retries, connection drop, 529)
-            # earns an in-character, provider-named spoken heads-up instead of a bare error; any
-            # other failure just degrades soft as before. Never another LLM call — the LLM is what's
-            # down. History is untouched here (the commit is after a successful reply), so a failed
-            # turn leaves NO orphan. The failure cue plays AFTER the Idle transition (via
-            # _fail_cue_to_idle) so stop_loop's alert-bus clear can't drop it.
+            # earns an in-character, provider-named spoken heads-up instead of a bare error.
+            # Issue #108: a NON-transient, user-fixable misconfiguration (bad key/model/endpoint)
+            # earns a different spoken heads-up naming the likely fix — that's the one failure mode
+            # that's silent-by-default AND entirely the Commander's to fix, so staying quiet is worse
+            # than repeating it every failed turn. Any other (unclassified) failure just degrades
+            # soft as before — never call the LLM to narrate its own outage. History is untouched
+            # here (the commit is after a successful reply), so a failed turn leaves NO orphan. The
+            # failure cue plays AFTER the Idle transition (via _fail_cue_to_idle) so stop_loop's
+            # alert-bus clear can't drop it.
             if _retry.is_degraded_error(e):
                 self._speak_degraded(e, cancel, tts=tts, text_only=text_only)
+            elif _retry.is_config_error(e):
+                self._speak_misconfig(e, cancel, tts=tts, text_only=text_only)
             self._fail_cue_to_idle(f"error: {e}")
 
     # ---- provider reliability (issue #97) ---------------------------------
@@ -2853,6 +2859,30 @@ class App:
         name = self._provider_display_name()
         line = f"{name} is overloaded right now, Commander — give it a moment and try again."
         self._log("system", f"provider degraded: {_retry.degraded_reason(err)}")
+        if self.text_only if text_only is None else text_only:
+            self._log("COVAS", line)
+            return
+        try:
+            self._speak(line, cancel, tts=tts, text_only=text_only)
+        except Exception:  # noqa: BLE001 — _speak already logged loudly; degrade to text
+            self._log("COVAS", line)
+
+    def _speak_misconfig(self, err: Exception, cancel: threading.Event, *, tts=None,  # noqa: ANN001
+                         text_only=None) -> None:
+        """Tell the Commander, plainly, that the LLM is unreachable because of a SETTINGS problem —
+        a bad model id, a wrong/missing API key, a bad endpoint (issue #108) — and log the precise
+        reason. Sibling of :meth:`_speak_degraded`: canned/verbatim (the LLM is what's down, so it
+        never narrates its own failure), fires on EVERY failed turn (no rate-limiting — a config
+        error is persistent and each failed turn was a deliberate PTT that got no answer), and
+        degrades to a logged line when TTS is unavailable or `[llm].speak_config_errors` is off.
+        `tts`/`text_only` are the turn-locals (issue #90 review) so the line stays on the turn's own
+        provider + text-only state through a mid-turn hot-swap."""
+        name = self._provider_display_name()
+        hint = _retry.config_hint(err)
+        line = f"I can't reach {name}, Commander — {hint}. Check the AI settings."
+        self._log("system", f"provider misconfigured: {_retry.degraded_reason(err)}")
+        if not bool((self.cfg.get("llm", {}) or {}).get("speak_config_errors", True)):
+            return  # operator opted out of the spoken line; the log line above still recorded it
         if self.text_only if text_only is None else text_only:
             self._log("COVAS", line)
             return

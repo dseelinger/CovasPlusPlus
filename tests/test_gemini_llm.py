@@ -14,6 +14,7 @@ import pytest
 
 from covas import firstrun
 from covas.providers import gemini_llm as gem
+from covas.providers._retry import ProviderError, is_config_error
 
 
 # ---- helpers ---------------------------------------------------------------
@@ -193,11 +194,14 @@ def test_cancel_stops_streaming(monkeypatch):
 
 
 def test_no_key_raises(monkeypatch):
+    """A missing key is a MISCONFIGURATION (issue #108), not a bare RuntimeError: it carries a
+    401-shaped ProviderError so the app's misconfig voice branch classifies it."""
     monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: None)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ProviderError) as ei:
         list(gem.GeminiLLM({"gemini": {}, "web_search": {"enabled": False},
                             "personality": {"enabled": False}}).stream_reply(
             [{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
+    assert ei.value.status == 401 and is_config_error(ei.value)
 
 
 # ---- request shaping + SSE parsing -----------------------------------------
@@ -236,6 +240,8 @@ def test_stream_generate_parses_sse_and_uses_header(monkeypatch):
 
 
 def test_stream_generate_raises_on_non_200(monkeypatch):
+    """A fail-fast (non-retryable) non-200 raises a structured ProviderError with the status intact
+    (issue #108), not a bare RuntimeError, so the app's misconfig voice branch can classify it."""
     class _Resp:
         status_code = 403
         text = "forbidden"
@@ -244,8 +250,9 @@ def test_stream_generate_raises_on_non_200(monkeypatch):
         def iter_lines(self): return iter(())
 
     monkeypatch.setattr(gem.requests, "post", lambda *a, **k: _Resp())
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ProviderError) as ei:
         list(gem._stream_generate("http://x/v1beta", "m", "k", {}, threading.Event()))
+    assert ei.value.status == 403 and ei.value.provider == "Gemini" and is_config_error(ei.value)
 
 
 def test_stream_generate_404_message_names_model_and_config(monkeypatch):
@@ -257,10 +264,11 @@ def test_stream_generate_404_message_names_model_and_config(monkeypatch):
         def close(self): pass
 
     monkeypatch.setattr(gem.requests, "post", lambda *a, **k: _Resp())
-    with pytest.raises(RuntimeError) as ei:
+    with pytest.raises(ProviderError) as ei:
         list(gem._stream_generate("http://x/v1beta", "gemini-bogus", "k", {}, threading.Event()))
     msg = str(ei.value)
     assert "gemini-bogus" in msg and "[gemini].model" in msg and "/models" in msg
+    assert ei.value.status == 404 and is_config_error(ei.value)
 
 
 # ---- model-list parsing + fail-soft guard (issue #91) ----------------------

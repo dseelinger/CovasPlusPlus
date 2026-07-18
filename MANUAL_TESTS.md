@@ -303,13 +303,41 @@ Notes:
       short spoken, **provider-named** *"…is overloaded right now, Commander…"* line — not a raw error —
       and 🌐 the log shows a precise reason (e.g. `provider degraded: … 529 … — retried 4×, giving up`).
 - [ ] **Fail-fast (no pointless retry):** point at a **404** model or a **bad key (401)** → the turn
-      fails **immediately** (no long backoff), degrading to text/IDLE.
+      fails **immediately** (no long backoff) and returns to Idle — and now (issue #108) **speaks** a
+      "check your settings" heads-up instead of failing silently; see **§4.3a** for the full check.
 - [ ] **Cancel during backoff:** while a turn is retrying/slow, **tap `[`** (or panel **CANCEL**) →
       it aborts **instantly**, no waiting out the backoff, back to IDLE.
 - [ ] **Text-only fail-soft:** in text-only mode (no TTS key), the slow/degraded messages appear as
       **log lines** (not spoken) and the loop never crashes.
 - [ ] **History intact:** after a degraded/failed turn, the **next** turn answers its own question
       (the failed turn left no orphaned prompt behind).
+
+Notes:
+
+### 4.3a LLM misconfiguration — spoken "check your settings" heads-up (issue #108)  🔊 HW 🌐 PANEL
+> A bad model id, a wrong/missing key, or a bad endpoint is NOT a transient blip (§4.3 above) — it
+> won't fix itself on retry, and only you can fix it. Unlike an overload, this line is deliberately
+> **not** silenced after the first turn: it speaks on every failed turn until you fix the setting.
+- [ ] **Bad model (404):** set `[gemini].model` (or the active provider's model field) to a nonsense
+      id, e.g. `gemini-does-not-exist`, on the Settings page. PTT and speak → COVAS **speaks**
+      *"I can't reach Gemini, Commander — the model name looks wrong. Check the AI settings."* and
+      🌐 the log shows the precise `404` reason (`provider misconfigured: Gemini …`).
+- [ ] **Bad/missing key (401/403):** clear or scramble the active provider's API key. PTT → COVAS
+      speaks the **key** variant of the line (*"…the API key looks wrong or missing…"*).
+- [ ] **Fixed → normal again:** restore the correct model/key → the next turn answers normally, no
+      warning, no residual state.
+- [ ] **Repeats, not rate-limited:** with the bad setting still in place, speak **two** separate
+      turns in a row → the heads-up is spoken **both** times (not just the first).
+- [ ] **Text-only mode:** repeat the bad-model case in text-only mode (no TTS key) → the heads-up
+      appears as a `COVAS` **log line**, not silence, and nothing crashes.
+- [ ] **Off switch:** set `[llm].speak_config_errors = false` on the Settings page, repeat the
+      bad-model case → the **failure cue** still plays and the log still records the precise reason,
+      but nothing is spoken. Set it back to `true` afterward.
+- [ ] **Doesn't cross with §4.3:** a genuine transient outage (e.g. `https://httpstat.us/529`) still
+      says *"…is overloaded right now, Commander…"* — never the settings line — and a bad-model/key
+      case never says "overloaded".
+- [ ] **History intact:** after a misconfigured turn, history stays empty (no orphaned prompt) and
+      fixing the setting lets the very next turn answer cleanly.
 
 Notes:
 

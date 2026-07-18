@@ -11,9 +11,10 @@ import threading
 
 import pytest
 
-from covas.providers._retry import (ProviderError, RetryPolicy, TransientError,
-                                    degraded_reason, is_degraded_error, is_retryable_status,
-                                    parse_retry_after, run_with_retry, sleep_cancellable)
+from covas.providers._retry import (CONFIG_STATUS, ProviderError, RetryPolicy, TransientError,
+                                    config_hint, degraded_reason, is_config_error,
+                                    is_degraded_error, is_retryable_status, parse_retry_after,
+                                    run_with_retry, sleep_cancellable)
 
 
 # ---- classifier -----------------------------------------------------------
@@ -181,6 +182,23 @@ def test_fails_fast_on_non_transient():
     assert not isinstance(ei.value, ProviderError)  # original error propagated untouched
 
 
+def test_provider_error_from_connect_propagates_untouched_no_retry():
+    """A provider that raises its own fail-fast ProviderError (issue #108: the structured
+    non-200/non-retryable outcome each raw provider now raises) must propagate AS-IS — no retry, no
+    reclassification — per `run_with_retry`'s 'already classified upstream' contract."""
+    calls = {"n": 0}
+
+    def connect():
+        calls["n"] += 1
+        raise ProviderError("Ollama LLM 404: model not found", provider="Ollama",
+                            status=404, retryable=False)
+
+    with pytest.raises(ProviderError) as ei:
+        run_with_retry(connect, threading.Event(), _tiny())
+    assert calls["n"] == 1                          # no retry on a fail-fast ProviderError
+    assert ei.value.status == 404 and ei.value.retryable is False
+
+
 def test_status_carrying_404_is_not_retried():
     class _Boom(Exception):
         status_code = 404
@@ -213,3 +231,62 @@ def test_degraded_reason_is_precise():
                         retryable=True, attempts=4)
     reason = degraded_reason(err)
     assert "Anthropic" in reason and "529" in reason and "retried 4×, giving up" in reason
+
+
+# ---- misconfiguration classifier (issue #108) ------------------------------
+@pytest.mark.parametrize("code", sorted(CONFIG_STATUS))
+def test_is_config_error_true_for_fail_fast_provider_error(code):
+    """Every config-shaped status, carried on a fail-fast (retryable=False) ProviderError, classifies."""
+    assert is_config_error(ProviderError("x", status=code, retryable=False)) is True
+
+
+def test_is_config_error_false_for_retryable_provider_error():
+    """A RETRYABLE ProviderError never classifies as config, even if it happens to carry a
+    config-shaped status (a status set by an exhausted-retry outcome, not a fail-fast one) — the two
+    branches (#97 degraded vs #108 misconfig) are mutually exclusive by construction."""
+    assert is_config_error(ProviderError("x", status=404, retryable=True)) is False
+
+
+@pytest.mark.parametrize("code", [429, 500, 502, 503, 529, 200, 418, None])
+def test_is_config_error_false_for_non_config_statuses(code):
+    assert is_config_error(ProviderError("x", status=code, retryable=False)) is False
+
+
+def test_is_config_error_true_for_raw_status_carrying_exception():
+    """The Anthropic SDK path (APIStatusError.status_code) never wraps in ProviderError — the
+    classifier must still work off the bare status attribute."""
+    class _Boom(Exception):
+        status_code = 401
+    assert is_config_error(_Boom()) is True
+
+
+def test_is_config_error_false_for_unclassified_exception():
+    """No status at all (a tool bug, a code crash) must NOT classify as config — misdiagnosing a bug
+    as a settings problem would send the Commander on a wild goose chase."""
+    assert is_config_error(RuntimeError("boom")) is False
+
+
+def test_config_hint_names_key_for_401_and_403():
+    assert "key" in config_hint(ProviderError("x", status=401, retryable=False))
+    assert "key" in config_hint(ProviderError("x", status=403, retryable=False))
+
+
+def test_config_hint_names_model_for_404():
+    assert "model" in config_hint(ProviderError("x", status=404, retryable=False))
+
+
+def test_config_hint_generic_for_400_and_422():
+    for code in (400, 422):
+        hint = config_hint(ProviderError("x", status=code, retryable=False))
+        assert "key" not in hint and hint  # a non-empty, non-key-specific nudge
+
+
+def test_anthropic_keyless_raises_structured_config_error(monkeypatch):
+    """`llm.list_anthropic_models` (the keyless case named in issue #108) must raise a structured,
+    401-shaped ProviderError, not a bare RuntimeError, so it classifies the same as every other
+    provider's missing-key case."""
+    from covas import llm as llm_mod
+    monkeypatch.setattr("covas.firstrun.anthropic_key", lambda cfg: None)
+    with pytest.raises(ProviderError) as ei:
+        llm_mod.list_anthropic_models({})
+    assert ei.value.status == 401 and ei.value.provider == "Anthropic" and is_config_error(ei.value)

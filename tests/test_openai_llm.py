@@ -14,6 +14,7 @@ import pytest
 
 from covas import firstrun
 from covas.providers import openai_llm as oai
+from covas.providers._retry import ProviderError, is_config_error
 
 
 # ---- helpers ---------------------------------------------------------------
@@ -246,10 +247,13 @@ def test_transient_503_then_success_emits_retry_and_recovers(monkeypatch):
 
 # ---- no key -----------------------------------------------------------------
 def test_no_key_raises(monkeypatch):
+    """A missing key is a MISCONFIGURATION (issue #108), not a bare RuntimeError: it carries a
+    401-shaped ProviderError so the app's misconfig voice branch classifies it."""
     monkeypatch.setattr(firstrun, "openai_key", lambda cfg: None)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ProviderError) as ei:
         list(oai.OpenAILLM({"openai": {}, "personality": {"enabled": False}}).stream_reply(
             [{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
+    assert ei.value.status == 401 and is_config_error(ei.value)
 
 
 # ---- request body shaping ---------------------------------------------------
@@ -291,6 +295,8 @@ def test_stream_chat_parses_data_lines(monkeypatch):
 
 
 def test_stream_chat_raises_on_non_200(monkeypatch):
+    """A fail-fast (non-retryable) non-200 raises a structured ProviderError with the status intact
+    (issue #108), not a bare RuntimeError, so the app's misconfig voice branch can classify it."""
     class _Resp:
         status_code = 401
         text = "unauthorized"
@@ -299,8 +305,9 @@ def test_stream_chat_raises_on_non_200(monkeypatch):
         def iter_lines(self): return iter(())
 
     monkeypatch.setattr(oai.requests, "post", lambda *a, **k: _Resp())
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ProviderError) as ei:
         list(oai._stream_chat("http://x/v1", "k", {}, threading.Event()))
+    assert ei.value.status == 401 and ei.value.provider == "OpenAI" and is_config_error(ei.value)
 
 
 # ---- opt-in integration (real OpenAI-compatible API; needs a key) ----------
