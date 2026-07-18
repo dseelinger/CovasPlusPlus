@@ -108,6 +108,7 @@ const $ = id => document.getElementById(id);
 let VERSION = null;   // content-hash of the roster file as we last loaded/saved it
 let VOICES = [];      // [{ref,label}] voice options for the per-character dropdown
 let HIRED = [];       // [{name,combat_rank}] hired NPC pilots from the journal (#125) — datalist
+let PAIRINGS = {};    // {name -> voice display name} best-fit Auto pairings (#124)
 
 function flash(text, isErr){
   const el = $("msg");
@@ -131,12 +132,16 @@ function addRow(member){
     <textarea class="cPersona" placeholder="Personality (optional) — e.g. Sharp-eyed sensor officer, terse and dry.">${esc(m.persona)}</textarea>`;
   // ONE reusable voice picker (issue #120) — the SAME searchable control the Settings page uses,
   // instead of a bespoke <select>. "" = Auto (deterministic); a saved ref stays selectable even if
-  // it's an unlisted id / Piper .onnx path (allowCustom).
+  // it's an unlisted id / Piper .onnx path (allowCustom). When Auto has a best-fit CREW PAIRING
+  // (#124) for this name, the blank option surfaces it — "Auto — currently: <voice>" — so the
+  // Commander can see (and veto, by pinning) what Auto would choose; fails soft to the plain label.
+  const paired = m.name ? PAIRINGS[m.name] : null;
+  const blankLabel = paired ? `Auto — currently: ${paired}` : "Auto (deterministic)";
   const picker = buildVoicePicker({
     value: m.voice_ref || "",
     label: "voice",
     allowCustom: true,
-    blankLabel: "Auto (deterministic)",
+    blankLabel: blankLabel,
     options: VOICES.map(v => ({value: v.ref, label: v.label, meta: ""})),
     onChange: () => {},   // value is read from the control at collect() time
   });
@@ -194,6 +199,7 @@ function apply(data){          // fold a server snapshot into the UI
   VERSION = data.version;
   VOICES = data.voices || [];
   HIRED = data.hired || [];
+  PAIRINGS = data.crew_pairings || {};
   // Rebuild the shared datalist of hired pilots (#125) — plain <option>s, one per pilot name.
   $("hiredList").innerHTML = HIRED.map(h => `<option value="${esc(h.name)}">`).join("");
   $("fileName").textContent = data.name || "";

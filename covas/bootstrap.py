@@ -1337,6 +1337,69 @@ def pair_persona_voices(app: "App") -> None:
         app._log("voice", f"voice pairing skipped: {e}")
 
 
+# ---- Auto crew->voice pairing (issue #124) ----------------------------------
+def build_crew_voice_pairing(app: "App") -> None:
+    """Kick the crew's OWN background pairing thread — a sibling of `build_voice_pairing`, started
+    from the same startup hook and gated by the SAME `_voice_pairing_allowed` switch. Split out (
+    rather than folded into `build_voice_pairing`) so a roster save can re-kick JUST the crew
+    pairing (`kick_crew_voice_pairing`, called from `web.py::crew_save`) without also re-running
+    the unrelated persona pairing."""
+    if not app._voice_pairing_allowed():
+        return
+    threading.Thread(target=lambda: pair_crew_voices(app), name="crew-voice-pairing",
+                     daemon=True).start()
+
+
+def kick_crew_voice_pairing(app: "App") -> None:
+    """Re-run the crew pairing in the BACKGROUND after the Commander saves the roster (issue #124):
+    a save with no persona changes is a cache hit (the shared `pairing_key`), so this costs NO LLM
+    call; only an actual persona edit/add/remove triggers one. Same gate + fail-soft as startup —
+    never blocks the save response."""
+    build_crew_voice_pairing(app)
+
+
+def pair_crew_voices(app: "App") -> None:
+    """Background worker (issue #124): pair a BEST-FIT voice with each crew member who has a
+    written `persona` and is left on Auto (blank `voice_ref`), mirroring `pair_persona_voices` but
+    keyed to the roster (`covas/crew.py`) instead of the shipped personas, and cached SEPARATELY
+    (`crew.voice_pairings_file`) so a roster edit never busts the persona-pairing cache. Members
+    with an explicit `voice_ref` are excluded from the input entirely (nothing to pair — their
+    pinned voice already wins). Result lands on `app._crew_voice_pairings` (mirroring
+    `_voice_pairings`) and is pushed straight to the audio layer so `speak_crew`'s NEXT line already
+    honors it. Fail-soft throughout: any failure (LLM off, empty catalog, bad JSON, no persona'd
+    members) just leaves crew on the deterministic per-name fallback — Auto never gets worse than
+    before this issue."""
+    try:
+        from . import crew as crew_mod
+        from . import elevenlabs as el
+        from . import voice_pairing as vp
+        members = [m for m in crew_mod.load_members(app.cfg) if m.persona and not m.voice_ref]
+        if not members:
+            app._crew_voice_pairings = {}
+            if app.audio is not None:
+                app.audio.set_crew_pairings({})
+            return
+        voices = el.list_voices_detailed(app.cfg)
+        if not voices:
+            return
+        cheap = Router.from_cfg(app.cfg).cheap_route(None).model
+        gen = vp.make_pairing_generator(app.llm, model=cheap)
+        personas = [{"name": m.name, "body": m.persona} for m in members]
+        result = vp.pair_voices(personas, voices, gen,
+                                cache_path=crew_mod.voice_pairings_file(app.cfg),
+                                log=lambda m: app._log("voice", m))
+        if result is None or not result.mapping:
+            return
+        app._crew_voice_pairings = {k.strip().lower(): v for k, v in result.mapping.items()}
+        app._voice_names.update({v["voice_id"]: v.get("name", "") for v in voices})
+        app._log("voice", f"crew voices paired ({'cache' if result.from_cache else 'fresh'}): "
+                           f"{len(app._crew_voice_pairings)}")
+        if app.audio is not None:
+            app.audio.set_crew_pairings(dict(app._crew_voice_pairings))
+    except Exception as e:  # noqa: BLE001 — pairing is best-effort; never crash/block the app
+        app._log("voice", f"crew voice pairing skipped: {e}")
+
+
 def persona_explicit_voices(app: "App") -> dict:
     """(moved from App._persona_explicit_voices)
 
@@ -1472,6 +1535,7 @@ MANIFEST: tuple[Wiring, ...] = (
     Wiring("hud",              None,                                                     build_hud),          # always wired
     Wiring("audio",            lambda a: a.mixer is not None,                            build_audio_layer),  # last registration
     Wiring(None,               None,                                                     build_voice_pairing),
+    Wiring(None,               None,                                                     build_crew_voice_pairing),  # #124, needs audio
 )
 
 

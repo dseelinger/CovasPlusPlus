@@ -481,6 +481,15 @@ file = "crew.json"
 # that survives restarts. The Crew editor reads it to offer your ACTUAL pilots to ADOPT (prefill
 # name + role + a generated persona). Journal-derived per-user data — never committed.
 npc_registry_file = "npc_crew.json"
+# CREW best-fit voice pairing (issue #124). When a character has a written PERSONALITY and is left
+# on Auto (blank voice_ref), the SAME LLM voice-casting used for shipped personas (#96) runs over
+# the crew roster in the background, so "Sharp-eyed sensor officer, terse and dry" lands on a voice
+# that actually fits — instead of the arbitrary deterministic hash. A pinned voice_ref always wins;
+# a persona-less member (or any pairing failure) keeps the deterministic fallback. Recomputes only
+# when the roster's personas or your voice catalog change (cached below), and only when the roster
+# is saved (not every launch). Gated by the SAME [personality].auto_voice_pairing switch as #96, and
+# kept in a SEPARATE cache file so editing the roster never busts the shipped-persona cache.
+voice_pairings_file = "crew_voice_pairings.json"
 
 
 [elevenlabs]

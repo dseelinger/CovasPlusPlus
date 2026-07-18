@@ -92,6 +92,7 @@ _DATA_PATH_FIELDS = (
     ("checklist", "file"),
     ("crew", "file"),
     ("crew", "npc_registry_file"),  # hired-NPC-crew seen-set, harvested from the journal (#125)
+    ("crew", "voice_pairings_file"),  # generated crew best-fit-voice cache, separate from #96 (#124)
     ("memory", "dir"),
     ("macros", "file"),
     ("logging", "dir"),

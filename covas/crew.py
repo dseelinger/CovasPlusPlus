@@ -196,6 +196,16 @@ def roster_file(cfg: dict) -> Optional[Path]:
     return Path(raw) if raw else None
 
 
+def voice_pairings_file(cfg: dict) -> Path:
+    """Absolute path to the crew best-fit-voice pairing CACHE (`[crew].voice_pairings_file`,
+    issue #124), already resolved under the writable data dir by `config._resolve_paths`. Kept
+    SEPARATE from the shipped-persona cache (`voice_pairing.default_cache_path`) so editing the
+    roster never busts the persona pairing and vice versa. Falls back to a sane default name if
+    unconfigured (defensive — normal configs always set it via config.toml)."""
+    raw = str((cfg.get("crew", {}) or {}).get("voice_pairings_file", "") or "").strip()
+    return Path(raw or "crew_voice_pairings.json")
+
+
 def _dedupe(members: list[CrewMember]) -> list[CrewMember]:
     """First-wins de-dupe by (case-sensitive) name, capped at `_MAX_ROSTER` — a stable, bounded
     roster so the cached instruction can't balloon from a copy-paste."""

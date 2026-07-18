@@ -24,6 +24,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request
 from flask_sock import Sock
 
+from . import bootstrap
 from . import catalog
 from . import crew as crew_mod
 from . import elevenlabs as el
@@ -656,6 +657,23 @@ def create_app(core) -> Flask:
         except Exception:  # noqa: BLE001 — suggestions are advisory; never block the editor
             return []
 
+    def _crew_pairings_display() -> dict:
+        """{member name -> voice display name} for members currently on Auto with a resolved
+        best-fit pairing (issue #124) — so the editor can render "Auto — currently: <voice name>"
+        instead of the plain "Auto (deterministic)". Members with an explicit voice_ref, or with
+        no pairing yet (background worker hasn't finished / LLM off / no persona), are omitted —
+        the client falls back to the plain label. Never raises (a missing app attr degrades to {})."""
+        pairings = getattr(core, "_crew_voice_pairings", {}) or {}
+        names = getattr(core, "_voice_names", {}) or {}
+        out: dict[str, str] = {}
+        for m in crew_mod.load_members(core.cfg):
+            if m.voice_ref:
+                continue
+            vid = pairings.get(m.name.strip().lower())
+            if vid:
+                out[m.name] = names.get(vid, vid)
+        return out
+
     def _crew_snapshot() -> dict:
         """The roster + voice options + hired pilots + version, re-read from the shared file so the
         content-hash `version` and the returned members always describe the same on-disk state."""
@@ -664,6 +682,7 @@ def create_app(core) -> Flask:
         return {"members": [m.to_dict() for m in members], "voices": _crew_voices(),
                 "hired": _crew_hired(),
                 "enabled": crew_mod.is_enabled(core.cfg),
+                "crew_pairings": _crew_pairings_display(),
                 "version": _file_version(path) if path else "",
                 "name": path.name if path else ""}
 
@@ -730,6 +749,10 @@ def create_app(core) -> Flask:
         core.bus.publish({"type": "log", "who": "system",
                           "text": f"Crew roster updated from the web editor "
                                   f"({len(members)} character(s))."})
+        # Re-run the crew best-fit voice pairing in the BACKGROUND (issue #124) — a save with no
+        # persona changes is a cache hit (no LLM call); an edited/added persona recomputes. Never
+        # blocks this response; any failure is fail-soft (logged, deterministic fallback stays).
+        bootstrap.kick_crew_voice_pairing(core)
         return jsonify({"ok": True, **_crew_snapshot()})
 
     @flask_app.route("/api/crew/suggest_persona", methods=["POST"])

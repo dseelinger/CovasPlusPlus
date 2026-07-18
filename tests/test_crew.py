@@ -345,6 +345,15 @@ def test_system_instruction_no_character_clause_when_neither_role_nor_persona():
     assert "In character:" not in inst and "Zeta" in inst
 
 
+def test_voice_pairings_file_uses_configured_path():
+    assert crew.voice_pairings_file({"crew": {"voice_pairings_file": "X/crew_pairs.json"}}) == \
+        crew.Path("X/crew_pairs.json")
+
+
+def test_voice_pairings_file_defaults_when_unconfigured():
+    assert crew.voice_pairings_file({}) == crew.Path("crew_voice_pairings.json")
+
+
 def test_voice_ref_for_returns_explicit_ref_else_blank(tmp_path):
     import json
     f = tmp_path / "crew.json"
@@ -482,3 +491,55 @@ def test_speak_crew_barge_in_clears_the_comms_bus():
     cancel.set()                                       # already barging in
     assert layer.speak_crew("Nyx", "cut me off", cancel) is True
     assert not any(s["bus"] == "comms" for s in layer.mixer._sources)  # noqa: SLF001 — dropped
+
+
+# ============================================================================================
+# 5. Best-fit CREW voice pairing (issue #124) — precedence: explicit > paired > deterministic
+# ============================================================================================
+
+def test_speak_crew_precedence_explicit_beats_paired_beats_deterministic(tmp_path):
+    import json
+
+    said: list[tuple[str, str]] = []
+    layer = _crew_layer(said)
+
+    # No ref, no pairing -> the ORIGINAL deterministic pick (issue #69, unchanged).
+    layer.speak_crew("Nyx", "one", threading.Event())
+    deterministic = said[-1][0]
+
+    # A crew PAIRING (issue #124) for "Nyx" overrides the deterministic pick.
+    other = next(r for r in ("VA", "VB", "VC", "VD", "VE") if r != deterministic)
+    layer.set_crew_pairings({"nyx": other})              # keyed lowercase, as the worker stores it
+    layer.speak_crew("Nyx", "two", threading.Event())
+    assert said[-1][0] == other
+
+    # An EXPLICIT voice_ref (crew.json, issue #70) still wins over the pairing.
+    f = tmp_path / "crew.json"
+    f.write_text(json.dumps([{"name": "Nyx", "voice_ref": "VD"}]), encoding="utf-8")
+    layer.cfg["crew"] = {"file": str(f)}
+    layer.speak_crew("Nyx", "three", threading.Event())
+    assert said[-1][0] == "VD"
+
+
+def test_speak_crew_pairing_lookup_is_case_insensitive_on_name():
+    said: list[tuple[str, str]] = []
+    layer = _crew_layer(said)
+    layer.set_crew_pairings({"nyx": "VC"})
+    layer.speak_crew("Nyx", "hi", threading.Event())     # roster identity is "Nyx", pairing key "nyx"
+    assert said[-1][0] == "VC"
+
+
+def test_speak_crew_no_pairing_for_name_falls_back_to_deterministic():
+    said: list[tuple[str, str]] = []
+    layer = _crew_layer(said)
+    layer.set_crew_pairings({"someoneelse": "VC"})       # a pairing exists, but not for "Nyx"
+    layer.speak_crew("Nyx", "hi", threading.Event())
+    assert said[-1][0] == layer._cast.assign("Nyx").ref   # noqa: SLF001 — the untouched deterministic pick
+
+
+def test_set_crew_pairings_replaces_and_clears():
+    layer = _crew_layer([])
+    layer.set_crew_pairings({"nyx": "VA"})
+    assert layer._crew_pairings == {"nyx": "VA"}          # noqa: SLF001
+    layer.set_crew_pairings(None)                          # None clears, same as an empty dict
+    assert layer._crew_pairings == {}                      # noqa: SLF001

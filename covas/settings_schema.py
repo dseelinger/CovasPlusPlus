@@ -511,7 +511,11 @@ SCHEMA: list[Setting] = [
             "that line is spoken in its own distinct, radio-filtered voice (the ship persona still "
             "speaks every unprefixed line). Define each character's role, personality, and voice on "
             "the Crew tab of the control panel — where you can also ADOPT a hired NPC fighter pilot "
-            "from your journal (name + role + a generated personality). Off by default.",
+            "from your journal (name + role + a generated personality). A character left on Auto "
+            "with a written personality gets a BEST-FIT voice (an LLM casts it against your voice "
+            "catalog, in the background, cached); persona-less or pairing-unavailable members keep "
+            "the deterministic per-name fallback. A pinned voice always overrides Auto. Gated by "
+            "[personality].auto_voice_pairing. Off by default.",
             default=False, phrasings=("crew", "crew voices", "the crew"),
             example="turn crew on"),
 

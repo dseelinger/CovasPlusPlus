@@ -7,7 +7,9 @@ what these tests lock is every server guarantee:
   * a whole-roster save round-trips LOSSLESSLY through `covas/crew.py` (name / persona / voice_ref),
     dropping nameless rows, and the saved file is the SAME one the voice + prompt paths read;
   * the stale-write guard 409s when the file changed underneath the tab, leaving it unclobbered,
-    and `force` deliberately overrides.
+    and `force` deliberately overrides;
+  * (issue #124) the snapshot surfaces a resolved best-fit voice name for Auto members only, and a
+    save kicks the background crew pairing recompute (offline-tested in test_crew_voice_pairing.py).
 """
 from __future__ import annotations
 
@@ -15,6 +17,7 @@ import json
 
 import pytest
 
+from covas import bootstrap
 from covas import config
 from covas.app import App
 from covas.web import create_app
@@ -183,6 +186,51 @@ def test_crew_page_renders_the_editor(client):
     c, _core = client
     html = c.get("/crew").get_data(as_text=True)
     assert 'id="list"' in html and 'id="save"' in html and 'id="addRow"' in html
+
+
+# --- best-fit crew voice pairing (issue #124) ---------------------------------------------------
+
+def test_crew_pairings_surface_only_for_auto_members_with_a_resolved_pairing(client):
+    """`_crew_snapshot`'s `crew_pairings` map (issue #124) resolves a member's paired voice_id to
+    its display name via the app's `_voice_names` catalog, but ONLY for members left on Auto
+    (blank voice_ref) — a pinned member is never listed even if a stale pairing exists for them."""
+    c, core = client
+    version = _state(c)["version"]
+    _save(c, [{"name": "Nyx", "persona": "Terse.", "voice_ref": ""},
+              {"name": "Kael", "persona": "Warm.", "voice_ref": "VPINNED"}],
+         base_version=version)
+    core._crew_voice_pairings = {"nyx": "v_gruff", "kael": "v_warm"}
+    core._voice_names = {"v_gruff": "Bruno", "v_warm": "Sarah"}
+    data = _state(c)
+    assert data["crew_pairings"] == {"Nyx": "Bruno"}       # Kael is pinned -> excluded
+
+
+def test_crew_pairings_falls_back_to_the_raw_id_when_the_name_is_unknown(client):
+    c, core = client
+    version = _state(c)["version"]
+    _save(c, [{"name": "Nyx", "persona": "Terse.", "voice_ref": ""}], base_version=version)
+    core._crew_voice_pairings = {"nyx": "v_unknown"}
+    core._voice_names = {}
+    assert _state(c)["crew_pairings"] == {"Nyx": "v_unknown"}
+
+
+def test_crew_pairings_empty_when_nothing_paired_yet(client):
+    c, _core = client
+    version = _state(c)["version"]
+    _save(c, [{"name": "Nyx", "persona": "Terse.", "voice_ref": ""}], base_version=version)
+    assert _state(c)["crew_pairings"] == {}
+
+
+def test_save_kicks_the_crew_pairing_recompute(client, monkeypatch):
+    """A roster save re-runs the crew pairing worker in the background (issue #124) — mirroring how
+    a settings change kicks the persona pairing. We don't exercise the real (network) worker here;
+    that's covered offline in tests/test_crew_voice_pairing.py."""
+    c, core = client
+    kicked = []
+    monkeypatch.setattr(bootstrap, "kick_crew_voice_pairing", lambda app: kicked.append(app))
+    version = _state(c)["version"]
+    assert _save(c, [{"name": "Nyx"}], base_version=version).status_code == 200
+    assert kicked == [core]
 
 
 def test_crew_editor_unavailable_without_a_configured_file(tmp_path, monkeypatch):

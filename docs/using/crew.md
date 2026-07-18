@@ -100,17 +100,40 @@ COVAS++ splits that reply into ordered segments and speaks each in turn:
 - **`[Nyx]` / `[Vela]` lines** are spoken in each character's **own voice**, radio-filtered, from
   the shared [voice cast](../audio/ambient-audio.md).
 
-### Voices: auto or assigned
+### Voices: auto (best-fit), or assigned
 
-By default each crew name maps to a voice **deterministically**: the same name gets the **same**
-voice every time, and different names get **different** voices (drawn from your configured cast
-pool). *"Nyx"* simply sounds like Nyx across the whole session, and across sessions — including a
-free-form name the model invents on the spot.
+Leave a character on **Auto** and COVAS++ tries to give it a voice that actually *fits*:
+
+- **With a written personality**, the same best-fit voice-casting built for shipped personas
+  (issue #96) runs over your crew roster in the background — an LLM matches each personality
+  against your ElevenLabs catalog's metadata (gender, age, accent, description) and picks the
+  single closest voice. "Sharp-eyed sensor officer, terse and dry" lands on a voice that sounds
+  the part instead of an arbitrary one. This is **ONE cheap-tier, cached** call: it only re-runs
+  when you **save** a roster edit that actually changed a persona (or added/removed a member) or
+  your voice catalog changed — a save with no persona changes costs nothing.
+- **Without a personality** (or whenever a best-fit pairing isn't available — LLM off, no key, the
+  feature gated off), Auto falls back to the **deterministic** pick from before: the same name
+  always gets the same voice, different names get different voices, drawn from your configured
+  cast pool. Auto never gets *worse* than this — it's the guaranteed floor.
+
+Once a best-fit voice is found for an Auto character, the Crew tab's **Voice** dropdown shows it
+right on the blank option — *"Auto — currently: `<voice name>`"* — so you can hear what Auto chose
+before deciding whether to keep it or pin something else.
 
 In the **Crew** tab you can also **assign** a specific voice to a character instead of leaving it
-on Auto. An assigned voice always wins over the automatic pick; leaving it on **Auto** keeps the
-deterministic behavior above. If you haven't configured a cast pool and a character is on Auto,
-that crew line falls back to the persona voice.
+on Auto. An assigned (pinned) voice **always** wins, over both the best-fit pairing and the
+deterministic fallback — pin one to veto Auto's choice. Auto's own precedence is: an assigned voice
+first, then a best-fit pairing for that name, then the deterministic fallback last.
+
+Best-fit crew pairing is gated by the same `[personality].auto_voice_pairing` switch as the persona
+pairing it reuses (Settings → **Personality**) — turn it off and Auto is always the deterministic
+pick, with no background LLM call. It also needs the active TTS provider to be ElevenLabs with a
+key (the richest catalog metadata) and runs only at a non-lean optimization level, same as #96.
+
+The result is cached in its OWN small, git-ignored file (`crew_voice_pairings.json`,
+`[crew].voice_pairings_file`) — kept separate from the persona cache
+(`personalities/voice_pairings.json`) so editing your crew roster never re-triggers the persona
+pairing, and vice versa.
 
 ### Personas keep characters consistent
 
