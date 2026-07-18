@@ -1161,6 +1161,24 @@ Notes:
 - [ ] **REVERT restores the saved theme:** change the Theme dropdown to preview a different look, then
       click **REVERT** (don't save) → the page snaps back to the saved theme.
 
+### 14.2f Settings left-nav scrollspy (issue #119)  🌐 PANEL
+> The left group nav highlights the section you're in — by scroll, and (while editing) by the focused
+> control. Standard docs-site behaviour on a long page. JS-only; verify in the browser + native window.
+- [ ] **Scroll tracks the section:** open Settings and scroll slowly top→bottom → **exactly one** nav
+      entry is highlighted at a time (accent text + a 2px accent left-border + subtle bg, clearly
+      distinct from hover), and it's the section currently at the **top of the content area** (just
+      below the sticky header). The active entry carries `aria-current="location"`.
+- [ ] **Focus overrides scroll:** without scrolling, **Tab** (or click) into a control several sections
+      down → that control's section highlights immediately, overriding the scroll highlight; it stays
+      until your next scroll, which hands the highlight back to scroll tracking.
+- [ ] **Click jumps cleanly:** click a nav entry → it highlights **immediately** and the page scrolls
+      to that section (landing below the sticky header), with no flicker through the passed sections.
+- [ ] **Filter never highlights a hidden group:** type in **Filter settings…** to hide some sections →
+      the hidden groups also drop from the nav, and the highlight only ever lands on a **visible**
+      section (never a filtered-out one). Clear the filter → all nav entries return.
+- [ ] **Long nav stays usable:** shrink the window so the 28-group nav overflows → the active entry
+      scrolls into view in the nav as it changes.
+
 ### 14.3 Personality tab (N7)
 - [ ] **Persona picker:** the Personality tab lists personas; selecting one shows a **preview**. Pick a different persona → the next reply's **voice/register changes**.
 - [ ] **Campaign preserved:** switch persona and confirm your **Campaign** text (personal facts) is unchanged — switching voice never wipes it.

@@ -18,8 +18,17 @@
           padding:8px 12px;font-family:inherit;min-width:240px;font-size:13px}
   .wrap{display:grid;grid-template-columns:200px 1fr;gap:20px;padding:20px;max-width:1200px}
   nav.groups{position:sticky;top:78px;align-self:start;display:flex;flex-direction:column;gap:4px}
-  nav.groups a{color:var(--muted);font-size:12px;letter-spacing:1px;padding:4px 8px;border-radius:5px;text-transform:uppercase}
+  nav.groups a{color:var(--muted);font-size:12px;letter-spacing:1px;padding:4px 8px;border-radius:5px;
+    text-transform:uppercase;border-left:2px solid transparent}
   nav.groups a:hover{color:var(--text);background:var(--panel);text-decoration:none}
+  /* Scrollspy active entry (issue #119): accent text + subtle panel bg + a 2px accent left-border,
+     clearly distinct from :hover (which only lifts a muted entry to full text on a panel bg). */
+  nav.groups a.active{color:var(--accent);background:var(--panel);border-left-color:var(--accent);
+    padding-left:6px}
+  nav.groups a.navhidden{display:none}   /* a group hidden by the filter drops from the nav too */
+  /* Anchor jumps (and the click-to-section) land BELOW the ~78px sticky header, not under it. */
+  .card{scroll-margin-top:88px}
+  html{scroll-behavior:smooth}
   .card{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:8px 20px 16px;margin-bottom:18px}
   .card h2{font-size:13px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin:14px 0 6px}
   .setting{padding:14px 0;border-top:1px solid var(--divider)}
@@ -174,6 +183,80 @@ function render(){
     main.appendChild(card);
   }
   syncSaveBar();
+  setupScrollspy();   // (re)wire the left-nav scrollspy AFTER the nav/cards exist (issue #119)
+}
+
+// ---- Left-nav scrollspy (issue #119) --------------------------------------
+// Highlight the nav entry for the section in view (IntersectionObserver), and — while you're
+// editing — for the section of the focused control (focus wins over scroll until the next scroll).
+// A click highlights immediately and the observer resumes once the smooth-scroll settles.
+let _spyObserver = null;                 // current IntersectionObserver (rebuilt each render)
+let _spyFocusActive = false;             // focus owns the highlight until the next scroll
+let _spySuppressUntil = 0;               // ignore observer churn during a click's smooth-scroll
+
+function navLinks(){ return [...document.querySelectorAll("nav.groups a")]; }
+function linkForCard(card){
+  return card ? document.querySelector('nav.groups a[href="#'+card.id+'"]') : null;
+}
+function cardVisible(c){ return c && c.style.display!=="none"; }
+
+function setActiveNav(link){
+  for(const a of navLinks()){
+    const on = a===link;
+    a.classList.toggle("active", on);
+    if(on) a.setAttribute("aria-current","location"); else a.removeAttribute("aria-current");
+  }
+  // Keep the active entry in view when the (28-group) nav overflows a short window.
+  if(link && link.scrollIntoView) link.scrollIntoView({block:"nearest"});
+}
+
+// The active section is the LAST visible card whose top has scrolled up past the "active line" just
+// below the sticky header — i.e. the section currently filling the top of the content area. The
+// IntersectionObserver is the cheap TRIGGER (fires only when a card crosses the band, never per
+// scroll frame); this reads live geometry so it's correct on the very first paint too, before the
+// observer's async callback. Focus/click ownership short-circuits it. Filter-hidden cards are skipped.
+const _SPY_LINE = 88;                     // px below the viewport top (under the ~78px sticky header)
+function spyApply(){
+  if(_spyFocusActive || performance.now() < _spySuppressUntil) return;
+  const cards=[...document.querySelectorAll("#main .card")].filter(cardVisible);
+  if(!cards.length) return;
+  let current=cards[0];
+  for(const c of cards){
+    if(c.getBoundingClientRect().top - _SPY_LINE <= 1) current=c; else break;
+  }
+  setActiveNav(linkForCard(current));
+}
+
+function setupScrollspy(){
+  if(_spyObserver){ _spyObserver.disconnect(); }
+  const cards=[...document.querySelectorAll("#main .card")];
+  if(!cards.length){ _spyObserver=null; return; }
+  // Bias the "current" line just under the sticky header: a card crossing the top ~30% band below
+  // the 88px header retriggers a recompute (bottom margin -70% shrinks the root's bottom).
+  _spyObserver = new IntersectionObserver(()=>{ spyApply(); },
+    { rootMargin:"-88px 0px -70% 0px", threshold:0 });
+  for(const c of cards) _spyObserver.observe(c);
+  // Click a nav entry -> highlight now; let the observer take back over once the scroll settles.
+  for(const a of navLinks()){
+    a.addEventListener("click", ()=>{
+      _spyFocusActive=false;
+      setActiveNav(a);
+      _spySuppressUntil = performance.now()+450;   // ride out the smooth-scroll without flicker
+    });
+  }
+  spyApply();   // initial paint (once layout settles the observer also fires)
+}
+
+// Persistent listeners (attached ONCE; #main and window survive re-renders):
+//  * focusin — tabbing into a control marks its section active and OWNS the highlight till a scroll.
+//  * scroll  — hands ownership back to the observer.
+function initSpyListeners(){
+  const main=$("main");
+  if(main) main.addEventListener("focusin", (e)=>{
+    const card = e.target.closest ? e.target.closest(".card") : null;
+    if(cardVisible(card)){ _spyFocusActive=true; setActiveNav(linkForCard(card)); }
+  });
+  window.addEventListener("scroll", ()=>{ _spyFocusActive=false; }, {passive:true});
 }
 
 function row(s, group){
@@ -524,7 +607,15 @@ function filter(){
   for(const card of document.querySelectorAll(".card")){
     const any=[...card.querySelectorAll(".setting")].some(e=>!e.classList.contains("hidden"));
     card.style.display = any?"":"none";
+    // Keep the nav consistent with the filter (issue #119): a hidden section drops from the nav so
+    // the scrollspy can never land on it, and the nav mirrors what's actually shown.
+    const link=linkForCard(card);
+    if(link) link.classList.toggle("navhidden", !any);
   }
+  // Filtering is an explicit action that changes what's visible: hand the highlight back from any
+  // focus/click owner and recompute, so it can never stay stuck on a now-hidden section (issue #119).
+  _spyFocusActive=false; _spySuppressUntil=0;
+  spyApply();
 }
 
 // Escape a string for safe use inside a RegExp (issue #95).
@@ -661,6 +752,7 @@ async function clearKey(row, msg){
 $("saveBtn").onclick=save;
 $("revertBtn").onclick=()=>{ for(const k of Object.keys(EDITS)) delete EDITS[k]; render(); filter(); applyThemeFromGroups(); };
 $("search").oninput=filter;
+initSpyListeners();   // scrollspy focus/scroll listeners (issue #119) — attach once
 load();
 </script>
 {% include "_command_palette.html" %}
