@@ -1188,6 +1188,31 @@ def _fmt(n: float) -> str:
     return str(int(n)) if float(n).is_integer() else str(n)
 
 
+# Choices that only belong on the PUBLIC settings surface when their [experimental.<flag>] toggle
+# is on (issue #123). Keyed by (setting.key, choice) -> flag name. Off, the choice is dropped from
+# the rendered dropdown so the public is never offered a gated provider/mode (whose registration
+# seam would refuse it anyway); Doug's overrides.json opt-in flips the flag AND the choice back in.
+# Validation is deliberately NOT filtered here — the seam gate + the fail-soft TTS reload contain
+# an errant value, so this stays a display-only nicety and keeps the pure validator options-driven.
+_EXPERIMENTAL_CHOICES = {
+    ("tts.provider", "azure"): "azure_tts",
+    ("tts.provider", "cartesia"): "cartesia_tts",
+    ("audio.voices.cast_provider", "azure"): "azure_tts",
+    ("listen.mode", "continuous"): "voice_activation",
+}
+
+
+def public_options(cfg: dict, s: Setting, opts: Optional[list]) -> Optional[list]:
+    """Drop experimental-gated choices from an enum's option list for the public UI (issue #123).
+    A no-op for any setting/choice not in `_EXPERIMENTAL_CHOICES`, and for one whose flag is on."""
+    if not opts:
+        return opts
+    from .config import experimental
+    gated = {choice for (key, choice), flag in _EXPERIMENTAL_CHOICES.items()
+             if key == s.key and not experimental(cfg, flag)}
+    return [o for o in opts if o not in gated] if gated else opts
+
+
 def field_payload(cfg: dict, overrides: dict, s: Setting,
                   dynamic: Optional[dict] = None, readonly: bool = False) -> dict:
     """Serialize ONE setting into the dict the web surfaces render from: type + display metadata,
@@ -1201,7 +1226,7 @@ def field_payload(cfg: dict, overrides: dict, s: Setting,
         "label": s.label,
         "help": s.help,
         "doc_url": s.doc_url,
-        "options": resolve_options(s, dynamic),
+        "options": public_options(cfg, s, resolve_options(s, dynamic)),
         "options_source": s.options_source,
         "combobox": is_combobox(s),
         "min": s.min,

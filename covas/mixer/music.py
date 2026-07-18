@@ -168,8 +168,13 @@ class MusicDirector:
 
     @classmethod
     def from_cfg(cls, cfg: dict) -> "MusicDirector":
+        # EXPERIMENTAL (issue #123): the music layer is gated behind [experimental.music]
+        # (off by default) AT this seam — a flag-off director is built disabled, so update()
+        # decides no transitions and nothing ever plays, even with [music].enabled = true.
+        from ..config import experimental
         m = cfg.get("music", {}) or {}
-        return cls(MusicLibrary.from_cfg(cfg), enabled=bool(m.get("enabled", False)))
+        on = bool(m.get("enabled", False)) and experimental(cfg, "music")
+        return cls(MusicLibrary.from_cfg(cfg), enabled=on)
 
     def set_library(self, library: MusicLibrary) -> None:
         """Swap the track library WITHOUT touching the current context/track/rotation (live drop-in

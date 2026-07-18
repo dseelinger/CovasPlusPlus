@@ -1,5 +1,13 @@
 # Companion HUD
 
+!!! warning "Experimental — off by default"
+    The HUD (desktop, VR, and web surfaces) is an **experimental** feature: it ships **disabled**
+    for everyone and is gated at registration, so until it graduates it exposes no tool, help, or
+    Settings. Enable it just for yourself by adding `experimental.hud.enabled = true` to your
+    git-ignored `overrides.json` (see
+    [Experimental feature flags](../configuration.md#experimental-feature-flags)), then turn on the
+    surface you want (`hud.enabled` / `hud.vr_enabled` / `hud.web_enabled`).
+
 COVAS++ can show a small, glanceable **overlay** on top of the game — a transparent,
 always-on-top panel that surfaces the companion-centric information only COVAS++ has. It's a
 *view*, not a control surface: it's non-interactive and (on Windows) click-through, so it never

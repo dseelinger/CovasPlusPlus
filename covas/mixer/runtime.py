@@ -20,6 +20,7 @@ from dataclasses import replace
 from typing import Callable, Optional
 
 from ..capabilities.base import HelpMeta, Slot
+from ..config import experimental
 from .buses import ALERT, AMBIENT, COMMS, COVAS, MUSIC
 from .carrier import CarrierPlayer, build_carrier_config, carrier_cues
 from .chatter import (
@@ -159,7 +160,11 @@ class AudioLayer:
         self.chatter_on = bool((audio.get("cues", {}) or {}).get("enabled", False))
         self.sfx_on = self.chatter_on
         self.comms_on = bool((audio.get("comms", {}) or {}).get("enabled", True))
-        self.music_on = bool((cfg.get("music", {}) or {}).get("enabled", False))
+        # Music is EXPERIMENTAL (issue #123): gated behind [experimental.music] here too, so this
+        # runtime toggle (which mirrors onto the director's _enabled on a live reload) can't re-arm
+        # a director that MusicDirector.from_cfg built disabled.
+        self.music_on = (bool((cfg.get("music", {}) or {}).get("enabled", False))
+                         and experimental(cfg, "music"))
         # Fleet-carrier context voices (issue #19) — captain/tower/carrier-chatter, gated on being
         # at/near the OWN carrier. Independently toggleable; default on (they're naturally silent
         # unless you own a carrier and are there).
@@ -702,7 +707,8 @@ class AudioLayer:
         self.chatter_on = bool((audio.get("cues", {}) or {}).get("enabled", False))
         self.sfx_on = self.chatter_on
         self.set_comms(bool((audio.get("comms", {}) or {}).get("enabled", True)))
-        self.set_music(bool((self.cfg.get("music", {}) or {}).get("enabled", False)))
+        self.set_music(bool((self.cfg.get("music", {}) or {}).get("enabled", False))
+                       and experimental(self.cfg, "music"))   # experimental gate (#123)
         # Re-read the carrier roles (voices/names/enable) so a Settings change applies live (#19).
         self._carrier_cfg = build_carrier_config(self.cfg)
         self.set_carrier(self._carrier_cfg.enabled)

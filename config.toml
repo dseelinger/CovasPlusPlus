@@ -10,6 +10,69 @@
 # ============================================================================
 
 
+# ============================================================================
+#  EXPERIMENTAL FEATURE FLAGS  (issue #123)
+# ----------------------------------------------------------------------------
+#  Half-baked features live in `main` (and in downloadable releases) but stay
+#  INVISIBLE to the general public until they graduate. Every flag here defaults
+#  OFF, and each feature is gated at REGISTRATION (its capability/provider/seam is
+#  never wired when the flag is off) — so a flag-off feature exposes NO tool, NO
+#  help text, and NO settings surface. It is genuinely absent, not merely dormant.
+#
+#  SELF-ENABLE (turn one on for yourself): set it here — or, better, in the
+#  git-ignored, highest-precedence `overrides.json`, so your opt-in never touches
+#  these shipped defaults or anyone else's install:
+#      { "experimental": { "trade_route": { "enabled": true } } }
+#
+#  These flags are deliberately kept OUT of the public Settings page. Graduating a
+#  feature is one step: flip its default to `true` here (or promote it to a real
+#  [section]), at which point the full definition-of-done applies (docs into the
+#  default nav, MANUAL_TESTS, help metadata, DESIGN_AND_ROADMAP). See
+#  DESIGN_AND_ROADMAP.md §"Experimental feature flags".
+# ============================================================================
+[experimental]
+[experimental.azure_tts]
+# Azure Neural TTS (persona + cast). Gated at provider registration (make_tts) and
+# cast registration. Self-enable: also set [tts].provider = "azure" (or
+# [audio.voices].cast_provider = "azure") in overrides.json. See [azure] below.
+enabled = false
+[experimental.cartesia_tts]
+# Cartesia (Sonic) low-latency PREMIUM persona voice. Gated at provider registration
+# (make_tts). Self-enable: also set [tts].provider = "cartesia". See [cartesia] below.
+enabled = false
+[experimental.voice_activation]
+# Hands-free, non-PTT activation: continuous voice-activity listening + the wake word
+# ([listen].mode = "continuous", [listen].wake_word). Gated at the listen-mode seam —
+# off, the app is push-to-talk only regardless of [listen].mode. See [listen] below.
+enabled = false
+[experimental.crew]
+# Interactive named CREW voices (issue #69 + the #124–#127 crew cluster). Gated at
+# crew.is_enabled — off, [crew].enabled does nothing and no crew line is ever voiced.
+enabled = false
+[experimental.trade_route]
+# Trade-route planner (route_plan_capability). Gated at capability registration —
+# off, the tool is absent and unadvertised even with [route_plan].enabled = true.
+enabled = false
+[experimental.macro]
+# Custom voice-authored macros (macro_capability, [macros]). Gated at capability
+# registration — off, no macro tool is registered even with [macros].enabled = true.
+enabled = false
+[experimental.auto_reflex]
+# AMBIENT auto-reflexes (#37, auto_reflex_capability, [reflex.auto]). Gated at
+# capability registration — off, only the VERBAL reflex path exists. The verbal
+# Tier-2 reflex ([reflex].enabled) is NOT experimental.
+enabled = false
+[experimental.music]
+# Ambient MUSIC layer (C7, [music]). Gated at the MusicDirector seam — off, the
+# director decides no transitions even with [music].enabled = true.
+enabled = false
+[experimental.hud]
+# Companion HUD overlay — desktop, VR, and web surfaces (hud_capability, [hud]).
+# Gated at capability registration — off, no HUD tool/capability is wired and the
+# overlay can't be turned on by voice or Settings.
+enabled = false
+
+
 [keys]
 # Keyboard triggers. `keyboard`-library key names.
 # HOLD push_to_talk to speak; a BRIEF TAP of the same key cancels/stops.

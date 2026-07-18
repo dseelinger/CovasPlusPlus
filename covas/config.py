@@ -210,3 +210,27 @@ def mock_enabled(cfg: dict) -> bool:
     if env is not None and env.strip() != "":
         return env.strip().lower() in _TRUEISH
     return bool(cfg.get("dev", {}).get("mock", False))
+
+
+def experimental(cfg: dict, name: str) -> bool:
+    """Whether the named [experimental.<name>] feature flag is ON (issue #123).
+
+    The whole point is that OFF is the safe public default: an absent [experimental]
+    section, an unknown/typo'd name, or a malformed (non-dict) sub-table all read as
+    False, so a half-baked feature stays invisible to the general public build. Doug
+    flips one on for HIMSELF by setting [experimental.<name>].enabled = true in the
+    git-ignored, highest-precedence overrides.json — it never touches the shipped
+    defaults or anyone else's install.
+
+    This is only a config read; the ENFORCEMENT is at each feature's registration/seam
+    (see covas/bootstrap.py, crew.is_enabled, MusicDirector.from_cfg, App._listen_mode,
+    providers.factory.make_tts) so a flag-off feature contributes no tools/help/provider
+    at all — not a runtime `if flag:` inside a live handler. Sub-table shape mirrors
+    [reflex.auto.<name>] so the two read and grep the same."""
+    exp = cfg.get("experimental", {})
+    if not isinstance(exp, dict):
+        return False
+    sub = exp.get(name, {})
+    if not isinstance(sub, dict):
+        return False
+    return bool(sub.get("enabled", False))

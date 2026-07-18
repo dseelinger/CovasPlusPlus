@@ -17,8 +17,16 @@ big, entirely optional subsystem, and it's **off by default.**
 | **Comms voices** | Voices the game's comms-panel lines (NPC/station messages and direct player DMs) over a radio-treated bus | `audio.comms.enabled` (on by default *within* the layer) |
 | **Space chatter & SFX** | Occasional ambient radio chatter (**populated systems only**) and sound effects | `audio.cues.enabled` |
 | **Fleet-carrier voices** | A named **Captain**, **Tower Control**, and deck chatter that come alive at **your own fleet carrier**, each with its own voice | `audio.carrier.enabled` |
-| **Ambient music** | Context-crossfaded background music from your own local tracks | `music.enabled` |
+| **Ambient music** | Context-crossfaded background music from your own local tracks | `music.enabled` **+** `experimental.music.enabled` |
 | **Interdiction cue** | A layered "pirate interdiction" moment — a warning sting, your companion's threat line, and the pirate's line | `audio.interdiction.enabled` |
+
+!!! warning "Ambient music is experimental — off by default"
+    The **Ambient music** row above is an **experimental** feature: it ships **disabled** for
+    everyone and is gated at the music-director seam, so nothing plays until you opt in. Enable it
+    just for yourself by adding `experimental.music.enabled = true` to your git-ignored
+    `overrides.json` (see
+    [Experimental feature flags](../configuration.md#experimental-feature-flags)) **and** setting
+    `music.enabled = true`. The rest of the ambient layer is not experimental.
 
 Your companion's own voice always plays clean and full-volume on its own bus, so a radio line can
 never bury it. Each bus (COVAS, comms, ambient/SFX, music, alert) has its own volume trim.

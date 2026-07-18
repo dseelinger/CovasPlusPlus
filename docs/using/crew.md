@@ -1,5 +1,13 @@
 # Interactive crew
 
+!!! warning "Experimental — off by default"
+    Interactive crew is an **experimental** feature: it ships **disabled** for everyone and is
+    gated at its enablement seam, so a flag-off build voices no crew line and shows no crew
+    surface. Enable it just for yourself by adding `experimental.crew.enabled = true` to your
+    git-ignored `overrides.json` (see
+    [Experimental feature flags](../configuration.md#experimental-feature-flags)) **and** setting
+    `crew.enabled = true`.
+
 By default COVAS++ speaks in **one** voice — the ship's companion (the persona). With **crew**
 turned on, an ordinary reply can also voice a **named crew member**, each line attributed and
 spoken in its **own distinct voice**. The persona still speaks every line it isn't told to hand

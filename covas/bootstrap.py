@@ -24,7 +24,7 @@ import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
-from .config import deep_merge
+from .config import deep_merge, experimental
 from .router import Router
 
 if TYPE_CHECKING:
@@ -182,7 +182,13 @@ def _register_azure_cast(app: "App", cast_synth) -> None:  # noqa: ANN001 — a 
 
     Register official Azure Neural TTS as a cast-eligible backend (issue #17) — the reliable,
     free-tier sibling of Edge. Any NPC/comms/chatter role can use it. Fail-soft: a synth error
-    (no key, service down) is caught by CastSynth and the voice degrades to silence."""
+    (no key, service down) is caught by CastSynth and the voice degrades to silence.
+
+    EXPERIMENTAL (issue #123): Azure is gated at registration — with [experimental.azure_tts]
+    off (the public default) the cast never gains an 'azure' backend, so an 'azure' cast voice
+    degrades to silence exactly as it does when edge-tts is unavailable."""
+    if not experimental(app.cfg, "azure_tts"):
+        return
     try:
         from .providers.azure_tts import AzureTTS
         azure = AzureTTS(app.cfg)
@@ -500,7 +506,14 @@ def build_hud(app: "App") -> None:
     hears status/checklist/route/settings events. The capability keeps a pure HudModel and
     only opens a window when [hud].enabled AND a display are present — off by default, so
     this is inert until the Commander opts in (Settings page or 'turn the HUD on'). Fail
-    soft: any wiring problem just leaves the HUD off; it must never block startup."""
+    soft: any wiring problem just leaves the HUD off; it must never block startup.
+
+    EXPERIMENTAL (issue #123): the whole HUD (desktop / VR / web surfaces) is gated at
+    registration behind [experimental.hud] (off by default). While off, NO HudCapability or
+    HudPlacementCapability is registered — the overlay is genuinely absent (no tool, no help),
+    not merely a shown window that's hidden, and it can't be brought up by voice or Settings."""
+    if not experimental(app.cfg, "hud"):
+        return
     try:
         from .capabilities.hud_capability import (
             HudCapability, HudModel, WebHudView, checklist_line)
@@ -765,7 +778,14 @@ def build_auto_reflex(app: "App", binds: dict, executor: object) -> None:
     Build + register the ambient auto-reflex capability when opted in ([reflex.auto].
     enabled). Fail soft: a startup problem just leaves the automatic layer off — the verbal
     reflexes still work. Needs the event pump (it reacts to bus ed_events) and ED monitoring
-    (for the trigger snapshot + the guard)."""
+    (for the trigger snapshot + the guard).
+
+    EXPERIMENTAL (issue #123): the AUTOMATIC layer is gated at registration behind
+    [experimental.auto_reflex] (off by default) — so the public build never registers an
+    auto-reflex capability even with [reflex.auto].enabled set. The VERBAL Tier-2 reflex path
+    (build_reflex) is unaffected."""
+    if not experimental(app.cfg, "auto_reflex"):
+        return
     from .capabilities.auto_reflex_capability import AutoReflexCapability, AutoReflexConfig
     from .capabilities.reflex_capability import REFLEX_ACTIONS
 
@@ -1523,13 +1543,13 @@ MANIFEST: tuple[Wiring, ...] = (
     Wiring("honk",             lambda a: a.cfg.get("honk", {}).get("enabled"),           build_honk),
     Wiring("reflex",           lambda a: a.cfg.get("reflex", {}).get("enabled"),         build_reflex),
     Wiring("comms",            lambda a: a.cfg.get("comms_send", {}).get("enabled"),     build_comms),
-    Wiring("macros",           lambda a: a.cfg.get("macros", {}).get("enabled"),         build_macros),
+    Wiring("macros",           lambda a: a.cfg.get("macros", {}).get("enabled") and experimental(a.cfg, "macro"), build_macros),  # experimental (#123)
     Wiring("nav",              lambda a: a.cfg.get("nav", {}).get("enabled"),            build_nav),
     Wiring("ship_nav",         lambda a: a.cfg.get("nav", {}).get("enabled"),            build_ship_nav),
     Wiring(None,               lambda a: a.cfg.get("star_systems", {}).get("enabled"),   build_system_search),
     Wiring(None,               lambda a: a.cfg.get("search", {}).get("enabled"),         build_searches),
     Wiring(None,               lambda a: a.cfg.get("bodies", {}).get("enabled"),         build_bodies),
-    Wiring(None,               lambda a: a.cfg.get("route_plan", {}).get("enabled"),     build_route_plan),
+    Wiring(None,               lambda a: a.cfg.get("route_plan", {}).get("enabled") and experimental(a.cfg, "trade_route"), build_route_plan),  # experimental (#123)
     Wiring(None,               lambda a: a.cfg.get("neutron_plan", {}).get("enabled"),   build_neutron_plan),
     Wiring(None,               lambda a: a.cfg.get("riches_plan", {}).get("enabled"),    build_riches_plan),
     Wiring(None,               lambda a: a.cfg.get("mining_helper", {}).get("enabled"),  build_mining_helper),

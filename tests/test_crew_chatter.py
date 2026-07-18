@@ -214,16 +214,23 @@ def test_rejected_line_still_advances_throttle_so_generator_is_not_re_hit_immedi
 # Part B — addressing clause in the crew system instruction (prompt-level only)
 # ============================================================================================
 
+def _on(**crew_extra) -> dict:
+    """Crew-ON config: gated behind [crew].enabled AND [experimental.crew] (issue #123)."""
+    return {"crew": {"enabled": True, **crew_extra},
+            "experimental": {"crew": {"enabled": True}}}
+
+
 def test_addressing_clause_present_only_when_crew_enabled():
     assert crew.system_instruction({"crew": {"enabled": False}}) is None
-    inst = crew.system_instruction({"crew": {"enabled": True}})
+    assert crew.system_instruction({"crew": {"enabled": True}}) is None   # flag off -> still None (#123)
+    inst = crew.system_instruction(_on())
     assert inst is not None
     assert "addresses a crew member by name" in inst
     assert "sound off" in inst                            # the everyone/roll-call case
 
 
 def test_addressing_instruction_is_static_for_a_fixed_roster():
-    cfg = {"crew": {"enabled": True, "roster": ["Nyx", "Vela"]}}
+    cfg = _on(roster=["Nyx", "Vela"])
     a = crew.system_instruction(cfg)
     b = crew.system_instruction(cfg)
     assert a == b                                         # byte-identical -> prompt-cache safe

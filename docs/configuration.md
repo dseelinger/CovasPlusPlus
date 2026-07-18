@@ -32,6 +32,38 @@ itself carries a comment on every line.
 
 ---
 
+## Experimental feature flags
+
+Some features are still being finished. They live in every release but ship **disabled** for the
+general public, gated by the **`[experimental]`** section so a half-baked feature is genuinely
+absent — it exposes **no tool, no help, and no Settings surface** — rather than merely dormant.
+Each flag defaults **off**; graduating a feature flips its default on (and it then gets full docs,
+help, and Settings).
+
+Turn one on **just for yourself** by setting it in your git-ignored, highest-precedence
+`overrides.json` (so your opt-in never touches the shipped defaults or anyone else's install):
+
+```json
+{ "experimental": { "trade_route": { "enabled": true } } }
+```
+
+Most of these also have their *own* enable/selection — the experimental flag is an **additional
+gate**, so you set both (e.g. `experimental.crew.enabled = true` **and** `crew.enabled = true`).
+
+| Flag | Gates | Also needs |
+|------|-------|------------|
+| `experimental.azure_tts` | Azure Neural TTS (persona + cast) | `tts.provider = "azure"` (or a cast provider) |
+| `experimental.cartesia_tts` | Cartesia (Sonic) persona voice | `tts.provider = "cartesia"` |
+| `experimental.voice_activation` | [Hands-free listening](getting-started/hands-free.md) + wake word | `listen.mode = "continuous"` |
+| `experimental.crew` | [Interactive crew](using/crew.md) voices | `crew.enabled = true` |
+| `experimental.trade_route` | [Trade-route planner](search/trade-routes.md) | `route_plan.enabled = true` |
+| `experimental.macro` | [Custom macros](automation/custom-macros.md) | `macros.enabled = true` |
+| `experimental.auto_reflex` | Automatic [combat reflexes](automation/reflexes.md) | `reflex.auto.enabled = true` |
+| `experimental.music` | [Ambient music](audio/ambient-audio.md) | `music.enabled = true` |
+| `experimental.hud` | [Companion HUD](using/hud.md) (desktop / VR / web) | `hud.enabled` / `hud.vr_enabled` / `hud.web_enabled` |
+
+---
+
 ## Voice input (`[keys]`)
 
 | Setting | Default | What it does |

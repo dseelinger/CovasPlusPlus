@@ -142,7 +142,11 @@ def test_director_keeps_current_when_new_context_has_no_track():
 
 
 def test_director_from_cfg_enabled_flag():
-    assert MusicDirector.from_cfg({"music": {"enabled": True, "tracks": {}}})._enabled  # noqa: SLF001
+    # Music is gated behind [experimental.music] too (issue #123) — [music].enabled alone builds
+    # a DISABLED director; both are required to arm it.
+    assert not MusicDirector.from_cfg({"music": {"enabled": True, "tracks": {}}})._enabled  # noqa: SLF001
+    on = {"music": {"enabled": True, "tracks": {}}, "experimental": {"music": {"enabled": True}}}
+    assert MusicDirector.from_cfg(on)._enabled  # noqa: SLF001
     assert not MusicDirector.from_cfg({})._enabled  # noqa: SLF001
 
 

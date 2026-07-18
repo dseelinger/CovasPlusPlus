@@ -21,6 +21,10 @@ from . import elevenlabs as el
 from . import firstrun
 from . import settings_schema as schema
 
+# TTS providers gated behind an [experimental.<flag>] toggle (issue #123): never offered on the
+# public first-run path, even against a crafted request. Mirrors providers.factory._EXPERIMENTAL_TTS.
+_EXPERIMENTAL_TTS = frozenset({"azure", "cartesia"})
+
 # The finish-step copy differs by HOW the wizard is being shown, because the safe next action
 # differs. In the NATIVE single window (run_covas_app.py) the handoff swaps this SAME window over
 # to the control panel automatically — telling the user to "close this tab" there would make them
@@ -81,7 +85,10 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
         try:
             if llm and llm in schema.LLM_PROVIDERS:
                 firstrun.apply_override(cfg, {"llm": {"provider": llm}})
-            if tts and tts in schema.TTS_PROVIDERS:
+            # Experimental providers (azure/cartesia, #123) are never selectable on the public
+            # first-run path — reject one even from a crafted request, so the wizard can't write a
+            # provider the app then can't build (which would crash the very first startup).
+            if tts and tts in schema.TTS_PROVIDERS and tts not in _EXPERIMENTAL_TTS:
                 firstrun.apply_override(cfg, {"tts": {"provider": tts}})
 
             # 2) keys — only non-blank values, keyed by config section.

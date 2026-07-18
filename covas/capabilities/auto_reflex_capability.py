@@ -256,6 +256,16 @@ class AutoReflexCapability:
         self._log = log
         self._lock = threading.Lock()   # serialize concurrent bus events (one fire at a time)
 
+    # -- registry surface -------------------------------------------------------------
+    def tools(self) -> list[dict]:
+        """No LLM tools — this is the silent, no-voice reactor path (the verbal ReflexCapability
+        owns the spoken reflex tools + help). But the capability IS registered so the event pump
+        delivers it bus events, and `CapabilityRegistry.tools()/tools_for_level()` iterate EVERY
+        registered capability's `tools()`; without this method a registered auto-reflex would
+        AttributeError on the next turn. Return an empty list so it registers cleanly and stays
+        invisible to the LLM."""
+        return []
+
     # -- bus hook ---------------------------------------------------------------------
     def on_event(self, event: dict) -> None:
         """Bus hook (event-pump thread). On a waking `ed_event`, re-check + fire the matching

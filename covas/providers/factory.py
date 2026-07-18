@@ -2,8 +2,14 @@
 the local stack doesn't require the cloud SDKs (and vice versa)."""
 from __future__ import annotations
 
-from ..config import mock_enabled
+from ..config import experimental, mock_enabled
 from .base import LLMProvider, STTProvider, TTSProvider
+
+# Providers gated behind an [experimental.<flag>] toggle (issue #123). Selecting one while its
+# flag is off is treated exactly like an unknown provider — it isn't offered on the public Settings
+# surface, so this is only reachable by a deliberate overrides.json opt-in, where the matching flag
+# is set alongside. Kept here (not scattered in the branches) so the gate reads in one place.
+_EXPERIMENTAL_TTS = {"azure": "azure_tts", "cartesia": "cartesia_tts"}
 
 
 def make_stt(cfg: dict) -> STTProvider:
@@ -45,6 +51,15 @@ def make_tts(cfg: dict, *, mixer=None) -> TTSProvider:  # noqa: ANN001
         from .fakes import FakeTTS
         return FakeTTS(cfg)
     name = str(cfg.get("tts", {}).get("provider", "elevenlabs")).lower()
+    # Experimental providers (issue #123): unavailable unless their flag is on. Raise as unavailable
+    # (like an unknown provider) — the live TTS-swap path (App._reload_tts) handles it fail-soft
+    # (keeps the previous voice), and these aren't offered on the public Settings/wizard surface, so
+    # this is only reached by a deliberate overrides.json opt-in that forgot the matching flag.
+    flag = _EXPERIMENTAL_TTS.get(name)
+    if flag and not experimental(cfg, flag):
+        raise ValueError(
+            f"[tts].provider {name!r} is experimental — set [experimental.{flag}].enabled = true "
+            "in overrides.json to use it.")
     if name == "piper":
         from .piper_tts import PiperTTS
         return PiperTTS(cfg, mixer=mixer)

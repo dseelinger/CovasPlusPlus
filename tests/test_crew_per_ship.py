@@ -86,7 +86,10 @@ def _cfg_two_rosters(tmp_path, **crew_extra):
     crew.save_roster_file(f, RosterFile(
         default=(CrewMember("Def"),),
         ships={"42": ShipRoster(hull="krait_light", members=(CrewMember("ShipMate"),))}))
-    return {"crew": {"file": str(f), "enabled": True, **crew_extra}}
+    # crew is gated behind [crew].enabled AND the [experimental.crew] flag (issue #123); the
+    # extra key is harmless to the roster-resolution tests that don't route through is_enabled.
+    return {"crew": {"file": str(f), "enabled": True, **crew_extra},
+            "experimental": {"crew": {"enabled": True}}}
 
 
 def test_ship_with_roster_resolves_to_its_members(tmp_path):
@@ -134,7 +137,8 @@ def test_instruction_differs_across_ships_but_is_stable_within_one(tmp_path):
         default=(CrewMember("Def"),),
         ships={"1": ShipRoster(members=(CrewMember("Alpha"),)),
                "2": ShipRoster(members=(CrewMember("Beta"),))}))
-    cfg = {"crew": {"file": str(f), "enabled": True}}
+    cfg = {"crew": {"file": str(f), "enabled": True},
+           "experimental": {"crew": {"enabled": True}}}   # crew gate (#123)
     a, b = crew.system_instruction(cfg, "1"), crew.system_instruction(cfg, "2")
     assert "Alpha" in a and "Beta" not in a
     assert "Beta" in b and "Alpha" not in b
@@ -218,7 +222,8 @@ def test_build_system_uses_the_active_ship_roster(tmp_path):
     crew.save_roster_file(f, RosterFile(
         default=(CrewMember("Def"),),
         ships={"42": ShipRoster(members=(CrewMember("ShipMate"),))}))
-    cfg = {"personality": {"enabled": False}, "crew": {"enabled": True, "file": str(f)}}
+    cfg = {"personality": {"enabled": False}, "crew": {"enabled": True, "file": str(f)},
+           "experimental": {"crew": {"enabled": True}}}   # crew gate (#123)
     assert "ShipMate" in build_system(cfg, "42")
     assert "Def" in build_system(cfg, None) and "ShipMate" not in build_system(cfg, None)
 

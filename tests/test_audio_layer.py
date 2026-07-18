@@ -351,12 +351,17 @@ def test_enable_flags_are_consumed_by_the_layer():
     cfg = {"audio": {"mix_sample_rate": 16000, "enabled": True,
                      "cues": {"enabled": True}, "comms": {"enabled": False},
                      "interdiction": {"enabled": True}},
-           "music": {"enabled": True}}
+           "music": {"enabled": True},
+           "experimental": {"music": {"enabled": True}}}   # music is experimental-gated (#123)
     layer = AudioLayer(cfg, BusMixer(cfg), _FakeTTS(), ed_ctx=None, llm=None)
     assert layer.chatter_on and layer.sfx_on          # [audio.cues].enabled
     assert layer.comms_on is False                    # [audio.comms].enabled
-    assert layer.music_on is True                     # [music].enabled
+    assert layer.music_on is True                     # [music].enabled + [experimental.music]
     assert layer._interdiction.enabled is True        # [audio.interdiction].enabled (was dead)
+    # Music is EXPERIMENTAL (#123): [music].enabled WITHOUT the flag must not arm the layer, even
+    # though the director-enable mirrors this runtime toggle on a reload.
+    off = {"audio": {"mix_sample_rate": 16000, "enabled": True}, "music": {"enabled": True}}
+    assert AudioLayer(off, BusMixer(off), _FakeTTS(), ed_ctx=None, llm=None).music_on is False
 
 
 def test_audio_controls_registers_cleanly_in_the_registry():

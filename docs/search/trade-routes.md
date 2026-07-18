@@ -1,5 +1,13 @@
 # Trade-route planner
 
+!!! warning "Experimental — off by default"
+    The trade-route planner is an **experimental** feature: it ships **disabled** for everyone and
+    is gated at capability registration, so a flag-off build exposes no trade-route tool or help.
+    Enable it just for yourself by adding `experimental.trade_route.enabled = true` to your
+    git-ignored `overrides.json` (see
+    [Experimental feature flags](../configuration.md#experimental-feature-flags)) **and** setting
+    `route_plan.enabled = true`.
+
 > *"I plan a profitable multi-hop trade loop from where you're docked — every hop's buy, sell, and
 > profit plus the round-trip total, with a heads-up when prices are stale — and copy the next stop
 > to your clipboard for the galaxy map."*
