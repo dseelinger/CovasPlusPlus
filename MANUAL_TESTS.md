@@ -1041,6 +1041,17 @@ Notes:
 - [ ] **Refine** the query → the highlight tracks the new match; a query matching only a **section name** still surfaces that section's settings.
 - [ ] **Clear** the search box → all highlights are removed and the full list is restored.
 
+### 14.2d Settings page left-aligned (issue #106)  🌐 PANEL
+> The Settings body used to be centered under a full-bleed header, leaving a wide empty gutter on
+> the left of a maximized window. #106 left-aligns it to match the control panel.
+- [ ] **Maximized on a wide (≥1600px) monitor:** the Settings body (group nav + cards) sits **under
+      the header logo**, hard against the left — **no** large empty gutter on the left.
+- [ ] **Matches the control panel:** open the control panel (`/`) and the Settings page (`/settings`)
+      side by side — both are left-aligned; Settings is no longer the odd one out.
+- [ ] **Still readable / collapses gracefully:** setting rows stay readable (help text still capped);
+      narrow the window below 1200px → the layout stays sensible and the **sticky group nav** still
+      scrolls the page and stays usable.
+
 ### 14.3 Personality tab (N7)
 - [ ] **Persona picker:** the Personality tab lists personas; selecting one shows a **preview**. Pick a different persona → the next reply's **voice/register changes**.
 - [ ] **Campaign preserved:** switch persona and confirm your **Campaign** text (personal facts) is unchanged — switching voice never wipes it.
