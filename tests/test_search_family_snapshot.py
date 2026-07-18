@@ -52,20 +52,17 @@ def build_family_surface() -> list[dict]:
     """
     # Imports are local so a construction problem surfaces as a test error, not a collection error.
     from covas.capabilities._search_support import SearchConfig
-    from covas.capabilities.body_search_capability import BodySearchCapability
-    from covas.capabilities.find_closest_capability import FindClosestCapability, NavConfig
-    from covas.capabilities.find_closest_ship_capability import FindClosestShipCapability
+    from covas.capabilities.find_closest_capability import (FindClosestCapability,
+                                                            FindClosestShipCapability, NavConfig)
     from covas.capabilities.mining_helper_capability import (MiningHelperCapability,
                                                              MiningHelperConfig)
-    from covas.capabilities.minor_faction_search_capability import MinorFactionSearchCapability
-    from covas.capabilities.misc_search_capability import MiscSearchCapability
-    from covas.capabilities.neutron_plan_capability import NeutronPlanCapability, NeutronPlanConfig
-    from covas.capabilities.riches_plan_capability import RichesPlanCapability, RichesPlanConfig
-    from covas.capabilities.route_plan_capability import RoutePlanCapability, RoutePlanConfig
-    from covas.capabilities.signal_search_capability import SignalSearchCapability
-    from covas.capabilities.station_search_capability import StationSearchCapability
-    from covas.capabilities.system_search_capability import (SystemSearchCapability,
-                                                             SystemSearchConfig)
+    from covas.capabilities.route_plan_capability import (NeutronPlanCapability, NeutronPlanConfig,
+                                                          RichesPlanCapability, RichesPlanConfig,
+                                                          RoutePlanCapability, RoutePlanConfig)
+    from covas.capabilities.search_family import (BodySearchCapability,
+                                                  MinorFactionSearchCapability, MiscSearchCapability,
+                                                  SignalSearchCapability, StationSearchCapability,
+                                                  SystemSearchCapability, SystemSearchConfig)
 
     http, clip = _NoHttp(), _noop_copy
     common = dict(http=http, get_current_system=_current_system, clipboard=clip)

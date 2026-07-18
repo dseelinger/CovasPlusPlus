@@ -20,11 +20,9 @@ from covas.capabilities._search_support import SearchConfig, recovery
 from covas.capabilities.base import CapabilityRegistry
 from covas.capabilities.help_capability import HelpCapability
 from covas.capabilities.find_closest_capability import FindClosestCapability, NavConfig
-from covas.capabilities.minor_faction_search_capability import MinorFactionSearchCapability
-from covas.capabilities.misc_search_capability import MiscSearchCapability
-from covas.capabilities.signal_search_capability import SignalSearchCapability
-from covas.capabilities.station_search_capability import StationSearchCapability
-from covas.capabilities.system_search_capability import SystemSearchCapability, SystemSearchConfig
+from covas.capabilities.search_family import (MinorFactionSearchCapability, MiscSearchCapability,
+                                              SignalSearchCapability, StationSearchCapability,
+                                              SystemSearchCapability, SystemSearchConfig)
 from covas.search.factions import FACTION_STATES
 from covas.search.stations import STATION_TYPES
 

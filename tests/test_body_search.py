@@ -18,7 +18,7 @@ from pathlib import Path
 
 from covas.capabilities._search_support import SearchConfig
 from covas.capabilities.base import CapabilityRegistry, help_meta_problems
-from covas.capabilities.body_search_capability import BodySearchCapability
+from covas.capabilities.search_family import BodySearchCapability
 from covas.search.bodies import BIO_GENERA, resolve_bio_signal, resolve_subtype
 from covas.search.categories import parse_bodies
 

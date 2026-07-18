@@ -6,7 +6,7 @@ no-destination prompt, the no-start prompt, a fail-soft Spansh error, and empty 
 """
 from __future__ import annotations
 
-from covas.capabilities.neutron_plan_capability import (NeutronPlanCapability, NeutronPlanConfig)
+from covas.capabilities.route_plan_capability import NeutronPlanCapability, NeutronPlanConfig
 from covas.search.routes import RoutePlotter
 
 # Galaxy plotter result shape (confirmed live): system_jumps[] of {system, jumps}, jumps cumulative.

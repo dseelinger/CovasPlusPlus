@@ -6,7 +6,7 @@ Spansh error, and the no-route message.
 """
 from __future__ import annotations
 
-from covas.capabilities.riches_plan_capability import RichesPlanCapability, RichesPlanConfig
+from covas.capabilities.route_plan_capability import RichesPlanCapability, RichesPlanConfig
 from covas.search.routes import RoutePlotter
 
 _OK_RESULT = {"systems": [

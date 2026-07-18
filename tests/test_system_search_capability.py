@@ -11,8 +11,7 @@ import json
 from pathlib import Path
 
 from covas.capabilities.base import CapabilityRegistry, help_meta_problems
-from covas.capabilities.system_search_capability import (SystemSearchCapability,
-                                                         SystemSearchConfig)
+from covas.capabilities.search_family import SystemSearchCapability, SystemSearchConfig
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "spansh_systems_federation_sol.json"
 

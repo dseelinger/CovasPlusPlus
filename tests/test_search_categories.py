@@ -12,10 +12,8 @@ from pathlib import Path
 
 from covas.capabilities._search_support import SearchConfig
 from covas.capabilities.base import CapabilityRegistry, help_meta_problems
-from covas.capabilities.station_search_capability import StationSearchCapability
-from covas.capabilities.minor_faction_search_capability import MinorFactionSearchCapability
-from covas.capabilities.signal_search_capability import SignalSearchCapability
-from covas.capabilities.misc_search_capability import MiscSearchCapability
+from covas.capabilities.search_family import (MinorFactionSearchCapability, MiscSearchCapability,
+                                              SignalSearchCapability, StationSearchCapability)
 
 _FIX = Path(__file__).parent / "fixtures"
 _SYSTEMS = json.loads((_FIX / "spansh_systems_federation_sol.json").read_text("utf-8"))

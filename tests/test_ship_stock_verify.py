@@ -224,8 +224,7 @@ def test_stale_fallback_pass_reuses_memoized_checks():
 # --- the capability speaks the outcome -------------------------------------------------------
 
 def _cap(body, stock):
-    from covas.capabilities.find_closest_capability import NavConfig
-    from covas.capabilities.find_closest_ship_capability import FindClosestShipCapability
+    from covas.capabilities.find_closest_capability import FindClosestShipCapability, NavConfig
     return FindClosestShipCapability(NavConfig(enabled=True), http=ScriptedHttp(body),
                                      get_current_system=lambda: "Diaguandri",
                                      stock_lookup=stock, clipboard=lambda s: None)

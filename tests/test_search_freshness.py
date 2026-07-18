@@ -217,8 +217,7 @@ def test_run_query_fresh_empty_both_ways():
 
 def test_ship_capability_speaks_the_caveat_on_a_stale_answer():
     """End of the du Fresne story: a stale-fallback answer is spoken WITH the age caveat."""
-    from covas.capabilities.find_closest_capability import NavConfig
-    from covas.capabilities.find_closest_ship_capability import FindClosestShipCapability
+    from covas.capabilities.find_closest_capability import FindClosestShipCapability, NavConfig
     from covas.nav.closest import ClosestResult
 
     def fake_search(resolved, system, http, **kw):

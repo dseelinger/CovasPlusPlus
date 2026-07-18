@@ -5,7 +5,7 @@ need", the model answers from its training cutoff, so hulls added after that cut
 Clipper Mk II, Python Mk II, Type-8, Mandalay, Cobra Mk V, Corsair, …) are unknown or
 confidently wrong. This tool grounds the answer in a bundled, refreshable dataset instead.
 
-Same offline, STATELESS pattern as `find_closest_ship_capability`: resolve the (maybe
+Same offline, STATELESS pattern as `find_closest_capability`: resolve the (maybe
 misheard) name against the curated roster (`resolve_ship`), then — on a single resolved hull —
 look its spec up in the bundled table (`nav/ship_specs.py`). Structured guidance the tool
 DESCRIPTION steers the model through:
