@@ -35,6 +35,101 @@ Priorities agreed: **modular refactor**, **cut API costs** (quick cloud wins *an
 6. **Fail soft, stay live.** The current code already swallows errors to keep the loop alive — preserve that. A dead TTS provider should degrade to text, not crash the session.
 7. **Inject dependencies; keep the default test run free.** Build real providers only at the composition root; everything downstream receives them as arguments so tests can pass fakes. Unit tests hit no network, API, or hardware; anything that does is an opt-in integration test (see §9). This is what lets you run tests constantly without draining accounts.
 
+### 2.1 Product pillars — what COVAS++ is made of (Assist / Act / Immerse)
+
+The two existing admission bars gate features *negatively*: the **beat-competitors** rule (every issue names a concrete axis it improves on) and the **written non-goals** (no EDCoPilot/HCS/VoiceAttack integration, English-only — §5, MEMORY) both say what *not* to build. Neither states what the product positively *is*, so each issue argues its own merits in isolation and nothing forces the question "does this belong to an existing pillar, or is it quietly starting a fourth one?" That gap is how kitchen-sink drift starts — the ambient-audio layer (buses, carrier chatter, music director, interdiction cues, ~17 config sections) grew feature-by-feature, each individually justified, into a de-facto second product identity that was never *named* as such. Naming the pillars makes that kind of growth a **decision** instead of an accident.
+
+COVAS++ is exactly **three user-facing pillars**, plus one named non-pillar:
+
+| Pillar | One-liner | Owns today |
+|---|---|---|
+| **Assist** | Answer, look up, track, and show — never touches the game | checklist; persistent memory; the 12-category search/nav family (star-system / station / minor-faction / signal / faction-state / body search, find-closest module + ship, the three route planners, mining helper); engineering & loadout lookups (engineers, on-foot engineering, blueprints, loadout, stored ships/modules); ED-context + on-foot/SRV reads; location/carrier + community goals; ship-spec + game-data-status; HUD (2D / VR / web surfaces); help; version; proactive + route callouts; clipboard hand-off |
+| **Act** | Press keys in Elite on the Commander's behalf, behind the §6 safety layer | keybinds, custom macros, Tier-2 reflexes, ambient auto-reflex, auto-honk, comms-send (window focus #105 is shared Act plumbing, not a standalone capability) |
+| **Immerse** | Atmosphere — sound and personality, no information content | the ambient-audio layer (`AudioControls`) and everything under `covas/mixer/`: carrier chatter, music director, interdiction cues; personas/voices + the auto voice-pairing; named crew voicing (#69/#70) |
+
+**Foundation (the non-pillar).** Cross-cutting infrastructure that serves all three pillars but is not itself a feature: providers + the factory seam, the router/tiering, the settings subsystem (config, schema, the by-voice `SettingsCapability`, the web panel), packaging/installer, DPAPI secrets-at-rest, first-run. Foundation work needs no pillar declaration.
+
+**The admission rule** (extends the beat-competitors bar):
+
+> Every new enhancement names **exactly one pillar** it strengthens, in its improvement-thesis section. A feature that fits no pillar is a **non-goal by default**; creating a fourth pillar is a deliberate roadmap decision made *here in this document first*, never implicitly via an issue. Consolidation / refactor / docs issues are **Foundation** and exempt (they serve all three).
+
+#### The classification audit (2026-07) — all 40 registered capabilities
+
+The empirical check on the frame: if a shipped capability fits no pillar, either the definitions are wrong (fix them) or the capability is off-thesis (mark it and decide its future). The 40 rows below are every capability registered in `covas/bootstrap.py` (registered class / builder). Every one fits exactly one pillar — the frame matches the product as built.
+
+*Assist (32) — answer, look up, track, show; never touches the game:*
+
+| Capability | What it does |
+|---|---|
+| `HelpCapability` | "what can you do" — projects the live capability registry |
+| `ChecklistCapability` | markdown checklist CRUD + live page updates |
+| `VersionCapability` | reports the running app version (app-meta Q&A, like help) |
+| `ShipSpecCapability` | grounded ship specifications from the bundled dataset |
+| `GameDataStatusCapability` | bundled-data freshness ("how current is your data") |
+| `EDContextCapability` | live location / status reads from the journal |
+| `OnFootSrvCapability` | on-foot / SRV / exobiology situational reads |
+| `LoadoutCapability` | ship loadout & module readout |
+| `BlueprintCapability` | blueprint / material-sourcing lookup |
+| `StoredCapability` | stored ships & modules finder |
+| `EngineersCapability` | engineer finder + journal-grounded unlock status |
+| `OnFootEngineeringCapability` | Odyssey suit/weapon engineering reference |
+| `LocationCarrierCapability` | where's my carrier / copy current system |
+| `CGCapability` | community-goals lookup (journal + optional Inara) |
+| `ProactiveCapability` | spoken danger / event callouts |
+| `RouteCalloutCapability` | jumps-remaining route callouts |
+| `FindClosestCapability` | nearest station selling a module |
+| `FindClosestShipCapability` | nearest shipyard stocking a hull |
+| `SystemSearchCapability` | star-system search (Spansh) |
+| `SpecSearchCapability` (stations) | station search |
+| `SpecSearchCapability` (minor factions) | minor-faction search |
+| `SpecSearchCapability` (signals) | signal-source search |
+| `SpecSearchCapability` (faction states) | faction-state search |
+| `BodySearchCapability` | nearest body / biological signal |
+| `RoutePlanCapability` | trade-route planner |
+| `NeutronPlanCapability` | neutron / long-range galaxy planner |
+| `RichesPlanCapability` | Road-to-Riches planner |
+| `MiningHelperCapability` | hotspots + fresh sell price + checklist |
+| `MemoryCapability` | durable-fact capture + recall |
+| `HudCapability` | companion HUD (2D / VR / web surfaces) |
+| `HudPlacementCapability` | VR HUD repositioning by voice |
+| `ClipboardCapability` | "copy that to my clipboard" hand-off |
+
+*Act (6) — press keys in Elite, behind the §6 safety layer:*
+
+| Capability | What it does |
+|---|---|
+| `KeybindCapability` | guarded single-action keybinds (landing gear, …) |
+| `MacroCapability` | voice/UI-authored named macros |
+| `ReflexCapability` | Tier-2 combat-permissive reflexes |
+| `AutoReflexCapability` | ambient auto-reflex off status/journal thresholds |
+| `HonkCapability` | auto-honk the discovery scanner on arrival |
+| `CommsSendCapability` | send in-game chat text (read-back gated) |
+
+*Immerse (1 registered surface over a large subsystem) — atmosphere, no information content:*
+
+| Capability | What it does |
+|---|---|
+| `AudioControlsCapability` | the ambient-audio layer: fronts the whole `covas/mixer/` subsystem — carrier chatter, music director, interdiction cues — plus the persona/voice/crew path (personas & auto voice-pairing, named crew voicing) |
+
+*Foundation (1 registered surface) — infrastructure, no pillar declaration needed:*
+
+| Capability | What it does |
+|---|---|
+| `SettingsCapability` | change any setting by voice — the voice surface of the settings subsystem (the same schema the web panel uses) |
+
+**Friction items resolved** (reasoned, not shoehorned):
+
+- **`clipboard` → Assist.** "Copy that" and the search/nav destination-system hand-off *show* information to the Commander (into the Windows clipboard) and never touch the game. It's the hand-off half of the search/nav family, which reinforces the placement — an assist-adjacent utility that lands squarely in Assist under the "show" verb.
+- **`personas` / `voices` / `crew` → Immerse.** The tension is immerse-vs-Foundation: persona pairing and crew voicing carry infra-like machinery (the voice-pairing worker, cast synth, config sections). But Foundation is machinery that serves *all* pillars neutrally, whereas these serve exactly one effect — **personality with no information content** (who's speaking, what they sound like, cast banter). That is the Immerse definition verbatim, so they're Immerse. (None is a separately-registered capability; they live on the persona/conversation + `mixer/` path and are fronted by `AudioControls`.)
+- **`proactive` → Assist.** The tension is its act-like *trigger* model — it fires automatically off bus events, like auto-reflex/honk in Act. But the pillar test keys on **effect, not trigger**: proactive (and route) callouts emit spoken *information* and touch no game control, so they're Assist. The event-driven trigger is shared plumbing (the event pump), not an Act classification. `settings` is the mirror case — a registered *voice* capability whose effect is configuring the companion itself, so it's Foundation (the by-voice surface of the settings subsystem), not Assist.
+
+**Findings:**
+
+- **No capability is off-thesis** — all 40 fit exactly one pillar, so the frame fits the product as built (32 Assist + 6 Act + 1 Immerse + 1 Foundation = 40).
+- **Assist is dominant (32/40), by design.** COVAS++'s core identity is an information/assist companion that explicitly *does not fly the ship*; the concentration is the thesis, not drift.
+- **Immerse is one registered capability over a whole subsystem.** `AudioControlsCapability` is the sole registered Immerse surface, yet it fronts the entire `mixer/` package (~17 config sections: chatter, music, interdiction) plus the persona/voice/crew path. That asymmetry — a full product identity behind a single registered capability — is exactly the "second product identity that was never named" this subsection exists to name. Future Immerse growth is now a deliberate pillar decision, not an accretion.
+- **Act is small and deliberately so** (6 capabilities, every one behind the §6 allowlist / confirmation / combat-guard / hard-abort layer); it grows one on-hardware-validated action at a time.
+
 ---
 
 ## 3. Target architecture
