@@ -342,6 +342,16 @@ def test_config_missing_reflex_table_uses_trigger_defaults():
     assert hs.enabled is False
     assert hs.threshold == AUTO_REFLEXES["heat_sink"].default_threshold
     assert hs.cooldown == AUTO_REFLEXES["heat_sink"].default_cooldown
+    chaff = c.setting("chaff")
+    assert chaff.enabled is False
+    assert chaff.cooldown == AUTO_REFLEXES["chaff"].default_cooldown
+
+
+def test_chaff_default_cooldown_is_20s():
+    # Issue #118 — an 8s cooldown let auto-chaff re-fire while the previous burst was still
+    # masking the signature, wasting limited launcher ammo. 20s ≈ one burst's effective duration
+    # plus margin. Pin the trigger default so config.toml/settings_schema.py can't silently drift.
+    assert AUTO_REFLEXES["chaff"].default_cooldown == 20.0
 
 
 def test_config_bad_numbers_fall_back_to_defaults():

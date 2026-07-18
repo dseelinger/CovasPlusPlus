@@ -110,7 +110,7 @@ AUTO_REFLEXES: dict[str, ReflexTrigger] = {
         wake_events=frozenset({"EnteredDanger", "Interdicted", "UnderAttack"}),
         condition=_being_targeted,
         default_threshold=0.0,
-        default_cooldown=8.0,
+        default_cooldown=20.0,
         summary="fire chaff when a hostile locks on or you're interdicted",
     ),
 }

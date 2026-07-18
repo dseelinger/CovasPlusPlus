@@ -812,7 +812,7 @@ cooldown = 10.0
 # or being interdicted, which is exactly when the guard permits it.
 [reflex.auto.chaff]
 enabled = false
-cooldown = 8.0
+cooldown = 20.0
 
 
 [comms_send]
