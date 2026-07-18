@@ -168,3 +168,26 @@ def test_public_schema_folds_in_value_and_overridden_flag():
     assert flat["web_search.enabled"]["overridden"] is True
     # hidden settings (voice_name) are not exposed as rows
     assert "elevenlabs.voice_name" not in flat
+
+
+# ---- doc_url "Setup guide →" links (issue #121) ----------------------------
+def test_doc_url_round_trips_into_the_payload():
+    """A Setting's optional doc_url surfaces in the field payload alongside help; None when unset."""
+    with_doc = s.Setting("x.y", ("x", "y"), "bool", "X", "G", "help", default=False,
+                          doc_url="https://example.test/guide#anchor")
+    without = s.Setting("x.z", ("x", "z"), "bool", "X", "G", "help", default=False)
+    assert s.field_payload({}, {}, with_doc)["doc_url"] == "https://example.test/guide#anchor"
+    assert s.field_payload({}, {}, without)["doc_url"] is None
+
+
+def test_hud_rows_carry_setup_guide_doc_urls():
+    """The three Companion-HUD toggles link to the published hud.md setup sections (verified slugs)."""
+    base = "https://dseelinger.github.io/CovasPlusPlus/using/hud/"
+    expected = {
+        "hud.enabled": base + "#turning-it-on-and-off",
+        "hud.vr_enabled": base + "#in-vr-the-in-headset-overlay",
+        "hud.web_enabled": base + "#in-headset-without-steamvr-the-web-hud-openkneeboard",
+    }
+    for key, url in expected.items():
+        assert s.by_key[key].doc_url == url
+        assert s.field_payload({}, {}, s.by_key[key])["doc_url"] == url

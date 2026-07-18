@@ -30,6 +30,7 @@
   .setting.dirty .label{color:var(--accent)}
   .setting .control{flex:1;display:flex;align-items:center;gap:10px;justify-content:flex-end}
   .setting .help{color:var(--muted);font-size:12px;margin-top:6px;line-height:1.5;max-width:640px}
+  .setting .help a.docurl{white-space:nowrap;margin-left:2px}
   .setting .example{color:var(--faint);font-style:italic}
   /* Search-match highlight (issue #95) — readable on the dark panel and on a light theme alike. */
   mark.hl{background:var(--highlight-bg);color:inherit;border-radius:2px;padding:0 1px}
@@ -193,7 +194,12 @@ function row(s, group){
   wrap.appendChild(top);
 
   const help = document.createElement("div"); help.className="help";
-  help.innerHTML = esc(s.help) + (s.example ? ' <span class="example">e.g. “'+esc(s.example)+'”</span>':'');
+  // Optional "Setup guide →" link (issue #121) — mirrors the API-key "Get a key →" pattern; kept
+  // INSIDE the .help block and folded into _origHTML BEFORE caching, so search-highlight restore
+  // (issue #95) keeps the link intact.
+  help.innerHTML = esc(s.help)
+    + (s.example ? ' <span class="example">e.g. “'+esc(s.example)+'”</span>' : '')
+    + (s.doc_url ? ' <a class="docurl" href="'+esc(s.doc_url)+'" target="_blank" rel="noopener">Setup guide →</a>' : '');
   help._origHTML = help.innerHTML; // cached so search highlighting (issue #95) can restore cleanly
   wrap.appendChild(help);
   const err = document.createElement("div"); err.className="err";

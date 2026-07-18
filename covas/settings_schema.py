@@ -142,6 +142,7 @@ class Setting:
     example: str = ""                 # example spoken command
     hidden: bool = False              # tracked + settable, but not shown as a row
     allow_custom: bool = False        # enum: accept a value outside options (like a combobox source)
+    doc_url: Optional[str] = None     # optional "Setup guide →" link shown under the help (#121)
 
 
 # The schema. Order here is the order groups first appear in the web page.
@@ -919,14 +920,16 @@ SCHEMA: list[Setting] = [
             "current checklist step, and route progress. Off by default; needs a desktop "
             "(no effect headless).",
             default=False, phrasings=("hud", "the hud", "overlay", "hud overlay"),
-            example="turn the HUD on"),
+            example="turn the HUD on",
+            doc_url="https://dseelinger.github.io/CovasPlusPlus/using/hud/#turning-it-on-and-off"),
     Setting("hud.vr_enabled", ("hud", "vr_enabled"), "bool",
             "VR HUD overlay", "Companion HUD",
             "Show the same HUD as a true in-headset SteamVR overlay floating in the cockpit. Off "
             "by default; needs SteamVR running and Elite Dangerous rendering through it — nothing "
             "to install. Fails soft with no VR runtime (the panel simply doesn't appear).",
             default=False, phrasings=("vr hud", "the vr hud", "vr overlay", "headset hud"),
-            example="turn the VR HUD on"),
+            example="turn the VR HUD on",
+            doc_url="https://dseelinger.github.io/CovasPlusPlus/using/hud/#in-vr-the-in-headset-overlay"),
     Setting("hud.web_enabled", ("hud", "web_enabled"), "bool",
             "Web HUD (OpenKneeboard)", "Companion HUD",
             "Serve the same HUD as a transparent web page at /hud for OpenKneeboard's Web "
@@ -936,7 +939,9 @@ SCHEMA: list[Setting] = [
             "Independent of the desktop and SteamVR HUDs.",
             default=False,
             phrasings=("web hud", "the web hud", "kneeboard hud", "openkneeboard hud"),
-            example="turn the web HUD on"),
+            example="turn the web HUD on",
+            doc_url="https://dseelinger.github.io/CovasPlusPlus/using/hud/"
+                    "#in-headset-without-steamvr-the-web-hud-openkneeboard"),
     Setting("hud.vr_placement", ("hud", "vr_placement"), "enum",
             "VR HUD placement", "Companion HUD",
             "Where the VR panel sits: 'world' (cockpit-fixed, parked in front — the comfortable "
@@ -1147,6 +1152,7 @@ def field_payload(cfg: dict, overrides: dict, s: Setting,
         "type": s.type,
         "label": s.label,
         "help": s.help,
+        "doc_url": s.doc_url,
         "options": resolve_options(s, dynamic),
         "options_source": s.options_source,
         "combobox": is_combobox(s),

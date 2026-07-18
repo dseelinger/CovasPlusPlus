@@ -100,6 +100,11 @@ inline help:
   (`config.toml` stays pristine).
 - **Per-setting reset** — a changed setting shows a **Reset** button that reverts it to the default
   and drops it from the overrides.
+- **Setup guide links** — settings whose payoff needs a one-time setup carry a **Setup guide →**
+  link under their help that opens the relevant docs section in a new tab. The three **Companion
+  HUD** toggles use it today — the 2D overlay, the SteamVR overlay, and the OpenKneeboard web HUD
+  each link straight to their [HUD setup](using/hud.md) section, so the fiddly bits are one click
+  from the toggle.
 - **Validation** — out-of-range or unknown values are rejected rather than saved.
 - **Applies live** — a saved change takes effect immediately, no relaunch. Switching your **LLM or
   TTS provider** (or its model/voice/base URL) hot-swaps it for the **next turn** — an in-flight
