@@ -121,6 +121,11 @@ class AudioLayer:
         self._el_voices: Optional[list[dict]] = None
         self._cast: VoiceCast = build_cast(cfg, synth=self._cast_synth)
         self._clock = clock
+        # Crew best-fit voice pairings (issue #124): {name.lower() -> voice_id}, pushed in by the
+        # background pairing worker (bootstrap.pair_crew_voices) once it resolves. Consulted by
+        # speak_crew as the MIDDLE precedence tier — explicit [crew].file voice_ref (issue #70)
+        # still wins, an empty/absent entry falls through to the deterministic assign() (issue #69).
+        self._crew_pairings: dict[str, str] = {}
 
         # Random-but-sticky voice memories over the cast pool (C10+). Comms speakers are re-cast
         # per system (cleared on a jump); players keep a session-long voice via an LRU. Chatter is
@@ -343,7 +348,12 @@ class AudioLayer:
             return True  # empty segment -> treat as handled, don't force a persona re-speak
         try:
             from .. import crew as crew_mod  # local import: keep the mixer package cycle-free
-            voice = self._cast.for_crew(name, crew_mod.voice_ref_for(self.cfg, name))
+            # Precedence (issue #124): an EXPLICIT [crew].file voice_ref always wins; failing that,
+            # a best-fit CREW PAIRING for this name (from the background LLM casting worker); only
+            # with neither does for_crew() fall through to the deterministic assign(name).
+            ref = (crew_mod.voice_ref_for(self.cfg, name)
+                  or self._crew_pairings.get(str(name or "").strip().lower(), ""))
+            voice = self._cast.for_crew(name, ref)
             pcm, sr = self._cast.synth(voice, text)
         except Exception as e:  # noqa: BLE001 — a dead cast voice degrades to the persona voice
             self._log(f"crew synth failed ({name}): {e}")
@@ -557,6 +567,13 @@ class AudioLayer:
         m["volume_db"] = new
         self.mixer.set_bus_config(self.cfg)
         return new
+
+    def set_crew_pairings(self, mapping: Optional[dict]) -> None:
+        """Push the crew best-fit voice pairings (issue #124) computed by the background pairing
+        worker — `{name.lower() -> voice_id}` — so the VERY NEXT `speak_crew` line honors them.
+        None/empty clears the map (e.g. no persona'd auto members left), falling back to the
+        deterministic assign() for everyone, same as before this feature existed."""
+        self._crew_pairings = dict(mapping or {})
 
     def rebuild_cast(self, el_voices=None) -> None:  # noqa: ANN001 — list[dict] of EL voices
         """Rebuild the cast from current config, reusing the synth backends. `el_voices` (the

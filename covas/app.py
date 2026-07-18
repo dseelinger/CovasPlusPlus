@@ -256,6 +256,13 @@ class App:
         self._voice_pairings: dict[str, str] = {}
         self._voice_names: dict[str, str] = {}
         self._applying_persona_voice = False
+        # Crew best-fit voice pairing (issue #124): the same background pairing machine run over
+        # the crew roster instead of the shipped personas, into a SEPARATE cache so a roster edit
+        # never busts the persona cache. `_crew_voice_pairings` = {member name (lower) -> voice_id};
+        # display names land in the SHARED `_voice_names` above. Pushed to the audio layer (which
+        # applies the precedence: explicit voice_ref > crew pairing > deterministic assign) via
+        # `AudioLayer.set_crew_pairings` once the background worker completes.
+        self._crew_voice_pairings: dict[str, str] = {}
 
         self.history: list[dict] = []
         self.active_cancel: threading.Event | None = None

@@ -1454,6 +1454,29 @@ on in config (or the Settings page) before testing.
 - [ ] 🖥️ **Suggest fail-soft:** with no API key / network, adopting a pilot still fills a canned
   personality ("Steady in the seat; professional and brief on comms.") instead of erroring.
 
+### 18.5e Crew best-fit auto voice pairing (issue #124 — Crew tab)  🔊 HW
+> Reuses the #96 persona voice-casting machine over the crew roster. Needs an ElevenLabs key,
+> `[personality].auto_voice_pairing = true` (default), and a non-lean optimization level. Give a
+> character a **Personality** and leave its **Voice** on **Auto**, then **SAVE ROSTER**.
+- [ ] 🔊 **Auto picks a fitting voice:** with crew on, invite the persona'd Auto character into
+  conversation a few times → they consistently use ONE voice that plausibly matches the written
+  personality (not the arbitrary deterministic pick from before this issue).
+- [ ] 🖥️ **Editor shows the pick:** reload the Crew tab → that character's Voice dropdown's blank
+  option reads **"Auto — currently: `<voice name>`"** instead of the plain "Auto (deterministic)".
+- [ ] 🔊 **Pin overrides Auto:** pin that character to a DIFFERENT specific voice and save → they
+  now use the pinned voice, not the paired one; switch back to Auto and save → the paired voice
+  (or the deterministic fallback, if no persona) returns.
+- [ ] 🖥️ **No LLM call on an unrelated save:** with a pairing already computed, save the roster
+  again with only a cosmetic change (e.g. reordering rows, editing an unrelated member) → no new
+  LLM call fires (nothing to observe directly, but there's no delay/cost and the SAME voice is
+  kept — confirms the cache-key recompute-only-on-change guarantee).
+- [ ] 🖥️ **Persona-less members stay deterministic:** a character with NO personality text stays on
+  the old deterministic per-name voice, Auto or not.
+- [ ] 🖥️ **Fail-soft:** with no ElevenLabs key / `auto_voice_pairing = false` / a lean optimization
+  level, Auto characters still get the deterministic fallback voice — never silent, never an error.
+- [ ] 🖥️ **Separate cache file:** confirm `crew_voice_pairings.json` appears in the data dir
+  (git-ignored) alongside — and independent of — `personalities/voice_pairings.json`.
+
 ### 18.6 Drop-in content (C11)
 - [ ] On first run with the layer enabled, confirm the skeleton appears: **`audio/sfx/<cue>/`**,
   **`audio/music/<context>/`**, **`content/chatter/*.txt`**, **`content/interdiction_threat.txt`**,
