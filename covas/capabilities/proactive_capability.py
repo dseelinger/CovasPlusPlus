@@ -50,6 +50,17 @@ DEFAULT_COOLDOWN = 120.0
 DEFAULT_MIN_INTERVAL = 20.0
 # One-sentence callouts don't need many tokens; keeps the cheap tier cheap.
 DEFAULT_MAX_TOKENS = 120
+# Dedicated cooldown for place/history remarks (#138): a busy engineering session docks the same
+# base repeatedly, so place-aware enrichment is gated FAR longer than the normal per-event cooldown
+# — occasional colour, not narration of every dock. Separate axis from the per-event cooldown.
+DEFAULT_PLACE_COOLDOWN = 900.0
+# Long-hyperspace flavor remark (#149). "Longer than normal" = the plotted jump distance is at or
+# beyond this many light-years. Most non-explorer builds jump well under 50 ly, and even engineered
+# explorers only exceed it on their longest hops, so 50 ly reliably marks an above-average jump
+# without firing on routine ones. The remark rides its own cooldown so back-to-back long hops on a
+# highway don't each get a line.
+DEFAULT_LONG_JUMP_LY = 50.0
+DEFAULT_LONG_JUMP_COOLDOWN = 300.0
 
 
 @dataclass(frozen=True)
@@ -60,6 +71,10 @@ class ProactiveConfig:
     cooldown: float = DEFAULT_COOLDOWN
     min_interval: float = DEFAULT_MIN_INTERVAL
     max_tokens: int = DEFAULT_MAX_TOKENS
+    place_cooldown: float = DEFAULT_PLACE_COOLDOWN
+    long_jump_enabled: bool = True
+    long_jump_ly: float = DEFAULT_LONG_JUMP_LY
+    long_jump_cooldown: float = DEFAULT_LONG_JUMP_COOLDOWN
     events: dict[str, bool] = field(default_factory=lambda: dict(DEFAULT_EVENTS))
 
     @classmethod
@@ -78,6 +93,10 @@ class ProactiveConfig:
             cooldown=float(p.get("cooldown", d.cooldown)),
             min_interval=float(p.get("min_interval", d.min_interval)),
             max_tokens=int(p.get("max_tokens", d.max_tokens)),
+            place_cooldown=float(p.get("place_cooldown", d.place_cooldown)),
+            long_jump_enabled=bool(p.get("long_jump_enabled", d.long_jump_enabled)),
+            long_jump_ly=float(p.get("long_jump_ly", d.long_jump_ly)),
+            long_jump_cooldown=float(p.get("long_jump_cooldown", d.long_jump_cooldown)),
             events=events,
         )
 
@@ -96,6 +115,10 @@ class ProactivePolicy:
         self._muted = muted
         self._last: dict[str, float] = {}   # event name -> last fire time
         self._last_any: float = float("-inf")
+        # Separate last-fire clocks for the extra remark axes (#138 place/history, #149 long jump),
+        # so each has its own dedicated cooldown independent of the per-event whitelist cooldown.
+        self._last_place: float = float("-inf")
+        self._last_long_jump: float = float("-inf")
 
     @classmethod
     def from_cfg(cls, cfg: dict) -> "ProactivePolicy":
@@ -138,6 +161,41 @@ class ProactivePolicy:
         """Record that a callout for `event_name` was spoken at `now`, arming both its
         per-event cooldown and the global interval."""
         self._last[event_name] = now
+        self._last_any = now
+
+    # -- dedicated place/history cooldown (#138) --------------------------------------
+    def should_place_remark(self, now: float) -> bool:
+        """Whether a place/history remark may ride the current arrival callout — gated ONLY by the
+        dedicated place cooldown (the caller has already decided the arrival itself is speaking, and
+        the facts are already known to be notable). Pure; never mutates state."""
+        return (now - self._last_place) >= self.cfg.place_cooldown
+
+    def mark_place_remark(self, now: float) -> None:
+        """Arm the place cooldown after a place/history remark was included at `now`."""
+        self._last_place = now
+
+    # -- dedicated long-jump flavor gate (#149) ---------------------------------------
+    def should_long_jump(self, now: float) -> tuple[bool, str]:
+        """Whether a long-hyperspace flavor remark may fire at `now`. Honours the SAME master
+        switches as every other callout — proactive enable + runtime mute — plus its own enable and
+        a dedicated long-jump cooldown, and shares the global `min_interval` so it can't stack on
+        another callout. Pure; never mutates. The caller has already checked the jump is long."""
+        c = self.cfg
+        if not c.enabled:
+            return False, "proactive disabled"
+        if self._muted:
+            return False, "muted"
+        if not c.long_jump_enabled:
+            return False, "long-jump flavor off"
+        if now - self._last_any < c.min_interval:
+            return False, f"global cooldown ({c.min_interval:.0f}s)"
+        if now - self._last_long_jump < c.long_jump_cooldown:
+            return False, f"long-jump cooldown ({c.long_jump_cooldown:.0f}s)"
+        return True, "long jump"
+
+    def mark_long_jump(self, now: float) -> None:
+        """Arm the long-jump cooldown (and the global interval) after a flavor remark fired."""
+        self._last_long_jump = now
         self._last_any = now
 
 
@@ -183,10 +241,16 @@ def _humanize(name: str) -> str:
     return spaced[0].upper() + spaced[1:].lower()
 
 
-def build_prompt(event: dict, context_summary: str | None) -> str:
+def build_prompt(event: dict, context_summary: str | None,
+                 facts: dict | None = None) -> str:
     """The user-message prompt for a proactive callout. The (cached) personality system
     prompt keeps the companion in character; this just states what happened and asks for a
-    single short spoken reaction the Commander didn't request."""
+    single short spoken reaction the Commander didn't request.
+
+    `facts` (issue #138) is an OPTIONAL dict of GROUNDED place/visit facts (engineer base, own
+    carrier, landmark, visit counts). When present, the model must voice them ACCURATELY and may
+    NOT invent names or numbers — this is the same grounding discipline as everywhere else. It's
+    kept in the user prompt (never the cached system prompt), so it can't bust prompt caching."""
     phrase = event_phrase(event)
     lines = [
         "You are speaking UNPROMPTED — the Commander did not ask anything. Something just "
@@ -194,6 +258,15 @@ def build_prompt(event: dict, context_summary: str | None) -> str:
     ]
     if context_summary:
         lines.append(f"Current situation: {context_summary}")
+    if facts:
+        # Import here to keep the module import graph light and avoid a cycle at load time.
+        from ..ed.place_classifier import render_facts
+        rendered = render_facts(facts)
+        if rendered:
+            lines.append(
+                "Grounded facts about where you've arrived — voice these ACCURATELY and do "
+                f"NOT invent any names, places, or numbers: {rendered}."
+            )
     lines.append(
         "React with ONE short, in-character spoken line (a heads-up, quip, or "
         "acknowledgement). Do not ask a question or expect a reply. Keep it under 20 words."

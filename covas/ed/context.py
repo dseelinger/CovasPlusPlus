@@ -165,6 +165,12 @@ class EDContext:
         # A `ed.ship_loadouts.ShipLoadoutStore` (holds its own path + persistence), or None when
         # unconfigured. Guarded by _lock; single-writer is the journal thread. Kept OUT of _FIELDS.
         self._ship_loadouts = None
+        # Visit ledger (issue #138): the persisted per-location arrival log that lets a proactive
+        # arrival callout ground a history remark ("first time here", "tenth visit today"). Folded
+        # on arrival by the journal thread; read (under this lock) by the proactive worker thread.
+        # An `ed.visit_ledger.VisitLedger` (holds its own path + persistence), or None when
+        # unconfigured. Kept OUT of _FIELDS (structured + read on demand, not "current context").
+        self._visit_ledger = None
 
     def update(self, **changes) -> None:
         """Atomically set one or more fields. Unknown keys raise (fail loud) so a typo
@@ -369,6 +375,36 @@ class EDContext:
         with self._lock:
             store = self._ship_loadouts
             return store.ship_ids() if store is not None else []
+
+    # -- visit ledger (issue #138) -------------------------------------------------------
+    def set_visit_ledger(self, ledger) -> None:
+        """Install the persisted visit ledger (an `ed.visit_ledger.VisitLedger`). Called once at
+        bootstrap after the file path is resolved; None clears it."""
+        with self._lock:
+            self._visit_ledger = ledger
+
+    def record_arrival(self, event: dict) -> bool:
+        """Fold one arrival event into the visit ledger (and persist on change). Returns True on a
+        change; a no-op (False) when no ledger is installed. Runs on the journal thread; the lock
+        serialises it against the proactive worker's stats read."""
+        with self._lock:
+            led = self._visit_ledger
+            if led is None:
+                return False
+            return led.record_arrival(event)
+
+    def visit_stats_station(self, system, station):
+        """Grounded `VisitStats` for a station, or None when no ledger is installed. Read under
+        the lock (serialised against the journal thread's record)."""
+        with self._lock:
+            led = self._visit_ledger
+            return led.stats_for_station(system, station) if led is not None else None
+
+    def visit_stats_system(self, system):
+        """Grounded `VisitStats` for a system, or None when no ledger is installed. Read under lock."""
+        with self._lock:
+            led = self._visit_ledger
+            return led.stats_for_system(system) if led is not None else None
 
     # -- engineer progress (issue #65) ---------------------------------------------------
     def update_engineer_progress(self, mapping: dict) -> None:

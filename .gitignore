@@ -50,6 +50,9 @@ crew_voice_pairings.json
 /memory/
 # custom macros (issue #50) — Commander-authored macros; their content is personal.
 custom_macros.jsonl
+# visit ledger (issue #138) — per-location arrival log powering place/history callouts. The
+# Commander's own travel history; journal-derived per-user data — never committed.
+visit_ledger.json
 
 # --- Transient / local working files (scratchpad, not for the repo) ---
 # scratchpad for in-progress / one-off bug-fix prompts

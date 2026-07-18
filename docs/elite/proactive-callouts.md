@@ -33,6 +33,50 @@ and both cooldowns still gate them.
 
 Lines are short, in-character, and generated on the **cheap tier**, so callouts stay inexpensive.
 
+## It knows where it is (place-aware callouts)
+
+When you arrive somewhere **notable**, COVAS++ recognises it and grounds the callout in real facts
+instead of a generic "docked" line:
+
+- **Engineer bases** — dock at Farseer Inc and it knows that's Felicity Farseer's workshop, and what
+  she engineers.
+- **Your own fleet carrier** — it knows when you're home.
+- **Landmarks** — a small built-in list (Hutton Orbital, Sol, Shinrarta Dezhra, Colonia,
+  Sagittarius A*).
+- **First visit to a system** — it notices the first time you set foot somewhere new.
+
+It also remembers **how often you come here**. A private, on-disk **visit ledger** counts your
+arrivals per system and per station, so a callout can say *"Farseer's again — tenth time today,
+Commander"* or *"first time here."* The place names and the counts are **supplied facts** — COVAS++
+voices them, it never makes them up.
+
+!!! info "Grounded, occasional, and private"
+    The ledger is **git-ignored per-user data** (your own travel history) and never leaves your
+    machine. It's bounded — ancient entries roll off — so the file stays small. History remarks are
+    **occasional**: they only fire on something worth mentioning (a special place, your first visit,
+    a round-number milestone, or an unusually busy day) and ride a **dedicated cooldown**
+    (`proactive.place_cooldown`), so a busy engineering session never narrates every dock.
+
+## A remark to pass a long jump
+
+Hyperspace is dead air — and a **longer-than-normal** jump is one of the few moments talking during
+the tunnel is genuinely welcome. When a plotted jump is long, COVAS++ fills the wait with **one
+short, in-character, LLM-varied** remark: *"I wonder if a Thargoid's in our future,"* *"let's hope
+we don't run into any orange sidewinders."* (Long jumps are the folkloric setup for a Thargoid
+**hyperdiction** — perfect flavor.)
+
+- It's **pure atmosphere** — light, speculative, and it asserts **no game facts** (it never claims
+  something *is* actually out there).
+- It's **varied** — LLM-generated with no fixed pool, so you won't hear the same line twice.
+- It only fires past a **distance threshold** (`proactive.long_jump_ly`, default 50 ly), so ordinary
+  short jumps stay quiet, and it rides its own cooldown (`proactive.long_jump_cooldown`) so a run of
+  long hops on a highway doesn't each get a line.
+- It honours the same rules as every callout: proactive enable, mute, tier, and never over your turn.
+
+!!! note "Needs a plotted route"
+    The distance is read from your plotted route (`NavRoute.json`). A jump the game hasn't plotted
+    coordinates for simply stays silent — fail-soft, never a wrong guess.
+
 ## It never talks over you
 
 - A callout is spoken **only when the loop is idle** — if you're mid-conversation, it waits.
@@ -57,6 +101,11 @@ Say **"stop the callouts"** (or "be quiet," "no more announcements") and it goes
 | `proactive.min_interval` | Minimum seconds between any two callouts |
 | `proactive.cooldown` | How long before the same event type may re-announce |
 | `proactive.max_tokens` | Reply length cap for a callout (it's one sentence — keep it tight) |
+| `proactive.place_cooldown` | How long before another place-aware / visit-history remark may ride a callout |
+| `proactive.visit_ledger_file` | Where the private per-location arrival log lives (blank disables it) |
+| `proactive.long_jump_enabled` | Whether a longer-than-normal jump gets a flavor remark |
+| `proactive.long_jump_ly` | How far (ly) a plotted jump must be to count as "longer than normal" |
+| `proactive.long_jump_cooldown` | Minimum seconds between two long-jump remarks |
 | `[proactive.events]` | Per-event whitelist — only events set `true` are ever announced |
 
 See the [Configuration reference](../configuration.md#proactive-callouts-proactive) for the full

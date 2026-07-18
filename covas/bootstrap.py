@@ -305,6 +305,14 @@ def build_ed_monitoring(app: "App") -> None:
         _ships_loadouts_path = str((app.cfg.get("ships", {}) or {}).get("loadouts_file", "") or "").strip()
         if _ships_loadouts_path:
             app.ed_ctx.set_ship_loadout_store(ShipLoadoutStore.load(_ships_loadouts_path))
+        # Visit ledger (issue #138): load the persisted per-location arrival log (path resolved under
+        # the data dir by config) so the journal watcher can accumulate arrivals and the proactive
+        # callout can ground a history remark ("first time here", "10 times today"). Fail-soft: a
+        # missing file loads empty.
+        from .ed.visit_ledger import VisitLedger
+        _visit_ledger_path = str((app.cfg.get("proactive", {}) or {}).get("visit_ledger_file", "") or "").strip()
+        if _visit_ledger_path:
+            app.ed_ctx.set_visit_ledger(VisitLedger.load(_visit_ledger_path))
         app.registry.register(EDContextCapability(app.ed_ctx))
         # Owned-ships list + voice CRUD (#134): the conversational surface over the fleet identity.
         # All mutations go through the lock-protected EDContext methods (serialised vs the journal
@@ -497,6 +505,7 @@ def build_proactive(app: "App") -> None:
     events to capability on_event hooks. Fail soft: a startup problem just leaves
     callouts off. Proactive needs ED monitoring for its events — warn (don't fail) if
     that's not on, since the two are independently toggled."""
+    app.long_jump = None  # (#149) declared before the try so a mid-build failure leaves it defined
     try:
         from .capabilities.proactive_capability import (ProactiveCapability,
                                                         ProactivePolicy)
@@ -505,6 +514,21 @@ def build_proactive(app: "App") -> None:
             policy, app._speak_proactive,
             log=lambda reason: app._log("proactive", reason))
         app.registry.register(app.proactive)
+        # Long-hyperspace flavor remark (issue #149): a reactor-only capability sharing the proactive
+        # policy (enable/mute + its own long-jump cooldown). It watches StartJump(Hyperspace), gates
+        # on the plotted jump distance from NavRoute.json coords, and speaks a pure-flavor line via
+        # the proactive path with a prompt OVERRIDE (no place enrichment, asserts no game facts).
+        from .capabilities.long_jump_capability import LongJumpCapability
+        from .ed import read_navroute, resolve_journal_dir
+        _jdir = resolve_journal_dir(app.cfg)
+        app.long_jump = LongJumpCapability(
+            policy,
+            speak=lambda event, prompt: app._speak_proactive(
+                "StartJump", event, prompt_override=prompt),
+            load_navroute=lambda: read_navroute(_jdir),
+            current_system=app._current_system,
+            log=lambda m: app._log("long-jump", m))
+        app.registry.register(app.long_jump)
         app._start_event_pump()
         if app.ed_ctx is None:
             app.bus.publish({"type": "log", "who": "system", "text":

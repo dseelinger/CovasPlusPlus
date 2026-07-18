@@ -742,6 +742,30 @@ min_interval = 20
 cooldown = 120
 # Reply cap (tokens) for a callout — it's one sentence, so keep it tight and cheap.
 max_tokens = 120
+# PLACE-AWARE & VISIT-HISTORY callouts (issue #138). On arrival the companion can recognise WHERE
+# you are (an engineer's base, your own fleet carrier, a landmark like Hutton Orbital, your first
+# time in a system) and how OFTEN you come here, and ground the callout in it ("Farseer's again —
+# tenth time today, Commander"). The place/engineer names and visit counts are supplied FACTS the
+# model only voices; it never invents them.
+# The per-location arrival log that powers the history remarks. Git-ignored per-user data (it's your
+# own travel history) — never committed. Blank disables the ledger (arrivals stay generic).
+visit_ledger_file = "visit_ledger.json"
+# History remarks are OCCASIONAL: even across a busy engineering session that docks the same base
+# over and over, a place/history remark rides a callout at most once per this many seconds. Separate
+# from the per-event cooldown above so ordinary callouts stay responsive while colour stays rare.
+place_cooldown = 900
+# LONG-HYPERSPACE flavor remark (issue #149). When a plotted jump is longer than normal, the
+# companion passes the tunnel time with ONE short, LLM-varied, in-character remark (Thargoid /
+# hyperdiction folklore is fair game). Pure atmosphere — it asserts no game facts. Rides the same
+# proactive path, so it honours the enable switch, mute, and tier just like every other callout.
+long_jump_enabled = true
+# "Longer than normal" threshold, in light-years. Most non-explorer builds jump well under this, so
+# only a genuinely long hop trips it — ordinary jumps stay silent. Raise it if you fly a long-range
+# explorer and want only your very longest jumps to trigger a line.
+long_jump_ly = 50.0
+# At most one long-jump remark per this many seconds (its own cooldown, so back-to-back long hops
+# on a highway don't each get a line).
+long_jump_cooldown = 300
 # Per-event whitelist: only events set true here are ever announced. Add ED event names
 # (journal events like FSDJump/Docked/MissionCompleted/Died, or status transitions like
 # LowFuel/Overheating) to extend; set false to silence one. This table REPLACES the

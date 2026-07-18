@@ -426,6 +426,31 @@ Proactive callouts (`[proactive].enabled = true`; each fires only when idle, thr
 
 Notes:
 
+### 5.2b Place-aware & visit-history callouts (#138)  🎮 ED
+> Requires `[elite].enabled = true` **and** `[proactive].enabled = true`. On arrival the companion recognises notable places and remembers how often you've been there — grounded facts it voices, never invents. History remarks are occasional and ride a dedicated cooldown (`[proactive].place_cooldown`).
+
+- [ ] **Engineer base recognised:** dock at an engineer's base (e.g. **Farseer Inc** in Deciat) with proactive on → the arrival callout **names the place / engineer** ("Farseer's workshop"), not a generic "docked". (Grounded — it should never invent a wrong engineer.)
+- [ ] **Frequency remark:** dock at the **same** base several times in a session → after the first, a later callout references the **repeat / count** ("back again", "tenth time today") — accurate to how many times you actually arrived.
+- [ ] **Not every dock:** repeated docks in quick succession do **not** each get a history remark — colour stays occasional (the place cooldown gates it); ordinary stations still get today's plain callout.
+- [ ] **First visit to a system:** FSD-jump into a **brand-new** system → the callout can note it's your first time there.
+- [ ] **Own carrier / landmark:** dock at your **own fleet carrier**, or somewhere famous (e.g. **Hutton Orbital**) → recognised as such.
+- [ ] **Persists + private:** after a restart, prior visit counts survive (the ledger is on disk); confirm `visit_ledger.json` is **git-ignored** and never committed.
+- [ ] **Mute applies:** with the proactive mute on ("stop the callouts"), none of these speak.
+
+Notes:
+
+### 5.2c Long-hyperspace flavor remark (#149)  🎮 ED
+> Requires `[elite].enabled = true` **and** `[proactive].enabled = true`. On a longer-than-normal **plotted** jump, COVAS passes the tunnel time with one short, LLM-varied, in-character remark (Thargoid/hyperdiction flavor). Pure atmosphere — no game facts asserted. Plot a route so `NavRoute.json` has coordinates.
+
+- [ ] **Long jump → a remark:** plot a route with a **long** hop (≥ `[proactive].long_jump_ly`, default 50 ly) and jump → part-way through hyperspace, hear a short, light, in-character line (e.g. a playful Thargoid/"orange sidewinder" quip).
+- [ ] **Varied, not canned:** do **several** long jumps → the remarks **differ** each time (no fixed pool).
+- [ ] **Short jump → silence:** a normal short jump (below the threshold) produces **no** flavor remark.
+- [ ] **Cooldown:** back-to-back long jumps within `[proactive].long_jump_cooldown` don't each get a line.
+- [ ] **Mute / disable:** with the proactive mute on ("stop the callouts"), or `[proactive].long_jump_enabled = false`, long jumps stay silent.
+- [ ] **No false facts:** the line never claims a Thargoid *is* present or names a real place/number — it's speculative flavor only.
+
+Notes:
+
 ### 5.3 Route callouts (N4 — `[route].enabled = true`)  🎮 ED
 > Plot a multi-jump galaxy-map route first (writes `NavRoute.json`). These go through the proactive path — spoken only when idle, cancelable, and silenced by the proactive mute too.
 - [ ] **Scoopable heads-up:** as a target locks in, COVAS names whether the star you're **arriving at** is scoopable — never a bare "next star". Fly a route where the immediate destination is scoopable and the one after it isn't → hear the two-star line: "This star's scoopable — but the one after isn't, so top off here before you jump on."
