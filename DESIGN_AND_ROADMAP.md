@@ -53,11 +53,11 @@ COVAS++ is exactly **three user-facing pillars**, plus one named non-pillar:
 
 > Every new enhancement names **exactly one pillar** it strengthens, in its improvement-thesis section. A feature that fits no pillar is a **non-goal by default**; creating a fourth pillar is a deliberate roadmap decision made *here in this document first*, never implicitly via an issue. Consolidation / refactor / docs issues are **Foundation** and exempt (they serve all three).
 
-#### The classification audit (2026-07) — all 40 registered capabilities
+#### The classification audit (2026-07) — all 44 registered capabilities
 
-The empirical check on the frame: if a shipped capability fits no pillar, either the definitions are wrong (fix them) or the capability is off-thesis (mark it and decide its future). The 40 rows below are every capability registered in `covas/bootstrap.py` (registered class / builder). Every one fits exactly one pillar — the frame matches the product as built.
+The empirical check on the frame: if a shipped capability fits no pillar, either the definitions are wrong (fix them) or the capability is off-thesis (mark it and decide its future). The 44 rows below are every capability registered in `covas/bootstrap.py` (registered class / builder). Every one fits exactly one pillar — the frame matches the product as built.
 
-*Assist (32) — answer, look up, track, show; never touches the game:*
+*Assist (36) — answer, look up, track, show; never touches the game:*
 
 | Capability | What it does |
 |---|---|
@@ -93,6 +93,10 @@ The empirical check on the frame: if a shipped capability fits no pillar, either
 | `HudCapability` | companion HUD (2D / VR / web surfaces) |
 | `HudPlacementCapability` | VR HUD repositioning by voice |
 | `ClipboardCapability` | "copy that to my clipboard" hand-off |
+| `MaterialsCapability` | direct materials-inventory query (counts, per-bucket, caps) |
+| `OwnedShipsCapability` | owned-ships registry list + voice add/remove CRUD |
+| `ShipEngineeringPlanCapability` | per-ship engineering planning → checklist to-dos |
+| `ShipMetricsCapability` | jump range (current-ship live + fleet ranking) via the metric registry |
 
 *Act (6) — press keys in Elite, behind the §6 safety layer:*
 
@@ -125,8 +129,8 @@ The empirical check on the frame: if a shipped capability fits no pillar, either
 
 **Findings:**
 
-- **No capability is off-thesis** — all 40 fit exactly one pillar, so the frame fits the product as built (32 Assist + 6 Act + 1 Immerse + 1 Foundation = 40).
-- **Assist is dominant (32/40), by design.** COVAS++'s core identity is an information/assist companion that explicitly *does not fly the ship*; the concentration is the thesis, not drift.
+- **No capability is off-thesis** — all 44 fit exactly one pillar, so the frame fits the product as built (36 Assist + 6 Act + 1 Immerse + 1 Foundation = 44).
+- **Assist is dominant (36/44), by design.** COVAS++'s core identity is an information/assist companion that explicitly *does not fly the ship*; the concentration is the thesis, not drift.
 - **Immerse is one registered capability over a whole subsystem.** `AudioControlsCapability` is the sole registered Immerse surface, yet it fronts the entire `mixer/` package (~17 config sections: chatter, music, interdiction) plus the persona/voice/crew path. That asymmetry — a full product identity behind a single registered capability — is exactly the "second product identity that was never named" this subsection exists to name. Future Immerse growth is now a deliberate pillar decision, not an accretion.
 - **Act is small and deliberately so** (6 capabilities, every one behind the §6 allowlist / confirmation / combat-guard / hard-abort layer); it grows one on-hardware-validated action at a time.
 
@@ -1652,7 +1656,7 @@ The original seven-phase plan is done and tested:
     EDCoPilot/COVAS:NEXT: a durable fleet identity from your own journal — surviving restarts and
     correctable by voice — that later features hang per-ship memory on.**
 
-60. **Engineer unlock dashboard — the visual overview** (issue #133, `covas/ed/engineers.py`,
+61. **Engineer unlock dashboard — the visual overview** (issue #133, `covas/ed/engineers.py`,
     `covas/web.py`, `covas/templates/engineers.html` (new), `covas/templates/index.html` +
     `crew.html`/`memory.html`/`checklist.html` nav) — a **read-only** control-panel page (`/engineers`)
     that lays out **every** ship engineer as an at-a-glance grid: each one tagged locked / invited /
@@ -1680,7 +1684,7 @@ The original seven-phase plan is done and tested:
     beats reciting them one at a time by voice, and beats EDCoPilot/COVAS:NEXT, which offer no grounded
     local engineer-unlock dashboard at all.**
 
-NN. **Per-ship config memory + engineering planning, bridged to the checklist** (issue #135, the
+62. **Per-ship config memory + engineering planning, bridged to the checklist** (issue #135, the
     engineering-epic capstone; `covas/ed/ship_loadouts.py` (new), `covas/ed/context.py`,
     `covas/ed/journal.py`, `covas/config.py`, `config.toml`, `.gitignore`, `covas/bootstrap.py`,
     `covas/capabilities/ship_engineering_plan_capability.py` (new)) — Elite only ever describes the
@@ -1722,7 +1726,7 @@ NN. **Per-ship config memory + engineering planning, bridged to the checklist** 
     checklist — where EDCoPilot/COVAS:NEXT have no persistent per-ship build memory or grounded,
     checklist-integrated engineering planner at all.**
 
-NN. **Ship-metric registry + jump range (current-ship live + fleet ranking)** (issue #139, epic #136;
+63. **Ship-metric registry + jump range (current-ship live + fleet ranking)** (issue #139, epic #136;
     `covas/nav/fsd_data.py` (new), `covas/nav/jump_range.py` (new), `covas/nav/ship_metrics.py` (new),
     `covas/nav/ships.py`, `covas/capabilities/ship_metrics_capability.py` (new), `covas/bootstrap.py`)
     — the measurement payoff of the engineering epic: ask COVAS++ **computed** questions about your
@@ -1766,6 +1770,23 @@ NN. **Ship-metric registry + jump range (current-ship live + fleet ranking)** (i
     send you to Coriolis/EDSY to compare builds; COVAS++ computes YOUR engineered fleet's numbers and
     ranks them, by voice, from data it already has — and the metric registry means "for DPS", "most
     shields" drop in later with no new query surface.**
+
+64. **Materials inventory — the direct query** (issue #132, epic #136;
+    `covas/capabilities/materials_capability.py` (new), `covas/ed/blueprints.py`, `covas/bootstrap.py`)
+    — the live material inventory (`MaterialsSnapshot` from the journal `Materials` event, nudged by
+    Collected/Discarded deltas) was already parsed but reachable ONLY *through a blueprint* — no way to
+    ask *"how many Datamined Wake Exceptions do I have"*, *"list my raw materials"*, or *"what am I
+    capped on"*. A small self-registering `MaterialsCapability` (tiering group `engineering`, injected
+    the same `get_materials` getter `BlueprintCapability` uses) adds three read tools — `material_count`
+    (one fuzzy-matched material, with grade + cap wording), `list_materials` (per-bucket, held-only,
+    nearest-cap-first, trimmed), and `materials_capped` (at/near the grade caps 300/250/200/150/100).
+    **No new material table:** it reuses `blueprints.py`'s bundled data via new `resolve_material` /
+    `materials_by_category` helpers + a `GRADE_CAPS` constant (the cap is a game rule, not per-material
+    data). Never invents a count — reads only the snapshot; fails soft before the first `Materials`
+    event. Offline-unit-tested (`tests/test_materials_capability.py`, `tests/test_blueprints.py`);
+    on-hardware inventory-match checks are `MANUAL_TESTS.md` §5.4a. Docs `docs/elite/materials.md`
+    (+ `mkdocs.yml` nav). **Improvement thesis (Assist): grounded in YOUR live inventory — "what am I
+    short of / capped on" answered from the journal, not a wiki table.**
 
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
