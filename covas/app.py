@@ -326,6 +326,7 @@ class App:
         self._pump: threading.Thread | None = None
         self._pump_q: queue.Queue | None = None
         self._pump_stop = threading.Event()
+        self._pump_lock = threading.Lock()  # serialize first-enable so the pump starts once (#156)
 
         self._logf = self._open_log()
         self._log("system", _cost_summary(self.cfg, self.mock))
@@ -402,13 +403,17 @@ class App:
         capability on_event hooks on a dedicated daemon thread. A thread — not inline in
         the publisher — so slow handler work (a proactive LLM call) never blocks a watcher,
         and replay=False so stale startup events aren't delivered to a handler. Idempotent:
-        proactive and route callouts both need the pump but there's only ever one."""
-        if self._pump is not None:
-            return
-        self._pump_q = self.bus.subscribe(replay=False)
-        self._pump = threading.Thread(target=self._pump_events, name="event-pump",
-                                      daemon=True)
-        self._pump.start()
+        proactive and route callouts both need the pump but there's only ever one. The lock
+        makes the check-then-act atomic — many callers (bootstrap, HUD/route/macro enable) can
+        race the first enable, and an unguarded check would start two pumps + two subscriptions,
+        double-dispatching every event (issue #156)."""
+        with self._pump_lock:
+            if self._pump is not None:
+                return
+            self._pump_q = self.bus.subscribe(replay=False)
+            self._pump = threading.Thread(target=self._pump_events, name="event-pump",
+                                          daemon=True)
+            self._pump.start()
 
     def _pump_events(self) -> None:
         while not self._pump_stop.is_set():
@@ -833,10 +838,13 @@ class App:
         if not text or not text.strip():
             return  # nothing to answer — never send an empty user turn (the API 400s on it)
         # Barge-in exactly like on_ptt_down: interrupt any current thinking/speaking (incl. a
-        # proactive callout) and claim the turn under the proactive lock so a callout can't slip in.
+        # proactive callout) AND claim the turn — both under the proactive lock — so a callout
+        # can't slip its idle-claim in between and start a second, concurrent turn (issue #156).
+        # _dispatch_text sets self.worker (alive) inside the lock, so a racing _speak_proactive
+        # sees us busy and returns without starting.
         with self._proactive_lock:
             self._interrupt()
-        self._dispatch_text(text.strip())
+            self._dispatch_text(text.strip())
 
     def _dispatch_text(self, text: str) -> None:
         """Run ONE typed turn on the worker thread — mirrors :meth:`_dispatch_utterance` minus STT
@@ -1007,8 +1015,13 @@ class App:
             self._log("listen", f"reconcile failed: {e}")
 
     def on_cancel(self) -> None:
-        self._interrupt()
-        self.set_state("Idle", "cancelled")
+        # Hold the proactive lock across the interrupt + state flip, consistent with every other
+        # interrupt path (on_ptt_down, dispatch_text, reflex): otherwise a proactive callout that
+        # is mid-claim (has passed its Idle check but not yet started its worker) can have this
+        # cancel land in the gap and be lost, and the callout speaks anyway (issue #156).
+        with self._proactive_lock:
+            self._interrupt()
+            self.set_state("Idle", "cancelled")
 
     # public alias for the UI cancel button / voice command
     def trigger_cancel(self) -> None:
@@ -1036,8 +1049,15 @@ class App:
         # overrides (paths re-resolved), keeping the same dict identity so any
         # holder of self.cfg sees the update.
         fresh = load_config()
-        self.cfg.clear()
+        # Update in place WITHOUT an empty-dict window (issue #156): overwrite/add every fresh
+        # key first, then drop any stale top-level keys no longer present. clear()+update() left a
+        # window where the keyboard-hook thread reading self.cfg["keys"] (on_ptt_up, unguarded)
+        # would KeyError. Each dict.__setitem__/__delitem__ is atomic under the GIL and "keys"
+        # always exists in fresh (it comes from config.toml), so the read always sees a full dict.
+        stale = [k for k in self.cfg if k not in fresh]
         self.cfg.update(fresh)
+        for k in stale:
+            del self.cfg[k]
         self._after_settings_change(before)
 
     def _settings_snapshot(self) -> dict:
