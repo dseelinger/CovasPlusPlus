@@ -145,15 +145,17 @@ def test_system_prompt_rebuilt_per_turn_on_ship_swap(monkeypatch, tmp_path):
     def _system_text() -> str:
         return next((m["content"] for m in captured["messages"] if m["role"] == "system"), "")
 
-    # Flying ship 1 -> Nyx is the crew, Orin is not.
+    # Flying ship 1 -> Nyx is the crew, Orin is not. Anchor on the "Your crew:" roster line: the
+    # prompt template hardcodes an example that uses the bracket form ("[Nyx] ..."), so a bare
+    # substring check would false-match the example regardless of the active roster.
     cfg["crew"]["_active_ship_id"] = "1"
     list(p.stream_reply([{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
-    assert "Nyx" in _system_text() and "Orin" not in _system_text()
+    assert "Your crew: Nyx" in _system_text() and "Your crew: Orin" not in _system_text()
 
     # SWAP to ship 2 (same instance, no _reload_llm) -> the roster follows: Orin in, Nyx out.
     cfg["crew"]["_active_ship_id"] = "2"
     list(p.stream_reply([{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
-    assert "Orin" in _system_text() and "Nyx" not in _system_text()
+    assert "Your crew: Orin" in _system_text() and "Your crew: Nyx" not in _system_text()
 
 
 def test_reasoning_delta_routed_to_thinking(monkeypatch):

@@ -133,15 +133,17 @@ def test_system_prompt_rebuilt_per_turn_on_ship_swap(monkeypatch, tmp_path):
 
     monkeypatch.setattr(gem, "_stream_generate", fake_stream)
 
-    # Flying ship 1 -> Nyx is the crew, Orin is not.
+    # Flying ship 1 -> Nyx is the crew, Orin is not. Anchor on the "Your crew:" roster line: the
+    # prompt template hardcodes an example that uses the bracket form ("[Nyx] ..."), so a bare
+    # substring check would false-match the example regardless of the active roster.
     cfg["crew"]["_active_ship_id"] = "1"
     list(p.stream_reply([{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
-    assert "Nyx" in captured["system"] and "Orin" not in captured["system"]
+    assert "Your crew: Nyx" in captured["system"] and "Your crew: Orin" not in captured["system"]
 
     # SWAP to ship 2 (same instance, no _reload_llm) -> the roster follows: Orin in, Nyx out.
     cfg["crew"]["_active_ship_id"] = "2"
     list(p.stream_reply([{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
-    assert "Orin" in captured["system"] and "Nyx" not in captured["system"]
+    assert "Your crew: Orin" in captured["system"] and "Your crew: Nyx" not in captured["system"]
 
 
 def test_thought_part_routed_to_thinking(monkeypatch):
