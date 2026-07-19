@@ -774,7 +774,7 @@ def build_keybinds(app: "App") -> None:
         app.keybinds = KeybindCapability(
             binds=binds, executor=executor, config=kcfg,
             status_snapshot=snapshot, focuser=focuser,
-            abort_event=app._keybind_abort,   # shared with custom macros (#50)
+            abort_controller=app._keybind_abort,   # shared with custom macros (#50, #154)
             log=lambda msg: app._log("keybind", msg))
         app.registry.register(app.keybinds)
 
@@ -992,7 +992,7 @@ def build_macros(app: "App") -> None:
         app.macros = MacroCapability(
             store=store, config=mcfg, binds=binds, executor=executor,
             allowlist=allowlist, status_snapshot=snapshot,
-            abort_event=app._keybind_abort,          # one hard abort covers keybinds + macros
+            abort_controller=app._keybind_abort,     # one hard abort covers keybinds + macros (#154)
             speak=app._speak_proactive_line,         # triggered arm prompt / outcome
             log=lambda msg: app._log("macro", msg))
         app.registry.register(app.macros)

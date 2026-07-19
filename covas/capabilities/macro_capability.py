@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from ..keybinds import actions as _actions  # noqa: F401 — import populates the macro registry
+from ..keybinds.abort import AbortController
 from ..keybinds.binds import KeyBinding
 from ..keybinds.confirm import CONFIRM_EXPIRED, CONFIRM_OK, CONFIRM_SAME_TURN, ConfirmGate
 from ..keybinds.registry import Macro, registered_macros
@@ -150,7 +151,7 @@ class MacroCapability:
         allowlist: Callable[[], frozenset[str]],
         status_snapshot: Optional[Callable[[], Optional[dict]]] = None,
         actions: Optional[dict[str, Macro]] = None,
-        abort_event: Optional[threading.Event] = None,
+        abort_controller: Optional[AbortController] = None,
         speak: Optional[Callable[[str], object]] = None,
         spawn: Optional[Callable[[Callable[[], None]], None]] = None,
         clock: Callable[[], float] = time.monotonic,
@@ -165,8 +166,10 @@ class MacroCapability:
         self._status = status_snapshot
         self._actions = actions if actions is not None else registered_macros()
         # Shared with the keybind capability so ONE hard abort stops a running sequence from
-        # either; each run clears it first so a stale abort can't kill a fresh run.
-        self._abort_flag = abort_event or threading.Event()
+        # either; each run takes its own abort token (#154) so a stale abort can't kill a fresh
+        # run AND a fresh run can't wipe an abort meant for a concurrently-running one. (Named
+        # `_aborter`, not `_abort`, to avoid shadowing the `_abort()` tool handler below.)
+        self._aborter = abort_controller or AbortController()
         self._speak = speak
         self._spawn = spawn or _default_spawn
         self._clock = clock
@@ -319,7 +322,9 @@ class MacroCapability:
 
     def _abort(self) -> str:
         self._gate.clear()
-        self._abort_flag.set()   # stop a running sequence between steps (the runner polls this)
+        # Mark every currently-running sequence/macro aborted (shared controller). Unlike the old
+        # set()-then-per-run-clear() flag, this can't be wiped by a concurrently-starting run (#154).
+        self._aborter.abort()    # stop a running sequence between steps (the runner polls this)
         try:
             release = getattr(self._executor, "release_all", None)
             if release is not None:
@@ -342,19 +347,24 @@ class MacroCapability:
         return self._mode_guard(macro)
 
     def _execute(self, macro: Macro) -> str:
-        """Run the compiled macro through the #33 sequence runner. Clears the shared abort flag
-        first so a prior abort can't kill this run; the runner then polls it and calls
-        release_all on abort/failure. Never raises — turns the outcome into a spoken result."""
-        self._abort_flag.clear()
-        outcome = run_sequence(
-            macro.steps,
-            executor=self._executor,
-            binds=self._binds,
-            status=self._status,
-            sleep=self._sleep,
-            clock=self._clock,
-            abort=self._abort_flag.is_set,
-        )
+        """Run the compiled macro through the #33 sequence runner. Each run takes its OWN abort
+        token (#154): a fresh token starts un-aborted (so a prior abort can't kill this run)
+        WITHOUT clearing shared state, so this run can't wipe an abort meant for a concurrently-
+        running sequence. The runner polls the token and calls release_all on abort/failure; the
+        token is retired in `finally`. Never raises — turns the outcome into a spoken result."""
+        token = self._aborter.begin()
+        try:
+            outcome = run_sequence(
+                macro.steps,
+                executor=self._executor,
+                binds=self._binds,
+                status=self._status,
+                sleep=self._sleep,
+                clock=self._clock,
+                abort=lambda: self._aborter.is_aborted(token),
+            )
+        finally:
+            self._aborter.end(token)
         if outcome.status == "done":
             self._logline(f"ran macro {macro.name!r}")
             return macro.done_phrase

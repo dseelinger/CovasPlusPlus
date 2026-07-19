@@ -724,6 +724,7 @@ Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_
 - [ ] **Cross-mode rejected at authoring:** try to author a macro mixing a ship action and an on-foot action → **refused** ("mixes actions from different game modes").
 - [ ] **Unbound key:** if a macro's action isn't bound to a **key** in ED → running it reports "bind it in-game" and nothing fires.
 - [ ] **Hard abort:** with a macro armed (or mid-run), say *"abort"* → clears the pending macro and releases every held key (shared with §6.1/§6.3).
+- [ ] **Concurrent abort isn't defeated (#154):** start a **multi-step keybind sequence** (e.g. `launch`) and, while it's mid-run, say *"abort"* at the same moment a **triggered custom macro** fires (e.g. a benign `on-dock` macro, or manually *"run \<benign macro\>"* in the same breath). The sequence must **stop and stay stopped** — its remaining steps do **not** fire after `release_all`, and the concurrently-starting macro does **not** wipe the abort. (Before the #154 fix, the macro's start could clear the sequence's just-set abort and let it re-press its remaining keys.)
 - [ ] **Panel authoring + delete:** open **🎛 macros**, build a macro with the step editor (dropdowns only offer allowlisted actions / known triggers), SAVE → it appears in voice too; DELETE removes it. An out-of-allowlist action can't be picked, and the server rejects a hand-crafted bad request.
 - [ ] **Disabled:** set `[macros].enabled = false` → no macro tools offered; *"run \<name\>"* does nothing.
 

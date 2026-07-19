@@ -63,7 +63,9 @@ On top of that, a saved macro runs behind the **same safety layer** as every oth
 - **Mode gating** — a macro only runs in the game mode its actions belong to.
 - **Hard abort** — say **"abort"** any time to cancel an armed/pending macro and immediately
   release every held key. It shares one abort with the rest of ship control, so "abort" stops
-  *everything*.
+  *everything* — a running keybind sequence and any triggered macro alike. Each run tracks its
+  own stop signal, so a macro that starts (or auto-triggers) at the same instant you say "abort"
+  can never cancel out an abort meant for a sequence already in progress.
 
 ## Authoring a macro by voice
 

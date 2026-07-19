@@ -8,9 +8,8 @@ hard abort, and the trigger debounce.
 """
 from __future__ import annotations
 
-import threading
-
 from covas.capabilities.macro_capability import MacroCapability, MacroConfig
+from covas.keybinds.abort import AbortController
 from covas.keybinds.binds import KeyBinding
 from covas.keybinds.registry import Macro
 from covas.macros.store import MacroStore
@@ -63,7 +62,7 @@ def _cap(tmp_path, *, status=None, speak=None, spawn=None, abort=None, require_c
         allowlist=lambda: _ALLOW,
         actions=_ACTIONS,
         status_snapshot=lambda: snap["v"],
-        abort_event=abort or threading.Event(),
+        abort_controller=abort or AbortController(),
         speak=speak,
         spawn=spawn or (lambda fn: fn()),   # synchronous — no thread in tests
         clock=lambda: _cap._t,              # fake monotonic clock (advanced by tests)
@@ -219,13 +218,13 @@ def test_unrelated_event_does_not_fire(tmp_path):
 # ---- hard abort -----------------------------------------------------------
 
 def test_abort_clears_pending_and_releases(tmp_path):
-    abort = threading.Event()
+    abort = AbortController()
     cap, _, execu, _ = _cap(tmp_path, abort=abort)
     _create(cap, name="Gear", steps=[{"type": "action", "action": "landing_gear"}])
     cap.new_turn()
     cap.run_tool("run_macro", {"name": "Gear"})       # armed
     out = cap.run_tool("abort_macros", {})
-    assert abort.is_set()                             # loop-level abort raised
+    assert abort.abort_count == 1                     # loop-level hard abort raised
     assert ("release_all",) in execu.ops             # keys released
     assert "abort" in out.lower()
     # the armed macro is gone: a later confirm finds nothing

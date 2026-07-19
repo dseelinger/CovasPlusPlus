@@ -28,6 +28,7 @@ from typing import Callable
 
 from ..ed.modes import MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV
 from ..keybinds import actions as _actions  # noqa: F401 — import populates the macro registry
+from ..keybinds.abort import AbortController
 from ..keybinds.binds import KeyBinding
 from ..keybinds.executor import ExecutorError
 from ..keybinds.registry import Macro, registered_macros
@@ -194,7 +195,7 @@ class KeybindCapability:
         macros: dict[str, Macro] | None = None,
         status_snapshot: Callable[[], dict | None] | None = None,
         focuser: object | None = None,
-        abort_event: threading.Event | None = None,
+        abort_controller: AbortController | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
         log: Callable[[str], None] | None = None,
@@ -214,12 +215,14 @@ class KeybindCapability:
         self._lock = threading.Lock()
         self._pending: dict | None = None     # {name, turn, at}
         self._turn = 0                         # Commander-utterance counter (confirm gate)
-        # Set by the hard abort to stop a running sequence between steps; cleared at the start of
-        # each sequence run. The executor's release_all() is the key-level guarantee; this is the
-        # loop-level one so an abort ends the sequence rather than firing its remaining steps.
-        # INJECTED (defaulting to a fresh Event) so it can be SHARED with the custom-macro
-        # capability (#50) — then one hard abort stops a running sequence from either.
-        self._abort_flag = abort_event or threading.Event()
+        # Raised by the hard abort to stop a running sequence between steps. The executor's
+        # release_all() is the key-level guarantee; this is the loop-level one so an abort ends the
+        # sequence rather than firing its remaining steps. INJECTED (defaulting to a fresh one) so
+        # it can be SHARED with the custom-macro capability (#50) — then one hard abort stops a
+        # running sequence from either. It gives EACH run its own abort token (#154) so a
+        # concurrently-starting macro can't wipe an abort meant for this run. (Named `_aborter`,
+        # not `_abort`, to avoid shadowing the `_abort()` tool handler below.)
+        self._aborter = abort_controller or AbortController()
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:
@@ -342,7 +345,9 @@ class KeybindCapability:
         with self._lock:
             self._pending = None
         # Stop any in-flight sequence between steps (the runner polls this), then release keys.
-        self._abort_flag.set()
+        # abort() marks every currently-running sequence/macro (shared controller) — it does NOT
+        # clear a flag a concurrent run could re-clear, so a fresh run can't wipe this signal (#154).
+        self._aborter.abort()
         try:
             release = getattr(self._executor, "release_all", None)
             if release is not None:
@@ -410,18 +415,23 @@ class KeybindCapability:
 
     def _execute_sequence(self, macro: Macro) -> str:
         """Run a sequenced macro through the deterministic runner, reading Status.json between
-        steps to gate/verify. The abort flag is cleared first so a prior abort can't kill this
-        run; the runner then polls it (and calls release_all on abort/failure)."""
-        self._abort_flag.clear()
-        outcome = run_sequence(
-            macro.steps,
-            executor=self._executor,
-            binds=self._binds,
-            status=self._status,
-            sleep=self._sleep,
-            clock=self._clock,
-            abort=self._abort_flag.is_set,
-        )
+        steps to gate/verify. Each run takes its OWN abort token (#154): a fresh token starts
+        un-aborted (so a stale abort can't kill this run) WITHOUT clearing any shared flag, so a
+        concurrently-starting macro can't erase an abort meant for this run. The runner polls the
+        token (and calls release_all on abort/failure); the token is retired in `finally`."""
+        token = self._aborter.begin()
+        try:
+            outcome = run_sequence(
+                macro.steps,
+                executor=self._executor,
+                binds=self._binds,
+                status=self._status,
+                sleep=self._sleep,
+                clock=self._clock,
+                abort=lambda: self._aborter.is_aborted(token),
+            )
+        finally:
+            self._aborter.end(token)
         if outcome.status == "done":
             self._logline(f"executed sequence {macro.name}")
             return macro.done_phrase
