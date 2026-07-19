@@ -1146,6 +1146,13 @@ Notes:
 - [ ] **`/api/elevenlabs` only when relevant:** with a **non-ElevenLabs** TTS active, open the browser
       devtools **Network** tab and reload the panel → there is **no request to `/api/elevenlabs`**. Switch
       `[tts].provider` back to elevenlabs, restart, reload → the request reappears (voice/model lists load).
+- [ ] **Catalog dropdown throttle (#163):** with devtools **Network** open, open a fetched combobox
+      (e.g. the OpenAI/Gemini **model** or an **Edge/Azure voice** list) → **one** `/api/catalog?source=…`
+      request. Close and reopen it within a minute → **no** second request (served from the ~60s cache).
+      Even opening it twice near-simultaneously fires the network fetch **once** (per-key in-flight guard).
+- [ ] **Bad settings payload is a clean 400 (#163):** in a shell, `curl -s -o /dev/null -w "%{http_code}"
+      -X POST http://127.0.0.1:8765/api/settings/update -H "Content-Type: application/json"
+      -d '{"updates": [1,2,3]}'` → **400** (a non-object `updates` is rejected cleanly, not a 500).
 
 ### 14.1 Live status & log
 - [ ] The status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, status/search lines (timestamped).
@@ -1405,6 +1412,7 @@ applies to *whichever* TTS provider is active; each provider maps + clamps it to
 - [ ] **Stale-write guard:** load the tab, make a voice edit while you have unsaved changes, then click SAVE in the tab → an **amber warning** appears (file changed on disk) instead of clobbering; **RELOAD THEIR VERSION** shows the voice edit, or **OVERWRITE ANYWAY** forces yours.
 - [ ] **Save feedback:** a successful save flashes "Saved — N/M complete" and the Live Log (All filter) shows "Checklist updated from the web editor".
 - [ ] **Two tabs (#82):** open `/checklist` in **two** browser tabs; **SAVE** an edit in one → the *other* clean tab reflects it live in place.
+- [ ] **Concurrency never clobbers (#163):** hammer SAVE from two tabs (and/or a voice edit) at almost the same instant → each write either lands or gets the amber "changed on disk" 409; you never see one silently overwrite the other. (Internal fix: the version check and the write are now atomic under one save lock — hard to trigger by hand, covered by `tests/test_web_robustness.py`.)
 
 ### 14.7 Memory browser (issue #62) — http://127.0.0.1:8765/memory  🌐 PANEL 📋 FILE
 > Reads/writes the SAME `memory/memory.jsonl` the voice loop uses. Needs `[memory].enabled = true`
@@ -1413,6 +1421,7 @@ applies to *whichever* TTS provider is active; each provider maps + clamps it to
 - [ ] **Add:** type a fact (e.g. *"prefers metric units"*), pick a type, add a tag → **ADD** → 📋 a new JSON line appears in `memory/memory.jsonl`; ask by voice *"do you remember what units I use?"* → COVAS answers **from the new fact** (same file, read live).
 - [ ] **Search:** type in the search box → the list filters live by text, tag, or type; the count shows `N / total`; clearing restores all.
 - [ ] **Edit:** click **EDIT** on a memory, change its text/type/tags → **SAVE** → 📋 the file line updates; the memory's `id` and original `when` are **unchanged** (round-trips losslessly), only the edited fields differ.
+- [ ] **Edit keeps tags (#163):** EDIT a **tagged** memory, change only its **text** (leave the tag chips as-is) → SAVE → 📋 the tags are **still present** on the file line (a partial edit that omits `tags` no longer wipes them). An explicit *clear all tags* → SAVE still empties them.
 - [ ] **Delete:** click **DELETE** on a throwaway memory, confirm → 📋 that line is gone from the file; the rest survive.
 - [ ] **Voice → web:** say *"remember that my callsign is Ghost"*, then click **RELOAD FROM DISK** (or refocus the tab) → the captured fact appears in the list.
 - [ ] **Stale-write guard:** load the tab, make a voice memory (*"remember that…"*) so the file changes, then try to **ADD/EDIT/DELETE** in the tab → an **amber warning** appears (file changed on disk) and the write is refused instead of clobbering; **RELOAD** pulls in the voice memory. The Live Log (All filter) shows "Memory updated from the web browser" on a successful web write.

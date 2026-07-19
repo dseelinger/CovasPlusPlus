@@ -113,6 +113,13 @@ def create_app(core) -> Flask:
     flask_app = Flask(__name__, template_folder="templates", static_folder="static")
     sock = Sock(flask_app)
     _catalog_cache: dict = {}  # (source, base_url) -> (expires_at, options, error)
+    _catalog_locks: dict = {}  # (source, base_url) -> Lock serializing a cold resolve for that key
+    _catalog_locks_guard = threading.Lock()  # guards inserts into _catalog_locks itself
+    # Serializes the version-check-and-write of every stale-guarded editor save (checklist/crew/
+    # memory) so a concurrent web writer can't slip between the guard and the write and clobber
+    # without a 409. Each editor re-reads the on-disk version UNDER this lock immediately before
+    # writing, so the check-then-act window that the audit flagged (issue #163) is closed.
+    _save_lock = threading.Lock()
 
     # Signal the core that the control panel (this Flask server) exists, so a web HUD (#103)
     # enabled before the server came up can attach now that /hud is actually served. Guarded so a
@@ -178,15 +185,27 @@ def create_app(core) -> Flask:
 
     def _catalog_cached(source: str, base_url):
         """Resolve a catalog source through `catalog.resolve`, throttled by _CATALOG_TTL_S so
-        reopening a dropdown doesn't re-hit the provider. Fail-soft: returns (options, error)."""
+        reopening a dropdown doesn't re-hit the provider. Fail-soft: returns (options, error).
+
+        The TTL is honoured under a per-key lock (issue #163): without it, two cold dropdown opens
+        both saw the empty cache and both hit the network before either populated it, defeating the
+        throttle. A fast path serves a live cache hit lock-free; only a miss takes the per-key lock,
+        re-checks the cache once holding it (another thread may have filled it while we waited), and
+        resolves at most once. Per-key locking so a slow fetch for one source can't stall another."""
         import time
         ck = (source, base_url or "")
         hit = _catalog_cache.get(ck)
         if hit and hit[0] > time.monotonic():
             return hit[1], hit[2]
-        opts, err = catalog.resolve(source, core.cfg, base_url=base_url)
-        _catalog_cache[ck] = (time.monotonic() + _CATALOG_TTL_S, opts, err)
-        return opts, err
+        with _catalog_locks_guard:
+            lock = _catalog_locks.setdefault(ck, threading.Lock())
+        with lock:
+            hit = _catalog_cache.get(ck)             # double-check: filled while we waited?
+            if hit and hit[0] > time.monotonic():
+                return hit[1], hit[2]
+            opts, err = catalog.resolve(source, core.cfg, base_url=base_url)
+            _catalog_cache[ck] = (time.monotonic() + _CATALOG_TTL_S, opts, err)
+            return opts, err
 
     def _dynamic_options(keys) -> dict:
         """Resolve enum options that aren't statically known. Models come from
@@ -210,6 +229,10 @@ def create_app(core) -> Flask:
         """Validate a {key: value} map against the schema. Returns (patch,
         errors); the patch is built in full and applied by the caller ONLY when
         errors is empty, so a single bad field aborts the whole write."""
+        # A non-dict `updates` (e.g. a JSON list/string a client posted) must fail the SAME clean
+        # 400 as any other bad input, not raise AttributeError on `.keys()` -> HTTP 500 (issue #163).
+        if not isinstance(updates, dict):
+            return {}, {"updates": "updates must be an object of {key: value}"}
         dyn = _dynamic_options(list(updates.keys()))
         patch: dict = {}
         errors: dict = {}
@@ -540,23 +563,28 @@ def create_app(core) -> Flask:
         if path is None:
             return jsonify({"ok": False, "error": "no checklist file configured"}), 400
         b = request.get_json(force=True) or {}
-        current = _file_version(path)
-        if not b.get("force") and b.get("base_version") != current:
-            try:
-                on_disk = path.read_text(encoding="utf-8-sig")   # BOM-safe, as in the GET
-            except OSError:
-                on_disk = ""
-            return jsonify({"ok": False, "error": "stale",
-                            "version": current, "markdown": on_disk}), 409
         text = _normalize_tasks(str(b.get("markdown") or ""))
-        try:
-            path.write_text(text, encoding="utf-8")
-        except OSError as e:
-            return jsonify({"ok": False, "error": f"write failed: {e}"}), 500
-        # "Reload" the voice model: reads are already per-call fresh, so only the in-memory
-        # cursor needs care — clamp it so it can't point past the (possibly shorter) new list.
-        items = core.checklist.items()
-        core.checklist.current = min(core.checklist.current, len(items))
+        # Read the on-disk version and WRITE under one lock (issue #163): the stale check has to sit
+        # immediately before the write with nothing racing between, or a voice edit that lands in
+        # that window is silently clobbered with no 409. Serialize the whole guard-and-write here so
+        # concurrent web saves can't interleave, and clamp the shared cursor under the same lock.
+        with _save_lock:
+            current = _file_version(path)
+            if not b.get("force") and b.get("base_version") != current:
+                try:
+                    on_disk = path.read_text(encoding="utf-8-sig")   # BOM-safe, as in the GET
+                except OSError:
+                    on_disk = ""
+                return jsonify({"ok": False, "error": "stale",
+                                "version": current, "markdown": on_disk}), 409
+            try:
+                path.write_text(text, encoding="utf-8")
+            except OSError as e:
+                return jsonify({"ok": False, "error": f"write failed: {e}"}), 500
+            # "Reload" the voice model: reads are already per-call fresh, so only the in-memory
+            # cursor needs care — clamp it so it can't point past the (possibly shorter) new list.
+            items = core.checklist.items()
+            core.checklist.current = min(core.checklist.current, len(items))
         done = sum(1 for _, d, _ in items if d)
         core.bus.publish({"type": "log", "who": "system",
                           "text": f"Checklist updated from the web editor "
@@ -637,16 +665,19 @@ def create_app(core) -> Flask:
         if store is None:
             return jsonify({"ok": False, "error": "no memory store configured"}), 400
         b = request.get_json(force=True) or {}
-        stale = _memory_guard(store, b)
-        if stale is not None:
-            return stale
         text = str(b.get("text") or "").strip()
         if not text:
             return jsonify({"ok": False, "error": "a memory needs some text"}), 400
-        records = store.load()                     # fresh, file-synced list to append to
-        records.append(MemoryRecord(text=text, type=str(b.get("type") or "note") or "note",
-                                    tags=b.get("tags") or ()))
-        return _memory_saved(store, records)
+        # Guard-and-save under one lock (issue #163): the stale check, the file-synced reload, and
+        # the whole-file rewrite must not have another web write interleave between them.
+        with _save_lock:
+            stale = _memory_guard(store, b)
+            if stale is not None:
+                return stale
+            records = store.load()                     # fresh, file-synced list to append to
+            records.append(MemoryRecord(text=text, type=str(b.get("type") or "note") or "note",
+                                        tags=b.get("tags") or ()))
+            return _memory_saved(store, records)
 
     @flask_app.route("/api/memory/edit", methods=["POST"])
     def memory_edit():
@@ -656,21 +687,28 @@ def create_app(core) -> Flask:
         if store is None:
             return jsonify({"ok": False, "error": "no memory store configured"}), 400
         b = request.get_json(force=True) or {}
-        stale = _memory_guard(store, b)
-        if stale is not None:
-            return stale
         rec_id = str(b.get("id") or "")
         text = str(b.get("text") or "").strip()
         if not text:
             return jsonify({"ok": False, "error": "a memory needs some text"}), 400
-        records = store.load()
-        for i, r in enumerate(records):
-            if r.id == rec_id:
-                # Rebuild (not mutate) so tags re-normalize; preserve id + original timestamp.
-                records[i] = MemoryRecord(text=text,
-                                          type=str(b.get("type") or r.type) or "note",
-                                          tags=b.get("tags") or (), when=r.when, id=r.id)
-                return _memory_saved(store, records)
+        # Guard-and-save under one lock (issue #163) so no other web write lands between the stale
+        # check and this whole-file rewrite.
+        with _save_lock:
+            stale = _memory_guard(store, b)
+            if stale is not None:
+                return stale
+            records = store.load()
+            for i, r in enumerate(records):
+                if r.id == rec_id:
+                    # Rebuild (not mutate) so tags re-normalize; preserve id + original timestamp.
+                    # A partial edit that OMITS `tags` keeps the record's existing tags — symmetric
+                    # with `type` falling back to `r.type` (issue #163). Only an explicit `tags`
+                    # value (even an empty list, a deliberate clear) replaces them.
+                    tags = b["tags"] if "tags" in b else r.tags
+                    records[i] = MemoryRecord(text=text,
+                                              type=str(b.get("type") or r.type) or "note",
+                                              tags=tags, when=r.when, id=r.id)
+                    return _memory_saved(store, records)
         return jsonify({"ok": False, "error": f"no memory with id {rec_id!r}"}), 404
 
     @flask_app.route("/api/memory/delete", methods=["POST"])
@@ -680,15 +718,18 @@ def create_app(core) -> Flask:
         if store is None:
             return jsonify({"ok": False, "error": "no memory store configured"}), 400
         b = request.get_json(force=True) or {}
-        stale = _memory_guard(store, b)
-        if stale is not None:
-            return stale
         rec_id = str(b.get("id") or "")
-        records = store.load()
-        kept = [r for r in records if r.id != rec_id]
-        if len(kept) == len(records):
-            return jsonify({"ok": False, "error": f"no memory with id {rec_id!r}"}), 404
-        return _memory_saved(store, kept)
+        # Guard-and-save under one lock (issue #163) so no other web write lands between the stale
+        # check and this whole-file rewrite.
+        with _save_lock:
+            stale = _memory_guard(store, b)
+            if stale is not None:
+                return stale
+            records = store.load()
+            kept = [r for r in records if r.id != rec_id]
+            if len(kept) == len(records):
+                return jsonify({"ok": False, "error": f"no memory with id {rec_id!r}"}), 404
+            return _memory_saved(store, kept)
 
     # ---- Crew editor (issue #70) -----------------------------------------------
     # Define the crew CAST: name, personality, and (optional) explicit voice per character. It
@@ -881,34 +922,37 @@ def create_app(core) -> Flask:
         if path is None:
             return jsonify({"ok": False, "error": "no crew file configured"}), 400
         b = request.get_json(force=True) or {}
-        current = _file_version(path)
-        if not b.get("force") and b.get("base_version") != current:
-            return jsonify({"ok": False, "error": "stale", **_crew_snapshot()}), 409
         raw = b.get("members")
         if not isinstance(raw, list):
             return jsonify({"ok": False, "error": "members must be a list"}), 400
         members = [m for m in (crew_mod.CrewMember.from_obj(o) for o in raw) if m is not None]
-        rfile = crew_mod.load_roster_file(core.cfg)
-        target = str(b.get("ship_id") or "").strip()
-        if not target or target == "default":
-            new = crew_mod.RosterFile(default=tuple(members), ships=dict(rfile.ships))
-            where = ""
-        else:
-            fleet = {f["ship_id"]: f for f in _crew_fleet(rfile)}
-            existing = rfile.ships.get(target)
-            info = fleet.get(target, {})
-            label = str(info.get("label") or (existing.label if existing else "")).strip()
-            # Prefer a live hull from the journal fleet; keep the file's when the snapshot is stale.
-            hull = str(info.get("hull") or (existing.hull if existing else "")).strip()
-            if _crew_limit_to_seats():                    # editor-side seat cap (§5)
-                seats = crew_mod.seats_for_hull(hull)
-                if seats is not None:
-                    members = members[:seats]
-            ships = dict(rfile.ships)
-            ships[target] = crew_mod.ShipRoster(label=label, hull=hull, members=tuple(members))
-            new = crew_mod.RosterFile(default=tuple(rfile.default), ships=ships)
-            where = info.get("label") or f"ship {target}"
-        crew_mod.save_roster_file(path, new)
+        # Version-check-and-write under one lock (issue #163) so the guard sits immediately before
+        # the save and a concurrent web/voice write in that window can't be clobbered without a 409.
+        with _save_lock:
+            current = _file_version(path)
+            if not b.get("force") and b.get("base_version") != current:
+                return jsonify({"ok": False, "error": "stale", **_crew_snapshot()}), 409
+            rfile = crew_mod.load_roster_file(core.cfg)
+            target = str(b.get("ship_id") or "").strip()
+            if not target or target == "default":
+                new = crew_mod.RosterFile(default=tuple(members), ships=dict(rfile.ships))
+                where = ""
+            else:
+                fleet = {f["ship_id"]: f for f in _crew_fleet(rfile)}
+                existing = rfile.ships.get(target)
+                info = fleet.get(target, {})
+                label = str(info.get("label") or (existing.label if existing else "")).strip()
+                # Prefer a live hull from the journal fleet; keep the file's when the snapshot is stale.
+                hull = str(info.get("hull") or (existing.hull if existing else "")).strip()
+                if _crew_limit_to_seats():                    # editor-side seat cap (§5)
+                    seats = crew_mod.seats_for_hull(hull)
+                    if seats is not None:
+                        members = members[:seats]
+                ships = dict(rfile.ships)
+                ships[target] = crew_mod.ShipRoster(label=label, hull=hull, members=tuple(members))
+                new = crew_mod.RosterFile(default=tuple(rfile.default), ships=ships)
+                where = info.get("label") or f"ship {target}"
+            crew_mod.save_roster_file(path, new)
         scope = f"for {where} " if where else ""
         core.bus.publish({"type": "log", "who": "system",
                           "text": f"Crew roster {scope}updated from the web editor "
