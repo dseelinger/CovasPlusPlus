@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -164,12 +165,16 @@ def snapshot_from_dict(raw: object) -> LoadoutSnapshot | None:
 
 class ShipLoadoutStore:
     """The persisted per-ship loadout memory: `{ship_id: serialized LoadoutSnapshot}` backed by a
-    JSON file. Single-writer (the journal thread) so no internal lock — the EDContext accessor holds
-    it under its own lock. Fail-soft throughout, mirroring `owned_ships.OwnedShipsRegistry`."""
+    JSON file. State is guarded by the EDContext lock; the only internal lock is `_io_lock`, which
+    serialises the DISK write so the journal thread can persist OUTSIDE the EDContext lock without a
+    slow disk stalling readers (#161). Fail-soft throughout, mirroring `owned_ships.OwnedShipsRegistry`."""
 
     def __init__(self, loadouts: Optional[dict] = None, path: Optional[Path | str] = None) -> None:
         self._loadouts: dict = dict(loadouts or {})
         self._path: Optional[Path] = Path(path) if path else None
+        # Serialises DISK writes only (never held during a state mutation) so the journal thread can
+        # persist OUTSIDE the EDContext lock without a slow disk stalling readers (#161).
+        self._io_lock = threading.Lock()
 
     @classmethod
     def load(cls, path: Optional[Path | str]) -> "ShipLoadoutStore":
@@ -197,19 +202,28 @@ class ShipLoadoutStore:
         """Remember ONE ship's loadout, keyed by its ShipID. Persists (and returns True) only when
         the stored build actually changed. A None snapshot, or one with no ShipID (can't be keyed),
         is a no-op returning False — the current ship's build is never lost to a keyless event."""
+        changed, body = self.capture_deferred(snapshot)
+        if body is not None:
+            self.persist(body)
+        return changed
+
+    def capture_deferred(self, snapshot: LoadoutSnapshot | None) -> tuple[bool, Optional[str]]:
+        """Capture ONE ship's loadout IN MEMORY and render the body to persist, WITHOUT touching
+        disk. Returns `(changed, body)` — `body` is None when nothing changed or no path. The
+        journal path mutates under its state lock, then `persist()`s OUTSIDE it so a slow disk never
+        stalls readers (#161)."""
         if snapshot is None:
-            return False
+            return False, None
         sid = _sid(getattr(snapshot, "ship_id", None))
         if sid is None:
-            return False
+            return False, None
         serialized = snapshot_to_dict(snapshot)
         before = json.dumps(self._loadouts.get(sid), sort_keys=True, ensure_ascii=False)
         after = json.dumps(serialized, sort_keys=True, ensure_ascii=False)
         if before == after:
-            return False
+            return False, None
         self._loadouts[sid] = serialized
-        self.save()
-        return True
+        return True, (self._render() if self._path is not None else None)
 
     def get(self, ship_id: object) -> LoadoutSnapshot | None:
         """The remembered `LoadoutSnapshot` for a ShipID (accepts int or str), or None when nothing
@@ -227,20 +241,32 @@ class ShipLoadoutStore:
         return len(self._loadouts)
 
     # -- persistence --------------------------------------------------------------------
-    def save(self) -> None:
-        """Persist the whole store atomically (temp-then-replace), fail-soft — mirrors
-        `owned_ships.save`. A no-op when no path is configured."""
+    def _render(self) -> str:
+        """Serialize the whole store to its on-disk JSON body. Reads `_loadouts`, so call it under
+        the caller's state lock; only the returned (immutable) string crosses into a write."""
+        return json.dumps(self._loadouts, ensure_ascii=False, indent=2) + "\n"
+
+    def persist(self, body: str) -> None:
+        """Write a pre-rendered body to disk atomically (temp-then-replace), fail-soft — mirrors
+        `owned_ships.persist`. Serialised by `_io_lock` (never the state lock) so it's safe to call
+        OUTSIDE the EDContext lock (#161). A no-op when no path is configured."""
         if self._path is None:
             return
-        p = self._path
-        try:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            body = json.dumps(self._loadouts, ensure_ascii=False, indent=2)
-            tmp = p.with_suffix(p.suffix + ".tmp")
-            tmp.write_text(body + "\n", encoding="utf-8")
-            tmp.replace(p)  # atomic on the same filesystem
-        except OSError as e:
-            _warn(f"could not save ship-loadouts store {p} ({e})")
+        with self._io_lock:
+            p = self._path
+            try:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                tmp = p.with_suffix(p.suffix + ".tmp")
+                tmp.write_text(body, encoding="utf-8")
+                tmp.replace(p)  # atomic on the same filesystem
+            except OSError as e:
+                _warn(f"could not save ship-loadouts store {p} ({e})")
+
+    def save(self) -> None:
+        """Persist the current state immediately (render + write). Retained for direct callers; the
+        journal path uses `capture_deferred` + `persist` to keep disk off the lock."""
+        if self._path is not None:
+            self.persist(self._render())
 
 
 def _warn(msg: str) -> None:

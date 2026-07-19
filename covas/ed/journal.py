@@ -534,12 +534,22 @@ class JournalWatcher(threading.Thread):
         self._path = path
         self._buf = ""
         if prime:
-            for line in self._f:
-                ev = parse_journal_line(line)
-                if ev:
-                    apply_journal_event(self.ctx, ev)
-                    apply_carrier_event(self.ctx, ev)   # warm carrier state too
-                    self._record(ev)   # warm the recent feed too, but don't publish stale
+            # Split off complete lines exactly like _drain, so a HALF-WRITTEN final line at the
+            # startup boundary is BUFFERED (left in _buf) rather than parsed-and-dropped (#161).
+            # Iterating the file object would instead yield that partial line as a "complete" one;
+            # it'd fail to parse, be discarded, and the game would consume the file position past
+            # it — so once ED flushed the rest, _drain would see only the tail and never fold the
+            # event. Buffering hands the completion to the first tail _drain, which folds it once.
+            chunk = self._f.read()
+            if chunk:
+                self._buf += chunk
+                *lines, self._buf = self._buf.split("\n")
+                for line in lines:
+                    ev = parse_journal_line(line)
+                    if ev:
+                        apply_journal_event(self.ctx, ev)
+                        apply_carrier_event(self.ctx, ev)   # warm carrier state too
+                        self._record(ev)   # warm the recent feed too, but don't publish stale
 
     def _close(self) -> None:
         if self._f is not None:

@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -267,13 +268,17 @@ def match_ships(entries: dict, query: str) -> list[tuple[str, dict]]:
 
 
 class OwnedShipsRegistry:
-    """The persisted owned-ships store: `{ship_id: record}` backed by a JSON file. Single-writer
-    (the journal thread) so no internal lock — the EDContext accessor holds it under its own lock.
-    Fail-soft throughout, mirroring `npc_crew.NpcCrewRegistry`."""
+    """The persisted owned-ships store: `{ship_id: record}` backed by a JSON file. State is guarded
+    by the EDContext lock (the accessor holds it while mutating); the only internal lock is `_io_lock`,
+    which serialises the DISK write so the journal thread can persist OUTSIDE the EDContext lock
+    without a slow disk stalling readers (#161). Fail-soft throughout, mirroring `NpcCrewRegistry`."""
 
     def __init__(self, entries: Optional[dict] = None, path: Optional[Path | str] = None) -> None:
         self._entries: dict = dict(entries or {})
         self._path: Optional[Path] = Path(path) if path else None
+        # Serialises DISK writes only (never held during a state mutation) so the journal thread can
+        # persist OUTSIDE the EDContext lock without a slow disk stalling readers (#161).
+        self._io_lock = threading.Lock()
 
     @classmethod
     def load(cls, path: Optional[Path | str]) -> "OwnedShipsRegistry":
@@ -308,6 +313,21 @@ class OwnedShipsRegistry:
     def reconcile_stored(self, snapshot) -> bool:
         """Reconcile stored-ship locations from a `StoredShipsSnapshot`; persist on change."""
         return self._mutate(lambda e: reconcile_stored(e, snapshot))
+
+    # Deferred siblings of the three journal folds: mutate IN MEMORY + render the body, WITHOUT
+    # touching disk. The journal path (EDContext) mutates under its state lock, then `persist()`s
+    # the returned body OUTSIDE the lock so a slow disk never stalls readers (#161).
+    def apply_event_deferred(self, event: dict) -> tuple[bool, Optional[str]]:
+        """Fold one ownership-change event; return `(changed, body-to-write-or-None)`, no disk."""
+        return self._mutate_deferred(lambda e: fold(e, event))
+
+    def reconcile_loadout_deferred(self, snapshot) -> tuple[bool, Optional[str]]:
+        """Reconcile the active ship from a `LoadoutSnapshot`; return `(changed, body)`, no disk."""
+        return self._mutate_deferred(lambda e: reconcile_loadout(e, snapshot))
+
+    def reconcile_stored_deferred(self, snapshot) -> tuple[bool, Optional[str]]:
+        """Reconcile stored-ship locations; return `(changed, body)`, no disk."""
+        return self._mutate_deferred(lambda e: reconcile_stored(e, snapshot))
 
     # -- manual CRUD --------------------------------------------------------------------
     def add(self, ship_type: str, *, name: str | None = None, ident: str | None = None,
@@ -385,29 +405,48 @@ class OwnedShipsRegistry:
 
     # -- persistence --------------------------------------------------------------------
     def _mutate(self, op) -> bool:
-        """Apply a pure `entries -> entries` op and persist if it changed anything."""
+        """Apply a pure `entries -> entries` op and persist immediately if it changed anything."""
+        changed, body = self._mutate_deferred(op)
+        if body is not None:
+            self.persist(body)
+        return changed
+
+    def _mutate_deferred(self, op) -> tuple[bool, Optional[str]]:
+        """Apply a pure `entries -> entries` op IN MEMORY and render the body to persist, WITHOUT
+        touching disk. Returns `(changed, body)` — `body` is None when nothing changed or no path."""
         before = json.dumps(self._entries, sort_keys=True, ensure_ascii=False)
         op(self._entries)
         after = json.dumps(self._entries, sort_keys=True, ensure_ascii=False)
         if before == after:
-            return False
-        self.save()
-        return True
+            return False, None
+        return True, (self._render() if self._path is not None else None)
 
-    def save(self) -> None:
-        """Persist the whole registry atomically (temp-then-replace), fail-soft — mirrors
-        `npc_crew.save`. A no-op when no path is configured."""
+    def _render(self) -> str:
+        """Serialize the whole registry to its on-disk JSON body. Reads `_entries`, so call it under
+        the caller's state lock; only the returned (immutable) string crosses into a write."""
+        return json.dumps(self._entries, ensure_ascii=False, indent=2) + "\n"
+
+    def persist(self, body: str) -> None:
+        """Write a pre-rendered body to disk atomically (temp-then-replace), fail-soft — mirrors
+        `npc_crew.persist`. Serialised by `_io_lock` (never the state lock) so it's safe to call
+        OUTSIDE the EDContext lock (#161). A no-op when no path is configured."""
         if self._path is None:
             return
-        p = self._path
-        try:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            body = json.dumps(self._entries, ensure_ascii=False, indent=2)
-            tmp = p.with_suffix(p.suffix + ".tmp")
-            tmp.write_text(body + "\n", encoding="utf-8")
-            tmp.replace(p)  # atomic on the same filesystem
-        except OSError as e:
-            _warn(f"could not save owned-ships registry {p} ({e})")
+        with self._io_lock:
+            p = self._path
+            try:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                tmp = p.with_suffix(p.suffix + ".tmp")
+                tmp.write_text(body, encoding="utf-8")
+                tmp.replace(p)  # atomic on the same filesystem
+            except OSError as e:
+                _warn(f"could not save owned-ships registry {p} ({e})")
+
+    def save(self) -> None:
+        """Persist the current state immediately (render + write). Used by the manual CRUD paths
+        (add/remove) and direct callers; the journal folds use the `*_deferred` + `persist` split."""
+        if self._path is not None:
+            self.persist(self._render())
 
 
 # ---- primitives --------------------------------------------------------------------------

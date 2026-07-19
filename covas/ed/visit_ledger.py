@@ -34,6 +34,7 @@ from __future__ import annotations
 import calendar
 import json
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -105,8 +106,10 @@ def _parse_ts(ts: object) -> Optional[float]:
 
 class VisitLedger:
     """The persisted arrival log: `{location_key: {system, station, total, first, last, recent[]}}`,
-    backed by a JSON file. Single-writer (the journal thread, via the EDContext accessor under its
-    lock) so no internal lock — mirrors `NpcCrewRegistry`. Fail-soft throughout."""
+    backed by a JSON file. State is guarded by the EDContext lock (the accessor holds it while
+    folding); the only internal lock is `_io_lock`, which serialises the DISK write so the journal
+    thread can persist OUTSIDE the EDContext lock without a slow disk stalling readers (#161).
+    Fail-soft throughout, mirrors `NpcCrewRegistry`."""
 
     def __init__(
         self,
@@ -124,6 +127,9 @@ class VisitLedger:
         self._retention_s = max(1.0, float(retention_days) * _DAY_S)
         self._max_recent = max(1, int(max_recent))
         self._max_locations = max(1, int(max_locations))
+        # Serialises DISK writes only (never held during a state mutation) so the journal thread can
+        # persist OUTSIDE the EDContext lock without a slow disk stalling readers (#161).
+        self._io_lock = threading.Lock()
 
     # -- persistence (mirrors ed/npc_crew.py) ------------------------------------------
     @classmethod
@@ -145,19 +151,32 @@ class VisitLedger:
                     _warn(f"visit ledger {p} is not a JSON object; starting empty")
         return cls(entries=entries, path=p, **kw)
 
-    def save(self) -> None:
-        """Persist the whole ledger atomically (temp-then-replace), fail-soft. No-op with no path."""
+    def _render(self) -> str:
+        """Serialize the whole ledger to its on-disk JSON body. Reads `_entries`, so call it under
+        the caller's state lock; only the returned (immutable) string crosses into a write."""
+        return json.dumps(self._entries, ensure_ascii=False, indent=2) + "\n"
+
+    def persist(self, body: str) -> None:
+        """Write a pre-rendered body to disk atomically (temp-then-replace), fail-soft. Serialised by
+        `_io_lock` (never the state lock) so it's safe to call OUTSIDE the EDContext lock (#161).
+        No-op with no path."""
         if self._path is None:
             return
-        p = self._path
-        try:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            body = json.dumps(self._entries, ensure_ascii=False, indent=2)
-            tmp = p.with_suffix(p.suffix + ".tmp")
-            tmp.write_text(body + "\n", encoding="utf-8")
-            tmp.replace(p)  # atomic on the same filesystem
-        except OSError as e:
-            _warn(f"could not save visit ledger {p} ({e})")
+        with self._io_lock:
+            p = self._path
+            try:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                tmp = p.with_suffix(p.suffix + ".tmp")
+                tmp.write_text(body, encoding="utf-8")
+                tmp.replace(p)  # atomic on the same filesystem
+            except OSError as e:
+                _warn(f"could not save visit ledger {p} ({e})")
+
+    def save(self) -> None:
+        """Persist the current state immediately (render + write). Retained for direct callers; the
+        journal path uses `record_arrival_deferred` + `persist` to keep disk off the lock."""
+        if self._path is not None:
+            self.persist(self._render())
 
     # -- recording ---------------------------------------------------------------------
     def record_arrival(self, event: dict, *, when: Optional[float] = None) -> bool:
@@ -165,11 +184,22 @@ class VisitLedger:
         for FSDJump/CarrierJump and a STATION visit for Docked. `when` (epoch seconds) defaults to
         the event's own `timestamp`, then the injected clock. Returns True if anything changed.
         PURE-ish + fail-soft: an event we don't recognise, or one missing its location, is a no-op."""
+        changed, body = self.record_arrival_deferred(event, when=when)
+        if body is not None:
+            self.persist(body)
+        return changed
+
+    def record_arrival_deferred(self, event: dict, *,
+                                when: Optional[float] = None) -> tuple[bool, Optional[str]]:
+        """Fold one arrival event IN MEMORY and render the body to persist, WITHOUT touching disk.
+        Returns `(changed, body)` — `body` is the JSON to write (None when nothing changed or no
+        path). The caller mutates under its state lock, then `persist()`s OUTSIDE it so a slow disk
+        never stalls readers (#161)."""
         if not isinstance(event, dict):
-            return False
+            return False, None
         name = event.get("event")
         if name not in ARRIVAL_EVENTS:
-            return False
+            return False, None
         if when is None:
             when = _parse_ts(event.get("timestamp"))
         if when is None:
@@ -184,10 +214,10 @@ class VisitLedger:
             # station under whatever system name it carries (usually present on Docked).
             if station:
                 changed |= self._bump(_stn_key(system, station), system, station, float(when))
-        if changed:
-            self._evict_if_needed()
-            self.save()
-        return changed
+        if not changed:
+            return False, None
+        self._evict_if_needed()
+        return True, (self._render() if self._path is not None else None)
 
     def _bump(self, key: str, system: object, station: object, when: float) -> bool:
         """Record one arrival at `key` at time `when`. Increments the lifetime total, refreshes
