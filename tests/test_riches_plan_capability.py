@@ -88,6 +88,17 @@ def test_uses_given_from_system_over_current():
     assert "reference_system=Colonia" in http.posts[0]
 
 
+def test_non_numeric_slot_gets_friendly_reprompt_not_raw_error():
+    # A present-but-non-numeric jump range must reprompt in plain language, not fall through to
+    # the fail-soft guard and speak a raw ValueError. Nothing is submitted to Spansh.
+    http = _FakeHttp(post=(200, {"result": _OK_RESULT}))
+    cap, clip = _cap(http)
+    msg = cap.run_tool("plan_riches_route", {"jump_range": "very fast"})
+    assert "number" in msg.lower() and "jump range" in msg.lower()
+    assert "error" not in msg.lower() and "valueerror" not in msg.lower()
+    assert http.posts == [] and clip.copied == []
+
+
 def test_spansh_error_is_soft():
     cap, _ = _cap(_FakeHttp(post=(400, {"error": "bad"})))
     msg = cap.run_tool("plan_riches_route", dict(_ARGS))

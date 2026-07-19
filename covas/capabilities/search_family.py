@@ -143,15 +143,22 @@ class SpecSearchCapability:
                                    user_agent=self._cfg.user_agent, size=self._cfg.search_size,
                                    fresh_field=fresh_field)
 
-    def deliver(self, name: str, distance_ly: float) -> tuple[bool, bool]:
-        """Copy the result system to the clipboard unless it IS the reference system (the N3
-        already-here rule). Returns `(copied, already_here)`."""
-        return sup.deliver_system(self._clipboard, name, distance_ly, self._log)
+    def deliver(self, name: str, distance_ly: float, *,
+                reference_is_current: bool = True) -> tuple[bool, bool]:
+        """Copy the result system to the clipboard unless the Commander is already at it (the N3
+        already-here rule). `reference_is_current` is False when a `near X` override measured the
+        search from X rather than from where the Commander is, so a distance-0 match is the
+        override target (worth copying), not "you're already there". Returns
+        `(copied, already_here)`."""
+        return sup.deliver_system(self._clipboard, name, distance_ly, self._log,
+                                  reference_is_current=reference_is_current)
 
-    def deliver_logged(self, name: str, distance_ly: float, detail: str) -> tuple[bool, bool]:
+    def deliver_logged(self, name: str, distance_ly: float, detail: str, *,
+                       reference_is_current: bool = True) -> tuple[bool, bool]:
         """`deliver` plus the standard result log line — `<detail>, clipboard=<here|ok|failed>`.
         `detail` carries the per-category prefix (match name, distance, filters)."""
-        copied, here = self.deliver(name, distance_ly)
+        copied, here = self.deliver(name, distance_ly,
+                                    reference_is_current=reference_is_current)
         self.logline(f"{detail}, "
                      f"clipboard={'here' if here else ('ok' if copied else 'failed')}")
         return copied, here
@@ -361,7 +368,13 @@ def _sys_population(inp: dict) -> dict | None:
         hi_i = int(hi) if hi is not None else _POP_CEIL
     except (TypeError, ValueError):
         return None
-    return {"min": max(lo_i, 0), "max": hi_i}
+    # Normalize the range: clamp to non-negative and swap an inverted min>max (a mis-said
+    # "between a billion and a million"). Left unswapped it's an empty interval -> Spansh
+    # matches nothing and the Commander hears a misleading "no results", not the real hit.
+    lo_i, hi_i = max(lo_i, 0), max(hi_i, 0)
+    if lo_i > hi_i:
+        lo_i, hi_i = hi_i, lo_i
+    return {"min": lo_i, "max": hi_i}
 
 
 def _run_star_systems(cap: SpecSearchCapability, inp: dict) -> str:
@@ -402,9 +415,10 @@ def _run_star_systems(cap: SpecSearchCapability, inp: dict) -> str:
         return got
     records, _ = got
     best = records[0]
+    ref_here = not sup.near_override(inp)   # a `near X` search is measured from X, not from here
     copied, here = cap.deliver_logged(best.name, best.distance_ly,
                                       f"nearest match: {best.name} ({best.distance_ly:.1f} ly), "
-                                      f"filters={sorted(slots)}")
+                                      f"filters={sorted(slots)}", reference_is_current=ref_here)
     traits: list[str] = []
     if best.allegiance:
         traits.append(best.allegiance)
@@ -413,7 +427,8 @@ def _run_star_systems(cap: SpecSearchCapability, inp: dict) -> str:
     if best.security:
         traits.append(f"{best.security} security")
     trait_note = f" — {', '.join(traits)}" if traits else ""
-    line = f"Closest match: {best.name}, {sup.distance_phrase(best.distance_ly)}{trait_note}."
+    line = (f"Closest match: {best.name}, "
+            f"{sup.distance_phrase(best.distance_ly, reference_is_current=ref_here)}{trait_note}.")
     return line + sup.clipboard_note(best.name, copied, here)
 
 
@@ -567,11 +582,14 @@ def _run_stations(cap: SpecSearchCapability, inp: dict) -> str:
         return got
     stations, _ = got
     best = stations[0]
+    ref_here = not sup.near_override(inp)   # a `near X` search is measured from X, not from here
     copied, here = cap.deliver_logged(best.system, best.distance_ly,
                                       f"nearest station: {best.station} in {best.system} "
                                       f"({best.distance_ly:.1f} ly), filters={sorted(slots)}, "
-                                      f"carriers={'in' if include_carriers else 'out'}")
-    line = f"Closest station: {best.station} in {best.system}, {sup.distance_phrase(best.distance_ly)}."
+                                      f"carriers={'in' if include_carriers else 'out'}",
+                                      reference_is_current=ref_here)
+    line = (f"Closest station: {best.station} in {best.system}, "
+            f"{sup.distance_phrase(best.distance_ly, reference_is_current=ref_here)}.")
     if best.pad:
         line += f" Largest pad {best.pad}."
     arrival = best.extra.get("distance_to_arrival")
@@ -713,11 +731,12 @@ def _run_minor_factions(cap: SpecSearchCapability, inp: dict) -> str:
         return got
     systems, stale_age = got
     best = systems[0]
+    ref_here = not sup.near_override(inp)   # a `near X` search is measured from X, not from here
     copied, here = cap.deliver_logged(best.name, best.distance_ly,
                                       f"nearest faction match: {best.name} "
                                       f"({best.distance_ly:.1f} ly), filters={sorted(slots)}, "
-                                      f"stale_age={stale_age}")
-    dist = sup.distance_phrase(best.distance_ly)
+                                      f"stale_age={stale_age}", reference_is_current=ref_here)
+    dist = sup.distance_phrase(best.distance_ly, reference_is_current=ref_here)
     want_faction = slots.get("controlling_minor_faction") or slots.get("minor_faction_presences")
     if want_faction:
         # Ground the answer in the faction the Commander ASKED about. A presence search can
@@ -809,11 +828,12 @@ def _run_signals(cap: SpecSearchCapability, inp: dict) -> str:
         return got
     stations, _ = got
     best = stations[0]
+    ref_here = not sup.near_override(inp)   # a `near X` search is measured from X, not from here
     copied, here = cap.deliver_logged(best.system, best.distance_ly,
                                       f"nearest {stype}: {best.station} in {best.system} "
-                                      f"({best.distance_ly:.1f} ly)")
+                                      f"({best.distance_ly:.1f} ly)", reference_is_current=ref_here)
     line = (f"Closest {stype}: {best.station} in {best.system}, "
-            f"{sup.distance_phrase(best.distance_ly)}.")
+            f"{sup.distance_phrase(best.distance_ly, reference_is_current=ref_here)}.")
     return line + sup.clipboard_note(best.system, copied, here)
 
 
@@ -937,12 +957,14 @@ def _run_faction_states(cap: SpecSearchCapability, inp: dict) -> str:
         return got
     systems, stale_age = got
     best = systems[0]
+    ref_here = not sup.near_override(inp)   # a `near X` search is measured from X, not from here
     copied, here = cap.deliver_logged(best.name, best.distance_ly,
                                       f"nearest state match: {best.name} "
                                       f"({best.distance_ly:.1f} ly), filters={sorted(slots)}, "
-                                      f"stale_age={stale_age}")
+                                      f"stale_age={stale_age}", reference_is_current=ref_here)
     state_note = f" — {best.extra['state']}" if best.extra.get("state") else ""
-    line = f"Closest match: {best.name}, {sup.distance_phrase(best.distance_ly)}{state_note}."
+    line = (f"Closest match: {best.name}, "
+            f"{sup.distance_phrase(best.distance_ly, reference_is_current=ref_here)}{state_note}.")
     if best.controlling_minor_faction:
         line += f" Controlled by {best.controlling_minor_faction}."
     # Present only when a state-filtered search answered from the stale fallback.
@@ -1097,12 +1119,14 @@ def _run_bodies(cap: SpecSearchCapability, inp: dict) -> str:
         return got
     bodies, _ = got
     best = bodies[0]
+    ref_here = not sup.near_override(inp)   # a `near X` search is measured from X, not from here
     copied, here = cap.deliver_logged(best.system, best.distance_ly,
                                       f"nearest body: {best.name} ({best.subtype}) in "
                                       f"{best.system} ({best.distance_ly:.1f} ly), "
-                                      f"filters={sorted(slots)}")
+                                      f"filters={sorted(slots)}", reference_is_current=ref_here)
     what = best.subtype or "body"
-    line = f"Closest {what}: {best.name} in {best.system}, {sup.distance_phrase(best.distance_ly)}."
+    line = (f"Closest {what}: {best.name} in {best.system}, "
+            f"{sup.distance_phrase(best.distance_ly, reference_is_current=ref_here)}.")
     if best.distance_to_arrival_ls is not None and best.distance_to_arrival_ls >= 1:
         line += f" About {best.distance_to_arrival_ls:,.0f} light-seconds from the star."
     if best.is_landable:

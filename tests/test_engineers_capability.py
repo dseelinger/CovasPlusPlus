@@ -109,6 +109,35 @@ def test_status_overview_counts_and_buckets():
     assert "Tod 'The Blaster' McQuinn (known)" in out
 
 
+def test_status_overview_barred_not_bucketed_as_not_started():
+    # A "Barred" engineer is a real journal state, not "not yet started": it must be reported
+    # distinctly (matching _status_sentence/_short_status), never lumped into "Not yet started".
+    from covas.ed.engineers import ENGINEERS, EngineerStatus
+    barred = ENGINEERS[0]
+    out = _cap(progress={barred.name: EngineerStatus("Barred")}).run_tool(
+        "engineer_unlock_status", {})
+    assert f"{barred.name} (barred)" in out       # surfaced under In progress, tagged
+    assert "In progress:" in out
+    not_started = out.split("Not yet started:", 1)[1] if "Not yet started:" in out else ""
+    assert barred.name not in not_started         # NOT in the locked / not-started bucket
+
+
+def test_deliver_survives_a_raising_current_system_getter():
+    # A raising current-system getter must not turn a good answer (location + status) into a
+    # generic error — _deliver guards it like _progress. (Regression for the unguarded call.)
+    clips: list[str] = []
+
+    def boom() -> str:
+        raise RuntimeError("ed context exploded")
+
+    cap = EngineersCapability(get_progress=_progress, get_current_system=boom,
+                              clipboard=clips.append)
+    out = cap.run_tool("find_engineer", {"engineer": "Farseer"})
+    assert "Deciat" in out and "Frame Shift Drive" in out   # the good answer is preserved
+    assert "error" not in out.lower()                        # no generic error leaked
+    assert clips == ["Deciat"]                               # copy still happens (getter -> None)
+
+
 def test_status_overview_no_progress_yet():
     out = _cap(progress={}).run_tool("engineer_unlock_status", {})
     assert "haven't read your engineer progress" in out.lower()

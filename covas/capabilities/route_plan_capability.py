@@ -81,6 +81,25 @@ class _PlannerBase:
     def _handle(self, inp: dict) -> str:  # pragma: no cover — subclasses always override
         raise NotImplementedError
 
+    @staticmethod
+    def _coerce_numbers(inp: dict, specs) -> tuple[dict | None, str | None]:
+        """Coerce numeric slots UP FRONT, with a friendly reprompt on the first unparseable one
+        (the shape the neutron planner gets right). `specs` is an iterable of
+        `(key, caster, phrase)`; an absent/blank slot is skipped (the caller supplies its
+        default). Returns `(values, None)` on success, or `(None, reprompt)` naming the field so
+        a mis-heard "twenty-ish" doesn't fall through to the fail-soft guard and speak a raw
+        `ValueError`."""
+        out: dict = {}
+        for key, caster, phrase in specs:
+            raw = inp.get(key)
+            if raw in (None, ""):
+                continue
+            try:
+                out[key] = caster(raw)
+            except (TypeError, ValueError):
+                return None, f"I didn't catch {phrase} — give me a number."
+        return out, None
+
     def _logline(self, msg: str) -> None:
         if self._log is not None:
             self._log(msg)
@@ -219,15 +238,27 @@ class RoutePlanCapability(_PlannerBase):
         if need:
             return f"To plan a trade route I need {need}. What should I use?"
 
-        age_window = int(inp.get("max_price_age_days") or self._cfg.max_price_age_days)
+        # Coerce every numeric slot up front so a non-numeric value gets a friendly reprompt,
+        # not a raw ValueError from the fail-soft guard (the neutron planner's shape).
+        nums, reprompt = self._coerce_numbers(inp, (
+            ("capital", int, "your budget in credits"),
+            ("max_cargo", int, "your cargo capacity"),
+            ("jump_range", float, "your jump range"),
+            ("max_hops", int, "the number of hops"),
+            ("max_arrival_distance", int, "the distance from the star"),
+            ("max_price_age_days", int, "the price age in days"),
+        ))
+        if reprompt:
+            return reprompt
+
+        age_window = nums.get("max_price_age_days") or self._cfg.max_price_age_days
         try:
             params = build_trade_request(
                 from_system=system, from_station=station,
-                capital=int(inp["capital"]), max_cargo=int(inp["max_cargo"]),
-                jump_range=float(inp["jump_range"]),
-                max_hops=int(inp.get("max_hops") or self._cfg.default_max_hops),
-                max_arrival_distance=(int(inp["max_arrival_distance"])
-                                      if inp.get("max_arrival_distance") not in (None, "") else None),
+                capital=nums["capital"], max_cargo=nums["max_cargo"],
+                jump_range=nums["jump_range"],
+                max_hops=nums.get("max_hops") or self._cfg.default_max_hops,
+                max_arrival_distance=nums.get("max_arrival_distance"),
                 requires_large_pad=bool(inp.get("requires_large_pad", False)),
                 allow_planetary=bool(inp.get("allow_planetary", False)),
                 unique=bool(inp.get("avoid_loops", True)),
@@ -555,12 +586,23 @@ class RichesPlanCapability(_PlannerBase):
         if inp.get("jump_range") in (None, ""):
             return "To plan a Road to Riches I need your laden jump range. What is it?"
 
+        # Coerce every numeric slot up front so a non-numeric value gets a friendly reprompt,
+        # not a raw ValueError from the fail-soft guard (the neutron planner's shape).
+        nums, reprompt = self._coerce_numbers(inp, (
+            ("jump_range", float, "your jump range"),
+            ("radius", float, "the search radius"),
+            ("max_results", int, "the number of systems"),
+            ("min_value", int, "the minimum scan value"),
+        ))
+        if reprompt:
+            return reprompt
+
         try:
             params = build_riches_request(
-                from_system=system, jump_range=float(inp["jump_range"]),
-                radius=float(inp.get("radius") or self._cfg.default_radius),
-                max_results=int(inp.get("max_results") or self._cfg.default_max_results),
-                min_value=int(inp.get("min_value") or self._cfg.default_min_value),
+                from_system=system, jump_range=nums["jump_range"],
+                radius=nums.get("radius") or self._cfg.default_radius,
+                max_results=nums.get("max_results") or self._cfg.default_max_results,
+                min_value=nums.get("min_value") or self._cfg.default_min_value,
                 use_mapping_value=self._cfg.use_mapping_value)
             result = submit_and_poll(self._http, RICHES_ROUTE_URL, params,
                                      user_agent=self._cfg.user_agent, sleep=self._sleep,

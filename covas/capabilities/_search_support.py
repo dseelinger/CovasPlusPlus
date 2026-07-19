@@ -54,6 +54,16 @@ def reference_system(get_current_system: Callable[[], str | None] | None, inp: d
     return get_current_system() if get_current_system is not None else None
 
 
+def near_override(inp: dict, *, arg: str = "near") -> bool:
+    """True when the Commander gave an explicit `near X` reference override, so the search was
+    measured from X rather than their current system. This distinguishes "the query target
+    itself" from "the Commander's current location": a distance-0 top match under an override
+    means the answer IS X (worth copying — the Commander may be elsewhere), whereas a distance-0
+    match with NO override means they are actually already there (nothing to copy)."""
+    near = inp.get(arg)
+    return bool(near and str(near).strip())
+
+
 def run_query(spec: CategorySpec, slots: dict, http, reference: str, *,
               user_agent: str, size: int) -> list[dict]:
     """Build the category's query (fails LOUD on an unknown param), POST it, and return the raw
@@ -122,15 +132,18 @@ def copy_system(clipboard: Callable[[str], None], name: str,
 
 
 def deliver_system(clipboard: Callable[[str], None], name: str, distance_ly: float,
-                   log: Callable[[str], None] | None = None) -> tuple[bool, bool]:
-    """Copy the result system to the clipboard UNLESS it IS the reference/current system.
+                   log: Callable[[str], None] | None = None, *,
+                   reference_is_current: bool = True) -> tuple[bool, bool]:
+    """Copy the result system to the clipboard UNLESS the Commander is already at it.
 
-    A distance of ~0 ly means the nearest match is the system we measured from — the
-    Commander is already there, so there's nothing to navigate to and nothing worth copying
-    (copying your own system just clobbers the clipboard). Returns ``(copied, already_here)``:
-    exactly one is ever true. (The reference is the current system on the common path; an
-    explicit 'near X' override makes it X, which is the sensible thing to compare against.)"""
-    if distance_ly < 0.05:
+    A distance of ~0 ly means the nearest match is the system we measured FROM. On the common
+    path that reference IS the Commander's current system, so a ~0 match means they're already
+    there — nothing to navigate to, nothing worth copying (copying your own system just clobbers
+    the clipboard). But when the Commander searched `near X`, the reference is X, NOT where they
+    are: a ~0 match is X itself and they may be light-years away, so it IS worth copying. Pass
+    ``reference_is_current=False`` in that case (see `near_override`). Returns
+    ``(copied, already_here)``: exactly one is ever true."""
+    if reference_is_current and distance_ly < 0.05:
         return False, True
     return copy_system(clipboard, name, log), False
 
@@ -144,9 +157,11 @@ def clipboard_note(name: str, copied: bool, already_here: bool = False) -> str:
             else f" (Couldn't copy to the clipboard — the system is {name}.)")
 
 
-def distance_phrase(distance_ly: float) -> str:
-    """'your current system' when on top of it, else 'N.N light-years away'."""
-    return ("your current system" if distance_ly < 0.05
+def distance_phrase(distance_ly: float, *, reference_is_current: bool = True) -> str:
+    """'your current system' when the Commander is on top of it, else 'N.N light-years away'.
+    Only claims 'your current system' when the reference IS the current system (no `near X`
+    override); under an override a ~0 match is the override target, not where they are."""
+    return ("your current system" if (reference_is_current and distance_ly < 0.05)
             else f"{distance_ly:.1f} light-years away")
 
 
@@ -196,6 +211,6 @@ def or_list(items) -> str:
 
 
 # Re-export so capability modules import their exception from one place.
-__all__ = ["NavError", "SearchConfig", "reference_system", "run_query", "run_query_fresh",
-           "faction_or_recovery", "copy_system", "deliver_system", "clipboard_note",
-           "distance_phrase", "stale_note", "a_an", "or_list", "recovery"]
+__all__ = ["NavError", "SearchConfig", "reference_system", "near_override", "run_query",
+           "run_query_fresh", "faction_or_recovery", "copy_system", "deliver_system",
+           "clipboard_note", "distance_phrase", "stale_note", "a_an", "or_list", "recovery"]
