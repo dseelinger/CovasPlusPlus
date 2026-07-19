@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -112,12 +113,18 @@ _HANDLED = frozenset(
 
 class NpcCrewRegistry:
     """The persisted NPC-crew seen-set: `{crew_id: {name, combat_rank?, faction?, last_seen}}`,
-    backed by a JSON file. Single-writer (the journal thread) so no internal lock — the EDContext
-    accessor holds the snapshot under its own lock. Fail-soft throughout."""
+    backed by a JSON file. State is guarded by the EDContext lock; the only internal lock is
+    `_io_lock`, which serialises the DISK write so the journal thread can persist OUTSIDE the
+    EDContext lock without a slow disk stalling readers (#161). Fail-soft throughout."""
 
     def __init__(self, entries: Optional[dict] = None, path: Optional[Path | str] = None) -> None:
         self._entries: dict = dict(entries or {})
         self._path: Optional[Path] = Path(path) if path else None
+        # Serialises DISK writes only (never held during a state mutation), so the journal thread
+        # can persist OUTSIDE the EDContext lock without a slow disk stalling readers, yet two
+        # writers can't corrupt the shared temp file (#161). State reads happen under the caller's
+        # lock; the body is rendered there and only the finished string crosses into a write.
+        self._io_lock = threading.Lock()
 
     @classmethod
     def load(cls, path: Optional[Path | str]) -> "NpcCrewRegistry":
@@ -142,28 +149,49 @@ class NpcCrewRegistry:
     def apply_event(self, event: dict) -> bool:
         """Fold `event` into the registry and persist if anything changed. Returns True on a change
         (so the caller could log), False otherwise. Fail-soft — persistence errors are swallowed."""
+        changed, body = self.apply_event_deferred(event)
+        if body is not None:
+            self.persist(body)
+        return changed
+
+    def apply_event_deferred(self, event: dict) -> tuple[bool, Optional[str]]:
+        """Fold `event` into the registry IN MEMORY and render the body to persist, WITHOUT touching
+        disk. Returns `(changed, body)` — `body` is the JSON to write (None when nothing changed or
+        no path is configured). The caller mutates under its state lock, then `persist()`s the body
+        OUTSIDE that lock so a slow disk never stalls readers (#161)."""
         before = json.dumps(self._entries, sort_keys=True, ensure_ascii=False)
         fold(self._entries, event)
         after = json.dumps(self._entries, sort_keys=True, ensure_ascii=False)
         if before == after:
-            return False
-        self.save()
-        return True
+            return False, None
+        return True, (self._render() if self._path is not None else None)
 
-    def save(self) -> None:
-        """Persist the whole registry atomically (temp-then-replace), fail-soft — mirrors
-        `crew.save_members`. A no-op when no path is configured."""
+    def _render(self) -> str:
+        """Serialize the whole registry to its on-disk JSON body. Reads `_entries`, so call it under
+        the caller's state lock; only the returned (immutable) string crosses into a write."""
+        return json.dumps(self._entries, ensure_ascii=False, indent=2) + "\n"
+
+    def persist(self, body: str) -> None:
+        """Write a pre-rendered body to disk atomically (temp-then-replace), fail-soft — mirrors
+        `crew.save_members`. Serialised by `_io_lock` (never the state lock) so it's safe to call
+        OUTSIDE the EDContext lock. A no-op when no path is configured."""
         if self._path is None:
             return
-        p = self._path
-        try:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            body = json.dumps(self._entries, ensure_ascii=False, indent=2)
-            tmp = p.with_suffix(p.suffix + ".tmp")
-            tmp.write_text(body + "\n", encoding="utf-8")
-            tmp.replace(p)  # atomic on the same filesystem
-        except OSError as e:
-            _warn(f"could not save npc-crew registry {p} ({e})")
+        with self._io_lock:
+            p = self._path
+            try:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                tmp = p.with_suffix(p.suffix + ".tmp")
+                tmp.write_text(body, encoding="utf-8")
+                tmp.replace(p)  # atomic on the same filesystem
+            except OSError as e:
+                _warn(f"could not save npc-crew registry {p} ({e})")
+
+    def save(self) -> None:
+        """Persist the current state immediately (render + write). Retained for direct callers /
+        tests; the journal path uses `apply_event_deferred` + `persist` to keep disk off the lock."""
+        if self._path is not None:
+            self.persist(self._render())
 
     def entries(self) -> dict:
         """A shallow copy of the raw `{crew_id: record}` map (safe to hand out / snapshot)."""

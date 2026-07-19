@@ -314,6 +314,33 @@ def test_watcher_buffers_half_written_line(tmp_path):
     assert ctx.snapshot()["system"] == "Sol"
 
 
+def test_watcher_buffers_half_written_line_across_prime_boundary(tmp_path):
+    # #161: the PRIME (startup) open must buffer a half-written FINAL line exactly like _drain,
+    # so an event straddling the startup boundary is folded ONCE it's complete — not parsed as a
+    # truncated "complete" line, dropped, and the file position advanced past it (which would lose
+    # the event until the next full one self-corrected).
+    jf = tmp_path / "Journal.2026-07-08T120000.01.log"
+    # A complete line, then a PARTIAL final line with no trailing newline — present at startup.
+    jf.write_text(
+        '{"event":"LoadGame","Ship":"anaconda","FuelLevel":24.0,"FuelCapacity":32.0}\n'
+        '{"event":"FSDJump","StarSy',
+        encoding="utf-8")
+    w, ctx, q = _watcher(tmp_path)
+
+    w._open(jf, prime=True)                          # replay complete lines, BUFFER the partial
+    assert ctx.snapshot()["ship"] == "Anaconda"      # the complete primed line warmed context
+    assert ctx.snapshot()["system"] is None          # the partial FSDJump was NOT (mis)folded
+    assert [e for e in _drain_queue(q) if e.get("type") == "ed_event"] == []  # prime publishes nothing
+
+    # ED flushes the rest of the straddling line -> the first tail drain completes + folds it once.
+    with open(jf, "a", encoding="utf-8") as f:
+        f.write('stem":"Sol"}\n')
+    w._drain()
+    events = [e["event"] for e in _drain_queue(q) if e.get("type") == "ed_event"]
+    assert events == ["FSDJump"]                     # folded exactly once, not dropped
+    assert ctx.snapshot()["system"] == "Sol"
+
+
 def test_watcher_rolls_over_to_newer_file(tmp_path):
     old = tmp_path / "Journal.2026-07-08T120000.01.log"
     old.write_text('{"event":"FSDJump","StarSystem":"Sol"}\n', encoding="utf-8")

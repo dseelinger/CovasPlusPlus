@@ -271,12 +271,16 @@ class EDContext:
     def apply_npc_crew_event(self, event: dict) -> bool:
         """Fold one journal crew event into the registry (and persist on change). Returns True on a
         change. A no-op (False) when no registry is installed. Runs on the journal thread; the lock
-        serialises it against the Crew editor's read."""
+        serialises the in-memory fold against the Crew editor's read, but the DISK write happens
+        OUTSIDE the lock so a slow/locked disk can't stall a concurrent snapshot()/summary() (#161)."""
         with self._lock:
             reg = self._npc_crew
             if reg is None:
                 return False
-            return reg.apply_event(event)
+            changed, body = reg.apply_event_deferred(event)
+        if body is not None:
+            reg.persist(body)
+        return changed
 
     def npc_crew_hired(self) -> list[dict]:
         """The hired NPC pilots as `[{name, combat_rank}]` for the Crew-editor datalist, newest
@@ -295,31 +299,42 @@ class EDContext:
     def apply_shipyard_event(self, event: dict) -> bool:
         """Fold one ownership-change (Shipyard*) event into the registry (and persist on change).
         Returns True on a change; a no-op (False) when no registry is installed. Runs on the
-        journal thread; the lock serialises it against the voice-CRUD / web reads."""
+        journal thread; the lock serialises the in-memory fold against the voice-CRUD / web reads,
+        but the DISK write happens OUTSIDE the lock so a slow disk can't stall a reader (#161)."""
         with self._lock:
             reg = self._owned_ships
             if reg is None:
                 return False
-            return reg.apply_event(event)
+            changed, body = reg.apply_event_deferred(event)
+        if body is not None:
+            reg.persist(body)
+        return changed
 
     def reconcile_owned_from_loadout(self, snapshot) -> bool:
         """Reconcile the ACTIVE ship into the owned-ships registry from a `LoadoutSnapshot`
         (mark active + fill type/name/ident WITHOUT clobbering a manual correction). No-op when
-        no registry is installed."""
+        no registry is installed. Journal thread: fold under the lock, DISK write outside it (#161)."""
         with self._lock:
             reg = self._owned_ships
             if reg is None:
                 return False
-            return reg.reconcile_loadout(snapshot)
+            changed, body = reg.reconcile_loadout_deferred(snapshot)
+        if body is not None:
+            reg.persist(body)
+        return changed
 
     def reconcile_owned_from_stored(self, snapshot) -> bool:
         """Reconcile stored-ship locations into the owned-ships registry from a
-        `StoredShipsSnapshot` (upsert + locations, never remove). No-op when unconfigured."""
+        `StoredShipsSnapshot` (upsert + locations, never remove). No-op when unconfigured.
+        Journal thread: fold under the lock, DISK write outside it (#161)."""
         with self._lock:
             reg = self._owned_ships
             if reg is None:
                 return False
-            return reg.reconcile_stored(snapshot)
+            changed, body = reg.reconcile_stored_deferred(snapshot)
+        if body is not None:
+            reg.persist(body)
+        return changed
 
     def owned_ships(self) -> list[dict]:
         """The Commander's owned ships as a list of records (active first, then newest-seen).
@@ -354,13 +369,17 @@ class EDContext:
     def capture_loadout(self, snapshot) -> bool:
         """Remember the active ship's build in the per-ship store, keyed by its ShipID (and persist
         on change). Returns True on a change; a no-op (False) when no store is installed or the
-        snapshot has no ShipID. Runs on the journal thread; the lock serialises it against the
-        engineering-planning read."""
+        snapshot has no ShipID. Runs on the journal thread; the lock serialises the in-memory
+        capture against the engineering-planning read, but the DISK write happens OUTSIDE the lock
+        so a slow disk can't stall a reader (#161)."""
         with self._lock:
             store = self._ship_loadouts
             if store is None:
                 return False
-            return store.capture(snapshot)
+            changed, body = store.capture_deferred(snapshot)
+        if body is not None:
+            store.persist(body)
+        return changed
 
     def ship_loadout(self, ship_id) -> "object | None":
         """The remembered `LoadoutSnapshot` for an owned ship's ShipID (accepts int or str), or None
@@ -386,12 +405,16 @@ class EDContext:
     def record_arrival(self, event: dict) -> bool:
         """Fold one arrival event into the visit ledger (and persist on change). Returns True on a
         change; a no-op (False) when no ledger is installed. Runs on the journal thread; the lock
-        serialises it against the proactive worker's stats read."""
+        serialises the in-memory fold against the proactive worker's stats read, but the DISK write
+        happens OUTSIDE the lock so a slow disk can't stall a reader (#161)."""
         with self._lock:
             led = self._visit_ledger
             if led is None:
                 return False
-            return led.record_arrival(event)
+            changed, body = led.record_arrival_deferred(event)
+        if body is not None:
+            led.persist(body)
+        return changed
 
     def visit_stats_station(self, system, station):
         """Grounded `VisitStats` for a station, or None when no ledger is installed. Read under

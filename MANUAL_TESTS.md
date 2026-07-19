@@ -407,6 +407,12 @@ Notes:
 > Requires `[elite].enabled = true`. The journal watcher must fail **soft**: one malformed/unexpected event, or a journal file vanishing during a rollover, may not silently stop all further monitoring for the session.
 - [ ] **Bad line is skipped, tailing continues:** with COVAS++ running and ED live, append a garbage line to the current journal (e.g. `echo '{"event":"__notreal__","x":{}}' >> Journal.<latest>.log`), then do a real in-game action (FSD-jump / dock). The action is still reflected — *"where am I?"* / *"what did I just do?"* stays current. At most a single warning is logged for the bad line; monitoring does **not** go dark.
 - [ ] **Rollover race is harmless:** let ED roll to a new journal (long session, or relog) while COVAS++ runs → it picks up the new file and keeps narrating; no watcher-dead silence, no traceback in the log.
+- [ ] **Event straddling startup is not lost (#161):** start COVAS++ **while a jump/dock is landing** in the journal (relog COVAS++ mid-action, or start it the instant you jump), so its *final* journal line is half-written at startup. Once ED finishes writing that line, the action still lands — *"where am I?"* reflects the new system/station within a poll or two; the straddling event is **not** silently dropped.
+
+### 5.1c Registry persistence never stalls the voice loop (#161)  🎮 ED 📋 FILE
+> Requires `[elite].enabled = true`. The journal thread now persists its disk-backed registries (visit ledger #138, owned-ships #134, per-ship loadouts #135, NPC-crew #125) **outside** the EDContext lock, so a slow/locked disk can't stall a `snapshot()`/`summary()` read.
+- [ ] **Responsive under a busy disk:** during heavy fleet activity (jumping, docking, boarding different ships so the registries write often), COVAS++ keeps answering *"where am I?"* / *"what did I just do?"* promptly — no perceptible pause tied to journal writes.
+- [ ] **Registry files still update:** confirm the git-ignored registry files under the data dir (`memory/`, owned-ships, ship-loadouts, visit ledger) still change on disk as you play — persistence moved off the lock but was **not** dropped.
 
 Notes:
 
