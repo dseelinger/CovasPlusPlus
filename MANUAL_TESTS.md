@@ -1081,6 +1081,7 @@ Notes:
 - [ ] **Invalid value refused with options:** *"Set the Whisper model to gigantic."* → refuses and **lists the valid options** (doesn't guess or silently widen).
 - [ ] **Unknown setting → help:** *"Set the warp factor to 9."* → routes to help / says it isn't a setting, rather than inventing one.
 - [ ] **Get a setting:** *"What's my Whisper model set to?"* → reads the current value.
+- [ ] **Safety gates refused by voice (issue #183):** *"COVAS, turn off the combat guard."* → COVAS **refuses**, names it a *safety control*, and points you at the web control panel (**does not** flip it; 📋 `overrides.json` gets **no** `keybinds.combat_guard`/`macros.combat_guard` write). Repeat for *"turn off keybind confirmation,"* *"turn off macro confirmation,"* *"turn keybind automation off,"* and *"turn off sending in-game messages"* — each is refused the same way. Then confirm these **are** still changeable on the [Settings page](#142-settings-page-n1--http1270018765settings) (they show as normal rows there). Reading one by voice (*"is the combat guard on?"*) also returns the carve-out message, not the value.
 
 Notes:
 

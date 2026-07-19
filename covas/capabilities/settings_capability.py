@@ -39,7 +39,11 @@ _SET_DESCRIPTION = (
     "The tool validates the value against the setting's allowed type / range / options and "
     "returns a ready-to-speak confirmation. If the value is INVALID it returns the valid "
     "options — relay them and do NOT guess a different value. If the setting isn't "
-    "recognized it tells you what CAN be changed. Relay the tool's reply."
+    "recognized it tells you what CAN be changed. Relay the tool's reply.\n"
+    "  - The keybind/macro/comms SAFETY GATES (keybind + macro confirmation, combat guard, "
+    "mode guard, keybind automation on/off, in-game message sending) are NOT voice-writable — "
+    "the tool refuses them and points the Commander to the web control panel. Relay that "
+    "refusal; do NOT try to work around it."
 )
 _GET_DESCRIPTION = (
     "Report the CURRENT value of one COVAS++ setting — e.g. 'what's my whisper model', 'is "
@@ -117,7 +121,9 @@ class SettingsCapability:
                               "the George voice', or 'turn web search off'. Ask 'what can I "
                               "change' and I'll run through the options. Changes apply live — "
                               "even switching my language model or voice takes effect on the "
-                              "next thing you ask, no restart."),
+                              "next thing you ask, no restart. The keybind/macro safety gates "
+                              "(confirmation, combat guard, mode guard) aren't voice-writable on "
+                              "purpose — change those in the web control panel."),
         )
 
     def run_tool(self, name: str, inp: dict) -> str:
@@ -138,9 +144,15 @@ class SettingsCapability:
             return "Which setting do you want to check?"
         if is_placement_phrase(spoken):
             return _PLACEMENT_DEFER
-        matches = find_settings(spoken)
+        matches = find_settings(spoken, include_protected=True)
         if not matches:
             return self._unknown(spoken)
+        # If a protected safety gate is in the resolved (exact-beats-weak) tier, refuse rather than
+        # fall through to a same-named non-protected setting (e.g. bare "combat guard" must not
+        # silently hit the auto-honk guard). A non-protected EXACT match still outranks a protected
+        # weak one, so ordinary changes are unaffected.
+        if any(s.protected for s in matches):
+            return self._protected(matches)
         if len(matches) > 1:
             return self._ambiguous(matches)
         s = matches[0]
@@ -159,9 +171,15 @@ class SettingsCapability:
         # than emit the multi-HUD ambiguous list (issue #141, DESIGN §3.8.1 routing rule).
         if is_placement_phrase(spoken):
             return _PLACEMENT_DEFER
-        matches = find_settings(spoken)
+        matches = find_settings(spoken, include_protected=True)
         if not matches:
             return self._unknown(spoken)
+        # A protected safety gate in the resolved tier is refused by name and routed to the web
+        # panel — never silently persisted, and never allowed to fall through to a same-named
+        # non-protected setting. This is the core of the #183 carve-out: the LLM consumes untrusted
+        # text, so it must not be able to disable a keybind/macro/comms guard by voice.
+        if any(s.protected for s in matches):
+            return self._protected(matches)
         if len(matches) > 1:
             return self._ambiguous(matches)
         s = matches[0]
@@ -251,6 +269,16 @@ class SettingsCapability:
                 "whisper model, thinking depth, personality, the voice, or web search — ask "
                 "'what can I change' and I'll run through the full list.")
 
+    def _protected(self, matches: list[Setting]) -> str:
+        """Refuse a protected safety gate (keybind/macro/comms guard, issue #183). These are
+        deliberately out of the voice-writable surface — the LLM reads untrusted text, so it
+        must not be able to disable a guard by voice. Still changeable in the web control panel."""
+        labels = _dedupe([m.label for m in matches if m.protected])[:3]
+        which = _or_list(labels) if labels else "That"
+        verb = "is" if len(labels) <= 1 else "are"
+        return (f"{which} {verb} a safety control — I can't change it by voice. "
+                "Adjust it in the web control panel's Settings page, or edit config.toml directly.")
+
     def _ambiguous(self, matches: list[Setting]) -> str:
         labels = _dedupe([m.label for m in matches])[:5]
         return f"Did you mean {_or_list(labels)}? Tell me which one."
@@ -305,14 +333,22 @@ def _terms(s: Setting) -> set[str]:
     return {t for t in terms if t}
 
 
-def find_settings(spoken: str) -> list[Setting]:
+def find_settings(spoken: str, *, include_protected: bool = False) -> list[Setting]:
     """Resolve a spoken setting name to schema settings. Exact (normalized) matches win; if
     there are none, fall back to substring overlap. Returns [] (unknown), [one] (resolved),
-    or [several] (ambiguous). Hidden settings (e.g. the paired voice name) are never matched."""
+    or [several] (ambiguous). Hidden settings (e.g. the paired voice name) are never matched.
+
+    PROTECTED settings — the keybind/macro/comms safety gates (issue #183) — are excluded from
+    the voice surface by default: the LLM consumes untrusted text, so a guard it could flip via
+    set_setting is a prompt-injection privilege-escalation path. They stay editable in the
+    CSRF-guarded web panel (which reads SCHEMA directly, not this resolver). Pass
+    `include_protected=True` only to DETECT that a phrase named a protected gate, so the caller
+    can explain the carve-out instead of claiming the setting doesn't exist."""
     q = _norm(spoken)
     if not q:
         return []
-    visible = [s for s in schema.SCHEMA if not s.hidden]
+    visible = [s for s in schema.SCHEMA
+               if not s.hidden and (include_protected or not s.protected)]
     exact = [s for s in visible if q in _terms(s)]
     if exact:
         return _dedupe_settings(exact)

@@ -144,6 +144,11 @@ class Setting:
     phrasings: tuple = ()             # spoken names for the voice layer
     example: str = ""                 # example spoken command
     hidden: bool = False              # tracked + settable, but not shown as a row
+    protected: bool = False           # safety gate: NOT voice-writable (issue #183) — the LLM
+                                      # consumes untrusted text, so a guard it can flip via
+                                      # set_setting is a prompt-injection privilege-escalation
+                                      # path. Editable only via the CSRF-guarded web panel or by
+                                      # hand-editing config.toml/overrides.json.
     allow_custom: bool = False        # enum: accept a value outside options (like a combobox source)
     doc_url: Optional[str] = None     # optional "Setup guide →" link shown under the help (#121)
 
@@ -719,15 +724,15 @@ SCHEMA: list[Setting] = [
             "Keybind automation", "Keybinds",
             "Let the companion press ONE ship control (landing gear) behind a safety layer.",
             default=True, phrasings=("keybind automation", "ship controls"),
-            example="turn keybind automation on"),
+            example="turn keybind automation on", protected=True),
     Setting("keybinds.require_confirmation", ("keybinds", "require_confirmation"), "bool",
             "Require confirmation", "Keybinds",
             "Arming an action needs a SEPARATE spoken confirm before it fires. Leave ON.",
-            default=True, phrasings=("keybind confirmation",)),
+            default=True, phrasings=("keybind confirmation",), protected=True),
     Setting("keybinds.combat_guard", ("keybinds", "combat_guard"), "bool",
             "Combat guard", "Keybinds",
             "Refuse to touch controls during danger/interdiction (or unknown status). Leave ON.",
-            default=True, phrasings=("combat guard",)),
+            default=True, phrasings=("combat guard",), protected=True),
     Setting("keybinds.focus_before_inject", ("keybinds", "focus_before_inject"), "bool",
             "Focus Elite before injecting", "Keybinds",
             "Bring the Elite Dangerous window to the front right before pressing a ship control or "
@@ -752,15 +757,15 @@ SCHEMA: list[Setting] = [
     Setting("macros.require_confirmation", ("macros", "require_confirmation"), "bool",
             "Require confirmation", "Custom macros",
             "A consequential macro needs a SEPARATE spoken confirm before it runs. Leave ON.",
-            default=True, phrasings=("macro confirmation",)),
+            default=True, phrasings=("macro confirmation",), protected=True),
     Setting("macros.combat_guard", ("macros", "combat_guard"), "bool",
             "Combat guard", "Custom macros",
             "Refuse to run a macro during danger/interdiction (or unknown status). Leave ON.",
-            default=True, phrasings=("macro combat guard",)),
+            default=True, phrasings=("macro combat guard",), protected=True),
     Setting("macros.mode_guard", ("macros", "mode_guard"), "bool",
             "Mode guard", "Custom macros",
             "Only run a macro whose actions are valid for your current game mode. Leave ON.",
-            default=True, phrasings=("macro mode guard",)),
+            default=True, phrasings=("macro mode guard",), protected=True),
     Setting("macros.confirm_window", ("macros", "confirm_window"), "int",
             "Confirm window", "Custom macros",
             "Seconds an armed macro stays confirmable before it expires.",
@@ -850,7 +855,7 @@ SCHEMA: list[Setting] = [
             "Compose + send Elite Dangerous chat (local/wing/squadron/direct) by voice. "
             "Always reads the message back and sends only on a separate confirm.",
             default=False, phrasings=("send messages", "in-game messages", "voice comms"),
-            example="turn on sending in-game messages"),
+            example="turn on sending in-game messages", protected=True),
     Setting("comms_send.confirm_window", ("comms_send", "confirm_window"), "int",
             "Confirm window", "Comms",
             "Seconds a composed message stays confirmable before it expires.",
