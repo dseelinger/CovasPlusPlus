@@ -2090,6 +2090,34 @@ NN. **VR-HUD placement model — design decision** (issue #145, umbrella for #14
     offset". The SteamVR-mode requirement + OpenComposite→web-HUD (#103) split is restated in
     `docs/using/hud.md`. Pillar: **Immerse** / Foundation.
 
+NN. **VR-HUD fixes #140–#144 — implementing the §3.8.1 model** (Immerse / Foundation) — the five
+    symptoms from one VR session, fixed to conform to the placement model above rather than patched
+    separately. **(1, #140) Lifecycle.** A typed failure taxonomy (`probe_vr_reason` in `vr_hud.py`:
+    `openvr-missing` PERMANENT vs `steamvr-not-running` / `attach-failed` / `no-hmd-pose` TRANSIENT);
+    the one-shot creation latch (`HudCapability._reconcile_surface`) now resets on a transient
+    failure via an injected `vr_permanent` predicate, so starting SteamVR *after* COVAS++ then
+    enabling/pinning brings the overlay up with no restart; `adjust_vr_hud pin_here` ENABLES-and-
+    places (writes `vr_enabled`, reconciles, pins) and speaks the specific reason on failure (the
+    SteamVR case points at the #103 web-HUD). **(2, #141) Routing.** `adjust_vr_hud`'s description
+    now unambiguously owns pin/place/position-here with or without "VR"; defensively
+    `settings_capability.is_placement_phrase` makes the settings matcher DECLINE a placement verb
+    over "HUD" instead of emitting the multi-HUD ambiguous list (exact "hud" toggles unchanged).
+    **(3, #142) Transform.** The pitch Rx sign is inverted ONCE in `resolve_transform`, so positive
+    `pitch_deg` leans the top toward the viewer per the docstring — correcting pin AND the
+    tilt_up/tilt_down nudges together; a direction-asserting unit test locks the sign. **(4, #143)
+    Truthfulness.** A static `_ACTION_GROUNDING_GUARDRAIL` in `llm.build_system` forbids narrating a
+    side-effecting action without a real tool call (HUD confirmations relay `adjust_vr_hud`'s
+    return); corrective/complaint tilt phrasing is routed to the tool. **(5, #144) Positioning.** A
+    first-class horizontal **recentre** (`VrHudView.recenter_here` → `adjust_vr_hud recenter`/`center`)
+    snaps `vr_yaw_deg` to the current HMD heading — the real fix for a drifted world-locked panel —
+    while `vr_offset_x_m`'s "0.0 after a pin is correct" semantics are clarified in the setting help
+    and `docs/using/hud.md`; a `hud` log on the app's placement-apply path aids diagnosis. Offline
+    unit tests cover the taxonomy, latch retry-vs-latch, routing decline, tilt direction, and
+    recentre; two 🖐 in-headset direction/visual confirmations (tilt, recentre/offset) need SteamVR
+    mode and are enumerated in `MANUAL_TESTS.md`. **Improvement thesis (Immerse): truthful,
+    recoverable in-headset control — every failure names itself and every "done" is real — beats a
+    silent, unrecoverable overlay that latches out and confirms actions it never took.**
+
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 

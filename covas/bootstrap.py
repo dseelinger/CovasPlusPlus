@@ -602,7 +602,7 @@ def build_hud(app: "App") -> None:
     try:
         from .capabilities.hud_capability import (
             HudCapability, HudModel, WebHudView, checklist_line)
-        from .capabilities.vr_hud import make_vr_view
+        from .capabilities.vr_hud import make_vr_view, probe_vr_reason
         from .ed import read_navroute, resolve_journal_dir
 
         jdir = resolve_journal_dir(app.cfg)
@@ -632,18 +632,25 @@ def build_hud(app: "App") -> None:
             is_enabled=app._hud_enabled,
             vr_is_enabled=app._vr_hud_enabled,
             vr_view_factory=_vr_factory,
+            # A VR build failure only LATCHES when it's permanent (openvr not importable). A
+            # transient one (SteamVR not up yet) leaves the latch clear so a later enable/pin
+            # re-attempts — start SteamVR after COVAS++ and the overlay still comes up (#140).
+            vr_permanent=lambda: probe_vr_reason() == "openvr-missing",
             web_is_enabled=app._web_hud_enabled,
             web_view_factory=_web_factory,
             log=lambda m: app._log("hud", m))
         app.registry.register(app.hud)
-        # Voice repositioning for the VR overlay (nudges + look-to-place). Reuses the HUD's
-        # config + the app's live-apply settings path; pin reads the HMD gaze from the live
-        # overlay. Registered even when the VR HUD is off — the tool just reports it's not up.
+        # Voice repositioning for the VR overlay (nudges + look-to-place + recentre). Reuses the
+        # HUD's config + the app's live-apply settings path; pin/recentre read the HMD gaze from
+        # the live overlay, and vr_reason turns an attach failure into a specific spoken line.
+        # Registered even when the VR HUD is off — pin enables-and-places (#140).
         from .capabilities.hud_placement_capability import HudPlacementCapability
         app.registry.register(HudPlacementCapability(
             get_hud=lambda: app.cfg.get("hud", {}),
             apply_patch=app.update_settings,
             pin=lambda: app.hud.pin_vr_here() if app.hud is not None else None,
+            recenter=lambda: app.hud.recenter_vr_here() if app.hud is not None else None,
+            vr_reason=lambda: app.hud.vr_attach_reason() if app.hud is not None else None,
             log=lambda m: app._log("hud", m)))
         # A SHOWN HUD (either surface) repaints from live bus events (status/checklist/route/
         # callout), so it needs the shared event pump — but only when actually enabled. The

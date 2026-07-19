@@ -192,6 +192,82 @@ def test_vr_factory_returning_none_is_fail_soft_and_not_retried():
     assert any("VR HUD" in m and "no VR runtime" in m for m in logs)
 
 
+def test_transient_vr_failure_reattempts_but_permanent_latches():
+    """#140/§3.8.1 lifecycle: a TRANSIENT build failure (SteamVR not up yet) must not latch, so a
+    later reconcile re-attempts (start SteamVR after COVAS++ and the overlay still comes up); a
+    PERMANENT one (openvr missing) latches and is not retried."""
+    # Transient: predicate says "not permanent" -> the latch resets, factory runs again.
+    calls = {"n": 0}
+    cap = HudCapability(
+        HudModel(), is_enabled=lambda: False, view_factory=lambda p: None,
+        vr_is_enabled=lambda: True,
+        vr_view_factory=lambda p: (calls.__setitem__("n", calls["n"] + 1), None)[1],
+        vr_permanent=lambda: False)                 # transient
+    assert calls["n"] == 1                           # first attempt at construction
+    cap.reconcile()
+    assert calls["n"] == 2                           # re-attempted (no latch)
+
+    # Permanent: predicate says "permanent" -> latched, no retry.
+    calls2 = {"n": 0}
+    cap2 = HudCapability(
+        HudModel(), is_enabled=lambda: False, view_factory=lambda p: None,
+        vr_is_enabled=lambda: True,
+        vr_view_factory=lambda p: (calls2.__setitem__("n", calls2["n"] + 1), None)[1],
+        vr_permanent=lambda: True)                  # permanent
+    assert calls2["n"] == 1
+    cap2.reconcile()
+    assert calls2["n"] == 1                           # NOT retried (latched)
+
+
+def test_transient_reattempt_succeeds_once_the_surface_is_available():
+    """The recovery the bug is about: SteamVR comes up late, so the second attempt SUCCEEDS with
+    no restart of COVAS++."""
+    view = FakeView()
+    ready = {"up": False}
+
+    def factory(p):
+        return view if ready["up"] else None
+
+    cap = HudCapability(
+        HudModel(), is_enabled=lambda: False, view_factory=lambda p: None,
+        vr_is_enabled=lambda: True, vr_view_factory=factory,
+        vr_permanent=lambda: False)                 # transient while down
+    assert cap._vr_view is None                      # not up yet
+    ready["up"] = True                               # "SteamVR started"
+    cap.reconcile()
+    assert cap._vr_view is view and view.visible is True
+
+
+def test_probe_vr_reason_branches(monkeypatch):
+    """The typed-reason probe (#140): openvr absent -> PERMANENT 'openvr-missing'; openvr present
+    but SteamVR down -> TRANSIENT 'steamvr-not-running'; both present -> None (attachable). Robust
+    to whether openvr happens to be installed on the test box."""
+    import covas.capabilities.vr_hud as vr
+    try:
+        import openvr  # noqa: F401
+        have_openvr = True
+    except Exception:  # noqa: BLE001
+        have_openvr = False
+
+    monkeypatch.setattr(vr, "_steamvr_running", lambda: False)
+    assert vr.probe_vr_reason() == ("steamvr-not-running" if have_openvr else "openvr-missing")
+    monkeypatch.setattr(vr, "_steamvr_running", lambda: True)
+    assert vr.probe_vr_reason() == (None if have_openvr else "openvr-missing")
+
+
+def test_action_grounding_guardrail_is_in_the_system_prompt():
+    """#143/§3.8.1 truthfulness: the no-invented-ACTIONS rule ships in the static system prompt
+    (even with personality + crew off) and is cache-safe, so the model can't confirm a HUD change
+    it never made."""
+    from covas.llm import build_system, _ACTION_GROUNDING_GUARDRAIL
+
+    bare = build_system({"personality": {"enabled": False}, "crew": {"enabled": False}})
+    assert bare is not None and _ACTION_GROUNDING_GUARDRAIL in bare
+    low = _ACTION_GROUNDING_GUARDRAIL.lower()
+    assert "tool" in low and ("don't invent actions" in low or "invent actions" in low)
+    assert build_system({}) == build_system({})   # static -> cache-safe
+
+
 def test_no_vr_factory_means_no_vr_surface_and_no_crash():
     # The default HudCapability (2D only) has vr_view_factory=None: reconcile must not blow up
     # and must never claim a VR surface.
@@ -291,13 +367,64 @@ def test_resolve_transform_applies_lateral_and_distance_offsets():
 
 
 def test_resolve_transform_pitch_rotates_about_x():
-    """A nonzero pitch makes the rotation non-identity (top leans toward the viewer)."""
+    """A nonzero pitch makes the rotation non-identity, tilting the panel about its X axis."""
     flat = resolve_transform(VrPlacement(pitch_deg=0.0))
     tilted = resolve_transform(VrPlacement(pitch_deg=30.0))
     assert [flat[0][0], flat[1][1], flat[2][2]] == [1.0, 1.0, 1.0]   # identity at 0
-    assert tilted[1][1] != 1.0 and tilted[2][1] > 0.0                # rotated about X
+    assert tilted[1][1] != 1.0                                       # rotated about X
     # X row is untouched by an X-axis rotation
     assert tilted[0][0] == 1.0 and tilted[0][1] == 0.0
+
+
+def test_resolve_transform_positive_pitch_leans_top_toward_viewer():
+    """Direction guard for the ONE pitch convention (#142, §3.8.1): a positive `pitch_deg` must
+    lean the panel's TOP toward the viewer. The panel's local +Y (top edge) maps to world
+    R·(0,1,0) = (0, cos, −sin); the −sin Z-component is the corrected (hardware-confirmed)
+    sign — so a look-down pin (which sets pitch_deg > 0) reads head-on rather than tipping away.
+    Locks the sign so it can't silently regress back to top-AWAY."""
+    import math
+    m = resolve_transform(VrPlacement(pitch_deg=30.0, yaw_deg=0.0))
+    top_edge_z = m[2][1]                      # world Z of the panel's local +Y (top) axis
+    assert top_edge_z < 0.0                   # corrected: top leans toward the viewer
+    assert abs(top_edge_z - (-math.sin(math.radians(30.0)))) < 1e-9
+    # And it is a pure tilt reversal from the pre-fix rendering: the sign is simply flipped.
+    assert m[1][1] == math.cos(math.radians(30.0))
+
+
+def test_look_down_pin_fixture_yields_low_panel_tilted_toward_viewer():
+    """End-to-end direction for look-to-place (#142): a look-DOWN gaze drops the panel low AND
+    tilts its top toward you. Mirrors `_pin_to_gaze`'s pure math on a known look-down pose, so it
+    needs no VR runtime."""
+    import math
+    from covas.capabilities.vr_hud import hmd_pitch_deg, hmd_yaw_deg
+
+    def rx(deg):  # HMD pitched by +deg about X (looking up); forward = -Z column
+        r = math.radians(deg)
+        c, s = math.cos(r), math.sin(r)
+        return [[1.0, 0.0, 0.0, 0.0], [0.0, c, -s, 0.0], [0.0, s, c, 0.0]]
+
+    pose = rx(-30.0)                                     # looking DOWN 30°
+    e = math.radians(hmd_pitch_deg(pose))               # gaze elevation < 0
+    d = 1.3
+    pinned = VrPlacement(yaw_deg=hmd_yaw_deg(pose), forward_m=d * math.cos(e),
+                         up_m=d * math.sin(e), pitch_deg=-math.degrees(e), offset_x_m=0.0)
+    assert pinned.up_m < 0.0                             # panel dropped low
+    assert pinned.pitch_deg > 0.0                        # positive tilt...
+    assert resolve_transform(pinned)[2][1] < 0.0         # ...renders top-toward-you
+
+
+def test_resolve_transform_offset_moves_centre_at_yaw_zero_and_pinned_yaw():
+    """Lateral offset slides the panel centre view-relatively at yaw 0 AND after a pin (#144):
+    the offset acts in the YAWED frame, so it's never a dead knob — just view-relative."""
+    import math
+    at0 = resolve_transform(VrPlacement(offset_x_m=0.5, forward_m=1.3, yaw_deg=0.0))
+    assert at0[0][3] == 0.5                              # straight to world +X at yaw 0
+    yaw = 90.0
+    yawed = resolve_transform(VrPlacement(offset_x_m=0.5, forward_m=1.3, yaw_deg=yaw))
+    base = resolve_transform(VrPlacement(offset_x_m=0.0, forward_m=1.3, yaw_deg=yaw))
+    # A non-zero offset still moves the centre at a pinned yaw (here along world Z at yaw 90).
+    assert (yawed[0][3], yawed[2][3]) != (base[0][3], base[2][3])
+    assert abs(yawed[2][3] - base[2][3]) > 0.4          # ~0.5 m of lateral slide, now along Z
 
 
 def test_set_vr_placement_relays_to_the_live_view():

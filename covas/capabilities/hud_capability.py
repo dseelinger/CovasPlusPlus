@@ -504,6 +504,7 @@ class HudCapability:
         view_factory: Callable[[Callable[[], HudSnapshot]], Optional["HudView"]] = make_view,
         vr_is_enabled: Optional[Callable[[], bool]] = None,
         vr_view_factory: Optional[Callable[[Callable[[], HudSnapshot]], Optional[object]]] = None,
+        vr_permanent: Optional[Callable[[], bool]] = None,
         web_is_enabled: Optional[Callable[[], bool]] = None,
         web_view_factory: Optional[Callable[[Callable[[], HudSnapshot]], Optional[object]]] = None,
         log: Optional[Callable[[str], None]] = None,
@@ -513,6 +514,10 @@ class HudCapability:
         self._view_factory = view_factory
         self._vr_is_enabled = vr_is_enabled or (lambda: False)
         self._vr_view_factory = vr_view_factory
+        # () -> True only when the VR surface's failure is PERMANENT (openvr not importable), so a
+        # failed build LATCHES; a TRANSIENT failure (SteamVR not up yet) does NOT, and a later
+        # enable/reconcile/pin re-attempts (issue #140, DESIGN §3.8.1). Absent -> old always-latch.
+        self._vr_permanent = vr_permanent
         self._web_is_enabled = web_is_enabled or (lambda: False)
         self._web_view_factory = web_view_factory
         self._log = log
@@ -590,6 +595,34 @@ class HudCapability:
             self._logline(f"VR HUD pin failed: {e}")
             return None
 
+    def recenter_vr_here(self):
+        """Horizontal recentre (issue #144): ask the live overlay to snap its heading (yaw) to
+        the CURRENT HMD heading, keeping distance/height/tilt/size/curvature. Returns the new
+        placement (for the caller to persist) or None when the VR surface isn't up or doesn't
+        support it. Fail-soft."""
+        view = self._vr_view
+        recenter = getattr(view, "recenter_here", None)
+        if recenter is None:
+            return None
+        try:
+            return recenter()
+        except Exception as e:  # noqa: BLE001 — a recenter glitch must not disturb the loop
+            self._logline(f"VR HUD recenter failed: {e}")
+            return None
+
+    def vr_attach_reason(self):
+        """The typed reason the VR overlay isn't up *right now* (for the spoken failure line when
+        a pin/recenter can't attach), or None when the overlay is live. When a view exists it's up;
+        otherwise a cheap fresh probe distinguishes openvr-missing (permanent) from
+        SteamVR-not-running (transient). Fail-soft — never raises into the voice loop. (#140)"""
+        if self._vr_view is not None:
+            return None
+        try:
+            from .vr_hud import probe_vr_reason  # lazy: avoid an import cycle at module load
+            return probe_vr_reason()
+        except Exception:  # noqa: BLE001 — no reason available => generic
+            return None
+
     def on_web_ui_ready(self) -> None:
         """The control panel (Flask) has come up after startup. Clear the web surface's one-shot
         'tried' latch and reconcile, so a web HUD enabled BEFORE the server existed (e.g. on at
@@ -619,7 +652,8 @@ class HudCapability:
         if self._vr_view_factory is not None:
             self._reconcile_surface(
                 "_vr_view", "_vr_view_tried", self._vr_is_enabled, self._vr_view_factory,
-                label="VR HUD", unavailable="no VR runtime is available (openvr / SteamVR absent)")
+                label="VR HUD", unavailable="no VR runtime is available (openvr / SteamVR absent)",
+                latch_on_fail=self._vr_permanent)
         if self._web_view_factory is not None:
             self._reconcile_surface(
                 "_web_view", "_web_view_tried", self._web_is_enabled, self._web_view_factory,
@@ -629,10 +663,17 @@ class HudCapability:
 
     def _reconcile_surface(self, view_attr: str, tried_attr: str,
                            is_enabled: Callable[[], bool], factory, *,
-                           label: str, unavailable: str) -> None:
+                           label: str, unavailable: str,
+                           latch_on_fail: Optional[Callable[[], bool]] = None) -> None:
         """Match one surface's view to its enable flag: create+show when on, hide when off. The
         view is created lazily on first enable and reused thereafter (a toggle just hides/shows),
-        so the underlying toolkit/runtime is only touched once the Commander opts in."""
+        so the underlying toolkit/runtime is only touched once the Commander opts in.
+
+        ``latch_on_fail`` (VR only, issue #140): when a build returns None it is consulted — if it
+        returns False the failure is TRANSIENT and the 'tried' latch is RESET so a later
+        enable/reconcile/pin re-attempts (e.g. SteamVR started after COVAS++). Absent/True keeps
+        the old behaviour: latch once and don't retry (right for a headless 2D box / a missing
+        runtime that won't reappear)."""
         try:
             want = bool(is_enabled())
         except Exception:  # noqa: BLE001 — a config read glitch => treat as off
@@ -649,6 +690,14 @@ class HudCapability:
                 setattr(self, view_attr, view)
                 if view is None:
                     self._logline(f"{label} enabled but {unavailable}; continuing without it.")
+                    # A transient failure must not lock the surface out for the session — allow a
+                    # fresh attempt next reconcile (issue #140).
+                    if latch_on_fail is not None:
+                        try:
+                            if not latch_on_fail():
+                                setattr(self, tried_attr, False)
+                        except Exception:  # noqa: BLE001 — fail soft: keep the latch on a probe glitch
+                            pass
             if view is not None:
                 view.show()
                 self._logline(f"{label} shown.")

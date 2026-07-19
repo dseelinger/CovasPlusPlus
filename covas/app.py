@@ -647,7 +647,14 @@ class App:
             self.hud.reconcile()
             # Push the live placement so a Settings/voice change to distance / offset / pitch /
             # curvature / width repositions a SHOWN VR overlay immediately (no re-toggle).
-            self.hud.set_vr_placement(self._vr_hud_placement())
+            placement = self._vr_hud_placement()
+            self.hud.set_vr_placement(placement)
+            # Diagnostic (issue #144): a `hud` line every apply so a "the lateral offset does
+            # nothing" report can be pinned to config vs render — confirms the new offset/yaw
+            # actually flowed to set_vr_placement.
+            self._log("hud", f"placement -> yaw={placement.yaw_deg:.0f} "
+                             f"x={placement.offset_x_m:.2f} y={placement.up_m:.2f} "
+                             f"dist={placement.forward_m:.2f} pitch={placement.pitch_deg:.0f}")
         except Exception as e:  # noqa: BLE001 — a toggle glitch must not crash the loop
             self._log("hud", f"reconcile failed: {e}")
 

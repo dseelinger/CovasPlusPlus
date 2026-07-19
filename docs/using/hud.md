@@ -104,22 +104,36 @@ way to place the panel is to put the headset on and adjust by voice until it sit
 
 The natural way to do that, hands still on the stick, is two kinds of voice command:
 
-- **Look-to-place** — look where you want the panel and say *"pin the HUD here."* It places the
-  panel along your gaze — matching your heading **and** how far up or down you're looking (look
-  down at the dash and it drops there; look up and it rises) — and **tilts it to face you** so it
-  reads head-on. Distance, width, and curvature are kept; it recentres laterally onto your gaze.
-  A near-vertical gaze clamps gracefully (±60° tilt, ±2 m). Aimed for seated cockpit play.
+- **Look-to-place** — look where you want the panel and say *"pin the HUD here"* (the word "VR" is
+  optional — *"pin the HUD here"* and *"pin the VR HUD here"* both work, and so do *"place"* /
+  *"position … here"*). It places the panel along your gaze — matching your heading **and** how far
+  up or down you're looking (look down at the dash and it drops there; look up and it rises) — and
+  **tilts it to face you** so it reads head-on. Distance, width, and curvature are kept; it
+  recentres laterally onto your gaze. A near-vertical gaze clamps gracefully (±60° tilt, ±2 m).
+  Aimed for seated cockpit play. If the VR HUD is off, *"pin the HUD here"* **turns it on and
+  places it in one step** — no separate *"turn the VR HUD on"* first.
+- **Recentre** — if a world-locked panel has drifted off to the side because you turned your head,
+  say *"recentre the HUD on me"* (or *"centre the HUD"*). It snaps the panel's **heading** back in
+  front of you, keeping distance, height, tilt, size, and curvature. This is the fix for
+  "off-centre" — not the lateral offset (see the note under the settings table). A full *"pin the
+  HUD here"* also recaptures how high/low it sits.
 - **Nudges** — *"move the HUD left / right / up / down,"* *"closer" / "farther"* (or *"forward" /
-  "back"*), *"tilt it up / down,"* *"flatter" / "more curved,"* *"bigger" / "smaller,"* *"centre
-  the HUD,"* *"reset the HUD position."* Add an amount if you like: *"move it left 20
+  "back"*), *"tilt it up / down,"* *"flatter" / "more curved,"* *"bigger" / "smaller,"* *"reset the
+  HUD position."* Corrective phrasing works too — *"it's tilted the wrong way,"* *"tilt it back up
+  at me,"* *"fix the tilt"* all adjust the tilt. Add an amount if you like: *"move it left 20
   centimetres,"* *"tilt it up 10 degrees."*
+
+If a placement command can't bring the overlay up, COVAS says **why** in one line rather than a
+generic "not running": *the VR HUD is off*, *SteamVR isn't running* (with a pointer to the web HUD
+for OpenComposite / VDXR), *the VR component isn't installed*, or *it couldn't read your headset
+position — try again*. And because SteamVR-not-running is a recoverable state, you can start
+SteamVR **after** COVAS++ and then enable / pin the VR HUD — it comes up with no restart.
 
 For an exact value, the absolute settings still work: *"set the VR HUD distance to 1.5,"* *"set
 the VR HUD curvature to 0.1."*
 
-!!! note "The placement model (issue #145 — fixes landing via #140–#144)"
-    A few things worth knowing about how placement is *meant* to behave (the design is settled;
-    the code catches up in issues #140–#144):
+!!! note "The placement model (issue #145, implemented in #140–#144)"
+    A few things worth knowing about how placement behaves:
 
     - **"Pin/place/position the HUD here" always means the VR overlay** — the word "VR" is
       optional. Look-to-place is a VR-only action (you can't "pin here" the 2D window or the web
@@ -132,11 +146,11 @@ the VR HUD curvature to 0.1."*
       **recentre** — snap the panel to your *current* heading, keeping distance, height, tilt, and
       size — or a fresh *"pin the HUD here"* (which also recaptures elevation). Nudging the
       lateral offset is for fine left/right trim, not for bringing a panel back in front of you.
-    - **Started SteamVR after COVAS++?** Under the model, saying *"turn the VR HUD on"* or
-      *"pin the HUD here"* re-attempts the attach once SteamVR is up — no restart needed — and any
-      failure tells you the specific reason (SteamVR not running, overlay component missing, and
-      so on) instead of a generic "isn't running". It remains attach-only: it never launches
-      SteamVR, and on OpenComposite / VDXR it structurally can't attach — use the
+    - **Started SteamVR after COVAS++?** Saying *"turn the VR HUD on"* or *"pin the HUD here"*
+      re-attempts the attach once SteamVR is up — no restart needed — and any failure tells you the
+      specific reason (SteamVR not running, overlay component missing, and so on) instead of a
+      generic "isn't running". It remains attach-only: it never launches SteamVR, and on
+      OpenComposite / VDXR it structurally can't attach — use the
       [web HUD](#in-headset-without-steamvr-the-web-hud-openkneeboard) there.
 
 | Setting | What it does |
@@ -144,7 +158,7 @@ the VR HUD curvature to 0.1."*
 | **`[hud].vr_placement`** | `world` (default) parks the panel **cockpit-fixed** in front of you; `head` **locks it to your view** so it follows where you look |
 | **`[hud].vr_width_m`** | Physical width of the panel in metres (default `0.55` — reads well at arm's length) |
 | **`[hud].vr_distance_m`** | How far in front the panel sits, in metres (default `1.30`; range `0.30`–`5.0`) |
-| **`[hud].vr_offset_x_m`** | Left/right offset in metres (default `0.0`; `+` = right, `−` = left) |
+| **`[hud].vr_offset_x_m`** | Left/right **slide** in metres, view-relative to the panel's heading (default `0.0`; `+` = right, `−` = left). Reads `0.0` right after a pin — that's correct; for an off-centre panel use *"recentre the HUD on me"*, not this (see the placement-model note above) |
 | **`[hud].vr_offset_y_m`** | Up/down offset in metres (default `−0.12`, slightly below eye-line; `+` = up) |
 | **`[hud].vr_pitch_deg`** | Tilt in degrees (default `0`; **positive leans the top toward you**, so a low panel angles up to face you) |
 | **`[hud].vr_curvature`** | Curve of the panel: `0` flat … `1` a full cylinder. Default `0.1` — a gentle ED-style wrap |

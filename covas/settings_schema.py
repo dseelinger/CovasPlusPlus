@@ -1111,8 +1111,11 @@ SCHEMA: list[Setting] = [
             phrasings=("vr hud distance", "vr overlay distance")),
     Setting("hud.vr_offset_x_m", ("hud", "vr_offset_x_m"), "float",
             "VR HUD lateral offset", "Companion HUD",
-            "Left/right offset of the VR panel in metres (positive = right, negative = left). "
-            "Applies live.",
+            "Left/right slide of the VR panel in metres (positive = right, negative = left), "
+            "view-relative to the panel's heading. Applies live. Note: this reads 0 right after "
+            "'pin the HUD here' — that's correct. If a world-locked panel looks off to the side "
+            "later, that's your heading, not this offset: say 'recentre the HUD on me' (or re-pin) "
+            "rather than dialling in an offset.",
             default=0.0, min=-2.0, max=2.0, unit="m",
             phrasings=("vr hud left right", "vr overlay sideways")),
     Setting("hud.vr_offset_y_m", ("hud", "vr_offset_y_m"), "float",
