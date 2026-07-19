@@ -12,6 +12,7 @@ from covas.capabilities.macro_capability import MacroCapability, MacroConfig
 from covas.keybinds.abort import AbortController
 from covas.keybinds.binds import KeyBinding
 from covas.keybinds.registry import Macro
+from covas.keybinds.sequence import PRESS, Step
 from covas.macros.store import MacroStore
 
 
@@ -230,6 +231,72 @@ def test_abort_clears_pending_and_releases(tmp_path):
     # the armed macro is gone: a later confirm finds nothing
     cap.new_turn()
     assert "nothing to confirm" in cap.run_tool("confirm_macro", {}).lower()
+
+
+# ---- daemon-thread fail-soft (#159) ---------------------------------------
+
+def test_run_triggered_degrades_soft_on_raising_status_getter(tmp_path):
+    # _run_triggered is the body of the detached daemon thread the spawner starts — nothing up the
+    # stack can catch an escape there. A raising injected status getter must be swallowed + logged,
+    # not crash the thread. Invoke the daemon body directly (production runs it off-thread).
+    logs: list[str] = []
+    cap, _, execu, _ = _cap(tmp_path)
+    cap._log = logs.append
+
+    def boom():
+        raise RuntimeError("status feed exploded")
+
+    cap._status = boom
+    macro = Macro(name="Boom", tool="custom_macro:x", action="",
+                  arm_phrase="run your 'Boom' macro", done_phrase="Ran 'Boom'.",
+                  steps=(Step(PRESS, action="SetSpeedZero"),), confirm_required=False)
+    cap._run_triggered(macro)                     # must NOT raise
+    assert execu.ops == []                         # guard couldn't clear -> nothing pressed
+    assert any("Boom" in m for m in logs)          # degraded soft, with a log line
+
+
+# ---- two macros, one trigger: neither silently dropped (#159) -------------
+
+def test_two_macros_sharing_a_trigger_are_both_confirmable(tmp_path):
+    _cap._t = 0.0
+    spoken: list[str] = []
+    cap, _, execu, _ = _cap(tmp_path, speak=spoken.append)
+    # Two CONSEQUENTIAL macros (confirm=True) bound to the SAME 'docked' trigger.
+    _create(cap, name="Zero", trigger="docked", confirm=True,
+            steps=[{"type": "action", "action": "throttle_zero"}])
+    _create(cap, name="Gear", trigger="docked", confirm=True,
+            steps=[{"type": "action", "action": "landing_gear"}])
+
+    cap.on_event({"type": "ed_event", "event": "Docked"})
+    assert execu.ops == []                                   # both armed/queued, neither fired
+    assert len(spoken) == 2                                  # both were announced (no silent drop)
+
+    cap.new_turn()
+    cap.run_tool("confirm_macro", {})                        # confirms the first-armed macro
+    cap.new_turn()
+    cap.run_tool("confirm_macro", {})                        # confirms the promoted sibling
+
+    pressed = [o for o in execu.ops if o[0] == "press"]
+    assert ("press", "Key_0") in pressed                    # first macro ran
+    assert ("press", "Key_L") in pressed                    # the queued sibling ran too
+    # queue drained: a further confirm finds nothing armed
+    cap.new_turn()
+    assert "nothing to confirm" in cap.run_tool("confirm_macro", {}).lower()
+
+
+def test_abort_drops_a_queued_triggered_macro(tmp_path):
+    _cap._t = 0.0
+    spoken: list[str] = []
+    cap, _, execu, _ = _cap(tmp_path, speak=spoken.append)
+    _create(cap, name="Zero", trigger="docked", confirm=True,
+            steps=[{"type": "action", "action": "throttle_zero"}])
+    _create(cap, name="Gear", trigger="docked", confirm=True,
+            steps=[{"type": "action", "action": "landing_gear"}])
+    cap.on_event({"type": "ed_event", "event": "Docked"})    # Zero armed, Gear queued
+    cap.run_tool("abort_macros", {})                         # hard abort clears BOTH
+    cap.new_turn()
+    assert "nothing to confirm" in cap.run_tool("confirm_macro", {}).lower()
+    assert [o for o in execu.ops if o[0] == "press"] == []   # nothing ever ran
 
 
 # ---- listing / deleting ---------------------------------------------------

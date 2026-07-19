@@ -39,6 +39,11 @@ Every safeguard is on by default:
   immediately release any held key. One "abort" stops **every** in-flight run at once — a running
   keybind sequence *and* any custom macro that happens to be running or auto-triggering — and a
   new run starting at the same moment can never swallow an abort meant for one already underway.
+  Every key COVAS presses is **tracked from the instant it goes down**, so the abort can always
+  lift it — even if an individual key-release hits a transient fault mid-press, the key stays
+  recorded and the abort still gets it up rather than stranding it. A key being **held** (a
+  "hold to charge" step) is released the moment you abort — it doesn't wait out the remaining
+  hold time.
 
 ## Using it
 
