@@ -35,6 +35,25 @@ def test_config_events_table_replaces_defaults():
     assert c.allows("MissionCompleted") is False  # not in the table at all
 
 
+def test_config_bad_numeric_field_falls_back_instead_of_aborting():
+    # A null/non-numeric override for ONE field must fall back to its default, not raise and
+    # abort the whole build (which would silently disable every proactive callout).
+    d = ProactiveConfig()
+    c = ProactiveConfig.from_cfg({"proactive": {
+        "enabled": True,
+        "cooldown": None,            # explicit null (e.g. cleared in overrides.json)
+        "min_interval": "soon",      # non-numeric string
+        "max_tokens": None,
+        "long_jump_ly": "far",
+    }})
+    assert c.enabled is True                     # the rest of the build still happened
+    assert c.cooldown == d.cooldown
+    assert c.min_interval == d.min_interval
+    assert c.max_tokens == d.max_tokens
+    assert c.long_jump_ly == d.long_jump_ly
+    assert c.events == DEFAULT_EVENTS
+
+
 # --- ProactivePolicy: the gate --------------------------------------------------------
 
 def _policy(**over) -> ProactivePolicy:

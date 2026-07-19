@@ -182,7 +182,10 @@ class EngineersCapability:
         unlocked, in_progress, locked = [], [], []
         for eng in ENGINEERS:
             st = status_for(eng, progress)
-            if st is None or st.progress not in ("Known", "Invited", "Unlocked"):
+            # "Barred" is a real journal state, not "not yet started": keep it out of the locked
+            # bucket so the overview agrees with _status_sentence/_short_status (which report it
+            # distinctly). It falls through to in_progress, tagged "(barred)".
+            if st is None or st.progress not in ("Known", "Invited", "Unlocked", "Barred"):
                 locked.append(eng)
             elif st.unlocked:
                 grade = f" (grade {st.rank})" if st.rank else ""
@@ -248,12 +251,23 @@ class EngineersCapability:
         """Copy the engineer's system for plotting, unless the Commander is already there."""
         if self._clipboard is None:
             return ""
-        current = self._current_system() if self._current_system else None
+        current = self._current()
         if current and current.strip().lower() == eng.system.strip().lower():
             return "You're already in that system."
         if self._copy(eng.system):
             return f"I've copied {eng.system} to your clipboard to plot a route."
         return ""
+
+    def _current(self) -> Optional[str]:
+        """The Commander's current system, guarded like `_progress` — a raising getter must not
+        turn a good answer (location, status, what's left) into a generic error."""
+        if self._current_system is None:
+            return None
+        try:
+            return self._current_system()
+        except Exception as e:  # noqa: BLE001 — a bad getter must not break the answer
+            self._logline(f"current-system read failed: {e}")
+            return None
 
     def _copy(self, text: str) -> bool:
         try:

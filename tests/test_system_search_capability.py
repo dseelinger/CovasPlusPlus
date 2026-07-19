@@ -81,6 +81,30 @@ def test_result_that_is_current_system_is_not_copied():
     assert clip.copied == [] and "already there" in out.lower()
 
 
+def test_near_override_distance_zero_match_is_copied_not_already_there():
+    # Searching `near Sol` while the Commander is ELSEWHERE: the top match IS Sol (distance 0
+    # from the reference), but that's the query target, not where they are -> copy it, and never
+    # claim "you're already there". (Regression: the old code skipped the copy on any distance-0
+    # match, even under an override.)
+    cap, http, clip = _cap(system="Alpha Centauri")
+    out = cap.run_tool("search_star_systems", {"allegiance": "Federation", "near": "Sol"})
+    assert http.calls[0]["payload"]["reference_system"] == "Sol"
+    assert clip.copied == ["Sol"]
+    assert "already there" not in out.lower()
+    assert "clipboard" in out.lower()
+
+
+def test_population_inverted_range_is_swapped_not_empty():
+    from covas.capabilities.search_family import _sys_population
+    # A mis-said "between a billion and a million" arrives as min>max. Left as-is it's an empty
+    # interval that matches nothing (a misleading "no results"); normalized it becomes valid.
+    assert _sys_population({"min_population": 1_000_000_000, "max_population": 1_000_000}) == \
+        {"min": 1_000_000, "max": 1_000_000_000}
+    # A correctly-ordered range is untouched.
+    assert _sys_population({"min_population": 1_000_000, "max_population": 1_000_000_000}) == \
+        {"min": 1_000_000, "max": 1_000_000_000}
+
+
 def test_any_defaults_only_spoken_slots_appear():
     cap, http, _ = _cap()
     cap.run_tool("search_star_systems", {"security": "High"})

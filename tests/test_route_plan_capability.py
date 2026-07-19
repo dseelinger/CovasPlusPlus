@@ -81,6 +81,18 @@ def test_prompts_for_missing_numbers():
     assert "cargo" in msg.lower() and "jump range" in msg.lower()
 
 
+def test_non_numeric_slot_gets_friendly_reprompt_not_raw_error():
+    # A present-but-non-numeric jump range must reprompt in plain language, not fall through to
+    # the fail-soft guard and speak a raw ValueError. Nothing is submitted to Spansh.
+    http = _FakeHttp(post=(200, {"result": _OK_RESULT}))
+    cap, clip = _cap(http)
+    msg = cap.run_tool("plan_trade_route",
+                       {"capital": 100_000_000, "max_cargo": 720, "jump_range": "thirty-ish"})
+    assert "number" in msg.lower() and "jump range" in msg.lower()
+    assert "error" not in msg.lower() and "valueerror" not in msg.lower()
+    assert http.posts == [] and clip.copied == []
+
+
 def test_prompts_for_start_when_not_docked():
     http = _FakeHttp(post=(200, {"result": _OK_RESULT}))
     cap = RoutePlanCapability(RoutePlanConfig(enabled=True), http=http,

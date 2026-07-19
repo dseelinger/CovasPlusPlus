@@ -63,6 +63,22 @@ DEFAULT_LONG_JUMP_LY = 50.0
 DEFAULT_LONG_JUMP_COOLDOWN = 300.0
 
 
+def _as_float(value: object, default: float) -> float:
+    """Coerce a possibly null/non-numeric override to float, defaulting fail-soft (never raises)."""
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_int(value: object, default: int) -> int:
+    """Coerce a possibly null/non-numeric override to int, defaulting fail-soft (never raises)."""
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+
+
 @dataclass(frozen=True)
 class ProactiveConfig:
     """Immutable snapshot of the proactive policy, built from `[proactive]`. Kept separate
@@ -88,15 +104,18 @@ class ProactiveConfig:
             events = {str(k): bool(v) for k, v in events.items()}
         else:
             events = dict(DEFAULT_EVENTS)
+        # Coerce numerics fail-soft: a null/non-numeric override for ONE field falls back to its
+        # default instead of raising and aborting the whole config build — which would silently
+        # disable every proactive callout (the sibling HonkConfig/_as_float pattern).
         return cls(
             enabled=bool(p.get("enabled", False)),
-            cooldown=float(p.get("cooldown", d.cooldown)),
-            min_interval=float(p.get("min_interval", d.min_interval)),
-            max_tokens=int(p.get("max_tokens", d.max_tokens)),
-            place_cooldown=float(p.get("place_cooldown", d.place_cooldown)),
+            cooldown=_as_float(p.get("cooldown"), d.cooldown),
+            min_interval=_as_float(p.get("min_interval"), d.min_interval),
+            max_tokens=_as_int(p.get("max_tokens"), d.max_tokens),
+            place_cooldown=_as_float(p.get("place_cooldown"), d.place_cooldown),
             long_jump_enabled=bool(p.get("long_jump_enabled", d.long_jump_enabled)),
-            long_jump_ly=float(p.get("long_jump_ly", d.long_jump_ly)),
-            long_jump_cooldown=float(p.get("long_jump_cooldown", d.long_jump_cooldown)),
+            long_jump_ly=_as_float(p.get("long_jump_ly"), d.long_jump_ly),
+            long_jump_cooldown=_as_float(p.get("long_jump_cooldown"), d.long_jump_cooldown),
             events=events,
         )
 

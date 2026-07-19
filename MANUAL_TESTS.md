@@ -868,6 +868,7 @@ Notes:
 - [ ] **Per-run options:** try *"…large pad only, up to 5 hops, nothing more than 2000 light-seconds out, and include planetary ports"* → the returned route respects the limits (large-pad stations, ≤5 hops, close-in stations, surface markets allowed). Cross-check the same filters on spansh.co.uk/trade. ⚠️ These map to LIVE-VERIFY param names (`requires_large_pad`, `max_hops`, `max_system_distance`, `allow_planetary`) in `build_trade_request` — if a filter is ignored, that's where to correct it.
 - [ ] **Plot handoff:** after a plan, **paste** (Ctrl-V) into the galaxy-map search box → it's the **first destination system**; it sets course. (In-game auto course-set is the later keybind action #32.)
 - [ ] **Asks for missing numbers:** *"Plan a trade route."* with nothing else → it asks for your cargo capacity, jump range, and budget rather than guessing.
+- [ ] **Non-numeric number reprompts cleanly:** if a number comes through garbled (e.g. a mis-heard jump range), it asks for that number in plain language ("I didn't catch your jump range — give me a number.") and does **not** speak a raw error. (Same for Road to Riches.)
 - [ ] **Not docked:** while in space, ask for a trade route → it asks you to dock or name a start station (doesn't invent one).
 - [ ] **Freshness — per hop & whole loop:** if any leg's price is old, that hop is read with an inline **"(price ~N days old)"** tag; if the *whole* loop is stale, the reply also adds a spoken **"the freshest prices on this route are about N days old"** caveat (hard to force on demand — note if you see either). Try *"…only prices from the last day"* to tighten the window and make it easier to trigger.
 - [ ] **Fail-soft:** with the internet briefly off, ask for a route → a spoken "couldn't reach the trade planner" note, and the voice loop keeps working (no crash).
@@ -920,6 +921,7 @@ Notes:
 - [ ] **Correction, not invention:** ask for a nonsense type/biology (*"the nearest chocolate planet"*, *"a body with space whales"*) → it offers the closest real value or asks again; it does **not** run a bogus search.
 - [ ] **Plot handoff:** after a match, **paste** (Ctrl-V) into the galaxy-map search box → it's the **body's system**; it sets course. (There's no per-body plot; you plot the system, then fly in.)
 - [ ] **Already-there rule:** if the nearest match is a body **in your current system**, it says you're already there and does **NOT** copy.
+- [ ] **Near-override copies (not "already there"):** from a system that is NOT the target, ask *"…near \<other system\>"* where that system itself is the top match (distance 0 from the reference) → it **copies** the target and does **not** wrongly say "you're already there". (Applies to every `near X` search — systems, stations, factions, signals, faction states, bodies.)
 - [ ] **Fail-soft:** with the internet briefly off, ask for a body → a spoken "couldn't reach the bodies database" note, and the voice loop keeps working (no crash).
 
 Notes:
@@ -1029,6 +1031,7 @@ Notes:
 - [ ] **Journal-grounded status:** *"How do I unlock The Dweller?"* → your **actual** status (unlocked / invited / discovered / not started) from the journal, plus what's still needed. Compare against the in-game Engineers panel — it should match your real progress, not a generic answer.
 - [ ] **By module:** *"Which engineer upgrades my FSD?"* → lists the FSD engineers (Farseer, Palin, …), each tagged with whether **you've** unlocked them.
 - [ ] **Unlock rundown:** *"Which engineers have I unlocked?"* → a count plus what's unlocked, in-progress, and still locked — matching the in-game panel.
+- [ ] **Barred bucketed correctly:** if you're **barred** from an engineer (a real journal state), the rundown reports them as **barred** (under in-progress), not lumped into "Not yet started" — consistent with what asking about that one engineer says.
 - [ ] **Already-there rule:** ask *"where is …"* an engineer while you're **in that engineer's system** → it says you're already there and does **NOT** copy.
 - [ ] **No progress yet:** with the game not yet logged in this session, ask *"which engineers have I unlocked?"* → it says it hasn't read your progress yet rather than guessing.
 
