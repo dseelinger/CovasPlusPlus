@@ -246,6 +246,10 @@ Notes:
   `gpt-4o-mini`. (Do **not** use Groq's *free* tier here — see the limits note above: it 413/429s.)
 - [ ] **Fail-soft:** clear the key (or set a bad `base_url`) → the turn degrades to text and the loop
   returns to IDLE; restore → it works again. No crash.
+- [ ] **o-series reasoning model (issue #153):** set `[openai].model = "o3-mini"` (or another o-series
+  id) against OpenAI with a key, restart, speak a turn → COVAS answers (the request sends
+  `max_completion_tokens`, **not** `max_tokens`). Before the fix every o-series turn 400'd and spoke
+  the misconfig heads-up. A regular `gpt-4o-mini` turn still works unchanged.
 
 Notes:
 

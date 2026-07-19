@@ -25,6 +25,7 @@ Key: `[openai].api_key_file` (DPAPI-encrypted; shared with the OpenAI TTS provid
 from __future__ import annotations
 
 import json
+import re
 import threading
 from typing import Iterator, Optional
 
@@ -40,6 +41,18 @@ _DEFAULT_MODEL = "gpt-4o-mini"
 _USER_AGENT = "COVAS-Plus-Plus/0.1 (Elite Dangerous voice companion)"
 # Cap the client-tool loop like the Anthropic path, so a misbehaving model can't spin forever.
 _MAX_ROUNDS = 8
+# o-series / reasoning models (o1, o1-mini, o3, o3-mini, o4-mini, …) REJECT `max_tokens` and require
+# `max_completion_tokens` (issue #153). Match on the bare model name (strip any `provider/` prefix an
+# OpenRouter-style id carries) starting with `o<digit>`; gpt-4o etc. begin with 'g', so they don't
+# match and keep the classic `max_tokens` key.
+_REASONING_MODEL_RE = re.compile(r"^o\d", re.IGNORECASE)
+
+
+def _token_cap_key(model: str) -> str:
+    """The request key that carries the output-token cap for `model`: `max_completion_tokens` for an
+    o-series/reasoning model, `max_tokens` for everything else (issue #153)."""
+    base = str(model or "").strip().rsplit("/", 1)[-1]
+    return "max_completion_tokens" if _REASONING_MODEL_RE.match(base) else "max_tokens"
 
 
 class OpenAILLM:
@@ -109,7 +122,8 @@ class OpenAILLM:
 
         for _round in range(_MAX_ROUNDS):
             body: dict = {"model": mdl, "messages": working, "stream": True,
-                          "stream_options": {"include_usage": True}, "max_tokens": cap}
+                          "stream_options": {"include_usage": True},
+                          _token_cap_key(mdl): cap}
             if oa_tools:
                 body["tools"] = oa_tools
                 body["tool_choice"] = "auto"
