@@ -2066,7 +2066,7 @@ The original seven-phase plan is done and tested:
     configurable in the UI, deferential to its owner — where EDCoPilot/COVAS:NEXT carrier chatter is
     generic and never anchored to those exact arrival/departure beats.**
 
-NN. **VR-HUD placement model — design decision** (issue #145, umbrella for #140–#144; §3.8.1) —
+70. **VR-HUD placement model — design decision** (issue #145, umbrella for #140–#144; §3.8.1) —
     design-only, no code: one coherent model of "where is the HUD and how do I move it" for a
     Commander in a headset, replacing five independently-added controls whose seams showed up as
     five bug reports from a single VR session. The model (full text in §3.8.1): **(1) lifecycle** —
@@ -2090,7 +2090,7 @@ NN. **VR-HUD placement model — design decision** (issue #145, umbrella for #14
     offset". The SteamVR-mode requirement + OpenComposite→web-HUD (#103) split is restated in
     `docs/using/hud.md`. Pillar: **Immerse** / Foundation.
 
-NN. **VR-HUD fixes #140–#144 — implementing the §3.8.1 model** (Immerse / Foundation) — the five
+71. **VR-HUD fixes #140–#144 — implementing the §3.8.1 model** (Immerse / Foundation) — the five
     symptoms from one VR session, fixed to conform to the placement model above rather than patched
     separately. **(1, #140) Lifecycle.** A typed failure taxonomy (`probe_vr_reason` in `vr_hud.py`:
     `openvr-missing` PERMANENT vs `steamvr-not-running` / `attach-failed` / `no-hmd-pose` TRANSIENT);
