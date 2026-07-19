@@ -84,6 +84,46 @@ def test_save_rewrites_whole_file(tmp_path):
     assert [r.text for r in reread] == ["keep me"]
 
 
+# --- issue #164: concurrent add()/save() must not drop a fact ----------------
+
+def test_concurrent_add_and_save_drops_no_fact(tmp_path):
+    # The voice loop's add() (append) and the web thread's save() (full rewrite) both touch the shared
+    # store; without the RMW lock a save racing an add could clobber the just-added line. Hammer both
+    # concurrently and assert every added fact survives (and the file never corrupts under iteration).
+    import threading
+
+    path = tmp_path / "memory.jsonl"
+    store = MemoryStore(path)
+    store.load()
+
+    n_adds = 200
+    added_ids: list[str] = []
+    start = threading.Barrier(2)
+
+    def _adder() -> None:
+        start.wait()
+        for i in range(n_adds):
+            rec = store.remember(f"fact number {i}", tags=["bulk"])
+            added_ids.append(rec.id)
+
+    def _saver() -> None:
+        start.wait()
+        for _ in range(n_adds):
+            store.save()          # full rewrite from the current in-memory records
+
+    threads = [threading.Thread(target=_adder), threading.Thread(target=_saver)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # Rewrite once more so the on-disk file reflects the final in-memory set, then reload fresh.
+    store.save()
+    reread_ids = {r.id for r in MemoryStore(path).load()}
+    assert len(added_ids) == n_adds
+    assert set(added_ids) <= reread_ids          # no added fact was lost to a racing save
+
+
 # --- fail-soft on corrupt input ---------------------------------------------
 
 def test_corrupt_line_is_skipped_not_fatal(tmp_path, capsys):

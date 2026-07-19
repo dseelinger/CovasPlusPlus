@@ -16,6 +16,15 @@ from .models import CommunityGoal
 _MAX_FILES = 12   # recent journals to scan for the latest CommunityGoal event
 
 
+def _safe_mtime(p: Path) -> float:
+    """A file's mtime, or 0.0 if it vanished between the glob and the stat (fail-soft — a deleted
+    file sorts oldest and is skipped by the read guard below, issue #164)."""
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
 def parse_cg_event(event: dict) -> list[CommunityGoal]:
     """Parse a `CommunityGoal` journal event's `CurrentGoals` into CommunityGoal records
     (engaged=True — these are the CGs the Commander has visited). Non-CG events -> []."""
@@ -53,7 +62,7 @@ def cg_from_journals(journal_dir: str | Path) -> list[CommunityGoal]:
         files = list(Path(journal_dir).glob(_JOURNAL_GLOB))
     except OSError:
         return []
-    files.sort(key=lambda p: (p.stat().st_mtime, p.name))   # oldest -> newest
+    files.sort(key=lambda p: (_safe_mtime(p), p.name))   # oldest -> newest (vanished file -> 0.0)
     for path in reversed(files[-_MAX_FILES:]):              # newest file first
         try:
             lines = path.read_text(encoding="utf-8", errors="replace").splitlines()

@@ -164,8 +164,10 @@ def _jump_range_compute(inp: MetricInput) -> MetricResult:
     else:
         res = compute_jump_range(snap, hull_mass=hull_mass)
     if res is None:
+        # None = either no readable FSD, or no dry-mass basis (no MaxJumpRange and no hull mass in
+        # the spec) — in both cases the honest answer is "unknown" rather than a fabricated figure.
         return MetricResult(value=None, unit="ly", known=False,
-                            basis="no frame shift drive I can read")
+                            basis="I couldn't work out that ship's jump range")
     return MetricResult(value=res.value, unit="ly", basis=res.basis,
                         known=True, approximate=not res.calibrated)
 

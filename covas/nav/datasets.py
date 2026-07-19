@@ -48,21 +48,36 @@ class DatasetInfo:
             return None
 
 
+def _int(v: object) -> int:
+    """Coerce a manifest `row_count` to int, fail-soft: a non-numeric/None value -> 0 (unknown)."""
+    try:
+        return int(v or 0)
+    except (ValueError, TypeError):
+        return 0
+
+
 @lru_cache(maxsize=1)
 def load_manifest() -> tuple[DatasetInfo, ...]:
-    """Every bundled dataset's provenance, sorted by name. Empty tuple if the manifest is
-    missing or unreadable — the caller decides how to phrase 'no manifest'."""
+    """Every bundled dataset's provenance, sorted by name. Empty tuple if the manifest is missing,
+    unreadable, or the wrong shape (valid JSON that isn't the expected `{name: {row}}` object) — the
+    caller decides how to phrase 'no manifest'. Every shape-dependent step runs INSIDE the guard so a
+    structurally-wrong manifest fails soft instead of raising AttributeError/TypeError (issue #164)."""
     try:
         raw = json.loads(_MANIFEST.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        if not isinstance(raw, dict):        # a JSON array/scalar has no .items() -> no manifest
+            return ()
+        out = []
+        for name, d in sorted(raw.items()):
+            if not isinstance(d, dict):      # a malformed row -> skip it, keep the rest
+                continue
+            out.append(DatasetInfo(
+                name=str(name), source=str(d.get("source", "")),
+                source_ref=str(d.get("source_ref", "")),
+                generated_at=str(d.get("generated_at", "")),
+                row_count=_int(d.get("row_count", 0)),
+            ))
+    except (OSError, ValueError, TypeError, AttributeError):
         return ()
-    out = [
-        DatasetInfo(name=name, source=str(d.get("source", "")),
-                    source_ref=str(d.get("source_ref", "")),
-                    generated_at=str(d.get("generated_at", "")),
-                    row_count=int(d.get("row_count", 0) or 0))
-        for name, d in sorted(raw.items())
-    ]
     return tuple(out)
 
 

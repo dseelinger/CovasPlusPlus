@@ -61,8 +61,11 @@ class OpenAILLM:
         o = cfg.get("openai", {}) or {}
         self.base_url = str(o.get("base_url", "")).strip().rstrip("/") or _DEFAULT_BASE_URL
         self.model = str(o.get("model", "")).strip() or _DEFAULT_MODEL
-        self._max_tokens = int(o.get("max_tokens",
-                                     (cfg.get("anthropic", {}) or {}).get("max_tokens", 1024)))
+        # Defensive default only: the cost router supplies the per-turn cap on every real call
+        # (app.py always passes max_tokens=route.max_tokens), so the former [openai].max_tokens
+        # fallback was unreachable dead config. The single documented base cap is [anthropic].max_tokens
+        # — one reply-length policy across providers (issue #11) — read directly (issue #164).
+        self._max_tokens = int((cfg.get("anthropic", {}) or {}).get("max_tokens", 1024))
         # The system prompt is built PER TURN in stream_reply (issue #151), NOT frozen here: it
         # resolves the ACTIVE ship's crew roster (#127) from the runtime stamp the App writes onto
         # cfg before each turn. Caching it at construction would keep prefixing the roster of the

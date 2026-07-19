@@ -1020,6 +1020,7 @@ Notes:
 - [ ] **Never-flown ship → unknown, not guessed:** own a ship you have **not** boarded since setup (so it has no remembered build) and ask *"rank my ships by jump range"* → that ship is reported as **unknown** ("no remembered build yet"), never given an invented number.
 - [ ] **Named other ship at reference load:** *"what's the jump range of my &lt;a ship you're not flying&gt;?"* → a computed figure quoted at the reference load (full tank, empty cargo), since only the current ship's live cargo is known.
 - [ ] **Unknown metric is declined:** *"rank my ships by shield strength"* → it says it doesn't compute that yet and names what it can do (jump range), rather than inventing a ranking. (Confirms the metric registry is honest about its one metric today.)
+- [ ] **Jump-range sanity — no inflated fallback (#164):** for any ship with a remembered build, the quoted range is in the plausible tens of light-years for its class (cross-check Coriolis/EDSY), **not** an absurd hundreds-of-ly figure. (Regression guard: the hull-only fallback used to substitute fuel *capacity* for an unknown dry mass, over-stating range ~5–30×. A ship whose hull mass is genuinely unknown is now reported **unknown** rather than given an inflated number.)
 ## 9a. Engineers finder (#65)  🎮 ED 🔊 HW 📋 clipboard
 > `[elite].enabled = true`. Unlock **status** is read live from the journal's `EngineerProgress`
 > event (written at login); locations/requirements come from a bundled offline table. Log into the

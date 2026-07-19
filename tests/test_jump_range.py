@@ -122,3 +122,41 @@ def test_hull_only_fallback_flagged_rough_when_no_game_range():
     snap = _snap(_fsd(), fuel_capacity=32)  # max_jump_range absent
     res = compute_jump_range(snap, hull_mass=400.0)
     assert res is not None and res.calibrated is False and res.value > 0
+
+
+# ---- issue #164: the hull-only fallback must NOT use fuel capacity as dry mass -----------------
+
+def test_known_hull_mass_gives_sane_jump_range():
+    # A recognised ship with a real hull mass (no MaxJumpRange) yields a physically plausible figure:
+    # dry mass is the hull mass alone (rough, ignores modules), so total_mass = hull + a full tank.
+    fit = resolve_fsd(_snap(_fsd()))
+    snap = _snap(_fsd(), fuel_capacity=32)   # max_jump_range absent -> hull-only fallback path
+    res = compute_jump_range(snap, hull_mass=400.0)
+    assert res is not None and res.calibrated is False
+    expected = single_jump_range(fit, 400.0 + 32.0)   # hull + full tank, no cargo
+    assert math.isclose(res.value, expected, rel_tol=1e-9)
+    assert 10.0 < res.value < 100.0                    # tens of ly (sane), not the inflated hundreds
+    # And far below the old fuel-capacity-as-dry-mass figure (32t dry -> ~7x lighter -> ~7x range).
+    assert res.value < single_jump_range(fit, 32.0 + 32.0) / 3.0
+
+
+def test_unknown_hull_mass_returns_unknown_not_inflated_value():
+    # No MaxJumpRange AND no hull mass -> there is no honest dry-mass basis. The OLD code fell back to
+    # fuel *capacity* as dry mass, inflating range ~5-30x; the fix returns None (reported "unknown").
+    snap = _snap(_fsd(), fuel_capacity=32)   # max_jump_range absent, tiny fuel capacity
+    assert compute_jump_range(snap, hull_mass=None) is None
+    # Guard against the specific regression: had we used fuel_capacity (32t) as dry mass, the figure
+    # would have been many times the correct hull-based one. Prove that inflated value is not returned.
+    fit = resolve_fsd(_snap(_fsd()))
+    correct = single_jump_range(fit, 400.0 + 32.0)          # what a real ~400t hull would give
+    inflated = single_jump_range(fit, 32.0 + 32.0)          # the old fuel-capacity-as-dry-mass bug
+    assert inflated > correct * 3                            # confirm the old path really was 3x+ off
+
+
+def test_unknown_hull_mass_still_computes_when_game_range_present():
+    # Missing hull mass is fine as long as the game's MaxJumpRange is available to calibrate from.
+    fit = resolve_fsd(_snap(_fsd()))
+    r_game = single_jump_range(fit, 500.0 + fit.max_fuel)
+    snap = _snap(_fsd(), max_jump_range=r_game, fuel_capacity=32)
+    res = compute_jump_range(snap, hull_mass=None)
+    assert res is not None and res.calibrated is True and res.value > 0

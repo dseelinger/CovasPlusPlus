@@ -284,6 +284,21 @@ def test_generic_provider_tier_map_from_its_own_section():
     assert r.decide("think hard").model == "gpt-4o"  # same policy, provider's model
 
 
+def test_base_max_tokens_always_sources_from_anthropic_even_for_generic_provider():
+    # Issue #164: the reply-length cap is ONE documented policy ([anthropic].max_tokens) across every
+    # provider. A [openai].max_tokens is not a config key the router (or provider) reads, so it must
+    # not shadow the [anthropic] base — proving the removed provider-side fallback was dead code.
+    cfg = {
+        "llm": {"provider": "openai"},
+        "router": {"enabled": True},
+        "anthropic": {"max_tokens": 640},
+        "openai": {"model": "gpt-4o-mini", "max_tokens": 4096},   # NOT a real key -> must be ignored
+    }
+    r = Router.from_cfg(cfg)
+    assert r.cfg.base_max_tokens == 640
+    assert r.decide("hi there").max_tokens == 640                  # the cap the turn actually uses
+
+
 def test_generic_provider_without_tiers_uses_single_model_for_all():
     # A generic provider whose [<provider>].tiers is unset: every tier reuses [<provider>].model.
     cfg = {"llm": {"provider": "openai"}, "router": {"enabled": True},

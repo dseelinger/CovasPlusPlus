@@ -65,7 +65,10 @@ current-ship figure track the in-game FSD panel closely (within your cargo), wit
 mass data.
 
 If a ship's remembered build predates that data (no stored maximum jump range), COVAS++ falls back to
-a hull-only estimate and **flags the result as rough** rather than quoting false precision.
+a **hull-mass-only** estimate and **flags the result as rough** rather than quoting false precision. If
+even the hull mass is unknown (an unrecognized ship), the range is reported as **unknown** — COVAS++
+never substitutes a smaller figure like fuel capacity for the missing mass, which would overstate the
+range dramatically.
 
 ## The metric registry (extensibility)
 

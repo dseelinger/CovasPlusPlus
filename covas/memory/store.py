@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -83,29 +84,35 @@ class MemoryStore:
         self.path = Path(path)
         self._records: list[MemoryRecord] = []
         self._loaded = False
+        # Serialize the read-modify-write of the store: the voice loop's `add`/`remember` and the web
+        # thread's `save` both mutate `_records` + the file, and an unsynchronized `save` (full
+        # rewrite) racing an `add` (append) could drop the just-added fact (issue #164). Reentrant
+        # because `add`/`save` call `load` while holding it.
+        self._lock = threading.RLock()
 
     # --- read -------------------------------------------------------------
     def load(self) -> list[MemoryRecord]:
         """Parse the file line by line. A missing file is simply an empty memory; a corrupt
         line (bad JSON or no text) is skipped with a warning so one typo can't nuke the store."""
-        self._records = []
-        self._loaded = True
-        if not self.path.exists():
-            return self._records
-        try:
-            raw = self.path.read_text(encoding="utf-8")
-        except OSError as e:  # unreadable file -> empty memory, never crash the caller
-            self._warn(f"could not read memory file {self.path} ({e})")
-            return self._records
-        for lineno, line in enumerate(raw.splitlines(), start=1):
-            line = line.strip()
-            if not line or line.startswith("#"):  # allow blank lines + '#' comments in the file
-                continue
+        with self._lock:
+            self._records = []
+            self._loaded = True
+            if not self.path.exists():
+                return self._records
             try:
-                self._records.append(MemoryRecord.from_dict(json.loads(line)))
-            except (json.JSONDecodeError, ValueError, TypeError) as e:
-                self._warn(f"skipping corrupt memory line {lineno} in {self.path.name} ({e})")
-        return self._records
+                raw = self.path.read_text(encoding="utf-8")
+            except OSError as e:  # unreadable file -> empty memory, never crash the caller
+                self._warn(f"could not read memory file {self.path} ({e})")
+                return self._records
+            for lineno, line in enumerate(raw.splitlines(), start=1):
+                line = line.strip()
+                if not line or line.startswith("#"):  # allow blank lines + '#' comments in the file
+                    continue
+                try:
+                    self._records.append(MemoryRecord.from_dict(json.loads(line)))
+                except (json.JSONDecodeError, ValueError, TypeError) as e:
+                    self._warn(f"skipping corrupt memory line {lineno} in {self.path.name} ({e})")
+            return self._records
 
     def all(self) -> list[MemoryRecord]:
         """Every record, loading on first use. Returns the live list — treat as read-only."""
@@ -117,16 +124,17 @@ class MemoryStore:
     def add(self, record: MemoryRecord) -> MemoryRecord:
         """Append one fact. Writes a single line (append mode) so a large memory stays cheap to
         grow. Fail-soft: a write error leaves the in-memory copy intact and warns, doesn't raise."""
-        if not self._loaded:
-            self.load()
-        self._records.append(record)
-        try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(record.to_dict(), ensure_ascii=False) + "\n")
-        except OSError as e:
-            self._warn(f"could not append to memory file {self.path} ({e})")
-        return record
+        with self._lock:
+            if not self._loaded:
+                self.load()
+            self._records.append(record)
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(record.to_dict(), ensure_ascii=False) + "\n")
+            except OSError as e:
+                self._warn(f"could not append to memory file {self.path} ({e})")
+            return record
 
     def remember(self, text: str, *, type: str = "note",  # noqa: A002 — mirrors the record field
                  tags: object = ()) -> MemoryRecord:
@@ -136,17 +144,18 @@ class MemoryStore:
     def save(self, records: list[MemoryRecord] | None = None) -> None:
         """Rewrite the whole file (for edits/pruning, vs. the append-only `add`). Writes to a
         temp file then replaces, so a crash mid-write can't corrupt the existing store."""
-        if records is not None:
-            self._records = list(records)
-            self._loaded = True
-        try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-            body = "\n".join(json.dumps(r.to_dict(), ensure_ascii=False) for r in self._records)
-            tmp.write_text(body + ("\n" if body else ""), encoding="utf-8")
-            tmp.replace(self.path)  # atomic on the same filesystem
-        except OSError as e:
-            self._warn(f"could not save memory file {self.path} ({e})")
+        with self._lock:
+            if records is not None:
+                self._records = list(records)
+                self._loaded = True
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+                body = "\n".join(json.dumps(r.to_dict(), ensure_ascii=False) for r in self._records)
+                tmp.write_text(body + ("\n" if body else ""), encoding="utf-8")
+                tmp.replace(self.path)  # atomic on the same filesystem
+            except OSError as e:
+                self._warn(f"could not save memory file {self.path} ({e})")
 
     @staticmethod
     def _warn(msg: str) -> None:

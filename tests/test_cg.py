@@ -13,7 +13,7 @@ import pytest
 from covas.capabilities.base import help_meta_problems
 from covas.capabilities.cg_capability import CGCapability
 from covas.cg.feed import CGConfig, CGFeedError, fetch_inara_goals
-from covas.cg.journal import cg_from_journals, parse_cg_event
+from covas.cg.journal import _safe_mtime, cg_from_journals, parse_cg_event
 from covas.cg.models import CommunityGoal, match_goal, merge, standing_phrase, summarize
 
 
@@ -65,6 +65,29 @@ def test_cg_from_journals_empty_when_none(tmp_path):
     (tmp_path / "Journal.2026-07-01T10.01.log").write_text(
         json.dumps({"event": "FSDJump", "StarSystem": "Sol"}) + "\n", encoding="utf-8")
     assert cg_from_journals(tmp_path) == []
+
+
+# --- issue #164: a file vanishing between glob and stat must not escape (fail-soft) --------------
+
+def test_safe_mtime_of_vanished_file_is_zero_not_raise(tmp_path):
+    assert _safe_mtime(tmp_path / "gone.log") == 0.0     # no OSError escapes
+
+
+def test_cg_from_journals_skips_a_vanished_file(tmp_path, monkeypatch):
+    # Simulate a file present at glob time but gone by the stat/sort (a backup/cleanup tool). The old
+    # `files.sort(key=p.stat)` let that stat() escape cg_from_journals; the guard skips it instead.
+    real = tmp_path / "Journal.2026-07-05T10.01.log"
+    real.write_text(json.dumps(_JOURNAL_EVENT) + "\n", encoding="utf-8")
+    vanished = tmp_path / "Journal.2026-07-06T10.01.log"   # never created -> stat() would raise
+
+    real_glob = type(tmp_path).glob
+
+    def _glob_with_ghost(self, pattern):
+        return list(real_glob(self, pattern)) + [vanished]
+
+    monkeypatch.setattr(type(tmp_path), "glob", _glob_with_ghost)
+    goals = cg_from_journals(tmp_path)                     # must not raise
+    assert {g.title for g in goals} == {"Alliance Research Initiative", "Thargoid War Effort"}
 
 
 # --- standing phrasing -----------------------------------------------------

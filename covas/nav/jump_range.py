@@ -29,11 +29,14 @@ maximum single jump burns `max_fuel` tonnes, so we take that as its mass basis (
 Only when `MaxJumpRange` is absent (a hand-edited store, a pre-#135 row) do we fall back to
 `dry_mass = hull_mass` alone — a ROUGH estimate that ignores module masses (so it over-states range);
 the result is flagged `calibrated=False` so the capability can say so rather than quoting false
-precision.
+precision. We NEVER substitute fuel *capacity* for the missing hull mass: fuel capacity is ~5–30×
+smaller than a real dry mass, so using it would inflate the quoted range by that same factor. When
+neither `MaxJumpRange` nor a hull mass is available there is no honest dry-mass basis, so we report
+"unknown" (return None) rather than invent one.
 
 `compute_jump_range` returns a `JumpRangeResult` (value + the load basis it used + whether it was
-calibrated), or None when the FSD can't be identified at all (then the caller reports "unknown",
-never a guess).
+calibrated), or None when the FSD can't be identified at all, or when no dry-mass basis is available
+(no `MaxJumpRange` and no `hull_mass`) — then the caller reports "unknown", never a guess.
 """
 from __future__ import annotations
 
@@ -202,7 +205,9 @@ def compute_jump_range(
 
     `hull_mass` (from the bundled spec) is the fallback dry mass only when the game's `MaxJumpRange`
     is absent from the snapshot; normally dry mass is CALIBRATED from that figure (so real module
-    masses are accounted for without per-module data). Returns None when no usable FSD is fitted.
+    masses are accounted for without per-module data). Returns None when no usable FSD is fitted, or
+    when there is no dry-mass basis at all (no `MaxJumpRange` AND no `hull_mass`) — reporting
+    "unknown" beats quoting a fabricated, inflated range.
     """
     fit = resolve_fsd(snap)
     if fit is None:
@@ -224,15 +229,23 @@ def compute_jump_range(
     fuel_t = max(0.0, fuel_t)
 
     # Dry mass: prefer calibrating from the game's own MaxJumpRange (captures module masses); fall
-    # back to hull-only when that figure is missing (rough — flagged so the caller can hedge).
+    # back to hull mass ALONE when that figure is missing (rough — ignores module masses, flagged so
+    # the caller can hedge).
     calibrated = True
     dry = None
     game_max = _num(getattr(snap, "max_jump_range", None))
     if game_max and game_max > 0:
         dry = dry_mass_from_max_range(fit, game_max)
     if dry is None:
+        # No MaxJumpRange to calibrate from. The only honest fallback is the hull mass alone. Fuel
+        # *capacity* is NOT a dry-mass proxy — it is ~5–30× too small, and using it here inflated the
+        # quoted range by the same factor (issue #164). Without a hull mass we have no basis for the
+        # total mass, so report "unknown" (None) rather than invent a figure.
+        hull = _num(hull_mass)
+        if hull is None or hull <= 0:
+            return None
         calibrated = False
-        dry = _num(hull_mass) or _num(getattr(snap, "fuel_capacity", None)) or 0.0
+        dry = hull
 
     total_mass = dry + fuel_t + cargo_t
     value = single_jump_range(fit, total_mass)
