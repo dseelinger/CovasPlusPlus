@@ -75,8 +75,15 @@ class HudSnapshot:
 # shared adapter, rather than per-surface.
 _MD_LEADING_RE = re.compile(r"^\s*(?:[-*+]\s+|#{1,6}\s+)")          # "- ", "# ", "## foo" ...
 _MD_BOLD_RE = re.compile(r"\*\*(.+?)\*\*|__(.+?)__")                # **bold** / __bold__
+# Emphasis stripping. The `*` form allows intra-word emphasis (CommonMark does), but the `_`
+# form must NOT eat underscores inside a word — snake_case identifiers and filenames like
+# `check_setup_now` are common in checklist/callout text and would otherwise collapse to
+# `checksetupnow` (issue #158). So the `_em_` branch requires word boundaries: the opening `_`
+# is not preceded by a word char and the closing `_` is not followed by one, which leaves
+# intra-word underscores untouched while still stripping real ` _emphasis_ `.
 _MD_ITALIC_RE = re.compile(
-    r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)|(?<!_)_(?!_)(.+?)(?<!_)_(?!_)")  # *em* / _em_
+    r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)"          # *em*
+    r"|(?<![\w])_(?!_)(.+?)(?<!_)_(?![\w])")        # _em_ — word-bounded, spares snake_case
 _MD_CODE_RE = re.compile(r"`([^`]*)`")                              # `code`
 
 
@@ -186,13 +193,18 @@ class HudModel:
 
     def _on_ed_event(self, event: dict) -> None:
         name = event.get("event")
-        with self._lock:
-            if name == "NavRoute":
-                data = self._load_navroute()
+        if name == "NavRoute":
+            # Read NavRoute.json OUTSIDE the lock — file I/O must not block a concurrent
+            # snapshot() repaint on the view's Tk thread (issue #158). Load first, then apply
+            # the parsed result under the lock (an in-memory tracker update, not I/O).
+            data = self._load_navroute()
+            with self._lock:
                 if data:
                     self._tracker.load(data)
                     self._next_scoopable = None
-            elif name == "NavRouteClear":
+            return
+        with self._lock:
+            if name == "NavRouteClear":
                 self._tracker.clear()
                 self._next_scoopable = None
             elif name == "FSDTarget":
@@ -260,6 +272,28 @@ class HudModel:
 # A color unlikely to appear in the panel; keyed out for transparency + click-through on Windows.
 _TRANSPARENT_KEY = "#010203"
 
+# The fixed top-to-bottom order of the four HUD rows. A row that blinks out (empty) and back in
+# must return to its own slot, not the bottom of the stack (issue #158) — `_row_pack_before`
+# resolves where to re-insert it so the render order stays stable.
+_ROW_ORDER: tuple[str, ...] = ("voice_state", "checklist", "route", "callout")
+
+
+def _row_pack_before(order: tuple[str, ...], visible: set[str], key: str) -> Optional[str]:
+    """Which currently-visible row should `key` be packed BEFORE to keep the fixed order?
+
+    Pure ordering logic (unit-testable without a display): returns the first row after `key`
+    in `order` that is currently visible — so a returning row re-inserts above everything that
+    sits below it, landing back in its original slot. Returns None when nothing below it is
+    visible, meaning "pack at the end" is already correct."""
+    try:
+        idx = order.index(key)
+    except ValueError:
+        return None
+    for other in order[idx + 1:]:
+        if other in visible:
+            return other
+    return None
+
 
 class HudView:
     """A thin transparent, always-on-top tkinter window that renders a `HudSnapshot`.
@@ -286,6 +320,7 @@ class HudView:
         self._ok = False
         self._root = None
         self._rows: dict[str, object] = {}
+        self._visible_rows: set[str] = set()   # which rows are currently packed (for stable order)
         self._thread: Optional[threading.Thread] = None
 
     # -- lifecycle ---------------------------------------------------------------------
@@ -294,7 +329,13 @@ class HudView:
         only if the overlay is live — the caller treats False as "no 2D surface here"."""
         self._thread = threading.Thread(target=self._run, name="hud-view", daemon=True)
         self._thread.start()
-        self._ready.wait(timeout=timeout)
+        if not self._ready.wait(timeout=timeout):
+            # Build didn't finish in time. Don't orphan a half-built, hidden Tk root behind a
+            # live daemon thread (issue #158): flag a close so the moment the Tk thread reaches
+            # its poll it tears the root down instead of lingering. Report "no surface".
+            self._logline("HUD window build timed out; tearing it down.")
+            self.close()
+            return False
         return self._ok
 
     def show(self) -> None:
@@ -329,6 +370,16 @@ class HudView:
         except Exception as e:  # noqa: BLE001 — a headless box / Tcl error -> no overlay
             self._logline(f"HUD window failed: {e}")
             self._ok = False
+            # If `_build` raised after tk.Tk() succeeded, the root would otherwise leak — an
+            # undestroyed, hidden Tk root pinning this thread (issue #158). Destroy it here so a
+            # failed build leaves nothing behind, then report "no surface" to the waiting caller.
+            root = self._root
+            if root is not None:
+                try:
+                    root.destroy()
+                except Exception:  # noqa: BLE001 — teardown must not mask the original failure
+                    pass
+                self._root = None
             self._ready.set()
 
     def _build(self, tk, root) -> None:
@@ -353,6 +404,7 @@ class HudView:
                            font=("Segoe UI", size, "bold" if bold else "normal"))
             lbl.pack(fill="x", anchor="w")
             self._rows[key] = lbl
+            self._visible_rows.add(key)   # packed at build; _render collapses the empty ones
 
         add_row("voice_state", "#00e5e5", 13, True)   # the loop state — headline
         add_row("checklist", "#e0e0e0", 11, False)
@@ -416,13 +468,25 @@ class HudView:
         self._set_row("callout", "“" + snap.callout + "”" if snap.callout else "")
 
     def _set_row(self, key: str, text: str) -> None:
-        """Set a row's text and collapse it when empty, so the panel shrinks to what's live."""
+        """Set a row's text and collapse it when empty, so the panel shrinks to what's live.
+
+        A row that returns after being empty must re-appear in its FIXED slot, not at the bottom
+        of the pack stack (issue #158): `_row_pack_before` finds the visible row below it and packs
+        it `before` that, so the top-to-bottom order never scrambles when rows blink in and out."""
         lbl = self._rows[key]
         lbl.configure(text=text)
         if text:
-            lbl.pack(fill="x", anchor="w")
+            if key not in self._visible_rows:
+                before_key = _row_pack_before(_ROW_ORDER, self._visible_rows, key)
+                if before_key is not None:
+                    lbl.pack(fill="x", anchor="w", before=self._rows[before_key])
+                else:
+                    lbl.pack(fill="x", anchor="w")
+                self._visible_rows.add(key)
         else:
-            lbl.pack_forget()
+            if key in self._visible_rows:
+                lbl.pack_forget()
+                self._visible_rows.discard(key)
 
     def _logline(self, msg: str) -> None:
         if self._log is not None:
@@ -527,6 +591,11 @@ class HudCapability:
         self._vr_view_tried = False
         self._web_view: Optional[object] = None
         self._web_view_tried = False
+        # Serializes the check-then-act in `_reconcile_surface`: reconcile() can be called from
+        # more than one thread (startup, a settings change, `on_web_ui_ready`), and an unlocked
+        # "view is None and not tried -> build" is a race that could double-build a surface
+        # (two Tk roots / two overlays) — issue #158. One lock makes the whole reconcile atomic.
+        self._reconcile_lock = threading.Lock()
         self._reconcile()          # show at startup if already enabled
 
     # -- capability interface ----------------------------------------------------------
@@ -645,21 +714,26 @@ class HudCapability:
     def _reconcile(self) -> None:
         """Match each surface to its live enable flag. Independent and fail-soft — the 2D
         window and the VR overlay are reconciled separately, so one being unavailable (no
-        display, or no VR runtime) never affects the other."""
-        self._reconcile_surface(
-            "_view", "_view_tried", self._is_enabled, self._view_factory,
-            label="HUD", unavailable="no 2D overlay is available (no display / toolkit)")
-        if self._vr_view_factory is not None:
+        display, or no VR runtime) never affects the other.
+
+        Held under `_reconcile_lock` so the per-surface check-then-act (build-once-on-first-enable)
+        can't race two concurrent callers into building the same surface twice (issue #158)."""
+        with self._reconcile_lock:
             self._reconcile_surface(
-                "_vr_view", "_vr_view_tried", self._vr_is_enabled, self._vr_view_factory,
-                label="VR HUD", unavailable="no VR runtime is available (openvr / SteamVR absent)",
-                latch_on_fail=self._vr_permanent)
-        if self._web_view_factory is not None:
-            self._reconcile_surface(
-                "_web_view", "_web_view_tried", self._web_is_enabled, self._web_view_factory,
-                label="Web HUD",
-                unavailable="the control panel isn't running (start run_covas_ui.py, not "
-                            "run_covas.py, so /hud can be served)")
+                "_view", "_view_tried", self._is_enabled, self._view_factory,
+                label="HUD", unavailable="no 2D overlay is available (no display / toolkit)")
+            if self._vr_view_factory is not None:
+                self._reconcile_surface(
+                    "_vr_view", "_vr_view_tried", self._vr_is_enabled, self._vr_view_factory,
+                    label="VR HUD",
+                    unavailable="no VR runtime is available (openvr / SteamVR absent)",
+                    latch_on_fail=self._vr_permanent)
+            if self._web_view_factory is not None:
+                self._reconcile_surface(
+                    "_web_view", "_web_view_tried", self._web_is_enabled, self._web_view_factory,
+                    label="Web HUD",
+                    unavailable="the control panel isn't running (start run_covas_ui.py, not "
+                                "run_covas.py, so /hud can be served)")
 
     def _reconcile_surface(self, view_attr: str, tried_attr: str,
                            is_enabled: Callable[[], bool], factory, *,

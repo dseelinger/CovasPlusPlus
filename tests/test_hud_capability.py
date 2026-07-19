@@ -10,7 +10,8 @@ driven off crafted bus events + injected fakes and asserted on the snapshot.
 from __future__ import annotations
 
 from covas.capabilities.hud_capability import (
-    HudCapability, HudModel, HudSnapshot, _plain, checklist_line, make_view,
+    _ROW_ORDER, HudCapability, HudModel, HudSnapshot, _plain, _row_pack_before, checklist_line,
+    make_view,
 )
 
 
@@ -113,6 +114,71 @@ def test_plain_handles_none_and_empty():
 def test_plain_never_raises_on_odd_input():
     # An unbalanced/degenerate marker set must fall back gracefully, never raise.
     _plain("** unbalanced * markers ` here")
+
+
+def test_plain_preserves_snake_case_identifiers():
+    # issue #158: the italic regex used to eat the paired intra-word underscores in a
+    # snake_case token, mangling `check_setup_now` into `checksetupnow`. Word boundaries fix it.
+    assert _plain("check_setup_now") == "check_setup_now"
+    assert _plain("run check_setup.py first") == "run check_setup.py first"
+    assert _plain("read_navroute and _on_ed_event stay intact") == \
+        "read_navroute and _on_ed_event stay intact"
+
+
+def test_plain_preserves_underscored_filenames_in_context():
+    # A realistic checklist/callout row mixing a filename with real bold emphasis (#158): the
+    # snake_case survives, the emphasis is still stripped.
+    assert _plain("Edit **overrides.json** then run check_setup_now") == \
+        "Edit overrides.json then run check_setup_now"
+
+
+def test_plain_still_strips_word_bounded_underscore_emphasis():
+    # The fix must not stop stripping LEGITIMATE `_emphasis_` — only intra-word underscores are spared.
+    assert _plain("this is _emphasized_ text") == "this is emphasized text"
+    assert _plain("_em_") == "em"
+    assert _plain("(_em_)") == "(em)"
+
+
+def test_plain_leaves_a_leading_or_trailing_underscore_word_untouched():
+    # A private-style identifier with no closing word-bounded underscore must pass through whole.
+    assert _plain("call _private now") == "call _private now"
+    assert _plain("the trailing_ underscore") == "the trailing_ underscore"
+
+
+# --- _row_pack_before (stable row order, issue #158) -----------------------
+
+def test_row_pack_before_returns_next_visible_row_below():
+    # checklist blinked out then back in; route + callout are still visible. It must re-insert
+    # ABOVE route (its original slot), not at the bottom of the stack.
+    visible = {"voice_state", "route", "callout"}
+    assert _row_pack_before(_ROW_ORDER, visible, "checklist") == "route"
+
+
+def test_row_pack_before_skips_hidden_rows_to_the_first_visible_below():
+    # route returns while checklist is hidden but callout is visible: pack before callout.
+    visible = {"voice_state", "callout"}
+    assert _row_pack_before(_ROW_ORDER, visible, "route") == "callout"
+
+
+def test_row_pack_before_none_when_nothing_below_is_visible():
+    # callout is the last row — nothing sits below it, so "pack at the end" (None) is correct.
+    assert _row_pack_before(_ROW_ORDER, {"voice_state"}, "callout") is None
+    # route returning with only rows ABOVE it visible => still pack at end.
+    assert _row_pack_before(_ROW_ORDER, {"voice_state", "checklist"}, "route") is None
+
+
+def test_row_pack_before_after_empty_then_repopulated_keeps_original_slot():
+    """The exact regression (#158): a row that empties and comes back must land in its fixed
+    slot. Simulating the reappearance of checklist while route/callout stayed up, the pack
+    target is route — so the rendered order stays voice_state, checklist, route, callout."""
+    # start: all four up; checklist goes empty (removed from the visible set)...
+    visible = {"voice_state", "checklist", "route", "callout"}
+    visible.discard("checklist")
+    # ...then checklist repopulates: it must reinsert before route, not after callout.
+    before = _row_pack_before(_ROW_ORDER, visible, "checklist")
+    assert before == "route"
+    order_after = [k for k in _ROW_ORDER if k in visible or k == "checklist"]
+    assert order_after == ["voice_state", "checklist", "route", "callout"]
 
 
 # --- voice-loop state (status events) --------------------------------------
