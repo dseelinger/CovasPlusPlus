@@ -12,6 +12,14 @@ for settings, personality, your checklist, your memory, and your crew.
 The panel is **local-only** (`127.0.0.1`) and isn't exposed to your network. Change the host/port
 under `[ui]` in [`config.toml`](configuration.md) if you need to.
 
+> **Cross-site protection.** The panel refuses any state-changing request (settings, keys, updates,
+> memory/macros/crew edits) that comes from a **different web origin** than the panel itself — so a
+> random page you have open in another tab can't quietly drive it. Normal use is unaffected; requests
+> the panel makes to itself are same-origin. The updater only ever downloads the official release
+> from GitHub, ignoring any URL a page might try to supply. If you bind `[ui].host` to a non-loopback
+> address for LAN access, browse to the panel **at that address** — same-origin still works; note the
+> panel has no login, so only expose it on networks you trust.
+
 A small, muted **version tag** (`vX.Y.Z`) sits in the corner of every page — enough to tell at a
 glance which build you're on when comparing notes or filing a bug, without competing for attention
 with anything else on screen. The packaged app's window title carries the same version.

@@ -159,3 +159,39 @@ def test_default_current_is_app_version(monkeypatch):
     out = updates.check_for_update()
     assert out["current"] == __version__
     assert out["available"] is False
+
+
+# ---- installer host allowlist (security advisory: the download+exec sink) ------------
+
+@pytest.mark.parametrize("url", [
+    "https://github.com/dseelinger/CovasPlusPlus/releases/download/v1/COVAS++ Setup.exe",
+    "https://objects.githubusercontent.com/github-production-release-asset/x/setup.exe",
+    "https://codeload.githubusercontent.com/x",     # subdomain of githubusercontent.com
+])
+def test_trusted_asset_url_accepts_github(url):
+    assert updates._is_trusted_asset_url(url) is True
+
+
+@pytest.mark.parametrize("url", [
+    "http://github.com/x/s.exe",                    # not https
+    "https://attacker.example/malware.exe",         # foreign host
+    "https://github.com.attacker.example/s.exe",    # suffix spoof — host is attacker.example
+    "https://notgithub.com/s.exe",
+    "file:///C:/Windows/System32/calc.exe",
+    "", None, "not a url",
+])
+def test_trusted_asset_url_rejects_everything_else(url):
+    assert updates._is_trusted_asset_url(url) is False
+
+
+def test_download_refuses_untrusted_url_before_any_io(monkeypatch):
+    """The sink guards itself: an untrusted URL raises BEFORE mkstemp/requests/Popen ever run, so a
+    forged asset_url can't stream or execute anything."""
+    called = {"get": False, "popen": False}
+    monkeypatch.setattr(updates.requests, "get",
+                        lambda *a, **k: called.__setitem__("get", True))
+    monkeypatch.setattr(updates.subprocess, "Popen",
+                        lambda *a, **k: called.__setitem__("popen", True))
+    with pytest.raises(ValueError, match="untrusted"):
+        updates.download_and_launch_installer("https://attacker.example/malware.exe")
+    assert called == {"get": False, "popen": False}

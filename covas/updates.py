@@ -23,10 +23,29 @@ import os
 import re
 import subprocess
 import tempfile
+import urllib.parse
 
 import requests
 
 from .__version__ import __version__
+
+# Hosts a release installer may be fetched from. GitHub release-asset URLs live on github.com and
+# redirect to *.githubusercontent.com; nothing else is a legitimate update source. This fences the
+# download-and-execute SINK itself (defense in depth) so even a bug upstream can't aim it elsewhere.
+_TRUSTED_ASSET_HOSTS = ("github.com", "githubusercontent.com")
+
+
+def _is_trusted_asset_url(url: str) -> bool:
+    """True only for an https URL whose host is github.com/githubusercontent.com (or a subdomain).
+    Anything else — other scheme, other host, unparseable — is rejected."""
+    try:
+        parts = urllib.parse.urlsplit(url or "")
+    except Exception:  # noqa: BLE001 — a malformed URL is simply untrusted
+        return False
+    if parts.scheme != "https":
+        return False
+    host = (parts.hostname or "").lower()
+    return any(host == h or host.endswith("." + h) for h in _TRUSTED_ASSET_HOSTS)
 
 # GitHub's /releases/latest already excludes drafts and prereleases, so this one call is the
 # whole "which version is current" story. We still re-check the flags defensively in
@@ -126,7 +145,13 @@ def download_and_launch_installer(asset_url: str, timeout: float = 300) -> str:
 
     Unlike the background check this RAISES on failure: it's a user-initiated action, so the
     UI should surface a download/launch error rather than swallow it. Writes only to the OS
-    temp dir — never the user-data dir (decision #6: updates must not clobber user state)."""
+    temp dir — never the user-data dir (decision #6: updates must not clobber user state).
+
+    RAISES on an untrusted `asset_url`: this streams to a temp .exe and launches it, so the URL must
+    come from GitHub (github.com / githubusercontent.com). Callers derive it from `check_for_update`
+    server-side; the check here guards the sink regardless of caller."""
+    if not _is_trusted_asset_url(asset_url):
+        raise ValueError(f"refusing to fetch an installer from an untrusted URL: {asset_url!r}")
     fd, path = tempfile.mkstemp(prefix="COVAS++-setup-", suffix=".exe")
     os.close(fd)
     with requests.get(asset_url, stream=True, timeout=timeout) as r:

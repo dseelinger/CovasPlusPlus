@@ -2118,6 +2118,32 @@ The original seven-phase plan is done and tested:
     recoverable in-headset control — every failure names itself and every "done" is real — beats a
     silent, unrecoverable overlay that latches out and confirms actions it never took.**
 
+72. **Control-panel origin/CSRF hardening** (Foundation; security advisory GHSA-3mxj-5926-rqmr,
+    `covas/web.py`, `covas/updates.py`) — the Flask control panel (`127.0.0.1:8765`) had **no
+    origin/CSRF protection on any route** and every mutating endpoint read its body with
+    `request.get_json(force=True)` (parses regardless of `Content-Type`), so any web page the
+    Commander visited while the UI loop ran could drive the panel with a CORS-simple cross-origin
+    POST/GET. One root cause, three issues: **(1, CRITICAL)** `POST /api/update/apply` passed a
+    client-supplied `asset_url` straight into `updates.download_and_launch_installer` (stream to a
+    temp `.exe` → `subprocess.Popen`) — unauthenticated drive-by RCE; **(2, HIGH)** `GET /api/catalog`
+    let a free-form `base_url` flow to a `Authorization: Bearer <key>` fetch — the user's key
+    exfiltrated to an attacker host (also SSRF); **(3, MEDIUM)** every write route (keys/settings/
+    memory/macros/crew) was state-changing CSRF. The fix is layered: a **`before_request` origin
+    guard** refuses any POST/PUT/PATCH/DELETE whose `Origin` (or `Referer` fallback) isn't the panel's
+    own `[ui].host:[ui].port` origin (localhost/127.0.0.1 interchangeable) — header-less non-browser
+    clients pass, since a browser can't suppress `Origin` on the cross-site writes this defends; the
+    same origin check fences the `/ws` event stream. `update_apply` **ignores the client body** and
+    re-derives the installer URL from `check_for_update()` server-side, and
+    `download_and_launch_installer` now **rejects any non-github.com/githubusercontent.com https URL**
+    before touching disk (the sink guards itself). `/api/catalog` **allowlists `base_url`** to the
+    known presets plus the user's own configured endpoint, else refuses to attach the key. Offline
+    unit tests: cross-origin refuse / same-origin + header-less pass / port-aware origins
+    (`tests/test_web_csrf.py`), the installer host allowlist + no-IO-before-reject
+    (`tests/test_updates.py`), `update_apply` uses the server-derived URL not the body
+    (`tests/test_settings_web.py`), and the catalog `base_url` allowlist (`tests/test_catalog.py`);
+    the browser-level cross-origin behavior is `MANUAL_TESTS.md` §19.10. **The advisory stays a draft
+    for Doug to publish/withdraw.**
+
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 

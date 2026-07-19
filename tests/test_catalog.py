@@ -263,3 +263,55 @@ def test_static_tts_enums_are_strict():
     s = schema.by_key["openai_tts.voice"]
     assert not schema.is_combobox(s)
     assert schema.validate_value(s, "robot")[0] is None
+
+
+# ---- /api/catalog base_url allowlist (security advisory: key exfiltration) --------------
+# `base_url` flows to an `Authorization: Bearer <key>` fetch, and GET /api/catalog is reachable
+# cross-origin, so a free-form override would leak the user's key to an attacker's host. The web
+# boundary only honors a base_url that is a known preset or the user's OWN configured endpoint.
+class _CatalogCore:
+    def __init__(self, configured_base_url=""):
+        self.cfg = {"openai": {"base_url": configured_base_url}}
+
+
+def _catalog_client(configured_base_url=""):
+    import covas.web as web
+    app = web.create_app(_CatalogCore(configured_base_url))
+    app.testing = True
+    return app.test_client()
+
+
+def test_catalog_rejects_foreign_base_url_without_fetching(monkeypatch):
+    import covas.web as web
+    called = {"resolve": False}
+    monkeypatch.setattr(web.catalog, "resolve",
+                        lambda *a, **k: called.__setitem__("resolve", True) or ([], None))
+    r = _catalog_client().get("/api/catalog?source=@openai_models&base_url=https://attacker.example")
+    body = r.get_json()
+    assert r.status_code == 200                       # fail-soft contract: always 200 + {options,error}
+    assert body["options"] == [] and "not an allowed endpoint" in body["error"]
+    assert called["resolve"] is False                 # never resolved -> key never attached anywhere
+
+
+def _record_base_url(seen):
+    def _resolve(source, cfg, base_url=None):
+        seen["base_url"] = base_url
+        return [], None
+    return _resolve
+
+
+def test_catalog_allows_preset_base_url(monkeypatch):
+    import covas.web as web
+    seen = {}
+    monkeypatch.setattr(web.catalog, "resolve", _record_base_url(seen))
+    _catalog_client().get("/api/catalog?source=@openai_models&base_url=https://api.groq.com/openai/v1")
+    assert seen["base_url"] == "https://api.groq.com/openai/v1"   # a known preset passes through
+
+
+def test_catalog_allows_users_own_configured_base_url(monkeypatch):
+    import covas.web as web
+    seen = {}
+    monkeypatch.setattr(web.catalog, "resolve", _record_base_url(seen))
+    _catalog_client("https://myllm.local/v1").get(
+        "/api/catalog?source=@openai_models&base_url=https://myllm.local/v1")
+    assert seen["base_url"] == "https://myllm.local/v1"           # matches the configured endpoint
