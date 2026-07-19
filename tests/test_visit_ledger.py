@@ -6,6 +6,8 @@ and fail-soft load/save round-trips.
 """
 from __future__ import annotations
 
+import calendar
+
 from covas.ed.visit_ledger import (ARRIVAL_EVENTS, VisitLedger, VisitStats, _parse_ts)
 
 _DAY = 86400.0
@@ -167,3 +169,39 @@ def test_records_from_event_timestamp_when_no_when_given():
     assert ts is not None
     st = led.stats_for_station("Deciat", "Farseer Inc", now=ts)
     assert st.total == 1 and st.visits_24h == 1
+
+
+# --- UTC timestamp parsing (issue #155) -----------------------------------------------
+
+def test_parse_ts_is_true_utc_epoch_regardless_of_local_tz():
+    """ED journal stamps are UTC wall-clock. _parse_ts must yield the TRUE UTC epoch (via
+    calendar.timegm), NOT a local-time epoch (time.mktime) that skews by the machine's UTC
+    offset. This equality is independent of the test runner's timezone."""
+    stamp = "2026-07-08T12:00:00Z"
+    expected_utc = float(calendar.timegm((2026, 7, 8, 12, 0, 0, 0, 0, 0)))
+    assert _parse_ts(stamp) == expected_utc
+
+
+def test_visit_window_uses_utc_not_local_when_no_when_given():
+    """End-to-end guard for #155: record via the event's own `timestamp` (going through _parse_ts,
+    NOT an explicit when= float) and query with a `time.time()`-style UTC `now`. The arrival must
+    land in the correct 24h/7d windows regardless of the runner's local timezone. Before the fix,
+    a non-UTC machine offset the stored epoch by its UTC offset and shifted these windows."""
+    led = VisitLedger()
+    # A fixed UTC arrival, and a UTC "now" one hour later — both are true UTC epochs.
+    arrival_utc = float(calendar.timegm((2026, 7, 8, 12, 0, 0, 0, 0, 0)))
+    ev = {"event": "Docked", "StarSystem": "Deciat", "StationName": "Farseer Inc",
+          "timestamp": "2026-07-08T12:00:00Z"}
+    led.record_arrival(ev)  # no when= -> exercises _parse_ts
+
+    now = arrival_utc + 3600.0  # one hour after the arrival, in true UTC epoch seconds
+    st = led.stats_for_station("Deciat", "Farseer Inc", now=now)
+    assert st.total == 1
+    assert st.visits_24h == 1   # within the last day
+    assert st.visits_7d == 1
+
+    # And it must fall OUT of the window once we are >24h / >7d past it (no spurious offset).
+    st2 = led.stats_for_station("Deciat", "Farseer Inc", now=arrival_utc + 2 * _DAY)
+    assert st2.visits_24h == 0 and st2.visits_7d == 1
+    st3 = led.stats_for_station("Deciat", "Farseer Inc", now=arrival_utc + 8 * _DAY)
+    assert st3.visits_24h == 0 and st3.visits_7d == 0

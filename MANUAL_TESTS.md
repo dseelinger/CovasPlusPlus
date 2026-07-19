@@ -435,6 +435,7 @@ Notes:
 - [ ] **First visit to a system:** FSD-jump into a **brand-new** system → the callout can note it's your first time there.
 - [ ] **Own carrier / landmark:** dock at your **own fleet carrier**, or somewhere famous (e.g. **Hutton Orbital**) → recognised as such.
 - [ ] **Persists + private:** after a restart, prior visit counts survive (the ledger is on disk); confirm `visit_ledger.json` is **git-ignored** and never committed.
+- [ ] **UTC windows (not local-skewed) (#155):** on a machine whose local time zone is **not UTC** (e.g. UTC-8), dock somewhere, then dock again within the hour → the "N times in the last 24 hours" count is accurate (the arrival is not pushed in/out of the 24h/7d window by your UTC offset). Journal stamps are UTC; the ledger now parses them as UTC.
 - [ ] **Mute applies:** with the proactive mute on ("stop the callouts"), none of these speak.
 
 Notes:

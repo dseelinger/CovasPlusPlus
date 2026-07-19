@@ -31,6 +31,7 @@ Bounding (so the file can't grow without limit over a long career):
 """
 from __future__ import annotations
 
+import calendar
 import json
 import sys
 import time
@@ -88,11 +89,16 @@ def _stn_key(system: object, station: object) -> str:
 def _parse_ts(ts: object) -> Optional[float]:
     """Best-effort epoch seconds from an ED ISO timestamp ('2026-07-08T12:05:00Z'), or None.
     Kept dependency-free (stdlib `time.strptime`) and fail-soft — a bad stamp just means the
-    caller falls back to the injected clock."""
+    caller falls back to the injected clock.
+
+    ED journal stamps are UTC wall-clock. `time.strptime` yields a NAIVE struct, so we convert it
+    with `calendar.timegm` (interprets the struct as UTC) rather than `time.mktime` (which would
+    assume LOCAL time and skew the stored epoch by the machine's UTC offset — issue #155). The
+    result is a TRUE UTC epoch, consistent with the `time.time()` clock used by the stats query."""
     if not isinstance(ts, str) or "T" not in ts:
         return None
     try:
-        return time.mktime(time.strptime(ts.strip().rstrip("Z"), "%Y-%m-%dT%H:%M:%S"))
+        return float(calendar.timegm(time.strptime(ts.strip().rstrip("Z"), "%Y-%m-%dT%H:%M:%S")))
     except (ValueError, OverflowError):
         return None
 
