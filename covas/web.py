@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+import urllib.parse
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
@@ -102,6 +103,11 @@ _CATALOG_SOURCES = frozenset({
 # Short throttle so repeated dropdown opens don't hammer a provider (mirrors the ElevenLabs pattern).
 _CATALOG_TTL_S = 60.0
 
+# HTTP methods that change server/on-disk state — the ones the cross-origin CSRF guard covers. Every
+# mutating endpoint in this module is a POST; GET stays read-only (the one GET with a side effect,
+# /api/catalog's key-gated fetch, is separately fenced by base_url allowlisting in catalog_opts).
+_GUARDED_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
 
 def create_app(core) -> Flask:
     flask_app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -114,6 +120,53 @@ def create_app(core) -> Flask:
     _note_ui = getattr(core, "note_web_ui_started", None)
     if callable(_note_ui):
         _note_ui()
+
+    def _allowed_origins() -> set[str]:
+        """The browser origins the panel is legitimately served from. The one that always counts is
+        the request's OWN `Host` — a genuine same-origin request (including one served over the LAN
+        when the panel is bound to a non-loopback host) carries `Origin == scheme://Host`, while a
+        cross-site attacker's fetch sends the panel's Host but its own foreign Origin. We add the
+        configured [ui].host:[ui].port plus the localhost/127.0.0.1 loopback pair (interchangeable in
+        the address bar) so the guard holds even if `Host` is somehow absent. Both http and https."""
+        ui = core.cfg.get("ui", {}) or {}
+        port = ui.get("port", 8765)
+        hosts = {str(ui.get("host") or "127.0.0.1").strip(), "127.0.0.1", "localhost"}
+        origins: set[str] = set()
+        for h in hosts:
+            if not h:
+                continue
+            origins.add(f"http://{h}:{port}")
+            origins.add(f"https://{h}:{port}")
+        # request.host is what the browser actually connected to (host:port) — the authoritative
+        # same-origin anchor for whatever address this request came in on.
+        if request.host:
+            origins.add(f"http://{request.host}")
+            origins.add(f"https://{request.host}")
+        return origins
+
+    @flask_app.before_request
+    def _csrf_origin_guard():
+        """Reject state-changing requests that a page on ANOTHER origin drove (the root cause behind
+        the drive-by RCE, key exfiltration, and destructive-CSRF advisory). Browsers always attach an
+        `Origin` header to cross-origin POST/PUT/PATCH/DELETE, so a mismatched Origin is a forgery and
+        is refused; we fall back to `Referer` when `Origin` is absent. Requests carrying NEITHER header
+        are non-browser clients (curl, the app itself, tests) and pass — a browser cannot suppress
+        `Origin` on the cross-site writes this defends against."""
+        if request.method not in _GUARDED_METHODS:
+            return None
+        allowed = _allowed_origins()
+        origin = request.headers.get("Origin")
+        if origin is not None:
+            probe = origin
+        else:
+            referer = request.headers.get("Referer")
+            if not referer:
+                return None                       # non-browser client: no cross-site risk
+            parts = urllib.parse.urlsplit(referer)
+            probe = f"{parts.scheme}://{parts.netloc}"
+        if probe not in allowed:
+            return jsonify({"ok": False, "error": "cross-origin request refused"}), 403
+        return None
 
     @flask_app.context_processor
     def _inject_theme() -> dict:
@@ -234,13 +287,15 @@ def create_app(core) -> Flask:
     @flask_app.route("/api/update/apply", methods=["POST"])
     def update_apply():
         """Tier-2 apply (UI-only action, per decision #5): download the new installer and
-        launch it, then quit so it can replace files we hold open. The client supplies the
-        `asset_url` the check returned. On success we schedule the app's normal quit
-        (request_quit → run_covas_ui's quit-watch does shutdown + exit) just after this
-        response flushes; the installer takes over from there and preserves %APPDATA% state."""
-        b = request.get_json(force=True) or {}
-        asset = b.get("asset_url")
-        if not asset:
+        launch it, then quit so it can replace files we hold open. The installer URL is
+        re-derived from GitHub SERVER-SIDE — a client-supplied `asset_url` is never trusted,
+        because it flows into a download-and-execute sink (a forged one is drive-by RCE). On
+        success we schedule the app's normal quit (request_quit → run_covas_ui's quit-watch does
+        shutdown + exit) just after this response flushes; the installer takes over from there
+        and preserves %APPDATA% state."""
+        info = updates.check_for_update()
+        asset = info.get("asset_url")
+        if not info.get("available") or not asset:
             return jsonify({"ok": False, "error": "no installer asset in the latest release"}), 400
         try:
             updates.download_and_launch_installer(asset)
@@ -303,6 +358,21 @@ def create_app(core) -> Flask:
         except Exception as e:  # noqa: BLE001
             return jsonify({"error": str(e)}), 502
 
+    def _sanitized_base_url(raw):
+        """Vet a client-supplied `base_url` override before it can carry the user's API key on a
+        `Authorization: Bearer` fetch. `/api/catalog` is a GET reachable cross-origin (no Origin on
+        simple GETs), so a free-form value would exfiltrate the key to an attacker's host. Only a
+        known OpenAI-compatible preset, or the user's OWN configured endpoint, is honored; anything
+        else returns None so the caller refuses rather than attaching the key to a stranger."""
+        if not raw:
+            return None
+        norm = raw.rstrip("/")
+        allowed = {p["value"].rstrip("/") for p in catalog.OPENAI_BASE_URL_PRESETS}
+        configured = str((core.cfg.get("openai", {}) or {}).get("base_url") or "").strip().rstrip("/")
+        if configured:
+            allowed.add(configured)
+        return raw if norm in allowed else None
+
     @flask_app.route("/api/catalog")
     def catalog_opts():
         """Resolve ONE fetched-catalog options_source (issue #92 / #88) for the editable-combobox
@@ -311,9 +381,15 @@ def create_app(core) -> Flask:
         to free-text with the current value kept — never an empty blocking control. Results are cached
         briefly (throttle) since these are network calls, some key-gated."""
         source = (request.args.get("source") or "").strip()
-        base_url = (request.args.get("base_url") or "").strip() or None
+        raw_base = (request.args.get("base_url") or "").strip() or None
         if source not in _CATALOG_SOURCES:
             return jsonify({"options": [], "error": f"unknown source {source!r}"}), 400
+        base_url = _sanitized_base_url(raw_base)
+        if raw_base is not None and base_url is None:
+            # A base_url override we won't send the key to — degrade to free-text (the current value
+            # stays typeable) rather than silently querying the configured endpoint under a URL the
+            # client didn't ask for, or leaking the key to an unvetted host.
+            return jsonify({"options": [], "error": f"base_url {raw_base!r} is not an allowed endpoint"})
         opts, err = _catalog_cached(source, base_url)
         return jsonify({"options": opts or [], "error": err})
 
@@ -990,6 +1066,12 @@ def create_app(core) -> Flask:
 
     @sock.route("/ws")
     def ws(ws):  # noqa: ANN001
+        # The event stream carries the Commander's live activity (status, logs). A WebSocket handshake
+        # isn't covered by the before_request guard and browsers DON'T enforce same-origin on WS, so
+        # a cross-origin page could otherwise subscribe and read it — refuse a mismatched Origin here.
+        origin = request.headers.get("Origin")
+        if origin is not None and origin not in _allowed_origins():
+            return
         q = core.bus.subscribe()
         try:
             # prime the client with the current status

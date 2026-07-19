@@ -250,34 +250,46 @@ def test_update_check_endpoint_passes_through(client, monkeypatch):
     assert c.get("/api/update").get_json() == fake
 
 
-def test_update_apply_requires_asset(client):
+def test_update_apply_requires_available_release(client, monkeypatch):
+    from covas import web
     c, _, _ = client
+    # No newer release (or no asset) -> 400, and nothing is ever downloaded.
+    monkeypatch.setattr(web.updates, "check_for_update",
+                        lambda *a, **k: {"available": False, "asset_url": None})
     r = c.post("/api/update/apply", json={})
     assert r.status_code == 400
     assert "installer asset" in r.get_json()["error"]
 
 
-def test_update_apply_downloads_and_schedules_quit(client, monkeypatch):
+def test_update_apply_ignores_client_asset_url_and_uses_server_derived(client, monkeypatch):
+    """SECURITY: a client-supplied asset_url is NEVER trusted (it flows to a download-and-execute
+    sink). The endpoint re-derives the installer URL from GitHub server-side and uses only that,
+    so a forged body can't point the download at an attacker binary."""
     from covas import web
     c, core, _ = client
     launched = {}
+    monkeypatch.setattr(web.updates, "check_for_update", lambda *a, **k: {
+        "available": True, "asset_url": "https://github.com/dseelinger/CovasPlusPlus/x/s.exe"})
     monkeypatch.setattr(web.updates, "download_and_launch_installer",
                         lambda url, **k: launched.setdefault("url", url))
     # Don't actually schedule a real quit timer during the test.
     monkeypatch.setattr(web.threading, "Timer", lambda *a, **k: type(
         "T", (), {"start": lambda self: None})())
-    r = c.post("/api/update/apply", json={"asset_url": "https://x/s.exe"})
+    r = c.post("/api/update/apply", json={"asset_url": "http://attacker.example/malware.exe"})
     assert r.status_code == 200 and r.get_json()["ok"] is True
-    assert launched["url"] == "https://x/s.exe"
+    # The attacker's URL from the body is discarded; the server-derived GitHub URL is what runs.
+    assert launched["url"] == "https://github.com/dseelinger/CovasPlusPlus/x/s.exe"
 
 
 def test_update_apply_surfaces_download_failure(client, monkeypatch):
     from covas import web
     c, _, _ = client
+    monkeypatch.setattr(web.updates, "check_for_update", lambda *a, **k: {
+        "available": True, "asset_url": "https://github.com/dseelinger/CovasPlusPlus/x/s.exe"})
 
     def boom(url, **k):
         raise RuntimeError("connection reset")
     monkeypatch.setattr(web.updates, "download_and_launch_installer", boom)
-    r = c.post("/api/update/apply", json={"asset_url": "https://x/s.exe"})
+    r = c.post("/api/update/apply", json={})
     assert r.status_code == 502
     assert "connection reset" in r.get_json()["error"]
