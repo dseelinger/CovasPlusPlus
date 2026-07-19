@@ -26,8 +26,13 @@ MUSIC_EXTS = (".wav", ".ogg", ".flac", ".mp3")
 
 SFX_CUES = ("thargoid_voices", "space_radiation", "hyperspace_weirdness", "interdiction_sting")
 CHATTER_CATEGORIES = ("station_traffic", "system_patrol", "market_buzz", "populated_musing")
-MUSIC_CONTEXTS = ("deep_space", "populated", "unpopulated", "nebula", "near_star",
-                  "combat_adjacent", "scooping_fuel", "default")
+# SINGLE SOURCE OF TRUTH: reuse music.py's authoritative context tuple so the folders we scan and
+# offer in the skeleton can never drift from the contexts music_context() actually returns. A prior
+# private copy here listed `unpopulated`/`scooping_fuel` — state tokens that music_context() folds
+# into `deep_space`/`near_star`, never returns — so tracks dropped there were silently unreachable
+# (issue #160). `nebula` stays: it's a documented, registered library tag reserved for future
+# auto-selection, not a fold-away state token.
+from .music import MUSIC_CONTEXTS
 
 _SFX_DIR = ("audio", "sfx")
 _MUSIC_DIR = ("audio", "music")
