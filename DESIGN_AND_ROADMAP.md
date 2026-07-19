@@ -2118,7 +2118,8 @@ The original seven-phase plan is done and tested:
     recoverable in-headset control — every failure names itself and every "done" is real — beats a
     silent, unrecoverable overlay that latches out and confirms actions it never took.**
 
-72. **Control-panel origin/CSRF hardening** (Foundation; security advisory GHSA-3mxj-5926-rqmr,
+72. **Control-panel origin/CSRF hardening** (Foundation; security advisory
+    [GHSA-3mxj-5926-rqmr](https://github.com/dseelinger/CovasPlusPlus/security/advisories/GHSA-3mxj-5926-rqmr),
     `covas/web.py`, `covas/updates.py`) — the Flask control panel (`127.0.0.1:8765`) had **no
     origin/CSRF protection on any route** and every mutating endpoint read its body with
     `request.get_json(force=True)` (parses regardless of `Content-Type`), so any web page the
@@ -2141,8 +2142,8 @@ The original seven-phase plan is done and tested:
     (`tests/test_web_csrf.py`), the installer host allowlist + no-IO-before-reject
     (`tests/test_updates.py`), `update_apply` uses the server-derived URL not the body
     (`tests/test_settings_web.py`), and the catalog `base_url` allowlist (`tests/test_catalog.py`);
-    the browser-level cross-origin behavior is `MANUAL_TESTS.md` §19.10. **The advisory stays a draft
-    for Doug to publish/withdraw.**
+    the browser-level cross-origin behavior is `MANUAL_TESTS.md` §19.10. **Advisory
+    GHSA-3mxj-5926-rqmr — affected `<= 0.17.0`, patched in `v0.17.1` (the release cutting this fix).**
 
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
