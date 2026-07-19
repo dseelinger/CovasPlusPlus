@@ -2171,6 +2171,41 @@ The original seven-phase plan is done and tested:
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 
+#### Professionalization backlog — world-facing OSS gaps (not yet issues)
+
+Raised as considerations for a "professional app shipped to the world" rather than to a single
+customer. Captured here as candidates; none is a filed issue yet, and each still needs a §2.1
+product-pillar justification (mostly **Foundation**) before it becomes one.
+
+- **Non-technical onboarding (Foundation / usability).** Distribution is dev-shaped (`venv`,
+  `run_covas.py`, API key pasted into a `*APIKey.txt`) but the audience is Elite players, not
+  Python devs. Wanted: a first-run/GUI flow that captures the API key (with a "get one here" link),
+  human-readable error messages instead of tracebacks, and a surfaced `check_setup.py` self-test the
+  user can run and screenshot for support.
+- **Localization — five layers, not one (Immerse / reach).** A voice app localizes deeper than a
+  string table: (1) control-panel UI strings (currently hardcoded English), (2) STT language
+  (Whisper is multilingual — configure/detect it), (3) TTS voice per language (voice-pairing must be
+  locale-aware), (4) the LLM persona/system prompt ("respond in the Commander's language" — trivial,
+  high impact), (5) locale number/date formatting in spoken callouts. Do the trivial slices (#4,
+  string extraction for #1) first; gate any language we can't fully deliver — a half-localized app
+  feels more broken than an honestly English-only one. ED has large DE/FR/RU communities.
+- **Accessibility, both directions (Foundation).** Voice-first helps motor/vision-impaired players
+  and walls off deaf/HoH/non-verbal ones. Keep the text-in/text-out path a first-class *mode* (not
+  just the TTS-failure fallback), consider on-screen captions of what COVAS says, and give the web
+  panel keyboard nav, ARIA labels, colorblind-safe status colors, and `prefers-reduced-motion`.
+- **OSS community + legal hygiene (Foundation).** Missing: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
+  issue/PR templates, a user-visible `CHANGELOG` (SemVer bumps already happen — expose them). The one
+  genuine legal item: a third-party attributions / `NOTICE` file for bundled+redistributed models
+  and voices (Piper, Whisper, etc.), whose *redistribution* licenses must be compatible with ours.
+  Also confirm the README carries an explicit "not affiliated with Frontier Developments" fan-content
+  disclaimer, and point users to a real support channel (Discord, where ED players are).
+- **Operational maturity for machines we don't own (Foundation).** Opt-in, off-by-default crash/error
+  reporting (can't fix what we never see); an update *notifier* so users aren't running stale builds
+  when they file bugs; documented minimum system requirements + graceful degradation on low-VRAM
+  machines (smaller Whisper model, Piper TTS) so COVAS never stutters the game.
+- **Sustainability / bus factor (Foundation).** Confirm a contributor can build from a clean checkout
+  without Doug's machine, and set honest maintainer-response expectations in the README.
+
 ---
 
 ## 8. Watch-items / risks
