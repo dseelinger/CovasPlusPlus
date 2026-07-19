@@ -320,6 +320,40 @@ def test_request_body_has_model_tools_and_stream(monkeypatch):
     assert captured["tool_choice"] == "auto"
 
 
+def test_o_series_model_uses_max_completion_tokens(monkeypatch):
+    """Issue #153: o-series/reasoning models REJECT `max_tokens` and require `max_completion_tokens`.
+    The body must carry the cap under the family-correct key — `max_completion_tokens` for an
+    o-series id (and NOT `max_tokens`), plain `max_tokens` for a regular chat model."""
+    captured = {}
+
+    def fake_stream(base_url, key, body, cancel_ev, **k):
+        captured.clear()
+        captured.update(body)
+        yield _text_chunk("ok")
+
+    monkeypatch.setattr(oai, "_stream_chat", fake_stream)
+    p = _llm(monkeypatch)
+
+    # o-series -> max_completion_tokens, and max_tokens absent (its presence is what 400s).
+    list(p.stream_reply([{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None,
+                        model="o3-mini", max_tokens=256))
+    assert captured["max_completion_tokens"] == 256 and "max_tokens" not in captured
+
+    # A regular chat model keeps the classic key.
+    list(p.stream_reply([{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None,
+                        model="gpt-4o-mini", max_tokens=256))
+    assert captured["max_tokens"] == 256 and "max_completion_tokens" not in captured
+
+
+def test_token_cap_key_selection_by_family():
+    # PURE family detection (issue #153): o-series (incl. an OpenRouter `provider/` prefix) picks
+    # max_completion_tokens; gpt-4o and other chat models keep max_tokens.
+    for m in ("o1", "o1-mini", "o3", "o3-mini", "o4-mini", "openai/o1-preview"):
+        assert oai._token_cap_key(m) == "max_completion_tokens", m
+    for m in ("gpt-4o", "gpt-4o-mini", "gpt-4.1", "llama-3.3-70b-versatile", "deepseek-chat", ""):
+        assert oai._token_cap_key(m) == "max_tokens", m
+
+
 # ---- SSE line parsing (the one bit of _stream_chat that's pure) -------------
 def test_stream_chat_parses_data_lines(monkeypatch):
     class _Resp:
