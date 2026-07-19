@@ -73,3 +73,47 @@ def test_fetch_is_lazy_and_cached():
     idx.resolve("The Dark Wheel")
     idx.suggestions("x")
     assert calls["n"] == 1                          # fetched once, then cached
+
+
+# ---- issue #164: _ensure must publish _lut BEFORE _names (torn-write race) ---------------------
+
+def test_ensure_publishes_lut_before_names():
+    # `_names is not None` is the "loaded" sentinel readers check first; if it is set before _lut,
+    # a concurrent reader sees names-loaded but an empty table -> false "faction not found". Record
+    # the assignment order and assert the publish sets _lut then _names.
+    class _TrackingIndex(FactionIndex):
+        def __setattr__(self, name, value):
+            if name in ("_names", "_lut"):
+                object.__getattribute__(self, "_order").append(name)
+            super().__setattr__(name, value)
+
+    idx = _TrackingIndex.__new__(_TrackingIndex)
+    object.__setattr__(idx, "_order", [])
+    idx.__init__(fetch=lambda: list(_NAMES))
+    idx._ensure()
+    # The last two tracked assignments are the publish inside _ensure: _lut first, then _names.
+    assert idx._order[-2:] == ["_lut", "_names"]
+    # ...and the published state is internally consistent (non-empty names imply a populated table).
+    assert idx.resolve("Mother Gaia") == "Mother Gaia"
+
+
+def test_concurrent_readers_never_see_torn_state():
+    # Stress the publish under contention: many reader threads resolving while the index loads once.
+    # A reader that observes _names populated must always resolve a known name (never a torn empty
+    # table). With the ordered publish this holds; without it, readers could intermittently miss.
+    import threading
+
+    misses: list[str] = []
+    idx = FactionIndex(fetch=lambda: list(_NAMES))
+
+    def _reader() -> None:
+        for _ in range(200):
+            if idx._names is not None and idx.resolve("Mother Gaia") is None:
+                misses.append("torn")
+
+    threads = [threading.Thread(target=_reader) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert misses == []

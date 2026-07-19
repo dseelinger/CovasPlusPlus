@@ -66,8 +66,13 @@ class FactionIndex:
             names = list(self._fetch() or [])
         except Exception:  # noqa: BLE001 — a fetch failure degrades to "no resolution", not a crash
             names = []
-        self._names = names
+        # Publish _lut BEFORE _names. `_names is not None` is the "loaded" sentinel every reader
+        # checks first (in `loaded`/`resolve`/`suggestions`), so a concurrent reader that sees
+        # _names populated must already see the matching _lut — otherwise it reads an empty table and
+        # falsely reports "faction not found" (issue #164). Each assignment is atomic under the GIL;
+        # ordering is the only thing that closes the torn-write window.
         self._lut = {vocab.norm(n): n for n in names}
+        self._names = names
 
     def resolve(self, spoken) -> str | None:
         """The exact canonical faction name for a spoken one, or None. Exact-after-normalization
