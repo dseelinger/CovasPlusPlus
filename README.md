@@ -337,7 +337,7 @@ restricted keys** at each provider as defense-in-depth.
 ## Support
 
 COVAS++ is free and always will be. If it's made your time in the black better, a tip helps cover
-the API tokens behind every reply and the evenings behind every feature — nothing gets paywalled.
+the running costs behind every reply and the evenings behind every feature — nothing gets paywalled.
 
 **❤ [Support COVAS++ on Ko-fi →](https://ko-fi.com/dougseelinger)**
 
