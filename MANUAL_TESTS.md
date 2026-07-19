@@ -1705,6 +1705,11 @@ on in config (or the Settings page) before testing.
   names/voices), then **swap ships in game** (`ShipyardSwap`, which is followed by a fresh
   `Loadout`). Ask something that invites a crew line on each → the roster that answers/chatters is the
   one for the ship you're now flying. The other ship's crew stays silent.
+- [ ] 🎮 🔊 **Swap works on OpenAI **and** Gemini (issue #151):** repeat the swap-ships check above
+  with `[llm].provider = "openai"`, then again with `"gemini"` (no restart between the swap and the
+  next turn). The crew roster must follow the swap on **both** — the old ship's names must stop
+  prefixing crew lines the very next turn. (Regression: these providers used to freeze the system
+  prompt — and its roster — at startup, so the swap never took until you restarted.)
 - [ ] 🖥️ **Back-compat:** a pre-#127 `crew.json` (a bare JSON *list*) still loads as your Default
   roster with no error; the first save rewrites it to the `{default, ships}` shape.
 - [ ] 🖥️ **File-known ship survives a stale snapshot:** with a ship roster already saved, restart

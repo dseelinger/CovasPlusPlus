@@ -7,6 +7,7 @@ without a key or a socket. The `@pytest.mark.integration` `paid` test at the bot
 """
 from __future__ import annotations
 
+import json
 import os
 import threading
 
@@ -96,12 +97,53 @@ def test_build_tools_function_declarations_and_grounding():
 # ---- streaming text + usage + system ---------------------------------------
 def test_streams_text_and_emits_usage_and_system(monkeypatch):
     p = _llm(monkeypatch)
-    p._system = "You are COVAS."
+    # System is built PER TURN via build_system now (issue #151), not a frozen attr — patch it.
+    monkeypatch.setattr(gem, "build_system", lambda cfg: "You are COVAS.")
     text, events, calls = _run(p, monkeypatch, [[_text("Hello, "), _text("Commander."), _usage(10, 5)]])
     assert text == "Hello, Commander." and calls["n"] == 1
     assert calls["last_body"]["systemInstruction"] == {"parts": [{"text": "You are COVAS."}]}
     usage = [d for k, d in events if k == "usage"][0]
     assert usage["input_tokens"] == 10 and usage["output_tokens"] == 5 and usage["cost_usd"] > 0.0
+
+
+def test_system_prompt_rebuilt_per_turn_on_ship_swap(monkeypatch, tmp_path):
+    """Issue #151: build_system() is re-evaluated each stream_reply, so the ACTIVE ship's per-ship
+    crew roster (#127) — stamped onto cfg before each turn — follows a ship SWAP on the SAME provider
+    instance. The frozen-at-construction bug kept using the ship-you-built-with's roster forever.
+    Drives the REAL build_system -> crew.system_instruction -> load_members chain, fully offline
+    (a tmp roster file, no network)."""
+    roster = tmp_path / "crew.json"
+    roster.write_text(json.dumps({
+        "default": [{"name": "Vela"}],
+        "ships": {"1": {"hull": "sidewinder", "members": [{"name": "Nyx"}]},
+                  "2": {"hull": "sidewinder", "members": [{"name": "Orin"}]}},
+    }), encoding="utf-8")
+    cfg = {"gemini": {"model": "gemini-flash-lite-latest"}, "web_search": {"enabled": False},
+           "personality": {"enabled": False}, "crew": {"enabled": True, "file": str(roster)},
+           "experimental": {"crew": {"enabled": True}}}
+    monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: "k")
+    p = gem.GeminiLLM(cfg)
+
+    captured: dict = {}
+
+    def fake_stream(base_url, model, key, body, cancel_ev, **k):
+        parts = (body.get("systemInstruction") or {}).get("parts") or [{}]
+        captured["system"] = parts[0].get("text", "")
+        yield _text("ok")
+
+    monkeypatch.setattr(gem, "_stream_generate", fake_stream)
+
+    # Flying ship 1 -> Nyx is the crew, Orin is not. Anchor on the "Your crew:" roster line: the
+    # prompt template hardcodes an example that uses the bracket form ("[Nyx] ..."), so a bare
+    # substring check would false-match the example regardless of the active roster.
+    cfg["crew"]["_active_ship_id"] = "1"
+    list(p.stream_reply([{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
+    assert "Your crew: Nyx" in captured["system"] and "Your crew: Orin" not in captured["system"]
+
+    # SWAP to ship 2 (same instance, no _reload_llm) -> the roster follows: Orin in, Nyx out.
+    cfg["crew"]["_active_ship_id"] = "2"
+    list(p.stream_reply([{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
+    assert "Your crew: Orin" in captured["system"] and "Your crew: Nyx" not in captured["system"]
 
 
 def test_thought_part_routed_to_thinking(monkeypatch):

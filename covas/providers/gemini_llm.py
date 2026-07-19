@@ -58,7 +58,10 @@ class GeminiLLM:
         self._max_tokens = int(g.get("max_tokens",
                                      (cfg.get("anthropic", {}) or {}).get("max_tokens", 1024)))
         self._grounding = bool((cfg.get("web_search", {}) or {}).get("enabled", False))
-        self._system = build_system(cfg)  # personality.txt, or None if OFF
+        # The system prompt is built PER TURN in stream_reply (issue #151), NOT frozen here: it
+        # resolves the ACTIVE ship's crew roster (#127) from the runtime stamp the App writes onto
+        # cfg before each turn. Caching it at construction would keep prefixing the roster of the
+        # ship you were flying when the provider was built, because a ship swap never rebuilds it.
 
     def _key(self) -> str:
         from ..firstrun import gemini_key
@@ -113,6 +116,9 @@ class GeminiLLM:
     ) -> Iterator[tuple[str, str]]:
         key = self._key()
         contents = self._contents(messages)
+        # Build the system prompt PER TURN (issue #151) so a ship swap's crew roster (#127) — stamped
+        # onto cfg just before this call — is reflected, mirroring the Anthropic path (llm.py).
+        system = build_system(self._cfg)
         mdl = str(model or self.model)
         cap = int(max_tokens if max_tokens is not None else self._max_tokens)
         gem_tools = _build_tools(tools, self._grounding)
@@ -124,8 +130,8 @@ class GeminiLLM:
         for _round in range(_MAX_ROUNDS):
             body: dict = {"contents": contents,
                           "generationConfig": {"maxOutputTokens": cap}}
-            if self._system:
-                body["systemInstruction"] = {"parts": [{"text": self._system}]}
+            if system:
+                body["systemInstruction"] = {"parts": [{"text": system}]}
             if gem_tools:
                 body["tools"] = gem_tools
 

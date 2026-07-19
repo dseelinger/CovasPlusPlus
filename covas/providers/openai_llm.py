@@ -50,7 +50,10 @@ class OpenAILLM:
         self.model = str(o.get("model", "")).strip() or _DEFAULT_MODEL
         self._max_tokens = int(o.get("max_tokens",
                                      (cfg.get("anthropic", {}) or {}).get("max_tokens", 1024)))
-        self._system = build_system(cfg)  # personality.txt, or None if OFF
+        # The system prompt is built PER TURN in stream_reply (issue #151), NOT frozen here: it
+        # resolves the ACTIVE ship's crew roster (#127) from the runtime stamp the App writes onto
+        # cfg before each turn. Caching it at construction would keep prefixing the roster of the
+        # ship you were flying when the provider was built, because a ship swap never rebuilds it.
 
     def _key(self) -> str:
         from ..firstrun import openai_key
@@ -63,12 +66,13 @@ class OpenAILLM:
                 provider="OpenAI", status=401, retryable=False)
         return key
 
-    def _messages(self, messages: list[dict]) -> list[dict]:
+    def _messages(self, messages: list[dict], system: Optional[str]) -> list[dict]:
         """Convert the app's conversation history to OpenAI chat messages (system first). History
-        turns carry plain-string content; an Anthropic-style block list is flattened to its text."""
+        turns carry plain-string content; an Anthropic-style block list is flattened to its text.
+        `system` is the per-turn system prompt (issue #151), or None when personality/crew add none."""
         out: list[dict] = []
-        if self._system:
-            out.append({"role": "system", "content": self._system})
+        if system:
+            out.append({"role": "system", "content": system})
         for m in messages:
             content = m.get("content")
             if isinstance(content, str):
@@ -91,7 +95,9 @@ class OpenAILLM:
         max_tokens: Optional[int] = None,
     ) -> Iterator[tuple[str, str]]:
         key = self._key()
-        working = self._messages(messages)
+        # Build the system prompt PER TURN (issue #151) so a ship swap's crew roster (#127) — stamped
+        # onto cfg just before this call — is reflected, mirroring the Anthropic path (llm.py).
+        working = self._messages(messages, build_system(self._cfg))
         oa_tools = _translate_tools(tools)
         mdl = str(model or self.model)
         cap = int(max_tokens if max_tokens is not None else self._max_tokens)

@@ -7,6 +7,7 @@ a key or a socket. The `@pytest.mark.integration` `paid` test at the bottom hits
 """
 from __future__ import annotations
 
+import json
 import os
 import threading
 
@@ -77,19 +78,19 @@ def _run(provider, monkeypatch, rounds, *, tool_handler=None, tools=None, cancel
 
 # ---- message + tool translation --------------------------------------------
 def test_messages_prepends_system_and_keeps_str_turns():
+    # _messages now takes the per-turn system prompt as an arg (issue #151) instead of a frozen attr.
     p = oai.OpenAILLM({"openai": {}, "personality": {"enabled": False}})
-    p._system = "You are COVAS."
     msgs = p._messages([{"role": "user", "content": "hello"},
-                        {"role": "assistant", "content": "hi there"}])
+                        {"role": "assistant", "content": "hi there"}], "You are COVAS.")
     assert msgs[0] == {"role": "system", "content": "You are COVAS."}
     assert msgs[1]["role"] == "user" and msgs[2]["content"] == "hi there"
 
 
 def test_messages_flattens_block_content():
     p = oai.OpenAILLM({"openai": {}, "personality": {"enabled": False}})
-    p._system = None
     msgs = p._messages([{"role": "user",
-                         "content": [{"type": "text", "text": "a"}, {"type": "text", "text": "b"}]}])
+                         "content": [{"type": "text", "text": "a"}, {"type": "text", "text": "b"}]}],
+                       None)
     assert msgs == [{"role": "user", "content": "a b"}]
 
 
@@ -113,6 +114,48 @@ def test_streams_text_and_emits_usage(monkeypatch):
     usage = [d for k, d in events if k == "usage"][0]
     assert usage["input_tokens"] == 10 and usage["output_tokens"] == 5
     assert usage["model"] == "gpt-4o-mini" and usage["cost_usd"] > 0.0   # gpt-4o-mini is priced
+
+
+def test_system_prompt_rebuilt_per_turn_on_ship_swap(monkeypatch, tmp_path):
+    """Issue #151: build_system() is re-evaluated each stream_reply, so the ACTIVE ship's per-ship
+    crew roster (#127) — stamped onto cfg before each turn — follows a ship SWAP on the SAME provider
+    instance. The frozen-at-construction bug kept prefixing the ship-you-built-with's roster forever.
+    Drives the REAL build_system -> crew.system_instruction -> load_members chain, fully offline
+    (a tmp roster file, no network)."""
+    roster = tmp_path / "crew.json"
+    roster.write_text(json.dumps({
+        "default": [{"name": "Vela"}],
+        "ships": {"1": {"hull": "sidewinder", "members": [{"name": "Nyx"}]},
+                  "2": {"hull": "sidewinder", "members": [{"name": "Orin"}]}},
+    }), encoding="utf-8")
+    cfg = {"openai": {"model": "gpt-4o-mini"}, "personality": {"enabled": False},
+           "crew": {"enabled": True, "file": str(roster)},
+           "experimental": {"crew": {"enabled": True}}}
+    monkeypatch.setattr(firstrun, "openai_key", lambda cfg: "k")
+    p = oai.OpenAILLM(cfg)
+
+    captured: dict = {}
+
+    def fake_stream(base_url, key, body, cancel_ev, **k):
+        captured["messages"] = body["messages"]
+        yield _text_chunk("ok")
+
+    monkeypatch.setattr(oai, "_stream_chat", fake_stream)
+
+    def _system_text() -> str:
+        return next((m["content"] for m in captured["messages"] if m["role"] == "system"), "")
+
+    # Flying ship 1 -> Nyx is the crew, Orin is not. Anchor on the "Your crew:" roster line: the
+    # prompt template hardcodes an example that uses the bracket form ("[Nyx] ..."), so a bare
+    # substring check would false-match the example regardless of the active roster.
+    cfg["crew"]["_active_ship_id"] = "1"
+    list(p.stream_reply([{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
+    assert "Your crew: Nyx" in _system_text() and "Your crew: Orin" not in _system_text()
+
+    # SWAP to ship 2 (same instance, no _reload_llm) -> the roster follows: Orin in, Nyx out.
+    cfg["crew"]["_active_ship_id"] = "2"
+    list(p.stream_reply([{"role": "user", "content": "hi"}], threading.Event(), lambda *a: None))
+    assert "Your crew: Orin" in _system_text() and "Your crew: Nyx" not in _system_text()
 
 
 def test_reasoning_delta_routed_to_thinking(monkeypatch):
