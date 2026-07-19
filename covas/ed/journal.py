@@ -512,13 +512,16 @@ class JournalWatcher(threading.Thread):
 
     # -- file selection ----------------------------------------------------------------
     def _newest(self) -> Path | None:
+        # Guard glob AND the mtime read together: a file can vanish between the glob and
+        # the stat() (log rollover, cleanup), and an escaping OSError would otherwise
+        # propagate up to run() and kill the watcher for the session (#152).
         try:
             files = list(self.dir.glob(_JOURNAL_GLOB))
+            if not files:
+                return None
+            return max(files, key=lambda p: (p.stat().st_mtime, p.name))
         except OSError:
             return None
-        if not files:
-            return None
-        return max(files, key=lambda p: (p.stat().st_mtime, p.name))
 
     def _open(self, path: Path, *, prime: bool) -> None:
         """Open `path` for tailing. When `prime` (the file that was already mid-session at
@@ -558,14 +561,27 @@ class JournalWatcher(threading.Thread):
         self._buf += chunk
         *lines, self._buf = self._buf.split("\n")
         for line in lines:
-            ev = parse_journal_line(line)
-            if ev is None:
-                continue
-            patch = apply_journal_event(self.ctx, ev)
-            apply_carrier_event(self.ctx, ev)
-            self._record(ev)
-            self._publish(ev)
-            self._srv_hull_alert(ev, patch)
+            # Guard EACH line: parse+apply+publish for one event must not take down the
+            # tail loop. A single malformed/unexpected event (e.g. a fail-loud ctx.update
+            # KeyError) is logged via on_error and skipped so tailing continues (#152).
+            # Mirrors StatusWatcher.run()'s per-poll guard.
+            try:
+                self._apply_line(line)
+            except Exception as e:  # noqa: BLE001 — one bad event can't stop monitoring
+                if self._on_error is not None:
+                    self._on_error(e)
+
+    def _apply_line(self, line: str) -> None:
+        """Parse a single journal line and fold+publish it. Raises are the caller's to
+        catch (see _drain) so one faulty event is skipped, not fatal."""
+        ev = parse_journal_line(line)
+        if ev is None:
+            return
+        patch = apply_journal_event(self.ctx, ev)
+        apply_carrier_event(self.ctx, ev)
+        self._record(ev)
+        self._publish(ev)
+        self._srv_hull_alert(ev, patch)
 
     def _srv_hull_alert(self, event: dict, patch: dict) -> None:
         """Publish a derived `SrvHullLow` ed_event when SRV hull crossed below the threshold on
