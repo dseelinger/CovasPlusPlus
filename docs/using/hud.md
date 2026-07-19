@@ -37,6 +37,8 @@ your route** — a purpose-built minimal panel, not a generic instrument dump.
 The checklist and callout rows are shown as **plain prose** — any Markdown in the source text
 (`**bold**`, `` `code` ``, a leading `- ` list marker, and so on) is stripped before it reaches
 the panel, so it reads cleanly across all three surfaces instead of showing literal asterisks.
+Underscored `snake_case` identifiers and filenames (e.g. `check_setup_now`, `overrides.json`) are
+left intact — only genuine `_emphasis_` at word boundaries is stripped, never intra-word underscores.
 
 ## Turning it on and off
 
