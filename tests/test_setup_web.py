@@ -41,6 +41,9 @@ def client(tmp_path, monkeypatch):
     saved = {}
     monkeypatch.setattr(firstrun, "load_overrides", lambda: {})
     monkeypatch.setattr(firstrun, "save_overrides", lambda o: saved.update({"o": o}))
+    # The mic-default resolver enumerates real audio devices (issue #165) — stub it so the default
+    # suite stays hermetic and finish's auto-pick is deterministic. Tests that care assert on it.
+    monkeypatch.setattr(firstrun, "resolve_default_input_device", lambda: "Default Input Device")
     done = threading.Event()
     app = setup_web.create_setup_app(cfg, done)
     app.config.update(TESTING=True)
@@ -168,6 +171,50 @@ def test_mic_saved_to_overrides(client, monkeypatch):
     assert r.status_code == 200
     assert cfg["audio"]["input_device"] == "Blue Yeti"
     assert saved["o"]["audio"]["input_device"] == "Blue Yeti"
+
+
+# --- first run never finishes with a blank (silent) mic (issue #165) ----------------------
+# A blank [audio].input_device falls through to PortAudio's implicit default, which on some setups
+# captures silence → STT reports "no speech detected" → the app looks broken. Finishing setup must
+# resolve + persist a concrete capture device instead of handing the app a blank one.
+
+def test_finish_resolves_and_persists_default_mic_when_blank(client, monkeypatch):
+    c, cfg, _, saved = client
+    monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
+    c.post("/api/setup/keys", json={"keys": {"anthropic": "k"}})     # make it configurable
+    # No mic chosen — input_device is unset/blank.
+    assert str((cfg.get("audio", {}) or {}).get("input_device") or "") == ""
+    r = c.post("/api/setup/finish")
+    assert r.status_code == 200
+    # The blank was replaced with the resolved concrete device (the fixture's stub), both in the
+    # live cfg and persisted to overrides — never left blank/silent.
+    assert cfg["audio"]["input_device"] == "Default Input Device"
+    assert saved["o"]["audio"]["input_device"] == "Default Input Device"
+
+
+def test_finish_keeps_explicit_mic_choice(client, monkeypatch):
+    """An explicit pick is never clobbered by the auto-default — the resolver isn't even consulted."""
+    c, cfg, _, _ = client
+    monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
+    monkeypatch.setattr(firstrun, "resolve_default_input_device",
+                        lambda: (_ for _ in ()).throw(AssertionError("must not resolve a default")))
+    c.post("/api/setup/keys", json={"keys": {"anthropic": "k"}})
+    c.post("/api/setup/mic", json={"device": "Blue Yeti"})
+    r = c.post("/api/setup/finish")
+    assert r.status_code == 200
+    assert cfg["audio"]["input_device"] == "Blue Yeti"               # untouched
+
+
+def test_finish_stays_blank_when_no_mic_resolvable(client, monkeypatch):
+    """Headless / no mic: the resolver returns None and finish leaves the device blank (the system
+    default stands) — fail-soft, the wizard never gates on a mic."""
+    c, cfg, _, _ = client
+    monkeypatch.setattr(firstrun, "stt_model_available", lambda *a, **k: True)
+    monkeypatch.setattr(firstrun, "resolve_default_input_device", lambda: None)
+    c.post("/api/setup/keys", json={"keys": {"anthropic": "k"}})
+    r = c.post("/api/setup/finish")
+    assert r.status_code == 200
+    assert str((cfg.get("audio", {}) or {}).get("input_device") or "") == ""
 
 
 # --- finish copy is native-aware (the "close this tab" quit-the-app bug, I9/I7) ------------

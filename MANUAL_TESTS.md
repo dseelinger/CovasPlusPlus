@@ -1953,6 +1953,12 @@ Notes:
       **no Anthropic key and no ElevenLabs key**. Finish → the app starts and speaks a turn in the
       **Edge** voice (not text-only).
 - [ ] **Mic** picker lists your input devices; pick one.
+- [ ] **Skip the mic step (issue #165):** leave the **Microphone** on *System default* and finish setup →
+      the app is **not silently deaf**. Hold PTT and speak → the turn transcribes (you do **not** get an
+      endless run of **"no speech detected"**). Confirm `overrides.json` now has a **concrete**
+      `[audio].input_device` name (the resolved default capture device), **not** a blank — so a fresh
+      install can't fall through to an implicit PortAudio default that captures silence. (On a headless
+      box with no mic at all it stays blank and the system default stands — fail-soft.)
 - [ ] **STT model** downloads (`small.en`, ~250 MB) with a **progress** indicator (needs internet); it's fetched **once**.
 - [ ] Wizard **hands off to the control panel in the same window** — no second window, no browser. The finish message says it's **switching to the control panel** (NOT "close this tab"); the panel appears **without you closing anything** (closing the single native window quits the app).
 - [ ] **Keyless-cloud-voice → text-only:** pick a cloud voice (e.g. ElevenLabs) but leave its key blank

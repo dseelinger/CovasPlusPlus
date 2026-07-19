@@ -83,6 +83,13 @@ You can bind a joystick/HOTAS button to the talk key with a tool like JoyToKey.
     **name** (survives reconnects), blank = the system default, and the change applies **live** — the
     recorder (and the hands-free listener, in continuous mode) re-open on the new mic with no restart.
 
+!!! note "First run picks a working mic for you (issue #165)"
+    If you skip the wizard's optional **Microphone** step, finishing setup no longer leaves the mic
+    **blank**. COVAS++ resolves a concrete default capture device (your system's default input, or
+    the first device with input channels) and stores it by name — so a fresh install can't fall
+    through to an implicit PortAudio default that captures **silence** and makes it look like nothing
+    is heard ("no speech detected"). You can always change it later on the Settings page above.
+
 ## Activation mode (`[listen]`)
 
 How a turn starts — push-to-talk or [hands-free](getting-started/hands-free.md). The energy

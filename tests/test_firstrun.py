@@ -7,6 +7,7 @@ mic enumeration, and ElevenLabs fetch are on-hardware and not exercised here.
 from __future__ import annotations
 
 import base64
+import sys
 
 import pytest
 
@@ -268,6 +269,99 @@ def test_resolve_voice_falls_back_to_first_when_george_absent():
 
 def test_resolve_voice_none_on_empty_list():
     assert firstrun.resolve_default_voice([]) is None
+
+
+# ---- default input device (mic) resolution (issue #165) -----------------------------
+# The mic step is optional, so a fresh install can reach finish with a blank input_device →
+# PortAudio's implicit default → silence → "no speech detected". These prove the resolver
+# picks a concrete, non-blank device offline (synthetic device table / stubbed sounddevice).
+
+
+def test_pick_default_input_prefers_reported_default():
+    """PortAudio's reported default input wins when it actually has input channels."""
+    devices = [
+        {"name": "Speakers", "max_input_channels": 0},
+        {"name": "USB Mic", "max_input_channels": 2},
+        {"name": "Webcam Mic", "max_input_channels": 1},
+    ]
+    assert firstrun._pick_default_input(devices, 1) == 1        # index 1 = USB Mic
+
+
+def test_pick_default_input_skips_output_only_default():
+    """A reported default with NO input channels (an output device) is rejected in favour of the
+    first real capture device — the crux of the silent-default bug."""
+    devices = [
+        {"name": "Speakers", "max_input_channels": 0},   # PortAudio's default points here…
+        {"name": "USB Mic", "max_input_channels": 2},     # …but this is the first real input
+    ]
+    assert firstrun._pick_default_input(devices, 0) == 1
+
+
+def test_pick_default_input_handles_missing_or_bad_default_index():
+    devices = [{"name": "Line In", "max_input_channels": 0},
+               {"name": "Headset", "max_input_channels": 1}]
+    assert firstrun._pick_default_input(devices, None) == 1     # no default reported
+    assert firstrun._pick_default_input(devices, -1) == 1       # sentinel "no default"
+    assert firstrun._pick_default_input(devices, 99) == 1       # out-of-range default
+
+
+def test_pick_default_input_none_when_no_capture_devices():
+    devices = [{"name": "Speakers", "max_input_channels": 0}]
+    assert firstrun._pick_default_input(devices, 0) is None
+    assert firstrun._pick_default_input([], 0) is None
+
+
+class _FakeSD:
+    """Minimal sounddevice stand-in: a device table + a `default.device` (in, out) pair."""
+
+    def __init__(self, devices, default):
+        self._devices = devices
+        self.default = type("D", (), {"device": default})()
+
+    def query_devices(self):
+        return list(self._devices)
+
+
+def test_resolve_default_input_device_returns_name(monkeypatch):
+    """The resolver returns the NAME of the chosen capture device (never a raw index), so it
+    persists the same way a user's pick does — stable across reboots."""
+    fake = _FakeSD(
+        [{"name": "Speakers", "max_input_channels": 0},
+         {"name": "Blue Yeti", "max_input_channels": 2}],
+        default=[1, 0])
+    monkeypatch.setitem(sys.modules, "sounddevice", fake)
+    assert firstrun.resolve_default_input_device() == "Blue Yeti"
+
+
+def test_resolve_default_input_device_never_blank_when_a_mic_exists(monkeypatch):
+    """Even when PortAudio's default points at an OUTPUT device, we resolve a real, non-blank
+    capture device rather than leaving it to the silent implicit default (issue #165)."""
+    fake = _FakeSD(
+        [{"name": "Speakers", "max_input_channels": 0},
+         {"name": "Headset Mic", "max_input_channels": 1}],
+        default=[0, 0])                                   # default = the output-only device
+    monkeypatch.setitem(sys.modules, "sounddevice", fake)
+    name = firstrun.resolve_default_input_device()
+    assert name == "Headset Mic"
+    assert name != ""                                     # never the blank/silent default
+
+
+def test_resolve_default_input_device_none_when_no_input(monkeypatch):
+    fake = _FakeSD([{"name": "Speakers", "max_input_channels": 0}], default=[0, 0])
+    monkeypatch.setitem(sys.modules, "sounddevice", fake)
+    assert firstrun.resolve_default_input_device() is None
+
+
+def test_resolve_default_input_device_fail_soft_without_portaudio(monkeypatch):
+    """No audio backend (import/query raises) → None, not a crash: the system default stands."""
+    class _Boom:
+        def query_devices(self):
+            raise RuntimeError("no PortAudio")
+
+        default = type("D", (), {"device": [0, 0]})()
+
+    monkeypatch.setitem(sys.modules, "sounddevice", _Boom())
+    assert firstrun.resolve_default_input_device() is None
 
 
 # ---- text-only mode ------------------------------------------------------------------

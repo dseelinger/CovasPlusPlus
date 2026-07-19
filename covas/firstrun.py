@@ -334,6 +334,49 @@ def list_input_devices() -> list[dict]:
     return out
 
 
+def _pick_default_input(devices: list[dict], default_index) -> int | None:
+    """Pure: choose a capture-device index from an enumerated PortAudio device table.
+    Prefer the reported default input (`default_index`) when it points at a real device that
+    actually HAS input channels; otherwise the FIRST device that does; None if none do. Split
+    out pure (a plain list of ``{max_input_channels, name}`` dicts) so the choice is unit-tested
+    with a synthetic table — no PortAudio, no audio hardware."""
+    try:
+        di = int(default_index)
+    except (TypeError, ValueError):
+        di = -1
+    if 0 <= di < len(devices) and int(devices[di].get("max_input_channels", 0)) > 0:
+        return di
+    for i, d in enumerate(devices):
+        if int(d.get("max_input_channels", 0)) > 0:
+            return i
+    return None
+
+
+def resolve_default_input_device() -> str | None:
+    """The NAME of a sensible default capture device for the mic setting, or None when the host
+    has no usable input device (issue #165).
+
+    A blank ``[audio].input_device`` otherwise falls through to PortAudio's IMPLICIT default,
+    which on some first-run setups selects a device that captures silence — so STT keeps reporting
+    "no speech detected" and the app looks broken. Resolving a concrete device (PortAudio's default
+    input when it validly has input channels, else the first device that does) and persisting it by
+    NAME during setup makes the mic explicit, visible, and never silently blank. Name — not index —
+    to match how the mic is stored (a name is stable across reboots / device reorders). Lazy
+    sounddevice import + fail-soft (None on any PortAudio error) so a headless/test caller with no
+    audio backend just leaves the system default in place, exactly as before."""
+    try:
+        import sounddevice as sd
+        devices = list(sd.query_devices())
+        default = sd.default.device
+        raw = default[0] if isinstance(default, (list, tuple)) else default
+        idx = _pick_default_input(devices, raw)
+        if idx is None:
+            return None
+        return str(devices[idx].get("name", "")).strip() or None
+    except Exception:  # noqa: BLE001 — no PortAudio / no devices: leave it to the system default
+        return None
+
+
 # ---- Default voice -------------------------------------------------------------------
 
 def resolve_default_voice(voices: list[dict], preferred: str = "George") -> dict | None:
