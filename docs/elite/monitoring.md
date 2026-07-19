@@ -56,6 +56,11 @@ The watchers only ever *publish* what they see; they never initiate speech on th
 your live state into spoken callouts is a separate, opt-in feature — see
 [Proactive callouts](proactive-callouts.md).
 
+Both watchers are **fail-soft**: a single malformed or unexpected line in the journal is logged and
+skipped, and a journal file rolling over (or briefly vanishing) mid-session is handled gracefully —
+neither stops monitoring for the rest of your session. Tailing simply continues with the next
+event.
+
 ## On-foot & SRV awareness
 
 Awareness follows you out of the pilot's seat. When you disembark or drop into the SRV, COVAS++

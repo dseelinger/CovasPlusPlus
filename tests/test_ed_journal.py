@@ -364,3 +364,54 @@ def test_published_event_is_flat_ed_event(tmp_path):
     ev = [e for e in _drain_queue(q) if e.get("type") == "ed_event"][0]
     # Flat shape: type stamped, raw fields preserved.
     assert ev["type"] == "ed_event" and ev["event"] == "FSDJump" and ev["StarSystem"] == "Sol"
+
+
+# --- fail-soft: one bad event/stat() race can't kill monitoring (#152) ------
+
+def test_drain_skips_raising_event_and_keeps_tailing(tmp_path, monkeypatch):
+    # A single event whose apply raises (e.g. a fail-loud ctx.update KeyError) must be
+    # reported via on_error and skipped — NOT propagate out of _drain and stop the tail.
+    import covas.ed.journal as journal_mod
+    real_apply = journal_mod.apply_journal_event
+
+    def boom(ctx, ev):
+        if ev.get("event") == "Poison":
+            raise KeyError("simulated fail-loud apply")
+        return real_apply(ctx, ev)
+    monkeypatch.setattr(journal_mod, "apply_journal_event", boom)
+
+    jf = tmp_path / "Journal.2026-07-08T120000.01.log"
+    jf.write_text("", encoding="utf-8")
+    bus = EventBus()
+    q = bus.subscribe()
+    ctx = EDContext()
+    errors: list[Exception] = []
+    w = JournalWatcher(tmp_path, bus, ctx, poll_interval=0.01, on_error=errors.append)
+    w._open(jf, prime=True)
+
+    with open(jf, "a", encoding="utf-8") as f:
+        f.write('{"event":"Poison"}\n')                       # this apply raises
+        f.write('{"event":"FSDJump","StarSystem":"Sol"}\n')   # the NEXT good event
+    w._drain()                                                # must NOT raise
+
+    # The bad event was surfaced once via on_error; the good one still processed + published.
+    assert len(errors) == 1 and isinstance(errors[0], KeyError)
+    events = [e["event"] for e in _drain_queue(q) if e.get("type") == "ed_event"]
+    assert events == ["FSDJump"]
+    assert ctx.snapshot()["system"] == "Sol"
+
+
+def test_newest_survives_file_vanishing_between_glob_and_stat(tmp_path):
+    # A journal file can disappear (rollover/cleanup) between the glob listing it and the
+    # stat() that reads its mtime; the resulting OSError must be swallowed to None, not
+    # propagate to run() and kill the watcher thread.
+    w, ctx, q = _watcher(tmp_path)
+    missing = tmp_path / "Journal.2026-07-08T120000.99.log"   # never created
+
+    class _VanishingDir:
+        def glob(self, pattern):
+            return [missing]                                  # listed, but already gone
+    w.dir = _VanishingDir()
+
+    # max()'s key calls missing.stat() -> FileNotFoundError (an OSError) -> caught -> None.
+    assert w._newest() is None

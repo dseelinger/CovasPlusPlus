@@ -399,6 +399,13 @@ Notes:
 
 Notes:
 
+### 5.1b Journal monitoring survives a bad line (#152)  🎮 ED 📋 FILE
+> Requires `[elite].enabled = true`. The journal watcher must fail **soft**: one malformed/unexpected event, or a journal file vanishing during a rollover, may not silently stop all further monitoring for the session.
+- [ ] **Bad line is skipped, tailing continues:** with COVAS++ running and ED live, append a garbage line to the current journal (e.g. `echo '{"event":"__notreal__","x":{}}' >> Journal.<latest>.log`), then do a real in-game action (FSD-jump / dock). The action is still reflected — *"where am I?"* / *"what did I just do?"* stays current. At most a single warning is logged for the bad line; monitoring does **not** go dark.
+- [ ] **Rollover race is harmless:** let ED roll to a new journal (long session, or relog) while COVAS++ runs → it picks up the new file and keeps narrating; no watcher-dead silence, no traceback in the log.
+
+Notes:
+
 ### 5.2 Proactive callouts (`[proactive].enabled = true`)
 - [ ] **Arrival:** **FSD jump** to a new system → within a few seconds COVAS speaks a short in-character callout **without** any PTT press (fires only when idle).
 - [ ] **Dock** at a station → a `Docked` callout fires (at most one line amid a jump→supercruise→dock burst — min-interval throttle).
