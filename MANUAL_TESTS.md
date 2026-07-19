@@ -155,6 +155,23 @@ Notes:
 
 Notes:
 
+## 3d. Concurrency & lifecycle edge cases (#156)  🌐 PANEL 🔊 HW 🎮 ED
+> Foundation hardening for four near-zero-probability races in `app.py`. No new behavior — these
+> confirm nothing regressed and nothing doubles up. Covered offline by `tests/test_app_concurrency.py`;
+> these are the on-hardware spot-checks.
+- [ ] 🌐 **Typed prompt vs. proactive callout:** with `[proactive].enabled = true` and ED live, fire a
+      typed prompt (§3c) at the same moment an ED event would trigger a callout (e.g. right after an FSD
+      jump). You get **one** turn — the typed reply — never two overlapping voices / a doubled reply.
+- [ ] 🌐 **Reset a setting while holding PTT:** hold the PTT key, and from the panel (another device or a
+      second hand) click **Reset** on any setting. Release PTT → the turn dispatches normally; no crash,
+      no dropped/garbled hotkey, log stays clean (no `KeyError`).
+- [ ] 🖥️ **Enable HUD/route mid-session:** toggle the Companion HUD (§5a) or route callouts (§5.3) on
+      while the app runs → each ED event is announced/repainted **once**, never twice (no double-dispatch).
+- [ ] 🔊 **Cancel wins over a callout:** hold `[` (or click **CANCEL**) exactly as an ED event lands →
+      silence; the pending callout does **not** sneak through after the cancel.
+
+Notes:
+
 ## 3a. Hands-free / continuous listening (issue #63 — `[listen].mode = "continuous"`)  🔊 HW 🎧 headset
 > Off by default. Switch to continuous by voice (*"switch to continuous listening"*), on the Settings
 > page (**Activation mode** under *Voice input*), or in `config.toml` (`[listen].mode`). Best tested
