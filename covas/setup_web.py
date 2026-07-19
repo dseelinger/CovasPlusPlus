@@ -34,6 +34,22 @@ _FINISH_MSG_NATIVE = "Setup complete — starting COVAS++. Switching to the cont
 _FINISH_MSG_BROWSER = "Setup complete — COVAS++ is starting. You can close this tab."
 
 
+def _ensure_input_device(cfg: dict) -> None:
+    """Make sure a concrete mic is chosen before finishing setup (issue #165). The mic step is
+    OPTIONAL, so a fresh install often reaches finish with a blank ``[audio].input_device`` — which
+    then falls through to PortAudio's implicit default and, on some setups, captures silence, so STT
+    reports "no speech detected" and the app looks broken. When it's still blank we resolve a real
+    default capture device and persist it by name, so first run is never silently deaf. Fail-soft:
+    if no device can be resolved (headless / no mic) we leave it blank and the system default stands,
+    exactly as before — the wizard doesn't gate on a mic."""
+    current = str((cfg.get("audio", {}) or {}).get("input_device") or "").strip()
+    if current:
+        return
+    name = firstrun.resolve_default_input_device()
+    if name:
+        firstrun.apply_override(cfg, {"audio": {"input_device": name}})
+
+
 def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) -> Flask:
     """Build the wizard app. `cfg` is mutated in place as steps write overrides (so status
     reads stay current); `done` is set when setup finishes so the caller can stop serving.
@@ -212,6 +228,9 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
         """Complete setup — but only if the required pieces are actually in place, so the
         wizard can't hand a half-configured app to the panel. Sets the done event the server
         loop waits on."""
+        # Never hand the app a blank mic → silent PortAudio default → "no speech detected"
+        # (issue #165): resolve + persist a concrete capture device if the user left it unset.
+        _ensure_input_device(cfg)
         if not firstrun.is_configured(cfg):
             st = firstrun.configured_status(cfg)
             need = []
