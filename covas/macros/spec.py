@@ -80,7 +80,7 @@ class MacroStepSpec:
             action=str(d.get("action", "") or "").strip(),
             seconds=_as_float(d.get("seconds", 0.0)),
             status=str(d.get("status", "") or "").strip(),
-            expect=bool(d.get("expect", True)),
+            expect=_as_bool(d.get("expect", True), default=True),
         )
 
 
@@ -133,7 +133,7 @@ class MacroSpec:
             name=name,
             steps=steps,
             trigger=str(d.get("trigger", "") or "").strip(),
-            confirm=bool(d.get("confirm", True)),
+            confirm=_as_bool(d.get("confirm", True), default=True),
             id=str(d.get("id", "") or ""),
             when=str(d.get("when", "") or ""),
         )
@@ -145,3 +145,31 @@ def _as_float(v: object) -> float:
         return float(v)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return 0.0
+
+
+# Strings a hand-editor might reasonably type for a boolean. A raw `bool("false")` is True (any
+# non-empty string is truthy), which would silently INVERT a precondition — so parse these
+# explicitly rather than trusting `bool()`.
+_FALSE_STRINGS = frozenset({"false", "0", "no", "off", "n", "f"})
+_TRUE_STRINGS = frozenset({"true", "1", "yes", "on", "y", "t"})
+
+
+def _as_bool(v: object, *, default: bool = True) -> bool:
+    """Coerce a possibly-hand-edited boolean field robustly (never raises). A real bool passes
+    through; a string is matched case-insensitively against the true/false vocabularies above so
+    `"false"`/`"0"`/`"no"` become False (not True as `bool()` would give); numbers use their
+    truthiness; None and any unrecognised value fall back to `default` (don't guess)."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in _FALSE_STRINGS:
+            return False
+        if s in _TRUE_STRINGS:
+            return True
+        return default
+    if isinstance(v, (int, float)):
+        return bool(v)
+    if v is None:
+        return default
+    return bool(v)

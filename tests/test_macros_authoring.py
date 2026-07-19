@@ -154,6 +154,30 @@ def test_spec_from_dict_rejects_nameless_or_empty():
         MacroSpec.from_dict({"name": "x", "steps": []})
 
 
+def test_from_dict_parses_string_expect_false_as_false(tmp_path):
+    # A hand-edited "expect":"false" must NOT become True (bare bool("false") is True), which would
+    # invert the precondition. #159: strings are parsed against the true/false vocabularies.
+    step = MacroStepSpec.from_dict({"kind": "require_status", "status": "docked", "expect": "false"})
+    assert step.expect is False
+    for falsey in ("false", "False", "0", "no", "off"):
+        s = MacroStepSpec.from_dict({"kind": "require_status", "status": "docked", "expect": falsey})
+        assert s.expect is False, falsey
+    for truthy in ("true", "1", "yes", "on"):
+        s = MacroStepSpec.from_dict({"kind": "require_status", "status": "docked", "expect": truthy})
+        assert s.expect is True, truthy
+    # A real bool and the default both still work.
+    assert MacroStepSpec.from_dict({"kind": "require_status", "status": "docked",
+                                    "expect": False}).expect is False
+    assert MacroStepSpec.from_dict({"kind": "require_status", "status": "docked"}).expect is True
+
+
+def test_from_dict_parses_string_confirm_false_as_false():
+    # The sibling `confirm` bool shared the same bug — a hand-edited "confirm":"false" must be False.
+    spec = MacroSpec.from_dict({"name": "M", "confirm": "false",
+                                "steps": [{"kind": "action", "action": "throttle_zero"}]})
+    assert spec.confirm is False
+
+
 # ---- store: fail-soft JSONL -----------------------------------------------
 
 def test_store_add_get_delete(tmp_path):
@@ -189,6 +213,64 @@ def test_store_persists_across_instances(tmp_path):
     p = tmp_path / "macros.jsonl"
     MacroStore(p).add(_spec(_action("throttle_zero"), name="Persisted"))
     assert MacroStore(p).get("Persisted") is not None
+
+
+def test_save_uses_a_unique_temp_file_not_a_fixed_one(tmp_path, monkeypatch):
+    # #159: two concurrent saves must not interleave into one shared `.tmp`. Assert each save
+    # allocates its OWN uniquely-named temp file (via tempfile.mkstemp), never a fixed `<name>.tmp`.
+    import covas.macros.store as store_mod
+    p = tmp_path / "macros.jsonl"
+    store = MacroStore(p)
+    store.add(_spec(_action("throttle_zero"), name="One"))   # first real save (warms the file)
+
+    seen: list[str] = []
+    real_mkstemp = store_mod.tempfile.mkstemp
+
+    def spy_mkstemp(*a, **kw):
+        fd, name = real_mkstemp(*a, **kw)
+        seen.append(name)
+        return fd, name
+
+    monkeypatch.setattr(store_mod.tempfile, "mkstemp", spy_mkstemp)
+    store.add(_spec(_action("landing_gear"), name="Two"))
+    store.add(_spec(_action("throttle_zero"), name="Three"))
+    assert len(seen) == 2                     # each save minted a temp file
+    assert seen[0] != seen[1]                 # ...and they were DISTINCT (no fixed collision)
+    fixed = str(p.with_suffix(p.suffix + ".tmp"))   # the OLD fixed temp name
+    assert fixed not in seen                  # ...never the fixed path two savers could share
+    # Final content is intact and complete (atomic replace left no torn file).
+    assert {s.name for s in MacroStore(p).all()} == {"One", "Two", "Three"}
+    assert list(tmp_path.glob("*.tmp")) == []  # no orphan temp files left behind
+
+
+def test_concurrent_saves_leave_a_valid_file(tmp_path):
+    # Two threads hammering add()/save() on the same store must never leave a corrupt/torn file:
+    # unique temp + atomic replace means every load() parses cleanly, last-writer-wins.
+    import threading
+    p = tmp_path / "macros.jsonl"
+    store = MacroStore(p)
+    store.add(_spec(_action("throttle_zero"), name="Seed"))
+
+    errors: list[Exception] = []
+
+    def worker(tag: str) -> None:
+        try:
+            for i in range(25):
+                store.save([_spec(_action("throttle_zero"), name=f"{tag}{i}")])
+        except Exception as e:  # noqa: BLE001 — surface any thread fault to the assertion
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(t,)) for t in ("A", "B")]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == []
+    # Whatever the interleaving, the file on disk is parseable (no half-written line) and non-empty.
+    reloaded = MacroStore(p).load()
+    assert len(reloaded) == 1
+    assert list(tmp_path.glob("*.tmp")) == []
 
 
 # ---- confirmation gate ----------------------------------------------------

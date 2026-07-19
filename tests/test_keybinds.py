@@ -299,3 +299,81 @@ def test_extended_flag_reaches_backend():
     ex, be = _executor()
     ex.press(KeyBinding(action="ToggleCargoScoop", key="Key_Home"))
     assert be.events == [("down", 0x47, True), ("up", 0x47, True)]
+
+
+# --- press key tracking (#159) --------------------------------------------
+
+def test_press_leaves_nothing_held():
+    """A clean tap tracks its keys but lifts them all — `_down` is empty afterwards."""
+    ex, _ = _executor()
+    ex.press(KeyBinding(action="X", key="Key_J", modifiers=("Key_LeftShift",)))
+    assert ex._down == set()
+
+
+class _FlakyBackend(_FakeBackend):
+    """A backend whose key_up for one scancode raises a bounded number of times, to model a
+    transient injection fault mid-press."""
+    def __init__(self, fail_up_scancode: int, fail_times: int) -> None:
+        super().__init__()
+        self._fail_sc = fail_up_scancode
+        self._fail_times = fail_times
+
+    def key_up(self, scancode: int, extended: bool) -> None:
+        if scancode == self._fail_sc and self._fail_times > 0:
+            self._fail_times -= 1
+            raise RuntimeError("key_up failed")
+        super().key_up(scancode, extended)
+
+
+def test_press_tracks_keys_so_release_all_recovers_a_failed_keyup():
+    # press() now records the key in _down BEFORE pressing it, so a key_up that fails mid-press
+    # leaves the key tracked as held — a later hard abort can still lift it rather than stranding it.
+    be = _FlakyBackend(fail_up_scancode=0x26, fail_times=1)   # Key_L up fails once
+    ex = KeyExecutor(backend=be, sleep=lambda _s: None, tap_ms=0)
+    with pytest.raises(RuntimeError):
+        ex.press(KeyBinding(action="X", key="Key_L"))
+    assert (0x26, False) in ex._down                          # stranded key IS tracked
+    ex.release_all()                                          # backend healthy now
+    assert ex._down == set()                                  # hard abort lifted it
+    assert ("up", 0x26, False) in be.events
+
+
+# --- abort-aware hold (#159) ----------------------------------------------
+
+def test_hold_returns_early_when_release_all_lifts_the_key():
+    # Model a concurrent hard abort: the injected sleep calls release_all() on the first poll
+    # chunk, discarding the held key. hold()'s next poll sees it gone and stops promptly instead
+    # of sleeping out the full (clamped) duration.
+    be = _FakeBackend()
+    holder: dict[str, KeyExecutor] = {}
+    chunks: list[float] = []
+
+    def sleep(s: float) -> None:
+        chunks.append(s)
+        if len(chunks) == 1:
+            holder["ex"].release_all()
+
+    ex = KeyExecutor(backend=be, sleep=sleep, tap_ms=0)
+    holder["ex"] = ex
+    ex.hold(KeyBinding(action="X", key="Key_L"), 5.0)
+    assert len(chunks) <= 2                                   # NOT ~100 chunks of a 5s hold
+    assert ex._down == set()
+    assert ("up", 0x26, False) in be.events
+
+
+def test_hold_returns_early_on_abort_predicate():
+    # An injected abort predicate is polled between chunks; once it flips True, hold() stops and
+    # its own release path lifts the key.
+    be = _FakeBackend()
+    aborted = {"v": False}
+    chunks: list[float] = []
+
+    def sleep(s: float) -> None:
+        chunks.append(s)
+        aborted["v"] = True
+
+    ex = KeyExecutor(backend=be, sleep=sleep, tap_ms=0)
+    ex.hold(KeyBinding(action="X", key="Key_L"), 5.0, abort=lambda: aborted["v"])
+    assert len(chunks) == 1
+    assert ex._down == set()
+    assert ("up", 0x26, False) in be.events

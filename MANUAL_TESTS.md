@@ -642,6 +642,7 @@ Notes:
 - [ ] **Precondition refuses (gear up):** while flying with the **gear up** (not on a pad), arm+confirm `launch` → it **refuses** ("your landing gear isn't down…") and presses **nothing**.
 - [ ] **Verify step catches a miss:** if the gear never retracts (e.g. unbind Landing Gear from a key after arming) → after ~4 s it reports it **couldn't confirm the gear retracted** rather than claiming success.
 - [ ] **Hard abort mid-sequence:** during the confirmed run, say *"abort"* → the sequence **stops**, the held thrust key **releases immediately**, and remaining steps don't fire.
+- [ ] **Abort interrupts a hold promptly (#159):** during the pad-clearing **hold** step, say *"abort"* → the held thrust key releases **the moment you abort** and the sequence ends — it does **not** keep holding for the rest of the hold duration before reacting.
 - [ ] **Mode gating:** **on foot** or **in the SRV**, `launch` isn't offered and is refused ("only works in your ship").
 - [ ] **Combat guard:** in **danger/interdiction** (or with `[elite]` off) arming/confirming `launch` is **refused**.
 - [ ] **Off by default:** with the default allowlist (`landing_gear` only), *"launch"* is **not** offered and is refused — the sequence ships opt-in.
@@ -728,6 +729,7 @@ Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_
 - [ ] **Run by name (consequential) — arm/confirm:** *"run gear up"* → says **armed, not done**; same-turn *"confirm"* is refused; a separate *"confirm"* runs it and the gear moves.
 - [ ] **Trigger (benign):** author *"when I dock, throttle to zero"* (benign). Dock → it auto-runs once and speaks the outcome (the doubled journal/Status `Docked` does **not** run it twice).
 - [ ] **Trigger (consequential) — arms + asks:** author *"when docking is granted, drop the gear"* (consequential). Get docking granted → COVAS **speaks a prompt** and arms it; it does **not** move the gear until you say *"confirm"*.
+- [ ] **Two macros, one trigger — neither dropped (#159):** author **two** consequential macros on the **same** trigger (e.g. `docked`): one drops the gear, one sets throttle to zero. Dock → COVAS **announces both** (arms the first, says it **queued** the second). Say *"confirm"* → the first runs; COVAS then offers the **queued** one → *"confirm"* again → the second runs. Neither is silently dropped. Saying *"abort"* while both are pending clears **both**.
 - [ ] **Combat guard:** in **danger/interdiction** (or with `[elite]` off) running/confirming any macro is **refused**; nothing fires.
 - [ ] **Cross-mode rejected at authoring:** try to author a macro mixing a ship action and an on-foot action → **refused** ("mixes actions from different game modes").
 - [ ] **Unbound key:** if a macro's action isn't bound to a **key** in ED → running it reports "bind it in-game" and nothing fires.

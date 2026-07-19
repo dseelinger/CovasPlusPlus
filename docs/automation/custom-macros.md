@@ -56,7 +56,10 @@ On top of that, a saved macro runs behind the **same safety layer** as every oth
 - **Confirmation** — a consequential macro (one whose actions need confirming, like landing gear)
   **arms** and waits for a *separate* spoken "confirm" before it runs. A benign one (throttle,
   panels) runs immediately. When a *trigger* fires a consequential macro, COVAS++ doesn't just do
-  it — it tells you the trigger happened and asks you to confirm.
+  it — it tells you the trigger happened and asks you to confirm. If **two** consequential macros
+  share the same trigger, COVAS++ arms the first and **queues** the second (telling you it did),
+  then offers it for a separate "confirm" once you've dealt with the first — so a shared trigger
+  never silently drops one of them. Saying **"abort"** clears the whole queue.
 - **Combat / interdiction guard** — a macro refuses to run while you're in danger or being
   interdicted, or when COVAS++ can't read your status at all (it won't act unless it can *prove*
   it's safe).
@@ -131,7 +134,10 @@ refused by the combat guard, so binding to them would be pointless. For combat, 
 ## Status flags you can check
 
 `docked`, `landing_gear`, `supercruise`, `hardpoints`, `low_fuel`, `analysis_mode`, `in_danger`,
-`being_interdicted`. Each can be required to be true or false.
+`being_interdicted`. Each can be required to be true or false. If you hand-edit the saved macros
+file, the `expect` (and `confirm`) fields accept `true`/`false` written as real JSON booleans **or**
+as the strings `"true"`/`"false"`/`"yes"`/`"no"`/`"1"`/`"0"` — so a stray `"false"` reads as false
+rather than silently flipping the check.
 
 ## Configuration
 

@@ -46,7 +46,8 @@ from ..keybinds.registry import Macro, registered_macros
 from ..keybinds.sequence import run_sequence
 from ..macros.compile import MacroValidationError, compile_macro
 from ..macros.registry import STATUS_CONDITIONS, TRIGGERS, triggers_for_event
-from ..macros.spec import (ACTION, AWAIT_STATUS, REQUIRE_STATUS, WAIT, MacroSpec, MacroStepSpec)
+from ..macros.spec import (ACTION, AWAIT_STATUS, REQUIRE_STATUS, WAIT, MacroSpec, MacroStepSpec,
+                           _as_bool)
 from ..macros.store import MacroStore
 from .base import HelpMeta
 from .keybind_capability import SAFE, _GUARD_MESSAGES, combat_state
@@ -179,6 +180,11 @@ class MacroCapability:
                                                       clock=clock)
         self._cooldowns: dict[str, float] = {}   # spec id -> last trigger-fire monotonic time
         self._cooldown_lock = threading.Lock()
+        # Consequential triggered macros waiting behind an already-armed one (the ConfirmGate holds
+        # exactly one payload). When two macros share a trigger, the first arms and the rest queue
+        # here so none is silently dropped; each is promoted to the gate as the prior is resolved.
+        self._pending_triggered: list[Macro] = []
+        self._pending_lock = threading.Lock()
 
     # -- capability interface ---------------------------------------------------------
     def tools(self) -> list[dict]:
@@ -309,6 +315,8 @@ class MacroCapability:
             return ("That isn't a separate confirmation yet — the Commander must confirm on a new "
                     "command. Tell them what's armed and wait for them to say it.")
         if verdict.status == CONFIRM_EXPIRED:
+            # The armed one aged out — offer the next queued sibling rather than stranding it.
+            self._promote_next_triggered()
             return "That macro expired for safety — ask for it again if you still want it."
         if verdict.status != CONFIRM_OK or verdict.payload is None:
             return "Nothing to confirm — no macro is armed."
@@ -317,11 +325,16 @@ class MacroCapability:
         problem = self._preflight(macro)
         if problem is not None:
             self._logline(f"macro {macro.name!r} blocked at confirm: {problem}")
+            self._promote_next_triggered()   # this one won't run; offer the next queued sibling
             return problem
-        return self._execute(macro)
+        result = self._execute(macro)
+        self._promote_next_triggered()       # arm the next queued sibling, if any
+        return result
 
     def _abort(self) -> str:
         self._gate.clear()
+        with self._pending_lock:
+            self._pending_triggered.clear()   # drop any queued triggered macros too
         # Mark every currently-running sequence/macro aborted (shared controller). Unlike the old
         # set()-then-per-run-clear() flag, this can't be wiped by a concurrently-starting run (#154).
         self._aborter.abort()    # stop a running sequence between steps (the runner polls this)
@@ -444,22 +457,63 @@ class MacroCapability:
         if self._cfg.require_confirmation and macro.confirm_required:
             # A consequential triggered macro does NOT fire itself — it arms and asks. The
             # Commander's spoken 'confirm' advances the gate turn, so the confirm passes.
-            self._gate.arm(macro)
-            when = TRIGGERS[spec.trigger].when if spec.trigger in TRIGGERS else "that happened"
-            self._logline(f"trigger armed macro {spec.name!r} ({when})")
-            self._say(f"{when.capitalize()} — say 'confirm' to run your '{spec.name}' macro, "
-                      f"or 'abort' to skip it.")
+            self._arm_triggered(macro, spec)
             return
 
         # A benign triggered macro runs immediately behind the guards, off the pump thread.
         self._logline(f"trigger firing macro {spec.name!r}")
         self._spawn(lambda: self._run_triggered(macro))
 
+    def _arm_triggered(self, macro: Macro, spec: MacroSpec) -> None:
+        """Arm a consequential triggered macro for a separate spoken confirm. The ConfirmGate holds
+        only ONE payload, so if another macro is already armed — a sibling sharing this trigger that
+        just armed, or a voice-armed macro still pending — QUEUE this one instead of overwriting the
+        gate. Overwriting is exactly the bug that silently dropped the earlier armed action when the
+        Commander said 'confirm'. Queued macros are promoted one at a time (`_promote_next_triggered`
+        on each confirm/expiry). The check-and-arm is done under `_pending_lock` so two triggers
+        firing on the pump thread can't both think the gate is free."""
+        when = TRIGGERS[spec.trigger].when if spec.trigger in TRIGGERS else "that happened"
+        with self._pending_lock:
+            if self._gate.pending is not None:
+                self._pending_triggered.append(macro)
+                queued = True
+            else:
+                self._gate.arm(macro)
+                queued = False
+        if queued:
+            self._logline(f"trigger queued macro {spec.name!r} ({when}) behind an armed one")
+            self._say(f"{when.capitalize()} — I've also queued your '{spec.name}' macro; I'll ask "
+                      f"about it once you've dealt with the one already armed.")
+        else:
+            self._logline(f"trigger armed macro {spec.name!r} ({when})")
+            self._say(f"{when.capitalize()} — say 'confirm' to run your '{spec.name}' macro, "
+                      f"or 'abort' to skip it.")
+
+    def _promote_next_triggered(self) -> None:
+        """Arm the next queued triggered macro (if any) once the current one is resolved — confirmed
+        and run, blocked by a guard, or expired — so siblings sharing one trigger are each offered
+        rather than silently dropped. Re-armed on the CURRENT turn; the Commander's next 'confirm'
+        is a new turn, so the gate's separate-turn safety rule still holds."""
+        with self._pending_lock:
+            nxt = self._pending_triggered.pop(0) if self._pending_triggered else None
+            if nxt is not None:
+                self._gate.arm(nxt)
+        if nxt is not None:
+            self._logline(f"promoted queued macro {nxt.name!r} to armed")
+            self._say(f"Next — say 'confirm' to run your '{nxt.name}' macro, or 'abort' to skip it.")
+
     def _run_triggered(self, macro: Macro) -> None:
-        result = self._arm_or_run(macro, spoken=False)
-        # Speak a benign trigger's outcome (success or a meaningful refusal) so the Commander
-        # isn't left guessing; a guard refusal is logged inside the guard already.
-        self._say(result)
+        # Runs on a detached daemon thread (the injected spawner), OFF the event pump — so nothing
+        # up the stack can catch an escaping exception. A raising injected dependency (e.g. a
+        # status getter that throws) would otherwise kill this thread silently. Guard the whole
+        # body and degrade soft (log), matching the loop's fail-soft convention.
+        try:
+            result = self._arm_or_run(macro, spoken=False)
+            # Speak a benign trigger's outcome (success or a meaningful refusal) so the Commander
+            # isn't left guessing; a guard refusal is logged inside the guard already.
+            self._say(result)
+        except Exception as e:  # noqa: BLE001 — a triggered run must never crash its daemon thread
+            self._logline(f"triggered macro {macro.name!r} failed: {e}")
 
     def _cooldown_ok(self, spec_id: str) -> bool:
         """True (and stamp now) if this macro hasn't triggered within _TRIGGER_COOLDOWN, else
@@ -575,7 +629,7 @@ def _spec_from_input(inp: dict) -> MacroSpec:
         name=name,
         steps=steps,
         trigger=str(inp.get("trigger") or "").strip(),
-        confirm=bool(inp.get("confirm", True)),
+        confirm=_as_bool(inp.get("confirm", True), default=True),
     )
 
 
@@ -591,7 +645,8 @@ def _step_from_input(s: dict) -> MacroStepSpec:
         return MacroStepSpec(kind=WAIT, seconds=_as_float(s.get("seconds")))
     if kind in (REQUIRE_STATUS, AWAIT_STATUS):
         return MacroStepSpec(kind=kind, status=str(s.get("status") or "").strip(),
-                             expect=bool(s.get("expect", True)), seconds=_as_float(s.get("seconds")))
+                             expect=_as_bool(s.get("expect", True), default=True),
+                             seconds=_as_float(s.get("seconds")))
     raise ValueError(f"a step has an unknown type {kind!r}")
 
 

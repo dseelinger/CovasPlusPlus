@@ -1013,7 +1013,14 @@ proving toggle-landing-gear end-to-end before any generalization:
 - **`executor.py`** injects via scancode-level `SendInput` (`KEYEVENTF_SCANCODE`) — ED ignores
   plain virtual-key events — with press / hold(duration) / release + a `release_all()` used by
   the hard abort. The `SendInput` call sits behind an injectable backend so the whole path is
-  unit-tested with a recording fake; `scancodes.py` is a pure ED-token→scancode map.
+  unit-tested with a recording fake; `scancodes.py` is a pure ED-token→scancode map. **Held-key
+  bookkeeping backs the hard-abort guarantee (#159):** *every* key — a `press` tap as well as a
+  `hold` — is recorded in `_down` **before** its key-down (closing the down→mark race) and lifted
+  through `_lift`, so `release_all()` can always get a key up even if an individual key-release hit
+  a transient backend fault mid-press (the key stays tracked rather than stranded). `hold()` is
+  **abort-aware**: it polls in small chunks and returns the instant the key is lifted out from
+  under it (a concurrent `release_all()`) or an injected `abort` predicate fires, so an abort during
+  a hold never has to wait out the remaining duration.
 - **Injection targets the OS foreground — so we make it deterministic (`focus.py`, #105).**
   `SendInput`/the comms clipboard-paste hit *whatever window has focus*; nothing used to check
   that ED was frontmost, a latent targeting bug. `covas/keybinds/focus.py` adds a shared
@@ -1400,13 +1407,21 @@ run.** Authoring safety is *structural*, not prompt-trust:
   *triggered* macro) ARMS and waits for a **separate spoken confirm** via a shared, turn-gated
   `ConfirmGate` (`keybinds/confirm.py`, extracted so authoring and future callers don't re-copy the
   arm/confirm/window logic). A consequential trigger doesn't fire itself — it arms and **speaks** a
-  prompt. The **hard abort** shares one `AbortController` with the keybind capability (injected), so
-  a single "abort" stops a running sequence from either and `release_all()` lifts every held key.
+  prompt. The `ConfirmGate` holds exactly one payload, so when **two** consequential macros share a
+  trigger the capability arms the first and **queues** the rest (#159), promoting each to the gate as
+  the prior is confirmed/expired — a shared trigger never silently drops one, and "abort" clears the
+  whole queue. The **hard abort** shares one `AbortController` with the keybind capability (injected),
+  so a single "abort" stops a running sequence from either and `release_all()` lifts every held key.
   The controller hands each run its own abort token (#154), so a macro that starts (or auto-triggers)
   at the same instant as an "abort" can't erase the abort meant for a concurrently-running sequence.
+  A triggered run's body is wrapped in a broad guard (#159) so a raising injected dependency degrades
+  soft (logged) rather than escaping onto its detached daemon thread.
 - **Persistence.** `macros/store.py` is a fail-soft JSONL store (one spec per line, mirroring the
   memory store) under the writable data dir (`[macros].file`, git-ignored — a macro is Commander
-  content). A corrupt hand-edited line is skipped, not fatal.
+  content). A corrupt hand-edited line is skipped, not fatal. Each save writes a **unique** temp file
+  then atomically `os.replace`s it (#159), so a voice-worker save and a web-thread save can't
+  interleave into one scratch file. Boolean fields (`expect`/`confirm`) are parsed robustly so a
+  hand-edited `"false"` reads as false instead of flipping the check.
 - Everything is injected (store, binds, executor, status snapshot, allowlist provider, speak,
   spawn, clock, sleep, abort controller), so author → validate → persist → run, a bus-triggered run, and
   every validation-failure path are unit-tested offline with a recording fake executor + fake

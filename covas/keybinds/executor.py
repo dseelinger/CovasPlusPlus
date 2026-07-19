@@ -38,6 +38,9 @@ _KEYEVENTF_SCANCODE = 0x0008
 DEFAULT_TAP_MS = 40.0
 # Safety ceiling on hold duration so a bad macro can't pin a key down indefinitely.
 MAX_HOLD_SECONDS = 10.0
+# Longest single sleep chunk inside `hold()`, so a concurrent `release_all()` (hard abort) or an
+# injected `abort` predicate is noticed within ~this long rather than after the full duration.
+_HOLD_POLL_S = 0.05
 
 
 class ExecutorError(Exception):
@@ -144,32 +147,47 @@ class KeyExecutor:
 
     def press(self, binding: KeyBinding) -> None:
         """Tap the binding: hold any modifiers, tap the key, release modifiers. Modifiers go
-        down before the key and up after, matching how ED expects a chord."""
+        down before the key and up after, matching how ED expects a chord.
+
+        Every key is TRACKED in `_down` (marked before its key-down) so a hard `release_all()`
+        can always lift it — if a `key_up` fails mid-press (a transient backend fault), the key
+        stays recorded as held and the abort path can still get it up rather than stranding it
+        (which in ED would e.g. pin a modifier or thrust). Marking BEFORE the key-down also
+        closes the down->mark race the old code left open."""
         key, mods = _resolve(binding)
         for sc, ext in mods:
+            self._mark(sc, ext, down=True)
             self.backend.key_down(sc, ext)
         try:
+            self._mark(*key, down=True)
             self.backend.key_down(*key)
             if self._tap_s:
                 self._sleep(self._tap_s)
-            self.backend.key_up(*key)
+            self._lift(*key)
         finally:
             for sc, ext in reversed(mods):
-                self.backend.key_up(sc, ext)
+                self._lift(sc, ext)
 
-    def hold(self, binding: KeyBinding, seconds: float) -> None:
+    def hold(self, binding: KeyBinding, seconds: float,
+             abort: Callable[[], bool] | None = None) -> None:
         """Press the key (with modifiers held) for `seconds`, then release. Clamped to
-        MAX_HOLD_SECONDS so a bad macro can't pin a key down. The key is tracked as held for
-        the duration so a concurrent `release_all()` (abort) can lift it early."""
+        MAX_HOLD_SECONDS so a bad macro can't pin a key down.
+
+        Abort-aware: the key is MARKED as held BEFORE its key-down (closing the down->mark gap a
+        `release_all()` snapshot could slip through), and the wait is split into small chunks that
+        poll two stop conditions — an optional injected `abort` predicate, and whether the key is
+        still recorded as held. A concurrent hard abort calls `release_all()`, which discards the
+        key from `_down`; the next poll sees it gone and returns promptly instead of sleeping out
+        the full duration and stalling the sequence."""
         seconds = max(0.0, min(float(seconds), MAX_HOLD_SECONDS))
         key, mods = _resolve(binding)
         for sc, ext in mods:
-            self.backend.key_down(sc, ext)
             self._mark(sc, ext, down=True)
-        self.backend.key_down(*key)
+            self.backend.key_down(sc, ext)
         self._mark(*key, down=True)
+        self.backend.key_down(*key)
         try:
-            self._sleep(seconds)
+            self._hold_wait(seconds, key, abort)
         finally:
             self._lift(*key)
             for sc, ext in reversed(mods):
@@ -197,6 +215,23 @@ class KeyExecutor:
                 self._down.discard((sc, ext))
 
     # -- held-key bookkeeping ----------------------------------------------------------
+    def _hold_wait(self, seconds: float, key: tuple[int, bool],
+                   abort: Callable[[], bool] | None) -> None:
+        """Sleep up to `seconds`, in `_HOLD_POLL_S` chunks, returning early once `abort` fires or
+        the held key has been lifted out from under us (a concurrent `release_all()` on abort).
+        Keeps a hold from pinning the worker thread for its full duration after an abort."""
+        remaining = seconds
+        while remaining > 1e-9:
+            if (abort is not None and abort()) or not self._is_held(*key):
+                return
+            chunk = min(_HOLD_POLL_S, remaining)
+            self._sleep(chunk)
+            remaining -= chunk
+
+    def _is_held(self, scancode: int, extended: bool) -> bool:
+        with self._lock:
+            return (scancode, extended) in self._down
+
     def _mark(self, scancode: int, extended: bool, *, down: bool) -> None:
         with self._lock:
             if down:

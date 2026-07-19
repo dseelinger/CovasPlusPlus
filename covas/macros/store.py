@@ -13,7 +13,9 @@ a concrete path), keeping unit tests hermetic — they point it at a tmp file, n
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 from .spec import MacroSpec
@@ -102,14 +104,29 @@ class MacroStore:
         self._save()
 
     def _save(self) -> None:
-        """Rewrite the file atomically (temp file then replace) so a crash mid-write can't
-        corrupt the existing store. Fail-soft: an OS error warns, never raises."""
+        """Rewrite the file atomically (unique temp file then replace) so a crash mid-write can't
+        corrupt the existing store. A UNIQUE per-write temp file (not a fixed `.tmp`) means two
+        concurrent saves — the voice worker and the web thread both persisting — can't interleave
+        into the same scratch file; each writes its own, and `os.replace` (atomic on the same
+        filesystem) makes the last one win cleanly rather than leaving a torn file. Fail-soft: an
+        OS error warns, never raises."""
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_suffix(self.path.suffix + ".tmp")
             body = "\n".join(json.dumps(s.to_dict(), ensure_ascii=False) for s in self._specs)
-            tmp.write_text(body + ("\n" if body else ""), encoding="utf-8")
-            tmp.replace(self.path)
+            # mkstemp gives a unique name in the target dir (same filesystem, so os.replace is
+            # atomic). Own the fd, write, replace; on any error remove the orphan temp file.
+            fd, tmp_name = tempfile.mkstemp(dir=str(self.path.parent),
+                                            prefix=self.path.name + ".", suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(body + ("\n" if body else ""))
+                os.replace(tmp_name, self.path)
+            except OSError:
+                try:
+                    os.unlink(tmp_name)
+                except OSError:
+                    pass
+                raise
         except OSError as e:
             self._warn(f"could not save macros file {self.path} ({e})")
 
