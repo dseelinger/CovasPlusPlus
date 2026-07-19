@@ -54,6 +54,50 @@ def test_load_content_maps_the_tree(tmp_path):
     assert b.threat == ["Contact, hostile.", "Brace!"]
 
 
+def test_offered_music_contexts_are_all_reachable(tmp_path):
+    """Every music folder we scan/offer must be a context music_context() can actually return
+    (or the documented `nebula` library seam) — otherwise tracks dropped there are silently
+    unreachable. Regression guard for issue #160: `unpopulated`/`scooping_fuel` are state tokens
+    that music_context() folds into `deep_space`/`near_star`, never returns."""
+    from covas.mixer import MUSIC_CONTEXTS as MUSIC_MODULE_CONTEXTS
+    from covas.mixer.content import MUSIC_CONTEXTS as CONTENT_CONTEXTS
+    from covas.mixer.eligibility import STATES
+    from covas.mixer.music import music_context
+
+    # content.py no longer keeps a private, drifted copy — it reuses the authoritative tuple.
+    assert CONTENT_CONTEXTS is MUSIC_MODULE_CONTEXTS
+    assert "unpopulated" not in CONTENT_CONTEXTS
+    assert "scooping_fuel" not in CONTENT_CONTEXTS
+
+    # Drive music_context() with every single live state token and collect the contexts it yields;
+    # each offered context must be either produced by the mapping or the reserved `nebula` tag.
+    reachable = {music_context(frozenset())}  # the default fallback
+    reachable |= {music_context({tok}) for tok in STATES}
+    for ctx in CONTENT_CONTEXTS:
+        assert ctx in reachable or ctx == "nebula", f"offered context {ctx!r} is unreachable"
+
+
+def test_scan_does_not_offer_folded_away_folders(tmp_path):
+    """A track dropped in an `unpopulated`/`scooping_fuel` folder is not scanned at all — those
+    contexts aren't offered, so the bundle carries no such keys (they'd never play)."""
+    _write(tmp_path / "audio" / "music" / "unpopulated" / "u.ogg")
+    _write(tmp_path / "audio" / "music" / "scooping_fuel" / "s.ogg")
+    _write(tmp_path / "audio" / "music" / "near_star" / "n.ogg")
+    b = load_content(tmp_path)
+    assert "unpopulated" not in b.music and "scooping_fuel" not in b.music
+    assert len(b.music["near_star"]) == 1                    # a real, reachable context still works
+
+
+def test_skeleton_only_creates_reachable_music_folders(tmp_path):
+    """ensure_skeleton() must not invite content into dead folders."""
+    ensure_skeleton(tmp_path)
+    music_root = tmp_path / "audio" / "music"
+    assert not (music_root / "unpopulated").exists()
+    assert not (music_root / "scooping_fuel").exists()
+    assert (music_root / "deep_space" / "README.md").is_file()
+    assert (music_root / "near_star" / "README.md").is_file()
+
+
 def test_load_content_empty_base_is_all_silent(tmp_path):
     b = load_content(tmp_path)                                # nothing dropped in
     assert all(v == [] for v in b.sfx.values())

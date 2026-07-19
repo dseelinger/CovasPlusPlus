@@ -1767,6 +1767,17 @@ on in config (or the Settings page) before testing.
   → the current track **keeps playing** (no restart of the track, no re-crossfade); a new track only
   takes over on the next genuine context change (e.g. jump into combat/deep space). Likewise, a cue
   that fired just before the reload does **not** immediately re-fire — its cooldown is preserved.
+- [ ] **Only reachable music folders offered (issue #160):** on first run the skeleton creates one
+  **`audio/music/<context>/`** per context COVAS actually selects — `combat_adjacent`, `near_star`,
+  `nebula`, `deep_space`, `populated`, `default` — and **no `unpopulated/` or `scooping_fuel/`**
+  folders (those states fold into `deep_space`/`near_star`, so a track there would never play). A
+  track dropped into `audio/music/near_star/` **does** play while scooping; one dropped into a
+  hand-made `audio/music/scooping_fuel/` folder is ignored.
+- [ ] **Interdiction survives a transient audio failure (issue #160):** if an interdiction fires
+  while TTS/SFX is momentarily unavailable so **nothing** is heard, the very next
+  Interdiction/UnderAttack tick still produces the full sting+threat+pirate moment (the failed
+  attempt did **not** burn the 45s cooldown), and the threat/pirate lines resume from where the
+  rotation left off (no line skipped by the silent attempt).
 
 Notes:
 

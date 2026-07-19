@@ -124,8 +124,11 @@ class InterdictionCue:
     def layers(self) -> list[Layer]:
         """The three layers in play order — sting (alert), threat (COVAS), pirate (comms) — using
         the current rotation positions. Pure; does not advance the rotation."""
-        sting = (self._sting_samples[self._rot_sting % len(self._sting_samples)]
-                 if self._sting_samples else self._sting)
+        # Snapshot the sample tuple ONCE: a concurrent set_content() rebind (issue #110/#160) can
+        # empty _sting_samples between a truthiness check and an index, which would divide by zero.
+        # Reading the reference a single time makes the choose-and-index consistent.
+        samples = self._sting_samples
+        sting = samples[self._rot_sting % len(samples)] if samples else self._sting
         out: list[Layer] = [Layer(ALERT, "sfx", sting)]
         if self._threat:
             out.append(Layer(COVAS, "line", self._threat[self._rot_threat % len(self._threat)]))
@@ -149,11 +152,16 @@ class InterdictionCue:
             if self._governor is not None and not self._governor.allow(gcue, now)[0]:
                 return []
             emitted = [layer for layer in self.layers() if bool(self._emit(layer))]
-            self._rot_threat += 1
-            self._rot_pirate += 1
-            self._rot_sting += 1
-            if self._governor is not None:
-                self._governor.mark_fired(gcue, now)
+            # Only advance rotations and arm the governor when at least one layer actually played
+            # (mirrors the driver's play-then-mark rule). If every emit() failed — a transient
+            # TTS/SFX outage — don't burn the 45s cooldown/rate budget on a moment nobody heard;
+            # the next UnderAttack tick gets a fresh shot at the same rotation position (issue #160).
+            if emitted:
+                self._rot_threat += 1
+                self._rot_pirate += 1
+                self._rot_sting += 1
+                if self._governor is not None:
+                    self._governor.mark_fired(gcue, now)
             if self._log is not None:
                 self._log(f"interdiction: emitted {len(emitted)} layers")
             return emitted
