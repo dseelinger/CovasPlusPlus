@@ -47,11 +47,27 @@ _CURRENCY_GUARDRAIL = (
 )
 
 
+# Action grounding guardrail (issue #143), always on — the no-invented-ACTIONS half of the
+# grounding discipline. The model must never narrate a side-effecting action it didn't actually
+# perform: a "done / corrected / moved it" claim requires a real tool call that returned success,
+# and the confirmation must relay that tool's result. This surfaced with the VR HUD (COVAS said
+# "tilted it back up" while no adjust_vr_hud call ran and the panel didn't move), but it's general.
+# Static text, so it rides the cached prefix and never busts the cache turn-to-turn.
+_ACTION_GROUNDING_GUARDRAIL = (
+    "Never claim you performed a side-effecting action — moved, tilted, pinned, centred, turned "
+    "something on/off, changed a setting, sent a message — unless you actually called the tool for "
+    "it and it returned success; then say only what the tool's result reports. If no tool ran, or "
+    "it errored, say so plainly (e.g. 'I couldn't move it' or ask again) — never a false "
+    "'done'/'corrected'. Just as you don't invent facts, don't invent actions."
+)
+
+
 def build_system(cfg: dict, ship_id: str | None = None) -> str | None:
     """The composed system prompt: `personality.compose_system` (Base + Persona + Campaign)
     when personality is ON (N7), plus STATIC always-on fragments — the ship-spec grounding
-    guardrail (issue #83), the currency grounding guardrail (issue #101), and, when CREW voicing
-    is on ([crew].enabled, issue #69), the crew line-prefix instruction for the ACTIVE ship's roster.
+    guardrail (issue #83), the currency grounding guardrail (issue #101), the action grounding
+    guardrail (no invented actions, issue #143), and, when CREW voicing is on ([crew].enabled,
+    issue #69), the crew line-prefix instruction for the ACTIVE ship's roster.
 
     The static fragments apply even with personality OFF (otherwise there'd be no system prompt to
     carry the guardrails) and are constant for a given config, so they ride the cached prefix and
@@ -64,7 +80,7 @@ def build_system(cfg: dict, ship_id: str | None = None) -> str | None:
     from .personality import compose_system
 
     parts = [compose_system(cfg), _SHIP_SPEC_GUARDRAIL, _CURRENCY_GUARDRAIL,
-             system_instruction(cfg, ship_id)]
+             _ACTION_GROUNDING_GUARDRAIL, system_instruction(cfg, ship_id)]
     joined = "\n\n".join(p for p in parts if p)
     return joined or None
 

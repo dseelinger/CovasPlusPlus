@@ -151,6 +151,31 @@ def test_ambiguous_setting_asks_which(cap):
     assert writes == []
 
 
+def test_placement_verb_over_hud_declines_instead_of_ambiguous(cap):
+    # #141/§3.8.1: 'pin/place/position the HUD here' is a VR-only look-to-place action, so the
+    # settings path defers to adjust_vr_hud rather than emitting the multi-HUD ambiguous list —
+    # WITH OR WITHOUT the word "VR".
+    c, _, writes = cap
+    for phrase in ("pin the hud here", "place the hud here", "position the hud there",
+                   "recentre the hud on me"):
+        out = c.run_tool("set_setting", {"setting": phrase, "value": "here"})
+        assert "did you mean" not in out.lower(), phrase
+        assert "pin the hud here" in out.lower(), phrase
+        assert writes == []
+
+
+def test_plain_hud_toggle_still_works_under_the_placement_guard(cap):
+    # The guard must not eat ordinary toggles: exact "hud" still resolves (exact-wins), and
+    # "turn the hud on" isn't a placement phrase.
+    from covas.capabilities.settings_capability import is_placement_phrase
+    assert not is_placement_phrase("hud")
+    assert not is_placement_phrase("turn the hud on")
+    assert not is_placement_phrase("vr hud tilt")
+    assert is_placement_phrase("pin the hud here")
+    assert is_placement_phrase("position the HUD there")
+    assert is_placement_phrase("recenter the hud")
+
+
 def test_get_reports_current_value(cap):
     c, cfg, _ = cap
     assert c.run_tool("get_setting", {"setting": "personality"}) == "Personality is on."

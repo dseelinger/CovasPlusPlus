@@ -438,12 +438,54 @@ def resolve_transform(p: VrPlacement) -> List[List[float]]:
     px = math.radians(float(p.pitch_deg))
     c, s = math.cos(px), math.sin(px)
     ry = [[cy, 0.0, sy, 0.0], [0.0, 1.0, 0.0, 0.0], [-sy, 0.0, cy, 0.0]]
+    # Pitch rotation about X. The sign here is the SINGLE source of the tilt convention: positive
+    # `pitch_deg` must lean the panel's top TOWARD the viewer (a low panel angles up to face you),
+    # matching `VrPlacement.pitch_deg`'s docstring. Hardware (#142) showed the previous `[c, -s /
+    # s, c]` block rendering positive pitch as top-AWAY — inverted — so it is flipped ONCE here.
+    # This one change corrects look-to-place pin AND the tilt_up/tilt_down nudges together (they
+    # share this reader); never flip a caller's sign instead. Direction is pinned by tests.
     local = [
         [1.0, 0.0, 0.0, float(p.offset_x_m)],
-        [0.0, c,  -s,   float(p.up_m)],
-        [0.0, s,   c,  -float(p.forward_m)],
+        [0.0, c,   s,   float(p.up_m)],
+        [0.0, -s,  c,  -float(p.forward_m)],
     ]
     return _mul_3x4(ry, local)
+
+
+# ---- typed, spoken failure taxonomy (issue #140) ------------------------------------------
+#
+# The Commander is in a headset and can't read the `hud` log, so every distinct reason the
+# overlay can't come up gets its OWN spoken line (turned into words by the placement capability).
+# TRANSIENT reasons are retryable — a later enable / settings reconcile / pin re-attempts with a
+# fresh `_steamvr_running()` check; PERMANENT ones latch for the session. See DESIGN §3.8.1
+# (lifecycle: attach is retryable, only true absence is terminal).
+VR_REASON_NOT_ENABLED = "not-enabled"        # the VR HUD switch is off
+VR_REASON_STEAMVR = "steamvr-not-running"    # TRANSIENT: SteamVR not up yet (or a non-SteamVR rig)
+VR_REASON_OPENVR = "openvr-missing"          # PERMANENT: the pyopenvr binding isn't installed
+VR_REASON_ATTACH = "attach-failed"           # TRANSIENT: init/attach failed despite SteamVR up
+VR_REASON_NO_POSE = "no-hmd-pose"            # TRANSIENT: overlay up but HMD pose not valid yet
+
+# Reasons that must NOT latch the one-shot creation flag (`_vr_view_tried`) — retry next time.
+VR_TRANSIENT_REASONS = frozenset({VR_REASON_STEAMVR, VR_REASON_ATTACH, VR_REASON_NO_POSE})
+
+
+def probe_vr_reason() -> Optional[str]:
+    """Why the VR overlay can't attach *right now* — a cheap, synchronous check — or ``None``
+    when it should attach (``openvr`` importable AND SteamVR up). No persistent view and no
+    ``openvr.init``: it only separates the PERMANENT ``openvr-missing`` from the TRANSIENT
+    ``steamvr-not-running`` so the lifecycle (DESIGN §3.8.1) can decide whether to latch and what
+    to speak. Never launches SteamVR; an actual init/attach glitch is a separate, rarer transient.
+    Fail-soft — any probe error reads as "can't attach" rather than raising."""
+    try:
+        import openvr  # noqa: F401 — optional binding; its absence is the permanent case
+    except Exception:  # noqa: BLE001 — not installed -> permanent for this session
+        return VR_REASON_OPENVR
+    try:
+        if not _steamvr_running():
+            return VR_REASON_STEAMVR
+    except Exception:  # noqa: BLE001 — fail soft: treat an odd probe as "not up yet"
+        return VR_REASON_STEAMVR
+    return None
 
 
 def _steamvr_running() -> bool:
@@ -512,6 +554,11 @@ class VrHudView:
         self._pin_request = False
         self._pin_event: Optional[threading.Event] = None
         self._pin_result: Optional[VrPlacement] = None
+        # "Recentre the HUD on me" (issue #144): same OpenVR-thread pose read, but snaps only the
+        # heading (yaw) to the current gaze, keeping distance/height/tilt/size/curvature.
+        self._recenter_request = False
+        self._recenter_event: Optional[threading.Event] = None
+        self._recenter_result: Optional[VrPlacement] = None
 
     # -- lifecycle ---------------------------------------------------------------------
     def start(self, timeout: float = 8.0) -> bool:
@@ -555,6 +602,21 @@ class VrHudView:
         ev.wait(timeout=timeout)
         with self._lock:
             return self._pin_result
+
+    def recenter_here(self, timeout: float = 1.5) -> Optional[VrPlacement]:
+        """Horizontal recentre (issue #144): snap the panel's HEADING (yaw) to the direction the
+        HMD faces NOW, keeping distance, height, tilt, size, and curvature. The fix for a
+        world-locked panel that drifted off to the side as you turned your head — distinct from
+        zeroing the lateral offset. Returns the new placement (for the caller to persist) or
+        ``None`` if the overlay/HMD pose isn't available. Pose is read on the OpenVR thread; this
+        blocks briefly for the result."""
+        with self._lock:
+            self._recenter_request = True
+            self._recenter_result = None
+            ev = self._recenter_event = threading.Event()
+        ev.wait(timeout=timeout)
+        with self._lock:
+            return self._recenter_result
 
     # -- OpenVR thread -----------------------------------------------------------------
     def _run(self) -> None:
@@ -660,6 +722,23 @@ class VrHudView:
         self._apply_placement(openvr, overlay, handle, pinned)
         return pinned
 
+    def _recenter_to_heading(self, openvr, overlay, handle) -> Optional["VrPlacement"]:
+        """Read the HMD pose and snap only the panel's HEADING (yaw) to the current gaze, keeping
+        every other field (distance, height, tilt, size, curvature, lateral offset). The recentre
+        primitive for a drifted world-locked panel (issue #144). Returns the new placement (also
+        applied live) or ``None`` if the HMD pose isn't valid yet. Runs on the OpenVR thread."""
+        system = openvr.VRSystem()
+        poses = system.getDeviceToAbsoluteTrackingPose(
+            openvr.TrackingUniverseSeated, 0, openvr.k_unMaxTrackedDeviceCount)
+        hmd = poses[openvr.k_unTrackedDeviceIndex_Hmd]
+        if not hmd.bPoseIsValid:
+            return None
+        m = hmd.mDeviceToAbsoluteTracking
+        mat = [[float(m[r][c]) for c in range(4)] for r in range(3)]
+        recentred = replace(self._placement, yaw_deg=hmd_yaw_deg(mat))
+        self._apply_placement(openvr, overlay, handle, recentred)
+        return recentred
+
     def _loop(self, openvr, overlay, handle) -> None:
         """Show/hide + repaint from the latest snapshot until closed. Re-uploads the RGBA
         buffer only when the snapshot changes, so a static HUD costs almost nothing."""
@@ -671,6 +750,8 @@ class VrHudView:
                 pending, self._pending_placement = self._pending_placement, None
                 pin, self._pin_request = self._pin_request, False
                 pin_ev = self._pin_event
+                recenter, self._recenter_request = self._recenter_request, False
+                recenter_ev = self._recenter_event
             if closing:
                 break
             if pending is not None:
@@ -688,6 +769,16 @@ class VrHudView:
                     self._pin_result = result
                 if pin_ev is not None:
                     pin_ev.set()
+            if recenter:
+                result = None
+                try:
+                    result = self._recenter_to_heading(openvr, overlay, handle)
+                except Exception as e:  # noqa: BLE001 — a recenter glitch must not kill the overlay
+                    self._logline(f"VR recenter error: {e}")
+                with self._lock:
+                    self._recenter_result = result
+                if recenter_ev is not None:
+                    recenter_ev.set()
             try:
                 if visible:
                     if not shown:

@@ -11,18 +11,21 @@ from covas.capabilities.hud_placement_capability import HudPlacementCapability
 from covas.capabilities.vr_hud import VrPlacement
 
 
-def _cap(pin=None):
+def _cap(pin=None, *, recenter=None, vr_reason=None, vr_enabled=None):
     """A capability over a mutable [hud] dict that records + applies each patch (so successive
     nudges accumulate, exactly like the real persist-then-reload path)."""
     hud = {"vr_distance_m": 1.30, "vr_offset_x_m": 0.0, "vr_offset_y_m": -0.12,
            "vr_pitch_deg": 0.0, "vr_curvature": 0.1, "vr_width_m": 0.55, "vr_yaw_deg": 0.0}
+    if vr_enabled is not None:
+        hud["vr_enabled"] = vr_enabled
     applied = []
 
     def apply(patch):
         applied.append(patch)
         hud.update(patch.get("hud", {}))
 
-    cap = HudPlacementCapability(get_hud=lambda: hud, apply_patch=apply, pin=pin)
+    cap = HudPlacementCapability(get_hud=lambda: hud, apply_patch=apply, pin=pin,
+                                 recenter=recenter, vr_reason=vr_reason)
     return cap, hud, applied
 
 
@@ -144,11 +147,72 @@ def test_pin_here_clamps_extreme_captured_values_on_write():
     assert hud["vr_offset_y_m"] == 2.0    # ±2 m clamp
 
 
+def test_pin_here_enables_and_places_in_one_step():
+    # ENABLE-and-place (#140): "pin here" with the VR HUD off first turns it on (writes
+    # vr_enabled), then pins — one command matching intent.
+    cap, hud, applied = _cap(pin=lambda: VrPlacement(yaw_deg=10.0))
+    msg = _run(cap, "pin_here")
+    assert applied[0] == {"hud": {"vr_enabled": True}}   # enabled first
+    assert hud["vr_enabled"] is True
+    assert hud["vr_yaw_deg"] == 10.0                     # then pinned
+    assert "Pinned" in msg
+
+
 def test_pin_here_is_soft_when_no_vr_overlay():
+    # With no pin result and no reason provider, it still enables (intent) then speaks a typed
+    # reason — the overlay is up but the pose couldn't be read yet (#140).
     cap, hud, applied = _cap(pin=lambda: None)
     msg = _run(cap, "pin_here")
-    assert "couldn't pin" in msg.lower()
-    assert applied == []                  # nothing persisted when there's nothing to pin
+    assert applied == [{"hud": {"vr_enabled": True}}]    # enabled, but nothing pinned
+    assert "headset position" in msg.lower()             # no-hmd-pose line
+    assert "vr_yaw_deg" not in [k for p in applied for k in p.get("hud", {})]
+
+
+def test_pin_here_speaks_the_specific_typed_reason():
+    # Each attach cause -> its OWN spoken line (#140), so the Commander (no screen) can recover.
+    cases = {
+        "steamvr-not-running": ("steamvr", "web hud"),   # points at the #103 path
+        "openvr-missing": ("isn't installed",),
+        "attach-failed": ("attach",),
+        "no-hmd-pose": ("headset position",),
+    }
+    for reason, needles in cases.items():
+        cap, _hud, _applied = _cap(pin=lambda: None, vr_reason=lambda r=reason: r)
+        msg = _run(cap, "pin_here").lower()
+        for needle in needles:
+            assert needle in msg, f"{reason!r} line missing {needle!r}: {msg!r}"
+
+
+def test_recenter_snaps_yaw_to_the_captured_heading():
+    # #144: recentre persists ONLY yaw (the drifted-heading fix), keeping everything else.
+    cap, hud, _ = _cap(recenter=lambda: VrPlacement(yaw_deg=33.0), vr_enabled=True)
+    hud["vr_offset_x_m"] = 0.4       # untouched by a recentre
+    msg = _run(cap, "recenter")
+    assert hud["vr_yaw_deg"] == 33.0
+    assert hud["vr_offset_x_m"] == 0.4
+    assert "recentred" in msg.lower()
+
+
+def test_center_routes_to_yaw_recentre_not_offset_zero():
+    # 'center' now BECOMES the yaw recentre (#144, §3.8.1), not the old offset-zero no-op.
+    cap, hud, _ = _cap(recenter=lambda: VrPlacement(yaw_deg=12.0), vr_enabled=True)
+    _run(cap, "center")
+    assert hud["vr_yaw_deg"] == 12.0
+
+
+def test_recenter_when_vr_hud_off_asks_to_turn_it_on():
+    cap, hud, applied = _cap(recenter=lambda: VrPlacement(yaw_deg=5.0), vr_enabled=False)
+    msg = _run(cap, "recenter")
+    assert "off" in msg.lower() and "turn the vr hud on" in msg.lower()
+    assert applied == []             # nothing changed while it's off
+
+
+def test_corrective_tilt_synonyms_route_to_a_tilt_action():
+    # #143: complaint/corrective phrasing the model may emit still lands on a real tilt nudge.
+    for action in ("tilt_back_up", "fix_tilt", "flatten"):
+        cap, hud, _ = _cap()
+        _run(cap, action)
+        assert hud["vr_pitch_deg"] == 5.0, action
 
 
 def test_reset_restores_defaults():

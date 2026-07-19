@@ -136,6 +136,8 @@ class SettingsCapability:
         spoken = str(inp.get("setting") or "").strip()
         if not spoken:
             return "Which setting do you want to check?"
+        if is_placement_phrase(spoken):
+            return _PLACEMENT_DEFER
         matches = find_settings(spoken)
         if not matches:
             return self._unknown(spoken)
@@ -152,6 +154,11 @@ class SettingsCapability:
         spoken = str(inp.get("setting") or "").strip()
         if not spoken:
             return "Which setting should I change?"
+        # A placement verb over "HUD" ('pin/place/position the HUD here') is a VR-only look-to-
+        # place action, never a settings toggle — decline in favour of the placement tool rather
+        # than emit the multi-HUD ambiguous list (issue #141, DESIGN §3.8.1 routing rule).
+        if is_placement_phrase(spoken):
+            return _PLACEMENT_DEFER
         matches = find_settings(spoken)
         if not matches:
             return self._unknown(spoken)
@@ -256,6 +263,25 @@ class SettingsCapability:
 # ---- pure matching helpers (module-level so they're unit-testable) ------------------------
 
 _ARTICLE = re.compile(r"^(?:the|my|your|a|an)\s+")
+
+# "Pin / place / position [the] HUD here/there" is a VR-only look-to-place action (you can't pin
+# the 2D window or the web page), so it belongs to adjust_vr_hud, never the settings matcher —
+# whose three HUD surfaces would otherwise make bare "hud" ambiguous (issue #141). Detect the verb
+# so the settings path can defer. Kept narrow (pin/place/position + here/there over "hud") so plain
+# toggles like "turn the hud on" are untouched.
+_PLACEMENT_PHRASE = re.compile(
+    r"\b(?:pin|place|position|re-?cent(?:er|re))\b.*\bhud\b|"
+    r"\bhud\b.*\b(?:here|there)\b")
+_PLACEMENT_DEFER = ("That's a VR HUD placement — say 'pin the HUD here' and I'll position the VR "
+                    "HUD along your gaze.")
+
+
+def is_placement_phrase(spoken: str) -> bool:
+    """True when the spoken phrase is a look-to-place / recentre command over the HUD ('pin the
+    HUD here', 'position the HUD there', 'recentre the HUD'). The settings path declines these in
+    favour of the placement tool (issue #141). Pure + module-level, so it's unit-testable."""
+    t = " ".join(str(spoken or "").lower().split())
+    return bool(_PLACEMENT_PHRASE.search(t))
 
 
 def _norm(text: str) -> str:
