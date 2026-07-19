@@ -36,7 +36,9 @@ Every safeguard is on by default:
 - **Confirmation expiry** — an armed action stops being confirmable after a timeout (60 s), so a
   stale "confirm" can't fire it later.
 - **Hard abort** — say **"abort"** (or "belay that") any time to cancel a pending action and
-  immediately release any held key.
+  immediately release any held key. One "abort" stops **every** in-flight run at once — a running
+  keybind sequence *and* any custom macro that happens to be running or auto-triggering — and a
+  new run starting at the same moment can never swallow an abort meant for one already underway.
 
 ## Using it
 

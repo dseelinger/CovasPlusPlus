@@ -1172,9 +1172,15 @@ sits **on** the existing executor and safety layer; it does not rewrite either.
   returns a `SequenceOutcome` the capability speaks.
 - **Safety inherited, not bypassed.** A sequence macro goes through the *same* gates as any macro
   — allowlist, combat/interdiction guard, mode gate, and (for consequential ones) arm-and-confirm.
-  The **hard abort** now also sets a flag the runner polls **between steps and during waits**, so
+  The **hard abort** raises a stop signal the runner polls **between steps and during waits**, so
   "abort" stops a running sequence *and* `release_all()` lifts any key a mid-sequence `hold` left
   down. On any failure the runner also calls `release_all()` — a failed step never strands a key.
+  That stop signal is a **per-run abort token** minted from the shared `AbortController`
+  (`keybinds/abort.py`, issue #154), **not** a single overloaded `threading.Event`: a hard abort
+  marks *every* in-flight run's token, while a newly-starting run gets a fresh, un-aborted token
+  instead of `clear()`-ing shared state. This closes a race where a macro starting concurrently
+  with a running sequence used to wipe that sequence's just-set abort (the old flag was both the
+  global stop *and* a per-run reset — see #154).
 - **Worked macro (`keybinds/actions/macros.py`).** `launch` — the design's own launch example —
   lifts off the pad and departs: `require_status(landing_gear=down)` → throttle 50% → **hold**
   vertical thrust to clear the pad → boost → retract gear → **`await_status(landing_gear=up)`** to
@@ -1394,13 +1400,15 @@ run.** Authoring safety is *structural*, not prompt-trust:
   *triggered* macro) ARMS and waits for a **separate spoken confirm** via a shared, turn-gated
   `ConfirmGate` (`keybinds/confirm.py`, extracted so authoring and future callers don't re-copy the
   arm/confirm/window logic). A consequential trigger doesn't fire itself — it arms and **speaks** a
-  prompt. The **hard abort** shares one `threading.Event` with the keybind capability (injected), so
+  prompt. The **hard abort** shares one `AbortController` with the keybind capability (injected), so
   a single "abort" stops a running sequence from either and `release_all()` lifts every held key.
+  The controller hands each run its own abort token (#154), so a macro that starts (or auto-triggers)
+  at the same instant as an "abort" can't erase the abort meant for a concurrently-running sequence.
 - **Persistence.** `macros/store.py` is a fail-soft JSONL store (one spec per line, mirroring the
   memory store) under the writable data dir (`[macros].file`, git-ignored — a macro is Commander
   content). A corrupt hand-edited line is skipped, not fatal.
 - Everything is injected (store, binds, executor, status snapshot, allowlist provider, speak,
-  spawn, clock, sleep, abort event), so author → validate → persist → run, a bus-triggered run, and
+  spawn, clock, sleep, abort controller), so author → validate → persist → run, a bus-triggered run, and
   every validation-failure path are unit-tested offline with a recording fake executor + fake
   Status feed — no real keys, no network, no real time.
 - **Deferred by design (Tier-2/Tier-3 spikes, NOT built).** Continuous-distance conditions ("within

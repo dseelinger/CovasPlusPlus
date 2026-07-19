@@ -31,6 +31,7 @@ from .providers import _retry
 from .router import Router
 from . import tiering
 from .ed import ContextDetector
+from .keybinds.abort import AbortController
 from .memory import MemoryDetector
 from . import crew as crew_mod
 from . import bootstrap
@@ -301,9 +302,11 @@ class App:
         # Shared window focuser (#105) — foregrounds ED before injection; None off-Windows.
         self._shared_focuser = None
         self._binds_cache: dict | None = None
-        # Shared hard-abort flag so ONE "abort" stops a running sequence started by EITHER the
-        # keybind capability or a custom macro (they share the executor too). Created once here.
-        self._keybind_abort = threading.Event()
+        # Shared hard-abort coordinator so ONE "abort" stops a running sequence started by EITHER
+        # the keybind capability or a custom macro (they share the executor too). Created once
+        # here. Per-run abort tokens (#154) mean a concurrently-starting run can't wipe an abort
+        # meant for a still-running one — the old single Event overloaded set/clear did.
+        self._keybind_abort = AbortController()
         # True once the control panel (Flask) is up — set by web.create_app via
         # note_web_ui_started(). The web HUD (#103) needs it: /hud is only served under
         # run_covas_ui.py, never headless run_covas.py.
