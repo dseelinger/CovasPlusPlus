@@ -334,7 +334,37 @@ restricted keys** at each provider as defense-in-depth.
 
 ---
 
-## Support
+## Help & community
+
+- 💬 **[Discord](https://discord.gg/WWHDU62WW)** — setup help, usage questions, and hanging out with
+  other Commanders. The fastest place to get unstuck.
+- 🐛 **[GitHub Issues](https://github.com/dseelinger/CovasPlusPlus/issues)** — bug reports and
+  feature requests. The [bug template](.github/ISSUE_TEMPLATE/bug_report.yml) asks for your
+  `check_setup.py` output, which usually pinpoints the problem fast.
+- 📖 **[Documentation](https://dseelinger.github.io/CovasPlusPlus/)** — install, setup, and a page
+  per feature. Check here first.
+- 📓 **[Changelog](CHANGELOG.md)** / **[Releases](https://github.com/dseelinger/CovasPlusPlus/releases)**
+  — what changed, so you can decide whether to update.
+
+## Maintainer status & response expectations
+
+COVAS++ is a **solo project**, built and maintained by one person in evenings and weekends, at
+high velocity. That's worth being honest about so your expectations are calibrated:
+
+- **It's actively developed** — releases ship often (see the [changelog](CHANGELOG.md)).
+- **Responses are best-effort and asynchronous.** Issues and PRs are read, but a reply or a merge
+  can take days, and not every feature request will fit the roadmap. That's not disinterest — it's
+  one maintainer's bandwidth.
+- **The best way to get a bug fixed** is a clear report with your `check_setup.py` output; **the
+  best way to get a change merged** is a small, tested PR that matches an existing issue (see
+  [CONTRIBUTING.md](CONTRIBUTING.md)).
+- **Bus factor:** the project is deliberately buildable by anyone from a clean checkout — no
+  author-specific machine setup is required (verified; steps in [CONTRIBUTING.md](CONTRIBUTING.md)).
+
+If COVAS++ stops being maintained, it keeps working: it's local-first, the source is MIT, and the
+build is reproducible.
+
+## Support the project
 
 COVAS++ is free and always will be. If it's made your time in the black better, a tip helps cover
 the running costs behind every reply and the evenings behind every feature — nothing gets paywalled.
@@ -343,7 +373,19 @@ the running costs behind every reply and the evenings behind every feature — n
 
 ---
 
-## License
+## Contributing
 
-MIT (see [`LICENSE`](LICENSE)) — covers the source only. Supply your own rights for any sound cues
-or voice models you add locally.
+Contributions are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for how to build from a clean
+checkout, run the tests, and open a PR, and the **[Code of Conduct](CODE_OF_CONDUCT.md)**. Read the
+maintainer-status note above first so the process makes sense.
+
+---
+
+## License & attributions
+
+MIT (see [`LICENSE`](LICENSE)) — covers the **source only**. Supply your own rights for any sound
+cues or voice models you add locally.
+
+The packaged installer redistributes third-party libraries and community game data (FFmpeg via
+PyAV, edge-tts, Elite Dangerous reference data from EDCD/Coriolis/Spansh, and more). Their licenses
+and attributions — including the copyleft components — are documented in **[NOTICE.md](NOTICE.md)**.

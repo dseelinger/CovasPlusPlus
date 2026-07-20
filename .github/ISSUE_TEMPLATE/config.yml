@@ -1,0 +1,14 @@
+# Keep the "blank issue" escape hatch, but steer questions/support to the right places.
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discord — questions, help & community
+    url: https://discord.gg/WWHDU62WW
+    about: >-
+      For setup help, usage questions, and chatting with other Commanders. Bugs and concrete
+      feature requests are better as issues here so they don't get lost.
+  - name: 📖 Documentation
+    url: https://dseelinger.github.io/CovasPlusPlus/
+    about: Install, setup, and a page per feature with example voice commands. Check here first.
+  - name: ❤ Support COVAS++ on Ko-fi
+    url: https://ko-fi.com/dougseelinger
+    about: COVAS++ is free and always will be. Tips defray the API-token and time cost of building it.
