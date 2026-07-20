@@ -129,7 +129,7 @@ LIVE_SECTIONS: tuple[str, ...] = (
     "conversation", "keys", "listen", "whisper", "personality", "crew", "elite", "language",
     "proactive", "route", "nav", "star_systems", "search", "route_plan",
     "neutron_plan", "riches_plan", "keybinds", "macros", "honk", "reflex",
-    "comms_send", "audio", "music", "hud",
+    "comms_send", "audio", "music", "hud", "crash_report",
 )
 
 
@@ -329,6 +329,11 @@ class App:
         self._pump_lock = threading.Lock()  # serialize first-enable so the pump starts once (#156)
 
         self._logf = self._open_log()
+        # Opt-in crash capture (issue #186): install a fail-soft excepthook that writes a REDACTED
+        # crash file to the logs dir — but only when [crash_report].enabled (checked live at crash
+        # time, so the Settings toggle works without a restart). Nothing is transmitted.
+        from . import crashlog
+        crashlog.install(self.cfg, log=lambda m: self._log("system", m))
         self._log("system", _cost_summary(self.cfg, self.mock))
         self._log("system", tiering.describe_level(self.cfg))
         if self.text_only:

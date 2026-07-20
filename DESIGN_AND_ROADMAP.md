@@ -2246,10 +2246,23 @@ product-pillar justification (mostly **Foundation**) before it becomes one.
   (EDCD/coriolis-data, EDCD/FDevIDs, Spansh) is Frontier IP under fan-content — attributed, not
   claimed as MIT. README fan-content disclaimer confirmed present; a real support channel (Discord +
   GitHub Issues) is now linked from the README and `docs/support.md`.
-- **Operational maturity for machines we don't own (Foundation).** Opt-in, off-by-default crash/error
-  reporting (can't fix what we never see); an update *notifier* so users aren't running stale builds
-  when they file bugs; documented minimum system requirements + graceful degradation on low-VRAM
-  machines (smaller Whisper model, Piper TTS) so COVAS never stutters the game.
+- **Operational maturity for machines we don't own (Foundation).** ✅ **Done (#186).**
+  **Crash reporting stays privacy-first — no telemetry, nothing phoned home.** "Can't fix what we
+  never see" is solved the local way: `[crash_report].enabled` (default **false**) installs a
+  fail-soft `sys.excepthook` (`covas/crashlog.py`) that, when opted in, writes a **redacted** crash
+  file to the logs dir — API keys, `DPAPI:` blobs, and the username/home path scrubbed by pure,
+  unit-tested redaction — for the Commander to *choose* to attach to a bug. The hook checks the live
+  config at crash time, so the toggle works without a restart; when off, it's a transparent
+  pass-through. This is a deliberate stance: **the user sees the crash and decides what to share; we
+  never collect.** The **update notifier** already existed (`covas/updates.py` + banner, GitHub
+  Releases as the server); #186 surfaces it in the **Test my setup** health report too (`check_updates`
+  reuses the fail-soft `check_for_update`), so a stale build is caught before a bug is filed against
+  it. **Minimum system requirements + graceful degradation** are documented
+  (`docs/getting-started/system-requirements.md`): COVAS is CPU-only for local ML (no VRAM
+  requirement — the real constraint is RAM/CPU), and a `check_system` health line reports RAM and
+  **warns when the configured Whisper model is heavy for it**, pointing at a lighter model
+  (`small.en`/`base.en`/`tiny.en`) — the graceful-degradation nudge. All three surfaces reuse the
+  #181 `covas/health.py` core.
 - **Sustainability / bus factor (Foundation).** ✅ **Done (#187).** Verified a contributor can build
   from a clean checkout without the author's machine — a fresh `git archive` export + a new Python
   3.11 venv + `requirements-dev.txt` byte-compiles and runs the full offline unit suite green, with

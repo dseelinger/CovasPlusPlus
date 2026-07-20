@@ -225,6 +225,58 @@ def check_gemini(report: HealthReport, cfg: dict,
         s.add(WARN, "Gemini model check skipped", friendly_provider_error("Gemini", e))
 
 
+def check_updates(report: HealthReport, current: Optional[str] = None,
+                  probe: Optional[Callable[[str], dict]] = None) -> None:
+    """Update-available check (issue #186): nudge a stale build before the user files a bug against
+    one. Reuses the fail-soft `updates.check_for_update` (GitHub Releases). `probe(current)->info`
+    injected for tests; fail-soft (a network hiccup WARNs, never FAILs)."""
+    s = report.section("Updates")
+    try:
+        from .__version__ import __version__
+        cur = current or __version__
+        info = probe(cur) if probe is not None else _probe_updates(cur)
+        if info.get("available"):
+            s.add(WARN, f"An update is available: {info.get('latest')} (you have {cur})",
+                  "Update from the banner on the control panel's main page.")
+        else:
+            s.add(OK, f"Up to date (version {cur})")
+    except Exception as e:  # noqa: BLE001 — an update check must never fail the report
+        s.add(WARN, "Update check skipped", str(e).splitlines()[0] if str(e) else "")
+
+
+# Rough RAM footprint of each Whisper size — used only to WARN a low-RAM machine toward a lighter
+# model (graceful degradation, issue #186). Approximate working-set, not exact.
+_WHISPER_RAM_GB = {
+    "tiny": 1, "tiny.en": 1, "base": 1, "base.en": 1, "small": 2, "small.en": 2,
+    "medium": 5, "medium.en": 5, "large-v3": 10,
+}
+
+
+def check_system(report: HealthReport, cfg: dict,
+                 probe: Optional[Callable[[], Optional[float]]] = None) -> None:
+    """Minimum-requirements / graceful-degradation check (issue #186). Reports total RAM and WARNs
+    if the configured Whisper model is heavy for it, pointing at a lighter model. `probe()->RAM GB`
+    (or None if unknown) is injected for tests. Speech is CPU-only, so RAM — not VRAM — is the real
+    constraint."""
+    s = report.section("System")
+    try:
+        ram = probe() if probe is not None else _probe_ram_gb()
+        model = str((cfg.get("whisper", {}) or {}).get("model", "small.en"))
+        need = _WHISPER_RAM_GB.get(model, 2)
+        if ram is None:
+            s.add(OK, f"Whisper model: {model} (couldn't read total RAM)")
+            return
+        s.add(OK, f"{ram:.0f} GB RAM, Whisper model {model}")
+        if ram < 8:
+            s.add(WARN, "Less than 8 GB RAM — the recommended minimum",
+                  "COVAS runs, but close other apps; a smaller Whisper model helps.")
+        if ram < need + 4:  # leave headroom for Elite + the OS
+            s.add(WARN, f"Whisper '{model}' may be heavy for {ram:.0f} GB RAM alongside Elite",
+                  "Set a smaller model (small.en / base.en / tiny.en) on the Settings page.")
+    except Exception as e:  # noqa: BLE001
+        s.add(WARN, "System check skipped", str(e).splitlines()[0] if str(e) else "")
+
+
 def check_datasets(report: HealthReport) -> None:
     s = report.section("Game data freshness")
     try:
@@ -281,6 +333,33 @@ def _probe_elevenlabs(key: str) -> int:
     return len(r.json().get("voices", []))
 
 
+def _probe_updates(current: str) -> dict:
+    from .updates import check_for_update
+    return check_for_update(current)
+
+
+def _probe_ram_gb() -> Optional[float]:
+    """Total physical RAM in GB, Windows-first (GlobalMemoryStatusEx) with an os.sysconf fallback;
+    None if it can't be determined. No new dependency."""
+    try:
+        import ctypes
+
+        class _MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+        stat = _MEMORYSTATUSEX(); stat.dwLength = ctypes.sizeof(_MEMORYSTATUSEX)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))  # type: ignore[attr-defined]
+        return stat.ullTotalPhys / (1024 ** 3)
+    except Exception:  # noqa: BLE001 — not Windows, or the call failed
+        try:
+            return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / (1024 ** 3)
+        except Exception:  # noqa: BLE001
+            return None
+
+
 def _probe_audio() -> dict:
     import sounddevice as sd
     devs = sd.query_devices()
@@ -319,5 +398,8 @@ def run_health(cfg: Optional[dict] = None, *, network: bool = True) -> HealthRep
         check_elevenlabs(report, el_key)
         check_gemini(report, cfg)
     check_datasets(report)
+    check_system(report, cfg)
     check_audio(report)
+    if network:
+        check_updates(report)
     return report

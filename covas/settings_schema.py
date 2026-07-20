@@ -1179,6 +1179,15 @@ SCHEMA: list[Setting] = [
             "Port the local control panel serves on. Restart to apply.",
             default=8765, min=1, max=65535, phrasings=("control panel port",)),
 
+    # --- Diagnostics (issue #186) ------------------------------------------
+    Setting("crash_report.enabled", ("crash_report", "enabled"), "bool",
+            "Save crash reports", "Diagnostics",
+            "OFF by default, and nothing is ever sent anywhere. When ON, an unexpected crash is "
+            "written to a redacted local file in your logs folder (keys and your username scrubbed) "
+            "that you can attach to a bug report — so a problem can actually be fixed.",
+            default=False, phrasings=("crash reports", "crash reporting", "save crashes"),
+            example="turn on crash reports"),
+
     # NOTE: dev mock mode (`[dev].mock`) is intentionally NOT a Setting (issue #130) — it swaps the
     # LLM/TTS/STT for fakes, useful only for tests/dev, never for an end user. The mechanism stays
     # (config.toml `[dev] mock = true`, `COVAS_MOCK=1`, `config.mock_enabled`, `app.self.mock`); it's
