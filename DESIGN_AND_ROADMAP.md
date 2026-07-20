@@ -2218,8 +2218,20 @@ product-pillar justification (mostly **Foundation**) before it becomes one.
   `covas/i18n.py` (`resolve_whisper_language`), so setting the reply language moves transcription
   with it and English installs keep `en`; an unmapped reply language falls back to auto-detect, and
   an `.en` (English-only) model warns the user to switch to a multilingual one rather than
-  auto-swapping it. The remaining layers — UI strings (after #181/#184 land template changes);
-  locale-aware voice pairing; number/date formatting — are filed as child issues of #182.
+  auto-swapping it. **Locale-aware voice pairing (TTS) is now done too — issue #198.** The voice
+  follows `[language].reply` for the locale-tagged providers: `covas/i18n.py` gains `locale_prefix`
+  + `voice_speaks` (does a voice's BCP-47 `Locale` tag speak the reply language?), and
+  `covas/voice_pairing.py` gains the pure `pick_language_voice` / `reply_voice_patch` — steer an
+  Edge/Azure voice that would mispronounce the active language to a locale-matched one (same gender
+  where possible), but keep a voice that already speaks it, **respect an explicit user pick (flag
+  the mismatch, don't override)**, and flag when the catalog has no voice for the language.
+  ElevenLabs/OpenAI voices are untagged/multilingual so they're deliberately left alone; Piper is
+  per-model. The Edge/Azure settings dropdowns (`covas/catalog.py`) also follow the reply locale so
+  a non-English commander can pick a matching voice by hand, and a new `[language].match_voice`
+  (default on) is the opt-out. Steering runs fail-soft on a background thread only when the reply
+  language actually changes — the English-default path never fetches a catalog. The remaining
+  layers — UI strings (after #181/#184 land template changes); number/date formatting — are filed
+  as child issues of #182.
 - **Accessibility, both directions (Foundation).** ✅ **Done (#184).** Voice-first helps
   motor/vision-impaired players and walls off deaf/HoH/non-verbal ones — so text is now a
   **first-class input path, not a TTS-failure fallback**: the typed-prompt box (#76) is documented

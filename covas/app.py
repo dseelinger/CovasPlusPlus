@@ -1125,6 +1125,9 @@ class App:
         # voice; a manual voice change on the current persona is remembered as explicit. Routed
         # through its own update_settings (guarded), so it rides the normal persist + TTS-reload path.
         bootstrap.reconcile_persona_voice(self, before)
+        # Locale-aware voice pairing (issue #182 layer 4, #198): if the reply language changed,
+        # steer an Edge/Azure voice that can't pronounce it to one that can. Fail-soft, background.
+        bootstrap.steer_reply_voice_for_language(self, before)
 
     def _reload_whisper(self) -> None:
         try:

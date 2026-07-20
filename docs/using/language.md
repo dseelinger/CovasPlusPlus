@@ -26,20 +26,22 @@ that answers in German but mishears your German speech — feels more broken tha
 English-only one, so the list grows only as the rest of the pipeline catches up.
 
 !!! note "What this does today (and doesn't yet)"
-    This setting changes the language COVAS **replies in** — the single cheapest, highest-impact
-    slice of localization. Your **speech → text follows it automatically**: `[whisper].language`
-    ships as `"follow"`, so setting the reply language moves Whisper's transcription language with
-    it — no separate step. One piece is still up to you:
+    Setting **one** language now localizes the whole round trip. Beyond the reply itself:
 
-    - **The voice that reads the reply.** Pick a [TTS voice](personas-voice.md) that speaks your
-      language (Edge and Azure cover many; Piper is per-voice-model). A voice that can't pronounce
-      the language will read it awkwardly.
+    - **Your speech → text follows it automatically.** `[whisper].language` ships as `"follow"`, so
+      setting the reply language moves Whisper's transcription language with it — no separate step.
+    - **The voice that reads the reply follows it too** (Edge/Azure). When the reply language is
+      non-English, COVAS steers a voice that can't pronounce it to a locale-matched one — see
+      [voice follows your reply language](personas-voice.md#voice-follows-your-reply-language). A
+      voice *you* explicitly picked is kept (and a mismatch is flagged, not overridden), and
+      ElevenLabs/OpenAI voices are multilingual so they're left alone. Toggle with
+      `[language].match_voice`.
 
     The one caveat for STT: a `.en` Whisper model (e.g. `small.en`) is **English-only**. Before
     setting a non-English reply language, switch to a **multilingual** model (e.g. `small`) on the
     [Settings page](../control-panel.md) — otherwise COVAS logs a warning and transcribes your
-    speech poorly. Locale-aware voice pairing, translated control-panel text, and localized
-    number/date formatting are still on the roadmap.
+    speech poorly. Translated control-panel text and localized number/date formatting are still on
+    the roadmap.
 
 ## How it works
 

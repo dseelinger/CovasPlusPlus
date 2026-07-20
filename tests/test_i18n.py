@@ -1,11 +1,13 @@
-"""Offline unit tests for the shared i18n helpers (issue #182, layer 3 / #197).
+"""Offline unit tests for the shared i18n helpers (issue #182, layers 3-4 / #197, #198).
 
-Pure and free — no model, network, or audio. Covers the display-name -> ISO code map and the
-'follow the reply language' resolution that lets STT track the language you converse in.
+Pure and free — no model, network, or audio. Covers the display-name -> ISO code map, the
+'follow the reply language' resolution that lets STT track the language you converse in, and the
+locale helpers layer 4 uses to steer a TTS voice to one that speaks the reply language.
 """
 from __future__ import annotations
 
-from covas.i18n import FOLLOW, language_code, resolve_whisper_language
+from covas.i18n import (FOLLOW, language_code, locale_prefix, resolve_whisper_language,
+                        voice_speaks)
 
 
 def test_language_code_maps_curated_names():
@@ -46,3 +48,32 @@ def test_blank_is_autodetect_and_explicit_code_is_forced():
 def test_missing_sections_are_safe():
     assert resolve_whisper_language({}) is None
     assert resolve_whisper_language({"whisper": {"language": FOLLOW}}) == "en"  # reply defaults English
+
+
+# ---- locale helpers (layer 4 / #198) ---------------------------------------
+def test_locale_prefix_is_code_plus_hyphen():
+    assert locale_prefix("German") == "de-"
+    assert locale_prefix("English") == "en-"
+    assert locale_prefix("Portuguese") == "pt-"
+
+
+def test_locale_prefix_unknown_or_blank_is_none():
+    assert locale_prefix("Klingon") is None
+    assert locale_prefix("") is None
+    assert locale_prefix(None) is None
+
+
+def test_voice_speaks_matches_primary_subtag():
+    assert voice_speaks("de-DE", "de") is True
+    assert voice_speaks("de-AT", "de") is True   # Austrian German still speaks German
+    assert voice_speaks("de", "de") is True       # bare code
+    assert voice_speaks("en-US", "de") is False   # English voice does NOT speak German
+
+
+def test_voice_speaks_is_permissive_when_it_cannot_tell():
+    # No target language -> never steer (True). English maps to a real code and is checked normally.
+    assert voice_speaks("en-US", None) is True
+    assert voice_speaks("en-US", "") is True
+    # Untagged voice (OpenAI/ElevenLabs/multilingual) -> assume it copes, don't steer.
+    assert voice_speaks("", "de") is True
+    assert voice_speaks(None, "de") is True

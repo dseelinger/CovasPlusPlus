@@ -213,11 +213,28 @@ def test_anthropic_falls_back_to_static_when_live_fails(monkeypatch):
 # ---- voice catalogs --------------------------------------------------------
 def test_edge_voices_no_key(monkeypatch):
     monkeypatch.setattr("covas.providers.edge_tts.list_edge_voices",
-                        lambda **k: [{"ref": "en-US-AriaNeural", "name": "Aria",
-                                      "gender": "Female", "locale": "en-US"}])
+                        lambda prefix="en-": [{"ref": "en-US-AriaNeural", "name": "Aria",
+                                               "gender": "Female", "locale": "en-US"}])
     opts, err = catalog.resolve(schema.OPT_EDGE_VOICES, {})
     assert err is None
     assert opts[0]["value"] == "en-US-AriaNeural" and "en-US" in opts[0]["meta"]
+
+
+def test_edge_voices_follow_reply_language_locale(monkeypatch):
+    """Locale-aware pool (#198): a German reply language filters the Edge catalog to de-* voices."""
+    seen = {}
+
+    def _fake(prefix="en-"):
+        seen["prefix"] = prefix
+        return [{"ref": "de-DE-KatjaNeural", "name": "Katja", "gender": "Female", "locale": "de-DE"}]
+
+    monkeypatch.setattr("covas.providers.edge_tts.list_edge_voices", _fake)
+    opts, err = catalog.resolve(schema.OPT_EDGE_VOICES, {"language": {"reply": "German"}})
+    assert err is None and seen["prefix"] == "de-"          # steered the pool to German
+    assert opts[0]["value"] == "de-DE-KatjaNeural"
+    # English (default) keeps the historical en- pool.
+    catalog.resolve(schema.OPT_EDGE_VOICES, {"language": {"reply": "English"}})
+    assert seen["prefix"] == "en-"
 
 
 def test_azure_voices_need_key_and_region(monkeypatch):
@@ -227,8 +244,8 @@ def test_azure_voices_need_key_and_region(monkeypatch):
 
     monkeypatch.setattr("covas.firstrun.azure_key", lambda cfg: "k")
     monkeypatch.setattr("covas.providers.azure_tts.list_azure_voices",
-                        lambda key, region, **k: [{"ref": "en-GB-RyanNeural", "name": "Ryan",
-                                                   "gender": "Male", "locale": "en-GB"}])
+                        lambda key, region, prefix="en-": [{"ref": "en-GB-RyanNeural", "name": "Ryan",
+                                                            "gender": "Male", "locale": "en-GB"}])
     opts, err = catalog.resolve(schema.OPT_AZURE_VOICES, {"azure": {"region": "uksouth"}})
     assert err is None and opts[0]["value"] == "en-GB-RyanNeural"
 
