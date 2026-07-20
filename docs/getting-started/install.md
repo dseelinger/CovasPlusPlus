@@ -58,7 +58,7 @@ combination you like** — you're not locked to one vendor:
    unset and COVAS runs **text-only** (it still listens and thinks, it just doesn't talk back) until
    you add one — but with Edge you never have to.
 3. **Speech model** — COVAS++ downloads its local speech-to-text model
-   (faster-whisper `small.en`, ~250 MB) with a progress bar. **This step needs internet**, and
+   (whisper.cpp `small.en`, ~465 MB) with a progress bar. **This step needs internet**, and
    the model is downloaded **once** — it's not bundled in the installer, which keeps the download
    small. Speech-to-text always runs **locally** and free after that.
 4. **Microphone** — pick the mic you'll push-to-talk with.
@@ -206,7 +206,7 @@ voice can too — nothing here competes with Elite Dangerous for the GPU:
 |-------|-------|-------------------|
 | Language model | Anthropic Claude / OpenAI-compatible / Gemini (tiered) | — (cloud only) |
 | Voice (TTS) | ElevenLabs / Edge / Azure / OpenAI / Cartesia | Piper |
-| Speech-to-text | *(already local)* | faster-whisper |
+| Speech-to-text | *(already local)* | whisper.cpp |
 
 To use the free local **Piper** voice, set `[tts].provider = "piper"` in
 [`config.toml`](../configuration.md) and download a Piper voice.

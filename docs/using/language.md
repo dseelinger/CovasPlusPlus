@@ -30,7 +30,7 @@ English-only one, so the list grows only as the rest of the pipeline catches up.
     slice of localization. Two other pieces are still English-first and are tracked separately:
 
     - **Your speech → text.** Set **[`[whisper].language`](../configuration.md)** to match the
-      language *you* speak, so your voice is transcribed correctly (faster-whisper is multilingual).
+      language *you* speak, so your voice is transcribed correctly (whisper.cpp is multilingual).
     - **The voice that reads the reply.** Pick a [TTS voice](personas-voice.md) that speaks your
       language (Edge and Azure cover many; Piper is per-voice-model). A voice that can't pronounce
       the language will read it awkwardly.

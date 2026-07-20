@@ -4,6 +4,6 @@ share exactly one definition; this module just re-exports them for `from tests.f
 import ...`."""
 from __future__ import annotations
 
-from covas.providers.fakes import FakeLLM, FakeSTT, FakeTTS
+from covas.providers.fakes import FakeLLM, FakeSTT, FakeTTS, FakeWhisperCppModel
 
-__all__ = ["FakeLLM", "FakeSTT", "FakeTTS"]
+__all__ = ["FakeLLM", "FakeSTT", "FakeTTS", "FakeWhisperCppModel"]

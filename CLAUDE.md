@@ -4,7 +4,7 @@ Read this first. It's the working agreement for this repo.
 
 ## What this is
 COVAS++ — a local Windows **voice AI companion for Elite Dangerous**. Push-to-talk →
-local STT (faster-whisper) → LLM → TTS. It converses, tracks a markdown checklist, and
+local STT (whisper.cpp) → LLM → TTS. It converses, tracks a markdown checklist, and
 can web-search. It does **not** fly the ship. The app is well past MVP — 110+ issues shipped:
 a multi-provider LLM/TTS seam (Anthropic/OpenAI/Gemini · ElevenLabs/Edge/Azure/OpenAI/Cartesia/
 Piper), 40+ self-registering capabilities, an ambient-audio layer, ED journal monitoring,
@@ -39,8 +39,9 @@ on-hardware testing.
   premium) that each provider's `[<provider>].tiers` map turns into a model id. There is **no local
   LLM** (issue #128 removed Ollama): cost is handled by cloud tiering, not a local model, because a
   useful local model would fight ED for the GPU. TTS = `edge_tts` (default) / `azure_tts` /
-  `openai_tts` / `cartesia_tts` (persona) / `elevenlabs_tts` / local `piper_tts`; `whisper_stt`
-  wraps STT (CPU-only). Local ML is CPU-side (Piper, Whisper) and never contends with the game.
+  `openai_tts` / `cartesia_tts` (persona) / `elevenlabs_tts` / local `piper_tts`; `whispercpp_stt`
+  wraps STT via whisper.cpp/pywhispercpp (MIT, CPU-only, no FFmpeg/GPL; issue #206). Local ML is
+  CPU-side (Piper, Whisper) and never contends with the game.
 - `covas/llm.py` — Anthropic streaming (prompt caching + tools live here).
 - `covas/checklist.py` — the checklist model; tools exposed to the LLM.
 - `covas/events.py` — `EventBus` (thread-safe pub/sub). This is the spine; new inputs

@@ -1,7 +1,7 @@
 # COVAS++ dependencies
 # ---------------------------------------------------------------------------
 anthropic>=0.40           # Claude Messages API (streaming, thinking, web_search)
-faster-whisper>=1.1       # local speech-to-text
+pywhispercpp>=1.5         # local speech-to-text (whisper.cpp — MIT, CPU-side, no FFmpeg/GPL; issue #206)
 sounddevice>=0.4.6        # mic capture + low-latency PCM playback
 soundfile>=0.12           # read wav/mp3/flac cue files (libsndfile)
 numpy>=1.26               # audio buffers

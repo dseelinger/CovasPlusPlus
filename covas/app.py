@@ -1112,8 +1112,8 @@ class App:
             threading.Thread(target=self._reload_tts, name="reload-tts", daemon=True).start()
         w = self.cfg["whisper"]
         ow = before.get("whisper") or {}
-        if (w["model"], w["device"], w["compute_type"]) != (
-            ow.get("model"), ow.get("device"), ow.get("compute_type")
+        if (w["model"], w.get("n_threads"), w.get("language")) != (
+            ow.get("model"), ow.get("n_threads"), ow.get("language")
         ):
             self.set_state(self.state, f"reloading Whisper: {w['model']}")
             threading.Thread(target=self._reload_whisper, daemon=True).start()

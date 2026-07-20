@@ -24,8 +24,6 @@ from typing import Any, Optional
 # an English companion. small.en is the shipped default the first-run wizard installs.
 WHISPER_SIZES = ["tiny", "tiny.en", "base", "base.en", "small", "small.en",
                  "medium", "medium.en", "large-v3"]
-WHISPER_DEVICES = ["cpu"]  # CPU-only (issue #128): no local GPU ML compute competes with ED
-WHISPER_COMPUTE = ["int8", "float16", "float32"]
 THINKING_TIERS = ["Off", "Low", "Medium", "High", "Extra", "Max"]
 # Reply languages (issue #182, layer 1). DELIBERATELY CURATED — the languages we intend to deliver
 # end-to-end as the later localization layers land, NOT "any language" (a half-localized experience
@@ -491,21 +489,17 @@ SCHEMA: list[Setting] = [
     # --- Speech-to-text ----------------------------------------------------
     Setting("whisper.model", ("whisper", "model"), "enum",
             "Whisper model", "Speech-to-text",
-            "Local STT model. Bigger = more accurate but slower.",
-            default="small", options=WHISPER_SIZES,
+            "Local STT model (whisper.cpp). Bigger = more accurate but slower.",
+            default="small.en", options=WHISPER_SIZES,
             phrasings=("whisper model", "transcription model", "speech model"),
             example="set the whisper model to medium"),
-    Setting("whisper.device", ("whisper", "device"), "enum",
-            "Whisper device", "Speech-to-text",
-            "Whisper runs on the CPU — no GPU needed, and nothing competes with Elite for the GPU.",
-            default="cpu", options=WHISPER_DEVICES,
-            phrasings=("whisper device",),
-            example="set the whisper device to cpu"),
-    Setting("whisper.compute_type", ("whisper", "compute_type"), "enum",
-            "Whisper compute type", "Speech-to-text",
-            "int8 = fast + low memory on CPU (the recommended default).",
-            default="int8", options=WHISPER_COMPUTE,
-            phrasings=("whisper compute type",)),
+    Setting("whisper.n_threads", ("whisper", "n_threads"), "int",
+            "Whisper threads", "Speech-to-text",
+            "CPU threads for transcription. whisper.cpp is CPU-side by design, so nothing competes "
+            "with Elite for the GPU; more threads = faster but more CPU load.",
+            default=4, min=1, max=32, unit="threads",
+            phrasings=("whisper threads", "transcription threads"),
+            example="set the whisper threads to 8"),
     Setting("whisper.language", ("whisper", "language"), "string",
             "Whisper language", "Speech-to-text",
             "Force a language code (en), or blank to auto-detect.",

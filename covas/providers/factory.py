@@ -16,9 +16,10 @@ def make_stt(cfg: dict) -> STTProvider:
     if mock_enabled(cfg):
         from .fakes import FakeSTT
         return FakeSTT(cfg)
-    # Only faster-whisper today; kept behind the seam for symmetry.
-    from .whisper_stt import WhisperSTT
-    return WhisperSTT(cfg)
+    # whisper.cpp via pywhispercpp (issue #206) — MIT, CPU-side, no FFmpeg/GPL. Kept behind the
+    # seam for symmetry with the TTS/LLM providers.
+    from .whispercpp_stt import WhisperCppSTT
+    return WhisperCppSTT(cfg)
 
 
 def make_llm(cfg: dict) -> LLMProvider:

@@ -334,19 +334,19 @@ flavor           = false
 
 
 [whisper]
-# Local speech-to-text (faster-whisper). Bigger model = more accurate, slower.
-# Options: tiny, base, small, medium, large-v3.  base/small/medium are the sweet spots.
-model       = "small"
-# Whisper runs on the CPU (issue #128) — no GPU needed, and nothing here competes with Elite for
-# the GPU. Leave device = "cpu".
-device      = "cpu"
-# int8 = fast + low memory on CPU (the recommended default).
-compute_type = "int8"
+# Local speech-to-text via whisper.cpp / pywhispercpp (issue #206) — MIT, CPU-only, reads float32
+# PCM directly (no FFmpeg / PyAV / GPL). Bigger model = more accurate, slower.
+# Options: tiny, base, small, medium, large-v3 (+ English-only .en variants). small.en is the
+# sweet spot for an English companion.
+model       = "small.en"
 language    = "en"       # force English; set "" to auto-detect
-# Where faster-whisper caches downloaded weights. Blank = the default HuggingFace cache
-# (dev machines reuse their existing models). A packaged build overrides this to a per-user
-# models dir so weights never land in the read-only install tree. Relative paths resolve
-# under the writable data dir.
+# CPU inference threads. whisper.cpp is CPU-side by design (issue #128) so STT never competes with
+# Elite for the GPU. More threads = faster transcription but more CPU contention; 4 is a safe
+# default. (Replaces faster-whisper's device/compute_type, which whisper.cpp doesn't use.)
+n_threads   = 4
+# Where the ggml weights are cached. Blank = a per-user models dir (%APPDATA%/COVAS++/models when
+# packaged, <project>/models in a source run) so weights never land in the read-only install tree.
+# Relative paths resolve under the writable data dir.
 download_root = ""
 
 

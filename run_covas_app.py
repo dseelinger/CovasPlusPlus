@@ -42,27 +42,46 @@ def _selftest() -> int:
     bundled lib raises ImportError and exits non-zero, which build.ps1 surfaces as a failure."""
     import importlib
     mods = [
-        # native / heavy risks
-        "ctranslate2", "sounddevice", "soundfile", "faster_whisper", "onnxruntime", "av",
+        # native / heavy risks. pywhispercpp (whisper.cpp STT, issue #206) + its top-level
+        # _pywhispercpp extension — importing the extension load-links the ggml/whisper DLLs, so this
+        # proves the native STT backend bundled and LOADS (replaces the old faster-whisper/av stack).
+        "pywhispercpp", "_pywhispercpp",
+        "sounddevice", "soundfile",
         "numpy", "requests", "anthropic", "flask", "flask_sock", "webview",
         # the app graph (pulls in the rest of covas transitively)
         "covas.config", "covas.app", "covas.web", "covas.firstrun", "covas.setup_web",
         # Swappable provider modules — imported LAZILY from the factory, so importing covas.app
         # doesn't prove they're bundled. Import each so a missing one fails the FROZEN build.
+        "covas.providers.whispercpp_stt",
         "covas.providers.edge_tts", "covas.providers.azure_tts", "covas.providers.openai_tts",
         "covas.providers.cartesia_tts", "covas.providers.piper_tts", "covas.providers.elevenlabs_tts",
         "covas.providers.openai_llm", "covas.providers.gemini_llm",
     ]
     for m in mods:
         importlib.import_module(m)
-    # onnxruntime backs the lazily-imported Silero VAD (vad_filter=True) — touch it directly.
-    importlib.import_module("faster_whisper.vad")
     # edge-tts (+ its aiohttp stack) is the DEFAULT voice and is imported lazily inside EdgeTTS —
     # import the THIRD-PARTY package here so the frozen build proves it bundled it (else the shipped
     # app's default voice silently degrades to text). See covas.spec.
     importlib.import_module("edge_tts")
-    print(f"SELFTEST OK: imported {len(mods) + 2} modules incl. onnxruntime/av/edge_tts.",
+    print(f"SELFTEST OK: imported {len(mods) + 1} modules incl. pywhispercpp/edge_tts.",
           flush=True)
+    # whisper.cpp STT (issue #206): prove the bundled native backend can TRANSCRIBE, not just import
+    # — build the real provider and run a numpy PCM buffer through it (the exact transcribe(ndarray)
+    # path app.py uses). Needs the ggml weights on disk (user data, downloaded on first run); if
+    # they're absent the import checks above already proved the bundle, so note-and-skip rather than
+    # fail the build.
+    import numpy as np
+
+    from covas import config, firstrun
+    from covas.providers.whispercpp_stt import WhisperCppSTT
+
+    _cfg = config.load_config()
+    if firstrun.stt_model_available(_cfg):
+        _text = WhisperCppSTT(_cfg).transcribe(np.zeros(16000, dtype=np.float32))
+        print(f"SELFTEST STT OK: whisper.cpp transcribed a numpy PCM buffer -> {_text!r}", flush=True)
+    else:
+        print("SELFTEST STT SKIP: ggml model not on disk (run first-run download); imports proved "
+              "the bundle.", flush=True)
     return 0
 
 

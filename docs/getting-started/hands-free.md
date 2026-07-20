@@ -27,7 +27,7 @@ same** path as a push-to-talk turn:
    was mid-reply, this **barges in** and cuts it off, just like grabbing the talk key.
 2. **You keep talking** — short pauses (a breath mid-sentence) don't end the capture.
 3. **Trailing silence** — once you've been quiet long enough, the utterance closes and the normal
-   **processing → thinking → speaking** turn runs. Transcription is still **local** faster-whisper —
+   **processing → thinking → speaking** turn runs. Transcription is still **local** whisper.cpp —
    nothing extra leaves your PC, and there's **no added cloud cost** just to listen.
 
 Because it reuses the standard loop, everything you already know still applies: replies are short,

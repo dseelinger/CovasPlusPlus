@@ -106,7 +106,7 @@ thresholds only apply in continuous mode. Switching the mode applies **live** (n
 | `listen.wake_word` | `""` | Optional [wake word](getting-started/hands-free.md#wake-word-optional) for continuous mode; blank = off. A hands-free capture must contain it (it's stripped before the model sees it). PTT is never gated |
 | `listen.wake_word_fuzzy` | `true` | Tolerate STT slips of the wake word (e.g. "Kovas"/"Covis"); off = exact (still case-insensitive) match |
 
-Continuous mode is **local-only** (same faster-whisper, no extra cloud cost) and keeps barge-in.
+Continuous mode is **local-only** (same whisper.cpp, no extra cloud cost) and keeps barge-in.
 With open speakers, raise `energy_threshold` or use a headset so COVAS doesn't hear its own voice.
 The optional **wake word** gates continuous mode so it isn't triggered by every stray utterance;
 matching runs on the local transcript, so a false trigger costs nothing.
@@ -122,14 +122,14 @@ matching runs on the local transcript, so a false trigger costs nothing.
 
 ## Speech-to-text (`[whisper]`)
 
-Local speech recognition (faster-whisper) — nothing leaves your machine.
+Local speech recognition (whisper.cpp) — nothing leaves your machine, no FFmpeg/GPL, CPU-only.
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `whisper.model` | `small` | Model size: `tiny`, `base`, `small`, `medium`, `large-v3` (bigger = more accurate, slower) |
-| `whisper.device` | `cpu` | CPU-only — no GPU needed, and nothing competes with Elite for the GPU |
-| `whisper.compute_type` | `int8` | `int8` (fast/low memory on CPU — the recommended default) |
+| `whisper.model` | `small.en` | Model size: `tiny`, `base`, `small`, `medium`, `large-v3` (+ `.en` variants; bigger = more accurate, slower) |
+| `whisper.n_threads` | `4` | CPU threads for transcription (whisper.cpp is CPU-side, so nothing competes with Elite for the GPU) |
 | `whisper.language` | `en` | Force a language code, or blank to auto-detect |
+| `whisper.download_root` | *(blank)* | Where the `ggml-*.bin` weights are cached; blank = a per-user models dir |
 
 ## Language model (`[anthropic]`)
 

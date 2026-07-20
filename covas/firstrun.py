@@ -17,9 +17,9 @@ were a plaintext bypass and masked fresh-install testing) — keys are FILE-only
 Split of concerns:
   * Keys — Anthropic (LLM, REQUIRED) and ElevenLabs (TTS, OPTIONAL: no key ⇒ text-only, the
     existing fail-soft path).
-  * STT — faster-whisper weights, download-on-first-run. Availability is a cache lookup; the
-    wizard's model step downloads `small.en` (the locked shipped default) into data_dir/models
-    when frozen, or the default HF cache in a source run (dev cache untouched).
+  * STT — whisper.cpp ggml weights (issue #206), download-on-first-run. Availability is a file
+    check (`<models dir>/ggml-<name>.bin`); the wizard's model step downloads `small.en` (the
+    locked shipped default) into data_dir/models (frozen: %APPDATA%/COVAS++/models).
   * Default voice — resolve ElevenLabs "George" by NAME, else the first valid voice, so a
     rotated catalog never dead-ends the wizard.
 
@@ -32,8 +32,6 @@ import os
 import sys
 from pathlib import Path
 
-from huggingface_hub import try_to_load_from_cache
-
 from . import dpapi
 from .config import _frozen, data_dir, deep_merge, load_overrides, save_overrides
 
@@ -41,24 +39,21 @@ from .config import _frozen, data_dir, deep_merge, load_overrides, save_override
 # more accurate than multilingual `small` at the same size, right for an English companion.
 DEFAULT_STT_MODEL = "small.en"
 
-# faster-whisper resolves these names to Systran HF repos. Hardcoded for the ones we care about
-# so an availability check never has to import faster-whisper's private tables; unknown names
-# fall through to the Systran naming convention.
-_WHISPER_REPOS = {
-    "tiny": "Systran/faster-whisper-tiny",
-    "tiny.en": "Systran/faster-whisper-tiny.en",
-    "base": "Systran/faster-whisper-base",
-    "base.en": "Systran/faster-whisper-base.en",
-    "small": "Systran/faster-whisper-small",
-    "small.en": "Systran/faster-whisper-small.en",
-    "medium": "Systran/faster-whisper-medium",
-    "medium.en": "Systran/faster-whisper-medium.en",
-    "large-v3": "Systran/faster-whisper-large-v3",
-}
+# whisper.cpp (issue #206) ships ONE ggml weight file per model on the ggerganov/whisper.cpp HF
+# repo — `ggml-<name>.bin` — unlike faster-whisper's per-model ctranslate2 directory. A model name
+# maps directly to its filename, so no repo table is needed.
+_WHISPERCPP_BASE_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main"
 
 
-def _whisper_repo(model: str) -> str:
-    return _WHISPER_REPOS.get(model, f"Systran/faster-whisper-{model}")
+def _ggml_filename(model: str) -> str:
+    """The ggml weight filename for a model name ('small.en' -> 'ggml-small.en.bin')."""
+    return f"ggml-{model}.bin"
+
+
+def _is_model_path(model: str) -> bool:
+    """True when `model` is a filesystem path to a ggml file rather than a bare model name."""
+    m = str(model)
+    return os.sep in m or bool(os.altsep and os.altsep in m) or m.lower().endswith((".bin", ".gguf"))
 
 
 # ---- API keys ------------------------------------------------------------------------
@@ -283,41 +278,51 @@ def text_only_mode(cfg: dict, *, mock: bool = False, tts_injected: bool = False)
 
 # ---- STT weights ---------------------------------------------------------------------
 
-def stt_download_root(cfg: dict) -> str | None:
-    """Where faster-whisper caches its weights. An explicit `[whisper].download_root` wins
-    (a test seam, resolved under data_dir by config.py); otherwise a frozen build caches under
-    data_dir/models (keeps weights out of the read-only install tree), and a source run returns
-    None — the default HF cache, so a dev's existing models are reused, not re-downloaded."""
+def stt_models_dir(cfg: dict) -> Path:
+    """The writable dir the whisper.cpp ggml weights live in. An explicit `[whisper].download_root`
+    wins (a test seam, resolved under data_dir by config.py); otherwise data_dir()/models — frozen:
+    %APPDATA%/COVAS++/models, source: <project>/models. Always a concrete dir (weights stay out of
+    the read-only install tree either way): unlike the old faster-whisper path there's no HF-hub
+    cache to fall back on, so a source run gets a real models dir too, not None."""
     explicit = (cfg.get("whisper", {}) or {}).get("download_root")
-    if explicit:
-        return str(explicit)
-    if _frozen():
-        return str(data_dir() / "models")
-    return None
+    return Path(explicit) if explicit else data_dir() / "models"
+
+
+def stt_model_path(cfg: dict, model: str | None = None) -> str:
+    """The model string to hand whisper.cpp: a direct ggml path (a hand-placed file) passes through
+    as-is; a bare name resolves to `<models dir>/ggml-<name>.bin` under `stt_models_dir`."""
+    model = model or (cfg.get("whisper", {}) or {}).get("model") or DEFAULT_STT_MODEL
+    if _is_model_path(model):
+        return str(model)
+    return str(stt_models_dir(cfg) / _ggml_filename(model))
 
 
 def stt_model_available(cfg: dict, model: str | None = None) -> bool:
-    """True when the STT weights are already on disk (so the wizard can skip the download).
-    A local path model counts if it exists; a named model is a lookup in the HF cache that
-    `stt_download_root` points at (default cache in a source run)."""
-    model = model or (cfg.get("whisper", {}) or {}).get("model") or DEFAULT_STT_MODEL
-    # A filesystem path (a hand-placed model dir) is available iff it exists.
-    if os.sep in str(model) or (os.altsep and os.altsep in str(model)):
-        return Path(str(model)).exists()
-    hit = try_to_load_from_cache(
-        repo_id=_whisper_repo(model), filename="model.bin",
-        cache_dir=stt_download_root(cfg))
-    return isinstance(hit, str) and os.path.exists(hit)
+    """True when the ggml weights are already on disk (so the wizard can skip the download)."""
+    return Path(stt_model_path(cfg, model)).exists()
 
 
-def download_stt_model(model: str = DEFAULT_STT_MODEL, download_root: str | None = None) -> None:
-    """Fetch the STT weights by constructing a throwaway WhisperModel — its init downloads the
-    repo into `download_root` (or the default cache). We discard the instance; only the on-disk
-    weights matter (the real Transcriber builds its own at startup). Blocking: the wizard runs
-    this on a background thread and polls a status flag. Raises on failure (network/disk) so the
-    wizard can surface it."""
-    from faster_whisper import WhisperModel
-    WhisperModel(model, device="cpu", compute_type="int8", download_root=download_root)
+def download_stt_model(model: str = DEFAULT_STT_MODEL, models_dir: str | Path | None = None) -> None:
+    """Fetch `ggml-<model>.bin` from the whisper.cpp HF repo into `models_dir` (defaults to
+    data_dir()/models). Streams to a `.part` file then atomically renames, so an interrupted fetch
+    (a mobile dead zone) never leaves a truncated file that reads as 'available'. Blocking: the
+    wizard runs this on a background thread and polls a status flag. Raises on failure
+    (network/disk) so the wizard can surface it."""
+    import requests
+
+    fname = _ggml_filename(model)
+    root = Path(models_dir) if models_dir else data_dir() / "models"
+    root.mkdir(parents=True, exist_ok=True)
+    dest = root / fname
+    if dest.exists():
+        return
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    with requests.get(f"{_WHISPERCPP_BASE_URL}/{fname}", stream=True, timeout=60) as r:
+        r.raise_for_status()
+        with open(tmp, "wb") as fh:
+            for chunk in r.iter_content(1 << 20):
+                fh.write(chunk)
+    tmp.replace(dest)
 
 
 # ---- Microphones ---------------------------------------------------------------------
