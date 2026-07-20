@@ -222,6 +222,16 @@ raise the length cap.
 | `web_search.enabled` | `true` | Let Claude search the web when it needs current info |
 | `web_search.max_uses` | `3` | Max searches per reply (each one inflates later turns too — keep it low) |
 
+## Reply language (`[language]`)
+
+See [Reply language](using/language.md). Changes the language COVAS replies in (a curated set:
+English, German, French, Russian, Spanish, Portuguese). Set `[whisper].language` and a matching
+[voice](using/personas-voice.md) too for a fully non-English experience.
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `language.reply` | `English` | Language the companion replies in, on every LLM provider. The English default adds nothing to the prompt |
+
 ## Personality (`[personality]`)
 
 See [Personas & voice](using/personas-voice.md).

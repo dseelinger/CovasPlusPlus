@@ -62,12 +62,31 @@ _ACTION_GROUNDING_GUARDRAIL = (
 )
 
 
+# Reply-language instruction (issue #182, layer 1). When [language].reply names a non-English
+# language, the model is told to respond in it — the cheap, highest-felt-impact localization slice.
+# Static per config, so it rides the cached prefix and never busts the cache turn-to-turn (only the
+# once, when the language changes). English (the default) emits NOTHING, so the common case keeps
+# the exact prompt/cache it has today. ED proper nouns stay verbatim so grounding and voice search
+# (which resolve names against a canonical English vocabulary) still work.
+def _language_instruction(cfg: dict) -> str | None:
+    lang = str((cfg.get("language", {}) or {}).get("reply", "English") or "English").strip()
+    if not lang or lang.lower() in ("english", "en"):
+        return None
+    return (
+        f"LANGUAGE: Always respond in {lang}, in natural, fluent {lang}, regardless of the language "
+        f"the Commander writes or speaks in — this governs both your spoken replies and any text you "
+        f"produce. Keep Elite Dangerous proper nouns verbatim in their original form (system, "
+        f"station, ship, module, commodity, engineer and keybind names); translate everything else."
+    )
+
+
 def build_system(cfg: dict, ship_id: str | None = None) -> str | None:
     """The composed system prompt: `personality.compose_system` (Base + Persona + Campaign)
     when personality is ON (N7), plus STATIC always-on fragments — the ship-spec grounding
     guardrail (issue #83), the currency grounding guardrail (issue #101), the action grounding
-    guardrail (no invented actions, issue #143), and, when CREW voicing is on ([crew].enabled,
-    issue #69), the crew line-prefix instruction for the ACTIVE ship's roster.
+    guardrail (no invented actions, issue #143), the reply-language instruction when a non-English
+    language is configured (issue #182), and, when CREW voicing is on ([crew].enabled, issue #69),
+    the crew line-prefix instruction for the ACTIVE ship's roster.
 
     The static fragments apply even with personality OFF (otherwise there'd be no system prompt to
     carry the guardrails) and are constant for a given config, so they ride the cached prefix and
@@ -80,7 +99,7 @@ def build_system(cfg: dict, ship_id: str | None = None) -> str | None:
     from .personality import compose_system
 
     parts = [compose_system(cfg), _SHIP_SPEC_GUARDRAIL, _CURRENCY_GUARDRAIL,
-             _ACTION_GROUNDING_GUARDRAIL, system_instruction(cfg, ship_id)]
+             _ACTION_GROUNDING_GUARDRAIL, _language_instruction(cfg), system_instruction(cfg, ship_id)]
     joined = "\n\n".join(p for p in parts if p)
     return joined or None
 
