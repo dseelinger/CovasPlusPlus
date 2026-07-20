@@ -27,17 +27,19 @@ English-only one, so the list grows only as the rest of the pipeline catches up.
 
 !!! note "What this does today (and doesn't yet)"
     This setting changes the language COVAS **replies in** — the single cheapest, highest-impact
-    slice of localization. Two other pieces are still English-first and are tracked separately:
+    slice of localization. Your **speech → text follows it automatically**: `[whisper].language`
+    ships as `"follow"`, so setting the reply language moves Whisper's transcription language with
+    it — no separate step. One piece is still up to you:
 
-    - **Your speech → text.** Set **[`[whisper].language`](../configuration.md)** to match the
-      language *you* speak, so your voice is transcribed correctly (whisper.cpp is multilingual).
     - **The voice that reads the reply.** Pick a [TTS voice](personas-voice.md) that speaks your
       language (Edge and Azure cover many; Piper is per-voice-model). A voice that can't pronounce
       the language will read it awkwardly.
 
-    For the best result today, set all three — reply language, Whisper language, and a matching
-    voice. Automatic Whisper locale selection, locale-aware voice pairing, translated control-panel
-    text, and localized number/date formatting are on the roadmap.
+    The one caveat for STT: a `.en` Whisper model (e.g. `small.en`) is **English-only**. Before
+    setting a non-English reply language, switch to a **multilingual** model (e.g. `small`) on the
+    [Settings page](../control-panel.md) — otherwise COVAS logs a warning and transcribes your
+    speech poorly. Locale-aware voice pairing, translated control-panel text, and localized
+    number/date formatting are still on the roadmap.
 
 ## How it works
 

@@ -2212,9 +2212,14 @@ product-pillar justification (mostly **Foundation**) before it becomes one.
   every LLM provider and rides the cached prefix; English (the default) emits nothing, keeping the
   common case byte-identical. ED proper nouns are kept verbatim so grounding + voice search still
   resolve against the canonical English vocabulary. This deliberately localizes only the *reply*;
-  the config/provider seam now carries a language dimension the remaining layers extend. Layers
-  1/2/3/5 (UI strings — after #181/#184 land template changes; Whisper locale auto-select;
-  locale-aware voice pairing; number/date formatting) are filed as child issues of #182.
+  the config/provider seam now carries a language dimension the remaining layers extend.
+  **Whisper locale auto-select (STT) is now done too — issue #197.** `[whisper].language` ships as
+  the sentinel `"follow"`, which derives the whisper.cpp language from `[language].reply` via
+  `covas/i18n.py` (`resolve_whisper_language`), so setting the reply language moves transcription
+  with it and English installs keep `en`; an unmapped reply language falls back to auto-detect, and
+  an `.en` (English-only) model warns the user to switch to a multilingual one rather than
+  auto-swapping it. The remaining layers — UI strings (after #181/#184 land template changes);
+  locale-aware voice pairing; number/date formatting — are filed as child issues of #182.
 - **Accessibility, both directions (Foundation).** ✅ **Done (#184).** Voice-first helps
   motor/vision-impaired players and walls off deaf/HoH/non-verbal ones — so text is now a
   **first-class input path, not a TTS-failure fallback**: the typed-prompt box (#76) is documented
