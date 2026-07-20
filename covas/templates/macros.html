@@ -55,46 +55,43 @@
 <body>
 <header>
   <h1>COVAS++</h1>
-  <span class="sub">CUSTOM MACROS</span>
-  <a href="/" class="sub">← control panel</a>
-  <a href="/settings" class="sub">⚙ settings</a>
-  <a href="/checklist" class="sub">☑ checklist</a>
-  <a href="/memory" class="sub">🧠 memory</a>
+  <span class="sub">{{ t('CUSTOM MACROS') }}</span>
+  <a href="/" class="sub">{{ t('← control panel') }}</a>
+  <a href="/settings" class="sub">{{ t('⚙ settings') }}</a>
+  <a href="/checklist" class="sub">{{ t('☑ checklist') }}</a>
+  <a href="/memory" class="sub">{{ t('🧠 memory') }}</a>
   <span class="sub" id="fileName" style="margin-left:auto"></span>
 </header>
 
 <div class="wrap">
   <div class="card">
-    <h2>Author a macro</h2>
+    <h2>{{ t('Author a macro') }}</h2>
     <div class="row">
-      <input class="grow" id="mName" placeholder="Macro name — e.g. Dock ASAP">
-      <select id="mTrigger" title="Auto-run trigger (optional)"></select>
+      <input class="grow" id="mName" placeholder="{{ t('Macro name — e.g. Dock ASAP') }}">
+      <select id="mTrigger" title="{{ t('Auto-run trigger (optional)') }}"></select>
       <label class="steplbl" style="min-width:auto">
-        <input type="checkbox" id="mConfirm" checked style="vertical-align:middle"> confirm
+        <input type="checkbox" id="mConfirm" checked style="vertical-align:middle"> {{ t('confirm') }}
       </label>
     </div>
     <div id="steps" style="margin-top:12px"></div>
     <div class="row" style="margin-top:8px">
-      <button id="addStep" class="small">+ ADD STEP</button>
-      <button class="primary" id="save" style="margin-left:auto">SAVE MACRO</button>
+      <button id="addStep" class="small">{{ t('+ ADD STEP') }}</button>
+      <button class="primary" id="save" style="margin-left:auto">{{ t('SAVE MACRO') }}</button>
     </div>
     <span class="msg" id="msg"></span>
     <div class="hint">
-      A macro can only use actions in your <b>[keybinds].allowlist</b> — that's what keeps it
-      safe (it can't do anything you haven't already enabled). Add a trigger to auto-run it on a
-      game event, or leave it blank and say "run <i>name</i>". Consequential macros ask for a
-      spoken confirm first. You can also author entirely by voice: "create a macro called…".
+      {{ t("A macro can only use actions in your <b>[keybinds].allowlist</b> — that's what keeps it safe (it can't do anything you haven't already enabled). Add a trigger to auto-run it on a game event, or leave it blank and say \"run <i>name</i>\". Consequential macros ask for a spoken confirm first. You can also author entirely by voice: \"create a macro called…\".") | safe }}
     </div>
   </div>
 
   <div class="card">
-    <h2>Saved macros</h2>
+    <h2>{{ t('Saved macros') }}</h2>
     <div class="row">
-      <button id="reload">RELOAD FROM DISK</button>
+      <button id="reload">{{ t('RELOAD FROM DISK') }}</button>
       <span class="count" id="count"></span>
     </div>
     <ul id="list" style="margin-top:12px"></ul>
-    <div class="empty" id="empty" style="display:none">No macros yet — author one above.</div>
+    <div class="empty" id="empty" style="display:none">{{ t('No macros yet — author one above.') }}</div>
   </div>
 </div>
 
