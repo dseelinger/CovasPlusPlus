@@ -198,6 +198,10 @@ class App:
         # factory returns fakes on its own when dev-mode mock is enabled, so a
         # single code path covers real, mock, and injected-fake runs.
         self.cfg = cfg if cfg is not None else load_config()
+        # Bind the active locale for spoken/on-screen number+date callouts (issue #182 layer 5,
+        # #199) — driven off [language].reply, refreshed on every settings change below.
+        from . import i18n as _i18n
+        _i18n.set_active_language_code(_i18n.language_code(_i18n.reply_language(self.cfg)))
         self.overrides = load_overrides()
         self.mock = mock_enabled(self.cfg)
         self.bus = bus or EventBus()
@@ -1081,6 +1085,9 @@ class App:
         listener/hotkeys/mic/audio reconcile in place. Only RESTART_REQUIRED settings need a
         relaunch — everything here takes effect without one."""
         self.bus.publish({"type": "settings", "settings": self.public_settings()})
+        # Locale for number/date callouts follows [language].reply live (issue #182 layer 5, #199).
+        from . import i18n
+        i18n.set_active_language_code(i18n.language_code(i18n.reply_language(self.cfg)))
         # Companion HUD (issue #47): apply an [hud].enabled toggle live (Settings page or voice).
         self._reconcile_hud()
         # Activation mode (issue #63): apply a [listen].mode switch live — start/stop the VAD

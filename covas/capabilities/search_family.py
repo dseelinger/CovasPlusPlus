@@ -594,7 +594,8 @@ def _run_stations(cap: SpecSearchCapability, inp: dict) -> str:
         line += f" Largest pad {best.pad}."
     arrival = best.extra.get("distance_to_arrival")
     if isinstance(arrival, (int, float)) and arrival >= 1:
-        line += f" About {arrival:,.0f} light-seconds from the star."
+        from ..i18n import fmt_num
+        line += f" About {fmt_num(arrival, 0)} light-seconds from the star."   # locale (#199)
     return line + sup.clipboard_note(best.system, copied, here)
 
 
@@ -1128,7 +1129,8 @@ def _run_bodies(cap: SpecSearchCapability, inp: dict) -> str:
     line = (f"Closest {what}: {best.name} in {best.system}, "
             f"{sup.distance_phrase(best.distance_ly, reference_is_current=ref_here)}.")
     if best.distance_to_arrival_ls is not None and best.distance_to_arrival_ls >= 1:
-        line += f" About {best.distance_to_arrival_ls:,.0f} light-seconds from the star."
+        from ..i18n import fmt_num
+        line += f" About {fmt_num(best.distance_to_arrival_ls, 0)} light-seconds from the star."
     if best.is_landable:
         line += " It's landable."
     if bio_search:

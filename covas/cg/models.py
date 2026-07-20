@@ -51,7 +51,8 @@ def standing_phrase(goal: CommunityGoal) -> str | None:
     if goal.player_percentile_band is not None:
         return f"you're in the top {goal.player_percentile_band}%"
     if goal.player_contribution:
-        return f"you've contributed {goal.player_contribution:,}"
+        from ..i18n import fmt_int
+        return f"you've contributed {fmt_int(goal.player_contribution)}"   # locale grouping (#199)
     return None
 
 
@@ -64,7 +65,8 @@ def _short_date_safe(iso: str | None) -> str | None:
         dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
     except (ValueError, TypeError):
         return None
-    return f"{dt.strftime('%b')} {dt.day}"
+    from ..i18n import fmt_date
+    return fmt_date(dt)   # locale short date, e.g. "Jul 15" / "15. Juli" (#199)
 
 
 def goal_line(goal: CommunityGoal) -> str:
