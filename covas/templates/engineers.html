@@ -70,35 +70,30 @@
 <body>
 <header>
   <h1>COVAS++</h1>
-  <span class="sub">ENGINEERS</span>
-  <a href="/" class="sub">← control panel</a>
-  <a href="/settings" class="sub">⚙ settings</a>
-  <a href="/checklist" class="sub">☑ checklist</a>
-  <a href="/memory" class="sub">🧠 memory</a>
-  <a href="/crew" class="sub">🎙 crew</a>
+  <span class="sub">{{ t('ENGINEERS') }}</span>
+  <a href="/" class="sub">{{ t('← control panel') }}</a>
+  <a href="/settings" class="sub">{{ t('⚙ settings') }}</a>
+  <a href="/checklist" class="sub">{{ t('☑ checklist') }}</a>
+  <a href="/memory" class="sub">{{ t('🧠 memory') }}</a>
+  <a href="/crew" class="sub">{{ t('🎙 crew') }}</a>
 </header>
 
 <div class="wrap">
   <div class="banner" id="noData">
-    No engineer data from the journal yet — this comes from Elite's <b>EngineerProgress</b> event,
-    written at login. Start the game with journal monitoring on and reload, and your live unlock
-    status will fill in. Until then, every engineer is shown <b>locked</b> with what it requires.
+    {{ t("No engineer data from the journal yet — this comes from Elite's <b>EngineerProgress</b> event, written at login. Start the game with journal monitoring on and reload, and your live unlock status will fill in. Until then, every engineer is shown <b>locked</b> with what it requires.") | safe }}
   </div>
 
   <div class="card">
-    <h2>Engineer unlock status</h2>
+    <h2>{{ t('Engineer unlock status') }}</h2>
     <div class="hint">
-      Every ship engineer at a glance — who's <b>unlocked</b> (and to what grade), who you're
-      <b>part-way</b> with (invited or discovered), and who's still <b>locked</b> with exactly
-      what each one still needs. Live status is read from your journal; the locations and
-      requirements are bundled. Filter by status or search by name, system, or module.
+      {{ t("Every ship engineer at a glance — who's <b>unlocked</b> (and to what grade), who you're <b>part-way</b> with (invited or discovered), and who's still <b>locked</b> with exactly what each one still needs. Live status is read from your journal; the locations and requirements are bundled. Filter by status or search by name, system, or module.") | safe }}
     </div>
     <div class="row" style="margin-top:12px">
       <div class="tally" id="tally"></div>
-      <input class="grow" id="search" placeholder="Search name, system, or module…" style="margin-left:auto">
+      <input class="grow" id="search" placeholder="{{ t('Search name, system, or module…') }}" style="margin-left:auto">
     </div>
     <ul id="grid"></ul>
-    <div class="empty" id="empty" style="display:none">No engineers match your filter.</div>
+    <div class="empty" id="empty" style="display:none">{{ t('No engineers match your filter.') }}</div>
     <div class="row" style="margin-top:12px">
       <span class="msg" id="msg"></span>
     </div>
