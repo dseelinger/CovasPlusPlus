@@ -339,7 +339,10 @@ flavor           = false
 # Options: tiny, base, small, medium, large-v3 (+ English-only .en variants). small.en is the
 # sweet spot for an English companion.
 model       = "small.en"
-language    = "en"       # force English; set "" to auto-detect
+# "follow" tracks [language].reply so STT matches the language you converse in (issue #182);
+# "" auto-detects; or force a code like "en". NOTE: a .en model (small.en) is English-only —
+# switch to a multilingual model (e.g. "small") before setting a non-English reply language.
+language    = "follow"
 # CPU inference threads. whisper.cpp is CPU-side by design (issue #128) so STT never competes with
 # Elite for the GPU. More threads = faster transcription but more CPU contention; 4 is a safe
 # default. (Replaces faster-whisper's device/compute_type, which whisper.cpp doesn't use.)

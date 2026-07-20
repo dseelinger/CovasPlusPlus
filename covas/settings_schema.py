@@ -502,8 +502,10 @@ SCHEMA: list[Setting] = [
             example="set the whisper threads to 8"),
     Setting("whisper.language", ("whisper", "language"), "string",
             "Whisper language", "Speech-to-text",
-            "Force a language code (en), or blank to auto-detect.",
-            default="en", phrasings=("whisper language", "transcription language"),
+            "How speech is transcribed: 'follow' tracks your reply language (issue #182), blank "
+            "auto-detects, or force a code (en). Non-English needs a multilingual model — a .en "
+            "model (e.g. small.en) only transcribes English.",
+            default="follow", phrasings=("whisper language", "transcription language"),
             example="set the whisper language to auto"),
 
     # --- Language (issue #182, layer 1) ------------------------------------

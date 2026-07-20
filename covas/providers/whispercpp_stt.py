@@ -9,10 +9,13 @@ in `firstrun.stt_model_path` (per-user models dir); the factory selects this pro
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 
 import numpy as np
+
+log = logging.getLogger(__name__)
 
 # whisper.cpp emits bracketed non-speech markers ("[BLANK_AUDIO]", "[ Silence ]", "(wind blowing)"
 # style cues) as ordinary segment text. They aren't words the Commander spoke, so drop them before
@@ -47,9 +50,17 @@ class WhisperCppSTT:
     """
 
     def __init__(self, cfg: dict, *, model=None) -> None:  # noqa: ANN001 — fake backend in tests
-        w = cfg.get("whisper", {}) or {}
-        # "" (auto-detect) stays as None so we ask whisper.cpp to detect rather than forcing a code.
-        self.language = (str(w.get("language") or "")).strip() or None
+        # Resolve the effective language: "" -> auto-detect (None), "follow" -> track the reply
+        # language ([language].reply), or a forced code. Centralised in i18n so STT follows the
+        # reply language automatically (issue #182 layer 3, #197).
+        from ..i18n import resolve_whisper_language
+        self.language = resolve_whisper_language(cfg)
+        # An .en model is English-only: forcing a non-English code transcribes poorly. Warn rather
+        # than auto-swap the model (issue #182 layer 3) — the user picks a multilingual model.
+        model_id = str((cfg.get("whisper", {}) or {}).get("model") or "")
+        if self.language and self.language != "en" and model_id.endswith(".en"):
+            log.warning("Whisper model %r is English-only but language is %r — transcription will "
+                        "be poor; switch to a multilingual model (e.g. 'small').", model_id, self.language)
         self._model = model if model is not None else self._build_model(cfg)
 
     @staticmethod
@@ -73,8 +84,10 @@ class WhisperCppSTT:
             "print_progress": False,
             "n_threads": int(w.get("n_threads") or 4),
         }
-        if w.get("language"):
-            params["language"] = str(w["language"])
+        from ..i18n import resolve_whisper_language
+        lang = resolve_whisper_language(cfg)
+        if lang:
+            params["language"] = lang
         else:
             params["detect_language"] = True
         model_ref = stt_model_path(cfg)

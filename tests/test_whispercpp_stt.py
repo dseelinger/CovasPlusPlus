@@ -76,6 +76,12 @@ def test_language_none_when_unset_for_autodetect():
     assert WhisperCppSTT({"whisper": {"model": "m", "language": "en"}}, model=FakeWhisperCppModel()).language == "en"
 
 
+def test_language_follows_reply_language():
+    # "follow" (the shipped default) tracks [language].reply so STT matches the conversed language.
+    cfg = {"whisper": {"model": "m", "language": "follow"}, "language": {"reply": "German"}}
+    assert WhisperCppSTT(cfg, model=FakeWhisperCppModel()).language == "de"
+
+
 def test_clean_collapses_whitespace():
     assert _clean("  hello   world  ") == "hello world"
     assert _clean("") == ""

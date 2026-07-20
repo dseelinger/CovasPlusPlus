@@ -1112,8 +1112,12 @@ class App:
             threading.Thread(target=self._reload_tts, name="reload-tts", daemon=True).start()
         w = self.cfg["whisper"]
         ow = before.get("whisper") or {}
-        if (w["model"], w.get("n_threads"), w.get("language")) != (
-            ow.get("model"), ow.get("n_threads"), ow.get("language")
+        # Compare the RESOLVED language (issue #182 layer 3): with whisper.language = "follow",
+        # flipping [language].reply changes the effective STT code while the raw string stays
+        # "follow", so a raw compare would miss it and leave STT on the old language.
+        from .i18n import resolve_whisper_language
+        if (w["model"], w.get("n_threads"), resolve_whisper_language(self.cfg)) != (
+            ow.get("model"), ow.get("n_threads"), resolve_whisper_language(before)
         ):
             self.set_state(self.state, f"reloading Whisper: {w['model']}")
             threading.Thread(target=self._reload_whisper, daemon=True).start()
