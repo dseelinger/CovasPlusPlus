@@ -13,6 +13,21 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.25.0] — 2026-07-20
+
+An **Immerse & reach** release: the control panel now speaks your language.
+
+### Added
+- **The control panel and first-run wizard are translated into German, French, Russian, Spanish,
+  and Portuguese.** Set your reply language and the whole web UI — headings, buttons, navigation,
+  hints and the wizard — switches to that language. English is unchanged. These translations are
+  **machine-generated and awaiting native-speaker review**, so wording may still be refined; a
+  language only activates once its catalog is complete (no half-translated panels). See the
+  "Translating the UI" docs to review or improve a catalog. ([#196])
+
+### Migration
+- Nothing to do. English is byte-for-byte unchanged; a non-English panel follows your reply language.
+
 ## [0.24.0] — 2026-07-20
 
 A **Foundation** release for reach: the control panel is now ready to be translated.
@@ -207,7 +222,8 @@ Feature and polish wave. See the
 Releases before 0.15.0 are listed on the
 [GitHub Releases page](https://github.com/dseelinger/CovasPlusPlus/releases).
 
-[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.25.0
 [0.24.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.24.0
 [0.23.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.23.0
 [0.22.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.22.0
