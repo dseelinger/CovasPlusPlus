@@ -36,12 +36,15 @@ English-only one, so the list grows only as the rest of the pipeline catches up.
       voice *you* explicitly picked is kept (and a mismatch is flagged, not overridden), and
       ElevenLabs/OpenAI voices are multilingual so they're left alone. Toggle with
       `[language].match_voice`.
+    - **Numbers and dates in callouts are formatted for your locale.** Credits, distances and
+      short dates in spoken and on-screen callouts use your language's separators — a balance reads
+      `2.000.000` in German (or `2 000 000` in French) where English says `2,000,000`, and a
+      Community Goal ends `15. Juli` rather than `Jul 15`. It's automatic; nothing to set.
 
     The one caveat for STT: a `.en` Whisper model (e.g. `small.en`) is **English-only**. Before
     setting a non-English reply language, switch to a **multilingual** model (e.g. `small`) on the
     [Settings page](../control-panel.md) — otherwise COVAS logs a warning and transcribes your
-    speech poorly. Translated control-panel text and localized number/date formatting are still on
-    the roadmap.
+    speech poorly. The remaining roadmap item is translated control-panel text.
 
 ## How it works
 

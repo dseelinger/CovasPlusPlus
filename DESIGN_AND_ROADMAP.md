@@ -2229,9 +2229,20 @@ product-pillar justification (mostly **Foundation**) before it becomes one.
   per-model. The Edge/Azure settings dropdowns (`covas/catalog.py`) also follow the reply locale so
   a non-English commander can pick a matching voice by hand, and a new `[language].match_voice`
   (default on) is the opt-out. Steering runs fail-soft on a background thread only when the reply
-  language actually changes — the English-default path never fetches a catalog. The remaining
-  layers — UI strings (after #181/#184 land template changes); number/date formatting — are filed
-  as child issues of #182.
+  language actually changes — the English-default path never fetches a catalog. **Locale number/date
+  formatting is now done too — issue #199.** `covas/i18n.py` gains a small, stdlib-only locale table
+  (per-language grouping + decimal separators: de/es/pt group with `.` and decimal with `,`; fr/ru
+  use a U+202F thin space; en keeps `,`/`.`) plus `format_int`/`format_decimal`/`format_date_short`
+  and a process-active locale (`set_active_language_code`, bound from `[language].reply` at startup
+  and every settings change) so the ~20 scattered callout sites route through `fmt_int`/`fmt_num`/
+  `fmt_date` without threading `cfg`. English (and any unmapped language) is **byte-identical** to
+  the old `f"{n:,}"`/`strftime` output — the formatter only remaps separators for a non-English
+  active locale. Applied to the user-facing spoken/on-screen callouts (credits & wallet, trade/route
+  profit, distances in light-seconds and light-years, the CG expiry short date); diagnostic loglines
+  and stored-memory fact text stay English by design (they aren't callouts). **This completes the
+  localization epic's runtime round trip** — reply (#182) → STT (#197) → voice (#198) → formatting
+  (#199); the one remaining layer, control-panel **UI-string** translation, waits on the #181/#184
+  template changes and is filed as the last child issue of #182.
 - **Accessibility, both directions (Foundation).** ✅ **Done (#184).** Voice-first helps
   motor/vision-impaired players and walls off deaf/HoH/non-verbal ones — so text is now a
   **first-class input path, not a TTS-failure fallback**: the typed-prompt box (#76) is documented

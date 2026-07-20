@@ -506,9 +506,10 @@ max_uses = 3
 # honestly English-only one. Options: English, German, French, Russian, Spanish, Portuguese.
 #
 # SCOPE: this sets the language COVAS *replies* in. Speech-to-text follows it automatically
-# ([whisper].language = "follow", #197) and, on Edge/Azure, so does the TTS voice (match_voice
-# below, #198) — so this one setting localizes the whole round trip. Use a multilingual Whisper
-# model (e.g. "small", not "small.en") for a non-English language.
+# ([whisper].language = "follow", #197), on Edge/Azure so does the TTS voice (match_voice below,
+# #198), and numbers/dates in spoken + on-screen callouts are formatted for the locale (e.g.
+# "2.000.000 Cr" in German, #199) — so this one setting localizes the whole round trip. Use a
+# multilingual Whisper model (e.g. "small", not "small.en") for a non-English language.
 reply = "English"
 
 # Locale-aware voice pairing (issue #182, layer 4 / #198). When the reply language is non-English,
