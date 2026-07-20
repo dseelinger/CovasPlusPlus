@@ -1,15 +1,15 @@
 # Translating the control panel
 
 The web control panel's text is **extracted for translation** (issue #196, layer 2 of the
-[localization epic](language.md)). Today COVAS++ ships the **English baseline** only — the
-mechanism is in place so a translator can add a language without touching templates or Python
-logic.
+[localization epic](language.md)). COVAS++ ships the **English baseline** plus complete catalogs for
+the five curated languages — German, French, Russian, Spanish and Portuguese. Those five are
+**machine-translated (LLM) and awaiting native-speaker review**; the mechanism lets a translator
+review or replace any catalog without touching templates or Python logic.
 
-!!! note "Why English-only for now"
+!!! note "Complete-catalog gate"
     A half-translated panel is more confusing than an honestly English one, so a language is
-    **gated off until its catalog is complete**. Shipping the extraction mechanism first means the
-    strings are ready to translate; it does **not** mean COVAS auto-translates them (it never
-    machine-translates the UI).
+    **only activated once its catalog covers every string** (enforced by a test). A language you
+    have no complete catalog for falls back to a fully-English panel — never a mix.
 
 ## How it works
 
@@ -25,47 +25,44 @@ Every user-visible string in the templates is wrapped in a tiny gettext-style he
   — so the English panel renders exactly as it always did.
 - For a language with a catalog, `t('SAVE')` returns the translation.
 
-The catalog and the language gate live in [`covas/ui_i18n.py`](https://github.com/dseelinger/CovasPlusPlus/blob/main/covas/ui_i18n.py):
-
-```python
-CATALOGS: dict[str, dict[str, str]] = {
-    "en": {},   # identity — English is the source, so it needs no entries
-}
-```
+Each language's catalog is a JSON file under
+[`covas/translations/`](https://github.com/dseelinger/CovasPlusPlus/blob/main/covas/translations)
+(`de.json`, `fr.json`, `ru.json`, `es.json`, `pt.json`) — a flat `{english source: translation}`
+map. `covas/ui_i18n.py` auto-discovers every `*.json` there and registers it; English stays an
+implicit identity (no file needed). The lookup and the language gate live in `ui_i18n.py`.
 
 The **active** UI language follows your [reply language](language.md) (`[language].reply`) — but
-only if a catalog for it exists. An untranslated or unmapped reply language falls back to English.
+only if a complete catalog for it exists. An untranslated or unmapped reply language falls back to
+English.
 
-## Adding a language
+## Reviewing or adding a language
 
-You need no Python beyond editing one table, and you never touch the templates.
+You edit one JSON file and never touch the templates or Python.
 
-1. **Collect the strings.** Every string wrapped in `{{ t('…') }}` across `covas/templates/` (and
-   the first-run wizard) is a message to translate. The English source string is the key.
-2. **Add a catalog** to `CATALOGS` in `covas/ui_i18n.py`, keyed by the ISO 639-1 code (the same
-   codes used for [reply language](language.md) — `de`, `fr`, `ru`, `es`, `pt`). For example:
+1. **Find the keys.** Every string wrapped in `{{ t('…') }}` across `covas/templates/` (and the
+   first-run wizard) is a message; the English source string is the JSON key. An existing catalog
+   (e.g. `de.json`) already lists all of them.
+2. **Edit or create the catalog** at `covas/translations/<code>.json`, keyed by the ISO 639-1 code
+   (the same codes as [reply language](language.md) — `de`, `fr`, `ru`, `es`, `pt`). For example:
 
-    ```python
-    CATALOGS = {
-        "en": {},
-        "de": {
-            "SAVE": "SPEICHERN",
-            "← control panel": "← Bedienfeld",
-            "Reply language": "Antwortsprache",
-            # …every wrapped string…
-        },
+    ```json
+    {
+      "SAVE": "SPEICHERN",
+      "← control panel": "← Bedienfeld"
     }
     ```
 
-3. **Complete it before shipping.** Only add a language to `CATALOGS` once its catalog covers the
-   wrapped strings — the presence of the key is what activates it. A missing key falls back to
-   English, so a partial catalog produces a **mixed** panel; that's exactly what the gate exists to
-   avoid.
-4. **Keep the HTML in translated values.** A few strings carry inline markup (`<b>…</b>`,
-   `<a href="…">…</a>`) — keep the tags in your translation; they're rendered as-is.
+3. **Cover every key.** A catalog must translate **every** template key — a missing one would fall
+   back to English and produce a mixed panel. The test
+   `test_shipped_catalog_covers_every_template_key` enforces exact coverage (no missing, no stale),
+   so `pytest` tells you immediately if a key is unhandled.
+4. **Preserve the non-text parts verbatim.** Keep inline HTML (`<b>…</b>`, `<a href="…">…</a>`),
+   HTML entities, any `[section].key` config tokens, URLs, and Elite Dangerous / brand proper nouns
+   (system, station, ship, engineer and module names; COVAS++, Anthropic, Edge, Whisper, …) exactly
+   as in the English source — translate only the surrounding prose.
 
-Once the catalog is present, set **Reply language** to that language (or `[language].reply` in
-`config.toml`) and the panel switches to it.
+The moment the file is present and complete, setting **Reply language** to that language (or
+`[language].reply` in `config.toml`) switches the panel to it.
 
 ## What's covered — and what isn't yet
 
