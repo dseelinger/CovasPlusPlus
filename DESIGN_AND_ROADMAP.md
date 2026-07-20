@@ -2206,6 +2206,15 @@ product-pillar justification (mostly **Foundation**) before it becomes one.
   high impact), (5) locale number/date formatting in spoken callouts. Do the trivial slices (#4,
   string extraction for #1) first; gate any language we can't fully deliver — a half-localized app
   feels more broken than an honestly English-only one. ED has large DE/FR/RU communities.
+  **Layer 4 (reply language) is done — the epic #182, layer 1.** A curated `[language].reply` enum
+  (English/German/French/Russian/Spanish/Portuguese — a deliberate allowlist, not "any language",
+  because that IS the gate) adds one static instruction to `llm.build_system`, so it applies on
+  every LLM provider and rides the cached prefix; English (the default) emits nothing, keeping the
+  common case byte-identical. ED proper nouns are kept verbatim so grounding + voice search still
+  resolve against the canonical English vocabulary. This deliberately localizes only the *reply*;
+  the config/provider seam now carries a language dimension the remaining layers extend. Layers
+  1/2/3/5 (UI strings — after #181/#184 land template changes; Whisper locale auto-select;
+  locale-aware voice pairing; number/date formatting) are filed as child issues of #182.
 - **Accessibility, both directions (Foundation).** Voice-first helps motor/vision-impaired players
   and walls off deaf/HoH/non-verbal ones. Keep the text-in/text-out path a first-class *mode* (not
   just the TTS-failure fallback), consider on-screen captions of what COVAS says, and give the web

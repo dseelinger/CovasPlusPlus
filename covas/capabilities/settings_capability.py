@@ -115,7 +115,7 @@ class SettingsCapability:
             category="settings",
             group="settings",
             one_liner=("I change my settings by voice — the whisper model, thinking depth, "
-                       "personality, the voice, web search, and more."),
+                       "personality, the voice, my reply language, web search, and more."),
             example="turn personality off",
             help_when_active=("Name a setting and a value — like 'set thinking to high', 'use "
                               "the George voice', or 'turn web search off'. Ask 'what can I "
