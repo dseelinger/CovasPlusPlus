@@ -65,6 +65,23 @@ def _selftest() -> int:
     importlib.import_module("edge_tts")
     print(f"SELFTEST OK: imported {len(mods) + 1} modules incl. pywhispercpp/edge_tts.",
           flush=True)
+    # whisper.cpp STT (issue #206): prove the bundled native backend can TRANSCRIBE, not just import
+    # — build the real provider and run a numpy PCM buffer through it (the exact transcribe(ndarray)
+    # path app.py uses). Needs the ggml weights on disk (user data, downloaded on first run); if
+    # they're absent the import checks above already proved the bundle, so note-and-skip rather than
+    # fail the build.
+    import numpy as np
+
+    from covas import config, firstrun
+    from covas.providers.whispercpp_stt import WhisperCppSTT
+
+    _cfg = config.load_config()
+    if firstrun.stt_model_available(_cfg):
+        _text = WhisperCppSTT(_cfg).transcribe(np.zeros(16000, dtype=np.float32))
+        print(f"SELFTEST STT OK: whisper.cpp transcribed a numpy PCM buffer -> {_text!r}", flush=True)
+    else:
+        print("SELFTEST STT SKIP: ggml model not on disk (run first-run download); imports proved "
+              "the bundle.", flush=True)
     return 0
 
 
