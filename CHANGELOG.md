@@ -13,6 +13,21 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.24.0] — 2026-07-20
+
+A **Foundation** release for reach: the control panel is now ready to be translated.
+
+### Changed
+- **Control-panel text is extracted for translation.** Every visible string in the web panel and
+  first-run wizard is now wired through a lightweight translation helper, with English as the
+  baseline. Nothing changes for you today — the panel reads exactly as before — but a translator
+  can now add a language by contributing one catalog, and a language only switches on once its
+  translation is complete (no half-translated panels). Completes the extraction groundwork for
+  localizing the UI; see the new "Translating the UI" docs. ([#196])
+
+### Migration
+- Nothing to do. The panel is unchanged in English.
+
 ## [0.23.0] — 2026-07-20
 
 An **Immerse & reach** release: numbers and dates now read in your locale — completing the
@@ -192,7 +207,8 @@ Feature and polish wave. See the
 Releases before 0.15.0 are listed on the
 [GitHub Releases page](https://github.com/dseelinger/CovasPlusPlus/releases).
 
-[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.24.0
 [0.23.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.23.0
 [0.22.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.22.0
 [0.21.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.21.0
@@ -252,5 +268,6 @@ Releases before 0.15.0 are listed on the
 [#190]: https://github.com/dseelinger/CovasPlusPlus/issues/190
 [#197]: https://github.com/dseelinger/CovasPlusPlus/issues/197
 [#198]: https://github.com/dseelinger/CovasPlusPlus/issues/198
+[#196]: https://github.com/dseelinger/CovasPlusPlus/issues/196
 [#199]: https://github.com/dseelinger/CovasPlusPlus/issues/199
 [#206]: https://github.com/dseelinger/CovasPlusPlus/issues/206
