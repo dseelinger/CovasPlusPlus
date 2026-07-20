@@ -24,7 +24,10 @@ Every safeguard is on by default:
   `landing_gear`. Ask for anything else ("deploy hardpoints") and it won't do it, unless you
   add that macro's name to `[keybinds].allowlist` yourself (see *More actions* below).
 - **Separate-turn confirmation** — asking arms the action but does **not** fire it. You must
-  confirm on a *separate* command. The model can't arm and fire in one breath, by design.
+  confirm on a *separate* command. The model can't arm and fire in one breath, by design. When you
+  confirm, COVAS **re-states the actual armed action** — a *"Confirming — toggle the landing
+  gear…"* line taken straight from what's armed, not from how the reply was phrased earlier — so if
+  what you're about to fire doesn't match what you were told, it's audible before it lands.
 - **Combat / interdiction guard** — it refuses to touch controls while you're in danger or being
   interdicted. If it can't read your status at all, it refuses too (it won't act unless it can
   *prove* it's safe).

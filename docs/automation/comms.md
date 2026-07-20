@@ -30,7 +30,10 @@ strangers is the risk to design against. The single, unconditional safeguard is 
    yet.
 2. **Confirm on a separate turn.** You must say **"confirm"** / **"send it"** on a *new* command.
    The assistant physically cannot compose-and-send in one breath (the confirmation is turn-gated,
-   exactly like [keybind automation](keybinds.md)), so you always hear the exact words first.
+   exactly like [keybind automation](keybinds.md)), so you always hear the exact words first. At
+   send time COVAS **re-states the actual composed message and channel** — a *"Confirming — sending
+   to wing chat: 'forming up…'"* line taken straight from what's armed, not from how the read-back
+   was phrased — so a swapped message would be audible before it leaves.
 3. **Cancel or reword.** Say **"cancel"** (or "no", "belay") to discard it. An un-confirmed message
    also **expires** after a timeout (default 60 s), so a stale "confirm" can't fire it later.
 

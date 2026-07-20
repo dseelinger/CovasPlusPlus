@@ -250,7 +250,9 @@ class KeybindCapability:
                        "controls — and run multi-step sequences (like a pad launch) that check "
                        "your game status between steps instead of firing blind. Always mode-aware "
                        "and behind a combat safety check; disruptive actions need a separate "
-                       "spoken confirmation, and 'abort' stops everything and releases held keys. "
+                       "spoken confirmation — and when you confirm I read back the exact armed "
+                       "action so you hear what's actually about to fire — and 'abort' stops "
+                       "everything and releases held keys. "
                        "I can also bring the Elite window to the front on command ('focus Elite'), "
                        "and I pull it forward before pressing a control so the key can't land in "
                        "the wrong window."),
@@ -339,7 +341,12 @@ class KeybindCapability:
         problem = self._binding_problem(macro)
         if problem is not None:
             return problem
-        return self._execute(macro)
+        # Re-state the ACTUAL armed action from the deterministic pending payload — never the
+        # model's earlier narration (issue #190, DESIGN §6 confused-deputy note). A separate turn
+        # only proves a new utterance occurred; it does NOT prove the Commander consented to THIS
+        # action. Leading the confirm output with the armed macro's own arm_phrase means a
+        # bait-and-switch — arming B while the model narrated A — is audible the moment it fires.
+        return f"Confirming — {macro.arm_phrase}. {self._execute(macro)}"
 
     def _abort(self) -> str:
         with self._lock:

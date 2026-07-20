@@ -218,7 +218,9 @@ class CommsSendCapability:
             one_liner=("I can send Elite Dangerous chat for you — to local, your wing, your "
                        "squadron, or a direct message — composing the words from what you say. "
                        "Because other Commanders see it, I always read the message back and only "
-                       "send after you confirm on a separate command."),
+                       "send after you confirm on a separate command — and at send time I re-state "
+                       "the exact message and channel I'm about to send, so you hear what actually "
+                       "goes out."),
             example="tell local o7",
         )
 
@@ -288,7 +290,13 @@ class CommsSendCapability:
         if problem is not None:
             self._logline(f"comms to {channel} blocked at confirm: {problem}")
             return problem
-        return self._execute(channel, message)
+        # Re-state the ACTUAL composed message + channel from the deterministic pending payload —
+        # never the model's earlier read-back (issue #190, DESIGN §6 confused-deputy note). A
+        # separate turn proves only that a new utterance occurred, not that the Commander consented
+        # to THIS message; leading the confirm output with the true pending channel + text makes a
+        # swapped message audible at send time.
+        return (f'Confirming — sending to {_CHANNEL_LABEL[channel]}: "{message}". '
+                f"{self._execute(channel, message)}")
 
     def _cancel(self) -> str:
         with self._lock:
