@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import covas.health as health
 from covas.health import (HealthReport, run_health, friendly_provider_error,
-                          check_anthropic, check_audio, check_keys_and_files, OK, WARN, FAIL)
+                          check_anthropic, check_audio, check_keys_and_files,
+                          check_updates, check_system, OK, WARN, FAIL)
 from covas.providers._retry import ProviderError
 
 
@@ -112,6 +113,49 @@ def test_present_keys_pass(monkeypatch):
     a, e = check_keys_and_files(r, {"personality": {"file": "nonexistent.txt"}})
     assert a == "sk-abc" and e == "el-abc"
     assert next(c for c in r.sections[-1].checks if "Anthropic" in c.label).status == OK
+
+
+# --- update notifier + system requirements (issue #186) --------------------
+
+def test_update_check_warns_when_newer_available():
+    r = HealthReport()
+    check_updates(r, current="0.18.0",
+                  probe=lambda cur: {"available": True, "latest": "0.19.0", "current": cur})
+    c = r.sections[-1].checks[0]
+    assert c.status == WARN and "0.19.0" in c.label
+
+
+def test_update_check_ok_when_current():
+    r = HealthReport()
+    check_updates(r, current="0.18.0", probe=lambda cur: {"available": False, "latest": None})
+    assert r.sections[-1].checks[0].status == OK
+
+
+def test_update_check_is_fail_soft():
+    r = HealthReport()
+    def boom(_c): raise ConnectionError("offline")
+    check_updates(r, current="0.18.0", probe=boom)
+    assert r.sections[-1].checks[0].status == WARN   # never FAIL on a network hiccup
+
+
+def test_system_check_warns_on_low_ram():
+    r = HealthReport()
+    check_system(r, {"whisper": {"model": "large-v3"}}, probe=lambda: 6.0)
+    labels = " ".join(c.label.lower() for c in r.sections[-1].checks)
+    statuses = [c.status for c in r.sections[-1].checks]
+    assert WARN in statuses and "8 gb" in labels        # flags the <8GB minimum
+
+
+def test_system_check_ok_on_ample_ram():
+    r = HealthReport()
+    check_system(r, {"whisper": {"model": "small.en"}}, probe=lambda: 32.0)
+    assert all(c.status == OK for c in r.sections[-1].checks)
+
+
+def test_system_check_handles_unknown_ram():
+    r = HealthReport()
+    check_system(r, {"whisper": {"model": "small.en"}}, probe=lambda: None)
+    assert r.sections[-1].checks[0].status == OK        # degrades gracefully, no crash
 
 
 # --- offline orchestration (network probes skipped) ------------------------

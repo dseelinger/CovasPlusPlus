@@ -11,6 +11,9 @@ one does, it offers to install it. **Your settings and keys are always preserved
    quick, read-only check that fails silently if you're offline — it never blocks startup.
 2. **A banner appears.** If a newer version is out, an **"Update available → vX.Y"** banner
    shows across the top of the control panel. If you're already current, you'll never see it.
+   **Test my setup** (Settings) also reports it as an *"update available"* line, so a stale build is
+   easy to catch before you file a bug against one — see
+   [System requirements](system-requirements.md#staying-up-to-date).
 3. **You click to update.** When you choose to update, COVAS++ **downloads the new installer**
    for you, launches it, and **exits** so the installer can replace the running app. (A running
    program can't overwrite its own files, hence the hand-off.)

@@ -1281,6 +1281,16 @@ max_turns = 20
 dir = "logs"
 
 
+[crash_report]
+# Opt-in crash capture (issue #186). DEFAULT OFF, and COVAS++ phones nothing home — this only
+# controls whether an UNCAUGHT error is written to a redacted local file under [logging].dir
+# (crash-<timestamp>.log) that YOU can read and attach to a bug report. Keys, your username/home
+# path, and DPAPI blobs are scrubbed before it's written. Nothing is ever transmitted; turning this
+# on just makes a crash shareable so it can actually be fixed. Turn it off and nothing extra is
+# captured (normal session logs are unaffected).
+enabled = false
+
+
 [hud]
 # Companion HUD (issue #47, epic #40) — a transparent, always-on-top, NON-interactive 2D
 # overlay window showing the companion-centric data COVAS++ already has: the voice-loop state
