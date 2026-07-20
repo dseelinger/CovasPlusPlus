@@ -829,7 +829,7 @@ callout_hazard          = true
 #
 # DEFAULT OFF — this is the twitchy part; opt in deliberately. Requires [elite].enabled for
 # the combat guard (it reads ED Status flags to refuse acting during combat/interdiction).
-enabled = true
+enabled = false
 # Bindings file override. Blank = auto-detect: read the active preset from
 #   %LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Bindings\StartPreset.4.start
 # then load "<preset>.4.0.binds" from that folder. Set an absolute path (or a filename

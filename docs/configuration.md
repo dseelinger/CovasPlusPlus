@@ -382,9 +382,19 @@ See [Route callouts](elite/route-callouts.md). **Off by default.**
 
 See [Keybind automation](automation/keybinds.md). **Off by default** — it sends real keypresses.
 
+!!! warning "Safety toggles are not voice-writable"
+    The keybind/macro/comms **safety gates** — `keybinds.enabled`,
+    `keybinds.require_confirmation`, `keybinds.combat_guard`, `macros.require_confirmation`,
+    `macros.combat_guard`, `macros.mode_guard`, and `comms_send.enabled` — are deliberately
+    **carved out of the voice `set_setting` surface** (issue #183). COVAS reads untrusted text
+    (web-search results, in-game/NPC chatter, remembered facts), so it must not be able to disable
+    its own guards by voice. "COVAS, turn off the combat guard" is **refused** and points you at the
+    Settings page. Change these only in the [web control panel](control-panel.md) (CSRF-guarded) or
+    by hand-editing `config.toml` / `overrides.json`.
+
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `keybinds.enabled` | `false` | Master switch |
+| `keybinds.enabled` | `false` | Master switch (**not voice-writable** — see the safety note above) |
 | `keybinds.require_confirmation` | `true` | Require a separate spoken confirm before firing (leave on) |
 | `keybinds.combat_guard` | `true` | Refuse during danger/interdiction or unknown status (leave on) |
 | `keybinds.focus_before_inject` | `true` | Bring Elite to the front before a ship control or comms send so the key can't misfire into another window (no-op if already focused; leave on) — see [Focus the game window](automation/keybinds.md#focus-the-game-window-105) |
