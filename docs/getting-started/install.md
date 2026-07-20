@@ -71,6 +71,15 @@ When the wizard finishes it hands straight off to the **control panel** in the s
 you're ready to talk. Everything you entered is saved under `%APPDATA%\COVAS++` and reused every
 launch — you won't see the wizard again unless that folder is cleared.
 
+!!! tip "Test my setup — one click, no terminal"
+    If something isn't working, open the **Settings** page in the control panel and click
+    **Test my setup**. It runs the same checks as `check_setup.py` — your keys, that each provider
+    is reachable, your game data, and your mic/speakers — and shows a plain, readable pass/fail
+    report right on the page. Nothing is changed and the provider calls are free. If you need help,
+    **screenshot that report** and include it with your question — it's usually enough to spot the
+    problem. Errors are shown as plain sentences ("COVAS couldn't sign in to Anthropic — the key
+    looks wrong"), never a wall of code.
+
 !!! tip "Where your keys and settings live"
     All of your writable state — keys, `overrides.json`, personality/campaign, checklist, and
     `logs/` — lives in **`%APPDATA%\COVAS++`**. The downloaded speech model lives in
@@ -162,7 +171,12 @@ Edit it by hand, or — more easily — from the **Personality** tab in the
 
 ### 4. Verify everything
 
-COVAS++ ships a preflight check that confirms your whole setup **without spending anything**:
+COVAS++ ships a preflight check that confirms your whole setup **without spending anything**. You
+can run it two ways — both run the *same* checks:
+
+- **In the app:** open **Settings → Test my setup** in the control panel and click the button (no
+  terminal needed — this is what a packaged install uses).
+- **From the command line:**
 
 ```powershell
 .\check_setup.bat

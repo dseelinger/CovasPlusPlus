@@ -174,6 +174,9 @@ function render(){
   nav.appendChild(Object.assign(document.createElement("a"),
     {href:"#g-api-keys", textContent:"API keys"}));
   main.appendChild(keysCard());
+  nav.appendChild(Object.assign(document.createElement("a"),
+    {href:"#g-health", textContent:"Test my setup"}));
+  main.appendChild(healthCard());
   for(const g of GROUPS){
     nav.appendChild(Object.assign(document.createElement("a"),
       {href:"#"+slug(g.name), textContent:g.name}));
@@ -730,6 +733,70 @@ async function postKeys(body){
     const data=await r.json().catch(()=>({}));
     return r.ok ? data : {ok:false, error:(data&&data.error)||"request failed"};
   }catch(e){ return {ok:false, error:"request failed"}; }
+}
+
+// ---- "Test my setup" card (issue #181) — one-click health check, no terminal --------
+function healthCard(){
+  const card=document.createElement("section");
+  card.className="card"; card.id="g-health";
+  card.innerHTML='<h2>Test my setup</h2>';
+  const note=document.createElement("div"); note.className="help"; note.style.margin="4px 0 8px";
+  note.textContent="Runs the same checks as check_setup.py — keys, providers, game data, and audio "+
+    "devices — and shows the result here. Nothing is changed, and the provider calls are free. "+
+    "Handy to screenshot if you're asking for help.";
+  card.appendChild(note);
+  const btn=document.createElement("button"); btn.className="kbtn set"; btn.id="healthRun";
+  btn.type="button"; btn.textContent="Test my setup";
+  card.appendChild(btn);
+  const out=document.createElement("div"); out.id="healthOut"; out.className="health-out";
+  out.setAttribute("role","status"); out.setAttribute("aria-live","polite");
+  card.appendChild(out);
+  btn.onclick=()=>runHealth(btn, out);
+  return card;
+}
+
+const HEALTH_MARK={ok:"✓", warn:"!", fail:"✗"};   // ✓ / ! / ✗ — text, not colour alone
+const HEALTH_WORD={ok:"OK", warn:"warn", fail:"FAIL"};
+
+async function runHealth(btn, out){
+  btn.disabled=true; const label=btn.textContent; btn.textContent="Testing…";
+  out.innerHTML='<div class="health-line">Running checks — this can take a few seconds…</div>';
+  let data;
+  try{
+    const r=await fetch("/api/health",{method:"POST",headers:{"content-type":"application/json"},body:"{}"});
+    data=await r.json().catch(()=>({}));
+  }catch(e){ data={ok:false,error:"Couldn't run the check — is the app still running?"}; }
+  btn.disabled=false; btn.textContent=label;
+  if(!data || (data.error && !data.report)){
+    out.innerHTML=''; const d=document.createElement("div");
+    d.className="health-line fail"; d.textContent="✗ "+((data&&data.error)||"The check failed.");
+    out.appendChild(d); return;
+  }
+  renderHealth(out, data.report);
+}
+
+function renderHealth(out, report){
+  out.innerHTML="";
+  const head=document.createElement("div");
+  head.className="health-summary "+(report.ok?"ok":"fail");
+  head.textContent=report.ok
+    ? "✓ All systems go, Commander."
+    : "✗ "+report.problems.length+" issue(s) to fix: "+report.problems.join(", ");
+  out.appendChild(head);
+  for(const section of report.sections){
+    const h=document.createElement("div"); h.className="health-section"; h.textContent=section.title;
+    out.appendChild(h);
+    for(const c of section.checks){
+      const line=document.createElement("div"); line.className="health-line "+c.status;
+      const mark=document.createElement("span"); mark.className="health-mark";
+      mark.textContent=HEALTH_MARK[c.status]||"?"; line.appendChild(mark);
+      const txt=document.createElement("span");
+      txt.textContent=" ["+(HEALTH_WORD[c.status]||"?")+"] "+c.label; line.appendChild(txt);
+      out.appendChild(line);
+      if(c.detail){ const d=document.createElement("div"); d.className="health-detail";
+        d.textContent=c.detail; out.appendChild(d); }
+    }
+  }
 }
 
 async function saveKey(row, inp, msg){

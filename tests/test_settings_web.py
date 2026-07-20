@@ -127,6 +127,42 @@ def test_command_palette_included_on_both_pages(client):
     assert "openPalette" in index and "cmdpOverlay" in index
 
 
+# --- "Test my setup" health route (issue #181) -----------------------------
+
+def test_health_route_returns_structured_report(client, monkeypatch):
+    # Monkeypatch the check so the route test stays offline (no provider network).
+    from covas import health
+    def fake_run(cfg, **k):
+        r = health.HealthReport()
+        r.section("Keys & files").add(health.OK, "Anthropic key is set")
+        return r
+    monkeypatch.setattr(health, "run_health", fake_run)
+    c, _, _ = client
+    resp = c.post("/api/health", json={})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["report"]["sections"][0]["title"] == "Keys & files"
+
+
+def test_health_route_is_fail_soft(client, monkeypatch):
+    # A crash inside the check becomes a friendly message + 200, never a 500 stack trace.
+    from covas import health
+    def boom(cfg, **k): raise RuntimeError("kaboom")
+    monkeypatch.setattr(health, "run_health", boom)
+    c, _, _ = client
+    resp = c.post("/api/health", json={})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is False and "kaboom" in data["error"]
+
+
+def test_settings_page_has_test_my_setup(client):
+    c, _, _ = client
+    html = c.get("/settings").get_data(as_text=True)
+    assert "Test my setup" in html and "/api/health" in html and "healthCard" in html
+
+
 # --- combobox accepts a custom value (issue #92) ---------------------------
 
 def test_combobox_custom_model_id_accepted(client):

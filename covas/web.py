@@ -446,6 +446,20 @@ def create_app(core) -> Flask:
             return jsonify({"ok": False, "error": str(e)}), 500
         return jsonify({"ok": True, "keys": _key_flags()})
 
+    @flask_app.route("/api/health", methods=["POST"])
+    def health_check():
+        """One-click "Test my setup" (issue #181): run the SAME checks as check_setup.py and return
+        a structured, human-readable report the Commander can screenshot for support — no terminal,
+        no tracebacks. POST (so the cross-origin CSRF guard covers it, since it fires the providers'
+        free reachability lookups); changes nothing on disk. Fail-soft: any error becomes a single
+        FAIL line rather than a 500."""
+        from . import health
+        try:
+            report = health.run_health(core.cfg)
+            return jsonify({"ok": report.ok, "report": report.to_dict()})
+        except Exception as e:  # noqa: BLE001 — the panel must never see a stack trace
+            return jsonify({"ok": False, "error": health.friendly_provider_error("your setup", e)}), 200
+
     @flask_app.route("/api/settings", methods=["POST"])
     def settings():
         """Legacy quick-config endpoint (index.html). Same schema validation."""
