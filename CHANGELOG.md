@@ -13,6 +13,26 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.20.0] — 2026-07-20
+
+A **Foundation** release: a fully permissive speech-to-text stack. Nothing changes in how you talk
+to COVAS — this removes redistributed GPL code from the installer and makes it smaller.
+
+### Changed
+- **Local speech-to-text now runs on whisper.cpp** (via `pywhispercpp`) instead of faster-whisper.
+  It reads your microphone audio directly, so the installer no longer pulls in FFmpeg/PyAV — and
+  the **GPL-licensed `libx264`/`libx265` codec DLLs that came with it are gone entirely**. The app
+  never used them, but they were unavoidable dead weight before. The Windows install is now **100%
+  permissively licensed** and **~157 MB smaller** (a 264 → 107 MB app folder). Same model sizes
+  (`tiny`…`large-v3`), still CPU-only, still nothing leaves your machine. ([#206])
+
+### Migration
+- The `[whisper]` config swapped the faster-whisper-only `device`/`compute_type` keys for a single
+  `n_threads` (CPU threads); `model` now defaults to `small.en`. Existing configs keep working —
+  the old keys are simply ignored. On first run after updating, COVAS re-downloads the STT model in
+  the new whisper.cpp `ggml` format (~465 MB) into your per-user models dir; the old ctranslate2
+  weights can be deleted.
+
 ## [0.19.0] — 2026-07-20
 
 A **Foundation & reach** release: talk to COVAS in your language, an easier front door, real
@@ -122,7 +142,8 @@ Feature and polish wave. See the
 Releases before 0.15.0 are listed on the
 [GitHub Releases page](https://github.com/dseelinger/CovasPlusPlus/releases).
 
-[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.20.0
 [0.19.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.19.0
 [0.18.1]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.18.1
 [0.18.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.18.0
@@ -176,3 +197,4 @@ Releases before 0.15.0 are listed on the
 [#188]: https://github.com/dseelinger/CovasPlusPlus/issues/188
 [#189]: https://github.com/dseelinger/CovasPlusPlus/issues/189
 [#190]: https://github.com/dseelinger/CovasPlusPlus/issues/190
+[#206]: https://github.com/dseelinger/CovasPlusPlus/issues/206
