@@ -58,6 +58,15 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
     app = Flask(__name__, template_folder="templates", static_folder="static")
     finish_message = _FINISH_MSG_NATIVE if native else _FINISH_MSG_BROWSER
 
+    # Same gettext-style t() the main panel uses (issue #182 layer 2, #196), so the wizard's
+    # extracted strings resolve here too. English today (catalog gate), so t() is identity.
+    from . import ui_i18n
+
+    @app.context_processor
+    def _inject_translator() -> dict:
+        code = ui_i18n.ui_language_code(cfg)
+        return {"t": lambda text: ui_i18n.translate(text, code)}
+
     # Coarse STT-download state shared with the status poll. Real byte-progress from
     # huggingface_hub is awkward to capture reliably, so we report a state, not a percent —
     # the template shows a "downloading ~250 MB, one time" spinner. state ∈ idle|downloading|

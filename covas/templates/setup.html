@@ -45,39 +45,37 @@
 <body>
 <header>
   <h1>COVAS++</h1>
-  <span class="sub">FIRST-RUN SETUP</span>
+  <span class="sub">{{ t('FIRST-RUN SETUP') }}</span>
 </header>
 
 <div class="wrap">
-  <p class="intro">Welcome, Commander. A few one-time steps and you're flying. Pick any AI + voice
-  combination you like — a <span class="free">free voice (Edge) needs no key at all</span>. Your keys
-  and settings are stored locally on this machine only — nothing is ever uploaded.</p>
+  <p class="intro">{{ t("Welcome, Commander. A few one-time steps and you're flying. Pick any AI + voice combination you like — a <span class=\"free\">free voice (Edge) needs no key at all</span>. Your keys and settings are stored locally on this machine only — nothing is ever uploaded.") | safe }}</p>
 
   <!-- 1. LLM provider -->
   <div class="card">
-    <h2>AI brain (LLM) <span class="req">required</span>
-      <span class="badge off" id="bLlm">not ready</span></h2>
-    <div class="hint">Which model powers the conversation. Pick a cloud provider and paste its key.</div>
-    <label class="f">LLM provider</label>
+    <h2>{{ t('AI brain (LLM)') }} <span class="req">{{ t('required') }}</span>
+      <span class="badge off" id="bLlm">{{ t('not ready') }}</span></h2>
+    <div class="hint">{{ t('Which model powers the conversation. Pick a cloud provider and paste its key.') }}</div>
+    <label class="f">{{ t('LLM provider') }}</label>
     <select id="llmProvider">
-      <option value="anthropic">Anthropic — Claude</option>
-      <option value="openai">OpenAI-compatible — OpenAI / Groq / DeepSeek / OpenRouter</option>
-      <option value="gemini">Google Gemini</option>
+      <option value="anthropic">{{ t('Anthropic — Claude') }}</option>
+      <option value="openai">{{ t('OpenAI-compatible — OpenAI / Groq / DeepSeek / OpenRouter') }}</option>
+      <option value="gemini">{{ t('Google Gemini') }}</option>
     </select>
 
     <div class="pfields" id="llm_anthropic">
-      <div class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank">Get an Anthropic key →</a></div>
-      <label class="f">Anthropic API key</label>
+      <div class="hint"><a href="https://console.anthropic.com/settings/keys" target="_blank">{{ t('Get an Anthropic key →') }}</a></div>
+      <label class="f">{{ t('Anthropic API key') }}</label>
       <input type="password" id="k_anthropic" placeholder="sk-ant-…" autocomplete="off">
     </div>
 
     <div class="pfields" id="llm_openai">
-      <div class="hint">Works with any OpenAI-compatible endpoint. Presets:
+      <div class="hint">{{ t('Works with any OpenAI-compatible endpoint. Presets:') }}
         <a href="https://console.groq.com/keys" target="_blank">Groq</a> ·
         <a href="https://platform.deepseek.com/api_keys" target="_blank">DeepSeek</a> ·
         <a href="https://openrouter.ai/keys" target="_blank">OpenRouter</a> ·
         <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI</a></div>
-      <label class="f">Endpoint (base URL)</label>
+      <label class="f">{{ t('Endpoint (base URL)') }}</label>
       <select id="openai_preset">
         <option value="https://api.openai.com/v1">OpenAI — https://api.openai.com/v1</option>
         <option value="https://api.groq.com/openai/v1">Groq — https://api.groq.com/openai/v1</option>
@@ -86,126 +84,118 @@
         <option value="__custom">Custom…</option>
       </select>
       <input type="text" id="openai_base_url" placeholder="https://…/v1" autocomplete="off" style="margin-top:8px;display:none">
-      <label class="f">Model</label>
+      <label class="f">{{ t('Model') }}</label>
       <input type="text" id="openai_model" placeholder="e.g. llama-3.3-70b-versatile" autocomplete="off">
-      <label class="f">API key</label>
-      <input type="password" id="k_openai" placeholder="key for the endpoint above" autocomplete="off">
+      <label class="f">{{ t('API key') }}</label>
+      <input type="password" id="k_openai" placeholder="{{ t('key for the endpoint above') }}" autocomplete="off">
     </div>
 
     <div class="pfields" id="llm_gemini">
-      <div class="hint"><a href="https://aistudio.google.com/apikey" target="_blank">Get a Gemini key →</a>
-        (Google's free tier is generous.)</div>
-      <label class="f">Gemini API key</label>
+      <div class="hint"><a href="https://aistudio.google.com/apikey" target="_blank">{{ t('Get a Gemini key →') }}</a>
+        {{ t("(Google's free tier is generous.)") }}</div>
+      <label class="f">{{ t('Gemini API key') }}</label>
       <input type="password" id="k_gemini" placeholder="AIza…" autocomplete="off">
-      <label class="f">Model (optional)</label>
+      <label class="f">{{ t('Model (optional)') }}</label>
       <input type="text" id="gemini_model" placeholder="gemini-flash-lite-latest" autocomplete="off">
     </div>
 
 
-    <button id="saveLlm">Save AI provider</button>
+    <button id="saveLlm">{{ t('Save AI provider') }}</button>
     <div class="msg" id="llmMsg"></div>
   </div>
 
   <!-- 2. TTS provider / voice -->
   <div class="card">
-    <h2>Voice (TTS) <span class="req">optional — Edge is free</span>
-      <span class="badge off" id="bVoice">not set</span></h2>
-    <div class="hint">Which voice COVAS speaks in. <b>Edge</b> is free and needs no key, so you always
-      get a voice. The cloud voices sound better but need their own key; leave a keyless cloud voice
-      unset and COVAS runs <b>text-only</b> until you add one.</div>
-    <label class="f">Voice provider</label>
+    <h2>{{ t('Voice (TTS)') }} <span class="req">{{ t('optional — Edge is free') }}</span>
+      <span class="badge off" id="bVoice">{{ t('not set') }}</span></h2>
+    <div class="hint">{{ t("Which voice COVAS speaks in. <b>Edge</b> is free and needs no key, so you always get a voice. The cloud voices sound better but need their own key; leave a keyless cloud voice unset and COVAS runs <b>text-only</b> until you add one.") | safe }}</div>
+    <label class="f">{{ t('Voice provider') }}</label>
     <!-- Azure + Cartesia are EXPERIMENTAL (issue #123): off by default and deliberately not
          offered here on the first-run public path. Self-enable via overrides.json (set the
          [experimental.azure_tts]/[experimental.cartesia_tts] flag + [tts].provider). -->
     <select id="ttsProvider">
-      <option value="edge">Edge — free neural voices, no key ★</option>
-      <option value="elevenlabs">ElevenLabs — premium</option>
-      <option value="openai">OpenAI — cheap cloud</option>
-      <option value="piper">Piper — local, offline (advanced)</option>
+      <option value="edge">{{ t('Edge — free neural voices, no key ★') }}</option>
+      <option value="elevenlabs">{{ t('ElevenLabs — premium') }}</option>
+      <option value="openai">{{ t('OpenAI — cheap cloud') }}</option>
+      <option value="piper">{{ t('Piper — local, offline (advanced)') }}</option>
     </select>
 
     <div class="pfields" id="tts_edge">
-      <div class="hint"><span class="free">Free — no key needed.</span> Uses Microsoft Edge's neural
-        voices. Optional: a specific voice ShortName.</div>
-      <label class="f">Edge voice (optional)</label>
+      <div class="hint">{{ t("<span class=\"free\">Free — no key needed.</span> Uses Microsoft Edge's neural voices. Optional: a specific voice ShortName.") | safe }}</div>
+      <label class="f">{{ t('Edge voice (optional)') }}</label>
       <input type="text" id="edge_voice" placeholder="en-US-AriaNeural" autocomplete="off">
     </div>
 
     <div class="pfields" id="tts_elevenlabs">
-      <div class="hint"><a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">Get an ElevenLabs key →</a>
-        Leave blank to run text-only for now.</div>
-      <label class="f">ElevenLabs API key</label>
-      <input type="password" id="k_elevenlabs" placeholder="leave blank for text-only" autocomplete="off">
-      <div class="hint">Then pick the default voice “George” (or the first in your library).</div>
+      <div class="hint"><a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">{{ t('Get an ElevenLabs key →') }}</a>
+        {{ t('Leave blank to run text-only for now.') }}</div>
+      <label class="f">{{ t('ElevenLabs API key') }}</label>
+      <input type="password" id="k_elevenlabs" placeholder="{{ t('leave blank for text-only') }}" autocomplete="off">
+      <div class="hint">{{ t('Then pick the default voice “George” (or the first in your library).') }}</div>
     </div>
 
     <div class="pfields" id="tts_azure">
-      <div class="hint"><a href="https://portal.azure.com" target="_blank">Azure Speech resource →</a>
-        (a free tier exists). Needs the key + your resource region.</div>
-      <label class="f">Azure Speech key</label>
-      <input type="password" id="k_azure" placeholder="Azure Speech key" autocomplete="off">
-      <label class="f">Region</label>
+      <div class="hint"><a href="https://portal.azure.com" target="_blank">{{ t('Azure Speech resource →') }}</a>
+        {{ t('(a free tier exists). Needs the key + your resource region.') }}</div>
+      <label class="f">{{ t('Azure Speech key') }}</label>
+      <input type="password" id="k_azure" placeholder="{{ t('Azure Speech key') }}" autocomplete="off">
+      <label class="f">{{ t('Region') }}</label>
       <input type="text" id="azure_region" placeholder="eastus" autocomplete="off">
-      <label class="f">Voice (optional)</label>
+      <label class="f">{{ t('Voice (optional)') }}</label>
       <input type="text" id="azure_voice" placeholder="en-US-AriaNeural" autocomplete="off">
     </div>
 
     <div class="pfields" id="tts_openai">
-      <div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank">OpenAI key →</a>
-        (shared with the OpenAI LLM key). Cheap cloud voices.</div>
-      <label class="f">OpenAI API key</label>
+      <div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank">{{ t('OpenAI key →') }}</a>
+        {{ t('(shared with the OpenAI LLM key). Cheap cloud voices.') }}</div>
+      <label class="f">{{ t('OpenAI API key') }}</label>
       <input type="password" id="k_openai_tts" placeholder="sk-…" autocomplete="off">
-      <label class="f">Voice (optional)</label>
+      <label class="f">{{ t('Voice (optional)') }}</label>
       <input type="text" id="openai_tts_voice" placeholder="alloy" autocomplete="off">
     </div>
 
     <div class="pfields" id="tts_cartesia">
-      <div class="hint"><a href="https://play.cartesia.ai" target="_blank">Cartesia →</a> — low-latency
-        persona voice. Needs the key and a voice id from your library.</div>
-      <label class="f">Cartesia API key</label>
-      <input type="password" id="k_cartesia" placeholder="Cartesia key" autocomplete="off">
-      <label class="f">Voice id</label>
-      <input type="text" id="cartesia_voice" placeholder="a voice id from play.cartesia.ai" autocomplete="off">
+      <div class="hint"><a href="https://play.cartesia.ai" target="_blank">{{ t('Cartesia →') }}</a> {{ t('— low-latency persona voice. Needs the key and a voice id from your library.') }}</div>
+      <label class="f">{{ t('Cartesia API key') }}</label>
+      <input type="password" id="k_cartesia" placeholder="{{ t('Cartesia key') }}" autocomplete="off">
+      <label class="f">{{ t('Voice id') }}</label>
+      <input type="text" id="cartesia_voice" placeholder="{{ t('a voice id from play.cartesia.ai') }}" autocomplete="off">
     </div>
 
     <div class="pfields" id="tts_piper">
-      <div class="hint"><span class="free">Free — no key.</span> Fully offline local TTS. Download a
-        voice: <code>python -m piper.download_voices en_US-lessac-medium</code>, then point to the
-        resulting <code>.onnx</code>.</div>
-      <label class="f">Piper voice (.onnx path)</label>
+      <div class="hint">{{ t('<span class="free">Free — no key.</span> Fully offline local TTS. Download a voice:') | safe }} <code>python -m piper.download_voices en_US-lessac-medium</code>{{ t(', then point to the resulting') }} <code>.onnx</code>.</div>
+      <label class="f">{{ t('Piper voice (.onnx path)') }}</label>
       <input type="text" id="piper_model" placeholder="voices/en_US-lessac-medium.onnx" autocomplete="off">
     </div>
 
-    <button id="saveVoice">Save voice</button>
+    <button id="saveVoice">{{ t('Save voice') }}</button>
     <div class="msg" id="voiceMsg"></div>
   </div>
 
   <!-- 3. Speech model -->
   <div class="card">
-    <h2>Speech-to-text model <span class="req">required</span>
-      <span class="badge off" id="bStt">not installed</span></h2>
-    <div class="hint">Downloads <b>faster-whisper small.en</b> (~250 MB, one time) so COVAS can
-      hear you. Runs entirely on your CPU afterward — no internet needed to talk.</div>
-    <button id="dlModel">Download speech model</button>
+    <h2>{{ t('Speech-to-text model') }} <span class="req">{{ t('required') }}</span>
+      <span class="badge off" id="bStt">{{ t('not installed') }}</span></h2>
+    <div class="hint">{{ t("Downloads <b>faster-whisper small.en</b> (~250 MB, one time) so COVAS can hear you. Runs entirely on your CPU afterward — no internet needed to talk.") | safe }}</div>
+    <button id="dlModel">{{ t('Download speech model') }}</button>
     <div class="msg" id="modelMsg"></div>
   </div>
 
   <!-- 4. Mic -->
   <div class="card">
-    <h2>Microphone <span class="req">optional</span></h2>
-    <div class="hint">Which mic COVAS listens to. Leave on the system default if you're unsure.</div>
-    <label class="f">Input device</label>
-    <select id="mic"><option value="">System default</option></select>
-    <button id="saveMic">Save microphone</button>
+    <h2>{{ t('Microphone') }} <span class="req">{{ t('optional') }}</span></h2>
+    <div class="hint">{{ t("Which mic COVAS listens to. Leave on the system default if you're unsure.") }}</div>
+    <label class="f">{{ t('Input device') }}</label>
+    <select id="mic"><option value="">{{ t('System default') }}</option></select>
+    <button id="saveMic">{{ t('Save microphone') }}</button>
     <div class="msg" id="micMsg"></div>
   </div>
 
   <!-- Finish -->
   <div class="card finish">
-    <h2>Finish</h2>
-    <div class="hint">Enabled once your chosen AI provider is ready and the speech model is installed.
-      A voice is optional — Edge gives you one for free.</div>
-    <button class="primary" id="finishBtn" disabled>Launch COVAS++ →</button>
+    <h2>{{ t('Finish') }}</h2>
+    <div class="hint">{{ t('Enabled once your chosen AI provider is ready and the speech model is installed. A voice is optional — Edge gives you one for free.') }}</div>
+    <button class="primary" id="finishBtn" disabled>{{ t('Launch COVAS++ →') }}</button>
     <div class="msg" id="finishMsg"></div>
   </div>
 </div>
