@@ -121,6 +121,17 @@ def create_app(core) -> Flask:
     # writing, so the check-then-act window that the audit flagged (issue #163) is closed.
     _save_lock = threading.Lock()
 
+    # Localizable UI strings (issue #182 layer 2, #196): expose a gettext-style `t()` to every
+    # template, bound once per render to the active UI language (derived from [language].reply,
+    # gated to languages with a complete catalog — English today, so `t` is identity). Templates
+    # wrap visible text in `{{ t('…') }}`; a translator ships a catalog in covas/ui_i18n.py.
+    from . import ui_i18n
+
+    @flask_app.context_processor
+    def _inject_translator() -> dict:
+        code = ui_i18n.ui_language_code(core.cfg)
+        return {"t": lambda text: ui_i18n.translate(text, code)}
+
     # Signal the core that the control panel (this Flask server) exists, so a web HUD (#103)
     # enabled before the server came up can attach now that /hud is actually served. Guarded so a
     # stub core in tests that doesn't implement it is fine.
