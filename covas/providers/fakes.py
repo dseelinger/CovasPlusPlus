@@ -24,6 +24,29 @@ class FakeSTT:
         return self._text
 
 
+class _FakeSegment:
+    """Stand-in for a pywhispercpp `Segment` — only `.text` is read by the provider."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class FakeWhisperCppModel:
+    """Stand-in for pywhispercpp's `Model` (the whisper.cpp backend, NOT a full provider) so the
+    WhisperCppSTT provider (#206) can be unit-tested offline — no native dep, no ~465 MB ggml load.
+
+    `segments` scripts what `transcribe()` returns (each str becomes one segment); the audio it was
+    handed is recorded on `heard` so tests can assert on dtype/shape normalization."""
+
+    def __init__(self, cfg: dict | None = None, *, segments: list[str] | None = None) -> None:
+        self._segments = list(segments if segments is not None else ["test transcription"])
+        self.heard: list = []
+
+    def transcribe(self, audio, *_a, **_k):  # noqa: ANN001 — mirrors Model.transcribe(media, ...)
+        self.heard.append(audio)
+        return [_FakeSegment(t) for t in self._segments]
+
+
 class FakeTTS:
     """TTSProvider: records what it was asked to say and plays nothing."""
 
