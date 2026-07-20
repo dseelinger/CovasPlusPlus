@@ -172,6 +172,28 @@ missing key/voice or service error degrades the persona to text — it never cra
 > **Alternative:** Deepgram **Aura** is a comparable low-latency option; Cartesia Sonic was chosen to
 > start. The provider seam makes adding Aura later a drop-in.
 
+### Voice follows your reply language
+
+If you set a non-English [reply language](language.md), COVAS++ makes the **voice** follow it too —
+so a German reply is read by a voice that actually pronounces German, not an English voice stumbling
+through it. This is on by default (`[language].match_voice = true`).
+
+- **It only steers a voice that would mispronounce.** Edge and Azure tag every neural voice with a
+  locale (`de-DE-…`, `fr-FR-…`, …). When your reply language turns non-English and the configured
+  voice can't speak it, COVAS switches to a locale-matched voice from the same catalog (keeping the
+  same gender where it can). A voice that already speaks the language is left exactly as it is.
+- **Your explicit pick is respected.** If *you* chose the voice, COVAS won't silently swap it — it
+  keeps your choice and logs a mismatch warning instead, so switching is your call.
+- **ElevenLabs, OpenAI, Piper are left alone.** ElevenLabs and OpenAI voices are multilingual (the
+  model handles the language), and Piper is one voice per downloaded model — none carry a locale to
+  steer within. Only **Edge** and **Azure** auto-steer.
+- **The voice pickers follow too.** With a non-English reply language set, the Edge/Azure voice
+  dropdowns on the Settings page list voices for *that* language, so picking a matching voice by hand
+  is easy.
+
+Prefer to keep whatever voice you configured regardless of language? Set `[language].match_voice =
+false` (or *"turn match voice to language off"*).
+
 ## Turning personality off
 
 Say *"turn personality off"* (or toggle it on the Settings page) and replies become plain and
@@ -182,6 +204,7 @@ neutral — no in-character address or campaign context. Turn it back on the sam
 | Setting | What it does |
 |---------|--------------|
 | `personality.enabled` | Whether the in-character system prompt is used at all |
+| `language.match_voice` | When the reply language is non-English, steer an Edge/Azure voice that can't pronounce it to one that can (default on; explicit picks are kept and flagged, not overridden) |
 | `elevenlabs.voice_id` | Which ElevenLabs voice speaks |
 | `tts.speed` | One normalized voice speed (0.5–2.0×, 1.0 = normal) for the active provider; each maps + clamps it to its own range (ElevenLabs 0.7–1.2, OpenAI 0.25–4.0, Edge/Azure/Cartesia/Piper wider) |
 | `tts.provider` | `edge` (free neural, default), `azure` (free-tier neural + SLA), `openai` (cheap cloud), `cartesia` (low-latency premium persona), `elevenlabs` (cloud), or `piper` (local, free) |
