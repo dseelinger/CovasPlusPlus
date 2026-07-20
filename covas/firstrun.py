@@ -17,9 +17,9 @@ were a plaintext bypass and masked fresh-install testing) — keys are FILE-only
 Split of concerns:
   * Keys — Anthropic (LLM, REQUIRED) and ElevenLabs (TTS, OPTIONAL: no key ⇒ text-only, the
     existing fail-soft path).
-  * STT — faster-whisper weights, download-on-first-run. Availability is a cache lookup; the
-    wizard's model step downloads `small.en` (the locked shipped default) into data_dir/models
-    when frozen, or the default HF cache in a source run (dev cache untouched).
+  * STT — whisper.cpp ggml weights (issue #206), download-on-first-run. Availability is a file
+    check (`<models dir>/ggml-<name>.bin`); the wizard's model step downloads `small.en` (the
+    locked shipped default) into data_dir/models (frozen: %APPDATA%/COVAS++/models).
   * Default voice — resolve ElevenLabs "George" by NAME, else the first valid voice, so a
     rotated catalog never dead-ends the wizard.
 

@@ -1337,7 +1337,7 @@ Notes:
 ### 14.2a Settings apply LIVE — hot-swap providers & keys (issue #90)  🔊 HW 🌐 PANEL 🌍 NET
 > #90 makes almost every Settings change take effect **without a restart**.
 - [ ] **Switch the LLM provider live:** on the Settings page change **LLM provider** (e.g. anthropic → gemini, with that provider's key set) and **SAVE CHANGES**. The log shows `LLM now: <provider> / <model>`. Speak a turn → the **next** turn is answered by the new provider (check the router/usage line), **no restart**. A turn already in flight when you saved finishes on the old provider.
-- [ ] **No Ollama, no GPU option (issue #128):** the **LLM provider** dropdown offers exactly **Anthropic / OpenAI-compatible / Gemini** — **no "Ollama"** entry, and there's no Ollama model field. The **Whisper device** row shows **cpu only** (no `cuda`), and its help mentions no GPU. Voice command *"turn on ollama"* / *"set the whisper device to cuda"* does nothing (not a valid setting/option).
+- [ ] **No Ollama, no GPU option (issue #128 / #206):** the **LLM provider** dropdown offers exactly **Anthropic / OpenAI-compatible / Gemini** — **no "Ollama"** entry, and there's no Ollama model field. The Whisper settings show **no device/GPU option at all** — whisper.cpp is CPU-only by construction (the old `whisper.device`/`whisper.compute_type` rows are gone; a `whisper.n_threads` row sets CPU threads instead). Voice command *"turn on ollama"* / *"set the whisper device to cuda"* does nothing (not a valid setting/option).
 - [ ] **Switch the TTS provider/voice live:** change **TTS provider** (e.g. edge → elevenlabs, or just a different voice) and SAVE → the log shows `Voice now: <provider>` and the next spoken reply uses the new voice. The mixer is **not** rebuilt.
 - [ ] **Ambient audio follows the swap (issue #90 review):** with the **bus mixer + audio layer ON**, switch the TTS voice/provider and SAVE, then trigger an ambient/comms line (or a persona musing) → it speaks in the **new** voice, not the old one (no half-swap). Likewise, switching the **LLM** keeps opt-in chatter-flavor / comms-variants generating on the new provider (canned/verbatim lines are unaffected).
 - [ ] **Failed switch is fail-soft:** switch to a provider whose key is missing/bad and SAVE → the log shows `Couldn't switch … keeping the previous one`, and the next turn **still works** on the previous provider (no dead loop).
@@ -1986,12 +1986,23 @@ Notes:
 > MUST bundle `edge_tts` + its `aiohttp` stack and prove it. `covas.spec` `collect_all`s them and
 > `--selftest` imports the third-party `edge_tts` plus every provider module.
 - [ ] **Frozen self-test (build machine):** `.\build.ps1 -Installer -SelfTest` → the freeze
-  completes and the frozen `COVAS++.exe --selftest` prints `SELFTEST OK …incl. …edge_tts` and exits
-  0. A missing bundle fails the build **loudly** instead of shipping. This proves `edge_tts` /
-  `aiohttp` **and** `covas.providers.{edge_tts,azure_tts,openai_tts,cartesia_tts,piper_tts,elevenlabs_tts,openai_llm,gemini_llm}`
+  completes and the frozen `COVAS++.exe --selftest` prints `SELFTEST OK …incl. pywhispercpp/edge_tts`
+  and exits 0. A missing bundle fails the build **loudly** instead of shipping. This proves `edge_tts`
+  / `aiohttp`, **`pywhispercpp` + its native `_pywhispercpp`/ggml/whisper DLLs** (the STT backend
+  load-links them at import), **and**
+  `covas.providers.{whispercpp_stt,edge_tts,azure_tts,openai_tts,cartesia_tts,piper_tts,elevenlabs_tts,openai_llm,gemini_llm}`
   are all in the bundle.
-- [ ] 📋 **Size delta:** note the onedir folder MB and `COVAS++ Setup.exe` MB the build prints; the
-  `aiohttp` stack (~10 pkgs) should add only a few MB next to av/onnxruntime — record here: ____.
+- [ ] **No GPL/FFmpeg DLLs in the bundle (issue #206):** grep the frozen tree —
+  `Get-ChildItem -Recurse dist\COVAS++ | Where-Object Name -match 'libx264|libx265|avcodec|avutil|swscale|ffmpeg|^av\.'`
+  → **zero hits**. The whisper.cpp move removed PyAV/FFmpeg entirely, so the GPL x264/x265 encoder
+  DLLs are gone by construction; the only STT natives are the MIT `ggml-*.dll`/`whisper*.dll`.
+- [ ] **Frozen STT transcribes (issue #206):** with the `small.en` ggml model present
+  (`%APPDATA%\COVAS++\models\ggml-small.en.bin`), the packaged app does a full PTT turn → your speech
+  is transcribed locally by whisper.cpp (accuracy/latency comparable to the old faster-whisper
+  `small.en`); confirm the reply reflects what you said.
+- [ ] 📋 **Size delta:** note the onedir folder MB and `COVAS++ Setup.exe` MB the build prints;
+  dropping the av/ctranslate2 stack (the ~63 MB `av.libs` FFmpeg blob + ctranslate2 DLL) should
+  **shrink** the bundle vs. the pre-#206 baseline — record here: ____.
   (Measured at v0.5.0: onedir **264.4 MB**, Setup.exe **74.7 MB**; the `aiohttp`+`edge_tts` files
   total **~3 MB uncompressed** → **~1–2 MB** of the installer — negligible, as expected.)
 - [ ] **Default Edge voice actually plays (not just imports):** launch the packaged `COVAS++.exe`
@@ -2031,7 +2042,7 @@ Notes:
       `[audio].input_device` name (the resolved default capture device), **not** a blank — so a fresh
       install can't fall through to an implicit PortAudio default that captures silence. (On a headless
       box with no mic at all it stays blank and the system default stands — fail-soft.)
-- [ ] **STT model** downloads (`small.en`, ~250 MB) with a **progress** indicator (needs internet); it's fetched **once**.
+- [ ] **STT model** downloads (whisper.cpp `ggml-small.en.bin`, ~465 MB) with a **progress** indicator (needs internet); it's fetched **once** into the per-user models dir.
 - [ ] Wizard **hands off to the control panel in the same window** — no second window, no browser. The finish message says it's **switching to the control panel** (NOT "close this tab"); the panel appears **without you closing anything** (closing the single native window quits the app).
 - [ ] **Keyless-cloud-voice → text-only:** pick a cloud voice (e.g. ElevenLabs) but leave its key blank
       → the voice badge shows **text-only** and the app still finishes (on the LLM + STT); add the key

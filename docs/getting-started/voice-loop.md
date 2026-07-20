@@ -8,7 +8,7 @@ minute and makes everything else obvious.
 1. **Hold** the push-to-talk key (<kbd>[</kbd> by default) and speak. The moment you press, a
    **listening** chirp plays and your microphone is captured — for as long as you hold.
 2. **Release.** A **processing** chirp plays, then a soft **thinking** bed fades in and hums
-   gently underneath while COVAS works. Your speech is transcribed **locally** by faster-whisper —
+   gently underneath while COVAS works. Your speech is transcribed **locally** by whisper.cpp —
    nothing leaves your PC just to turn your voice into text.
 3. The transcript goes to Claude with your personality, your recent conversation, and — only when
    the question needs it — a compact snapshot of your live game state.

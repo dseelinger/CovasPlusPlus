@@ -93,7 +93,7 @@ COVAS has one, an honest "I don't have that yet" when it doesn't.
 
 ### 🎙️ Conversation, voice & personas
 - **Push-to-talk voice loop** with instant local **sound cues** (listening / processing / done / failed), each a randomized set for variety.
-- **Local speech-to-text** via faster-whisper (`tiny`…`large-v3`), CPU or CUDA — nothing leaves your machine for STT.
+- **Local speech-to-text** via whisper.cpp (`tiny`…`large-v3`), CPU-only — nothing leaves your machine for STT.
 - **Streaming replies** spoken aloud, kept short by design (they're spoken, not read).
 - **Personality system** — the system prompt is composed as **Base + Persona + Campaign**: swap the *voice/register* (personas) without wiping your *personal Commander facts* (campaign). Ships with selectable presets; save your own.
 - **Interactive crew** *(opt-in)* — an ordinary reply can also voice a **named crew member** in its own distinct voice; the persona stays the default narrator, crew chime in only when a line is theirs.
@@ -181,7 +181,7 @@ shouldn't have to re-type it* — and you can check how fresh your data is.
 ## The voice loop
 
 1. **Hold** the push-to-talk key and speak. A *listening* chirp plays; your mic is captured while held. (Or switch on **hands-free** mode and just talk.)
-2. **Release** → a *processing* chirp; speech is transcribed locally (faster-whisper — nothing leaves your machine for STT).
+2. **Release** → a *processing* chirp; speech is transcribed locally (whisper.cpp — nothing leaves your machine for STT).
 3. The transcript streams to the LLM with your personality, rolling history, and — when relevant — live game state.
 4. A *done* chirp plays; the reply is spoken aloud (ElevenLabs cloud voice, or local Piper).
 5. **Cancel** anything mid-flight with a brief tap of the same PTT key.
@@ -199,7 +199,7 @@ The three swappable pieces of the loop live behind a small provider interface (`
 |-------|-------|--------------|
 | **LLM** | Anthropic Claude / OpenAI-compatible / Google Gemini (tiered) | — (cloud only; cost handled by tiering) |
 | **TTS** | ElevenLabs / Edge / Azure / OpenAI / Cartesia | Piper |
-| **STT** | — | faster-whisper (CPU) |
+| **STT** | — | whisper.cpp (CPU) |
 
 Select providers in `config.toml` under `[llm]` and `[tts]`. The LLM is always cloud by design —
 cost is handled by the tiering router, not a local model (a capable local model would compete with
@@ -386,6 +386,6 @@ maintainer-status note above first so the process makes sense.
 MIT (see [`LICENSE`](LICENSE)) — covers the **source only**. Supply your own rights for any sound
 cues or voice models you add locally.
 
-The packaged installer redistributes third-party libraries and community game data (FFmpeg via
-PyAV, edge-tts, Elite Dangerous reference data from EDCD/Coriolis/Spansh, and more). Their licenses
+The packaged installer redistributes third-party libraries and community game data (whisper.cpp,
+edge-tts, Elite Dangerous reference data from EDCD/Coriolis/Spansh, and more). Their licenses
 and attributions — including the copyleft components — are documented in **[NOTICE.md](NOTICE.md)**.
