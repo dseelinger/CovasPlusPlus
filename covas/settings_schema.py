@@ -718,7 +718,7 @@ SCHEMA: list[Setting] = [
     Setting("keybinds.enabled", ("keybinds", "enabled"), "bool",
             "Keybind automation", "Keybinds",
             "Let the companion press ONE ship control (landing gear) behind a safety layer.",
-            default=True, phrasings=("keybind automation", "ship controls"),
+            default=False, phrasings=("keybind automation", "ship controls"),
             example="turn keybind automation on"),
     Setting("keybinds.require_confirmation", ("keybinds", "require_confirmation"), "bool",
             "Require confirmation", "Keybinds",
