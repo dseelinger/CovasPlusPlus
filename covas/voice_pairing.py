@@ -253,3 +253,149 @@ def voice_for_persona(explicit_map: Optional[dict], pairings: Optional[dict],
     if not str(persona_name or "").strip():
         return None
     return _lookup_ci(explicit_map, persona_name) or _lookup_ci(pairings, persona_name)
+
+
+# --- Locale-aware voice pairing (issue #182 layer 4, #198) ------------------------------------
+# When the reply language is non-English, a voice that can't pronounce it reads the reply badly.
+# These PURE helpers steer the configured voice to one that speaks the active language — but only
+# when it would otherwise mispronounce, and never over an EXPLICIT user choice (which we flag
+# instead). Edge/Azure tag voices with a BCP-47 `locale`; ElevenLabs/OpenAI don't (multilingual /
+# untagged), so `i18n.voice_speaks` treats those as "copes" and we leave them alone.
+
+# Which config key each TTS provider stores its single reply voice under (the value `voice_speaks`
+# is evaluated against). Only Edge/Azure carry locale-tagged catalogs we can steer within; the
+# others are listed so the resolver can no-op cleanly rather than raise on an unknown provider.
+_PROVIDER_VOICE_KEY: dict[str, tuple[str, str]] = {
+    "edge": ("edge", "voice"),
+    "azure": ("azure", "voice"),
+    "elevenlabs": ("elevenlabs", "voice_id"),
+    "openai_tts": ("openai_tts", "voice"),
+    "cartesia": ("cartesia", "voice"),
+}
+
+
+def _vid(v: dict) -> str:
+    """A normalized voice dict's id — providers expose it as `ref` (Edge/Azure cast shape) or
+    `voice_id` (ElevenLabs). Blank string when neither is present."""
+    return str((v or {}).get("ref") or (v or {}).get("voice_id") or "")
+
+
+@dataclass(frozen=True)
+class LanguageVoice:
+    """The outcome of steering a reply voice to the active language (issue #198).
+
+    `voice_id` is the voice to USE (the current one when we keep it, a new one when we steer, or
+    None when there was no current voice to begin with). `steered` is True only when we changed
+    it; `mismatch` is True when the result can't actually speak the language — either because an
+    explicit user voice was respected, or because the catalog has no voice for that language — so
+    the caller can warn instead of silently mispronouncing."""
+    voice_id: Optional[str]
+    steered: bool = False
+    mismatch: bool = False
+
+
+def _best_speaker(speakers: list[dict], prefer_gender: Optional[str]) -> Optional[dict]:
+    """Pick a locale-appropriate voice: prefer one matching `prefer_gender` (keep the persona's
+    feel), else the first (the catalog is already sorted deterministically). None if empty."""
+    if not speakers:
+        return None
+    want = (prefer_gender or "").strip().lower()
+    if want:
+        for v in speakers:
+            if str(v.get("gender") or "").strip().lower() == want:
+                return v
+    return speakers[0]
+
+
+def pick_language_voice(
+    voices: list[dict],
+    code: Optional[str],
+    *,
+    current: Optional[str] = None,
+    explicit: bool = False,
+    prefer_gender: Optional[str] = None,
+) -> LanguageVoice:
+    """Resolve which voice should read a reply in ISO 639-1 language `code`, given the provider's
+    `voices` catalog (normalized `{ref/voice_id, name, gender, locale}` dicts) and the `current`
+    voice id. PURE and fully offline-testable — the whole point of layer 4 (#198).
+
+    The rule, in order:
+
+    1. No target language (`code` blank/None — English default or unmapped): no-op, keep `current`.
+    2. `current` already speaks it (locale tag matches, or the provider is untagged/multilingual):
+       keep it — "the pairing would NOT mispronounce", so don't steer.
+    3. `current` can't speak it:
+       - EXPLICIT user choice -> respect the override, but flag `mismatch` (the user set this voice
+         on purpose; we warn rather than override it).
+       - otherwise (an auto/default voice) -> STEER to the best catalog voice that speaks the
+         language (same gender when possible).
+    4. No catalog voice speaks it -> can't steer; keep `current` and flag `mismatch`.
+    """
+    from .i18n import voice_speaks
+
+    voices = voices or []
+    if not (code or "").strip():
+        return LanguageVoice(current, steered=False, mismatch=False)
+
+    by_id = {_vid(v): v for v in voices if _vid(v)}
+    cur = by_id.get(str(current)) if current is not None else None
+
+    # Already fine (speaks it, or an untagged/unknown voice we assume copes)?
+    if current is not None and voice_speaks((cur or {}).get("locale"), code):
+        return LanguageVoice(current, steered=False, mismatch=False)
+
+    # A mismatch. An explicit user voice is honored, but surfaced.
+    if explicit:
+        return LanguageVoice(current, steered=False, mismatch=True)
+
+    speakers = [v for v in voices if voice_speaks_strict(v, code)]
+    pick = _best_speaker(speakers, prefer_gender or (cur or {}).get("gender"))
+    if pick is not None:
+        pid = _vid(pick)
+        return LanguageVoice(pid, steered=(pid != str(current or "")), mismatch=False)
+
+    # Nothing in the catalog speaks it — keep what we have and let the caller warn.
+    return LanguageVoice(current, steered=False, mismatch=True)
+
+
+def voice_speaks_strict(v: dict, code: Optional[str]) -> bool:
+    """Like `i18n.voice_speaks`, but for PICKING a replacement: an untagged voice does NOT qualify
+    (we only steer TO a voice we can positively confirm speaks the language)."""
+    from .i18n import voice_speaks
+
+    if not str((v or {}).get("locale") or "").strip():
+        return False
+    return voice_speaks((v or {}).get("locale"), code)
+
+
+def reply_voice_patch(
+    cfg: dict,
+    voices: list[dict],
+    *,
+    explicit: bool = False,
+) -> tuple[Optional[dict], LanguageVoice]:
+    """Given the live `cfg` and the active provider's `voices` catalog, return `(patch, outcome)`
+    where `patch` is a config patch that steers the reply voice to the active language — or None
+    when nothing should change. `outcome` (a `LanguageVoice`) carries the mismatch flag so the
+    caller can warn. Reads `[language].reply` and `[tts].provider` from cfg; honors the
+    `[language].match_voice` opt-out. PURE (no network) — the caller fetches the catalog. """
+    from . import i18n
+
+    lang = cfg.get("language", {}) or {}
+    if not lang.get("match_voice", True):
+        return None, LanguageVoice(None)
+    code = i18n.language_code(i18n.reply_language(cfg))
+    if not code:  # English / unmapped -> never steer
+        return None, LanguageVoice(None)
+
+    provider = str((cfg.get("tts", {}) or {}).get("provider") or "").strip().lower()
+    keys = _PROVIDER_VOICE_KEY.get(provider)
+    if not keys:
+        return None, LanguageVoice(None)
+    section, field = keys
+    current = str((cfg.get(section, {}) or {}).get(field) or "") or None
+
+    outcome = pick_language_voice(voices, code, current=current, explicit=explicit)
+    if not outcome.steered or not outcome.voice_id:
+        return None, outcome
+    return {section: {field: outcome.voice_id}}, outcome

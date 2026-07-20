@@ -512,12 +512,23 @@ SCHEMA: list[Setting] = [
     Setting("language.reply", ("language", "reply"), "enum",
             "Reply language", "Language",
             "The language the companion REPLIES in, regardless of what you type or speak. Curated to "
-            "languages we deliver end-to-end. Note: your speech is still transcribed with the "
-            "Whisper language below, and the reply is read by your chosen TTS voice — set both to "
-            "match for the best result.",
+            "languages we deliver end-to-end. Your speech-to-text follows this automatically "
+            "(Whisper language 'follow', #197) and, on Edge/Azure, so does the TTS voice ('Match "
+            "voice to language' below, #198) — so setting this one language localizes the whole "
+            "round trip. Use a multilingual Whisper model (e.g. 'small', not 'small.en') for "
+            "non-English.",
             default="English", options=REPLY_LANGUAGES,
             phrasings=("language", "reply language", "response language", "speak my language"),
             example="reply in German"),
+    Setting("language.match_voice", ("language", "match_voice"), "bool",
+            "Match voice to language", "Language",
+            "When the reply language is non-English, prefer a TTS voice that actually speaks it "
+            "(Edge and Azure tag voices by locale). An explicit voice you picked is kept — COVAS "
+            "warns about a mismatch rather than overriding your choice — and it only ever steers an "
+            "auto/default voice that would otherwise mispronounce. Off leaves the voice exactly as "
+            "configured. English is unaffected either way.",
+            default=True, phrasings=("match voice to language", "locale voice", "voice follows language"),
+            example="turn match voice to language off"),
 
     # --- Personality -------------------------------------------------------
     Setting("personality.enabled", ("personality", "enabled"), "bool",

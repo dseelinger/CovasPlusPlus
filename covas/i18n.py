@@ -31,6 +31,39 @@ def language_code(name: str | None) -> str | None:
     return _LANG_CODES.get((name or "").strip())
 
 
+def locale_prefix(name: str | None) -> str | None:
+    """The locale-tag prefix a TTS catalog filters on for a REPLY_LANGUAGES display name —
+    the ISO code plus a hyphen, e.g. German -> ``"de-"`` (matching Edge/Azure ``Locale`` tags
+    like ``de-DE``). None when the language is unknown/blank, so callers keep the default pool.
+    """
+    code = language_code(name)
+    return f"{code}-" if code else None
+
+
+def voice_speaks(locale: str | None, code: str | None) -> bool:
+    """Does a TTS voice with ``locale`` (a BCP-47 tag like ``de-DE``, or blank/None when the
+    provider doesn't tag its voices) speak the ISO 639-1 language ``code`` (e.g. ``de``)?
+
+    Deliberately permissive so we only ever steer AWAY from a demonstrable mismatch, never on a
+    guess (layer 4, #198):
+
+    - ``code`` blank/None (an unmapped or blank reply language — English maps to ``en`` and is
+      checked normally): True — nothing to follow, so never steer on a guess.
+    - ``locale`` blank/None (OpenAI TTS isn't locale-tagged; ElevenLabs is multilingual; a voice
+      id we can't find in the catalog): True — assume it copes rather than swap a voice we can't
+      actually inspect.
+    - otherwise: True only when the tag matches the code exactly or as its primary subtag
+      (``de`` or ``de-DE`` both speak ``de``; ``de-AT`` too).
+    """
+    c = (code or "").strip().lower()
+    if not c:
+        return True
+    loc = (locale or "").strip().lower()
+    if not loc:
+        return True
+    return loc == c or loc.startswith(c + "-")
+
+
 def reply_language(cfg: dict) -> str:
     """The configured reply-language display name (defaults to English)."""
     return str((cfg.get("language", {}) or {}).get("reply", "English") or "English").strip()

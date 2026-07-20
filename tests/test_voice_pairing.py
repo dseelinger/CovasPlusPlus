@@ -185,3 +185,92 @@ def test_voice_for_persona_explicit_beats_pairing():
     assert vp.voice_for_persona(explicit, pairings, "classic") == "v_warm"      # ci, paired default
     assert vp.voice_for_persona({}, {}, "Classic") is None                      # neither -> keep default
     assert vp.voice_for_persona(explicit, pairings, "") is None
+
+
+# ---- locale-aware voice pairing (issue #182 layer 4 / #198) ----------------------------------
+# An Edge/Azure catalog: each voice is a normalized {ref, name, gender, locale} dict. Enough
+# German + English voices to prove the steer picks a de-* voice and respects gender.
+_LOCALE_VOICES = [
+    {"ref": "en-US-AriaNeural", "name": "Aria", "gender": "female", "locale": "en-US"},
+    {"ref": "en-US-GuyNeural", "name": "Guy", "gender": "male", "locale": "en-US"},
+    {"ref": "de-DE-KatjaNeural", "name": "Katja", "gender": "female", "locale": "de-DE"},
+    {"ref": "de-DE-ConradNeural", "name": "Conrad", "gender": "male", "locale": "de-DE"},
+    {"ref": "de-AT-JonasNeural", "name": "Jonas", "gender": "male", "locale": "de-AT"},
+]
+
+
+def test_pick_language_voice_no_language_is_noop():
+    # No target code (unmapped/blank reply language) -> keep the current voice, no steer.
+    out = vp.pick_language_voice(_LOCALE_VOICES, None, current="en-US-GuyNeural")
+    assert out.voice_id == "en-US-GuyNeural" and out.steered is False and out.mismatch is False
+
+
+def test_pick_language_voice_keeps_a_voice_that_already_speaks_it():
+    out = vp.pick_language_voice(_LOCALE_VOICES, "de", current="de-DE-KatjaNeural")
+    assert out.voice_id == "de-DE-KatjaNeural" and out.steered is False and out.mismatch is False
+
+
+def test_pick_language_voice_steers_a_mispronouncing_default_and_keeps_gender():
+    # reply=German with a male English voice -> steer to a de-* voice of the SAME gender.
+    out = vp.pick_language_voice(_LOCALE_VOICES, "de", current="en-US-GuyNeural")
+    assert out.steered is True and out.mismatch is False
+    assert out.voice_id == "de-DE-ConradNeural"   # male German, not the female Katja
+
+
+def test_pick_language_voice_respects_explicit_choice_but_flags_mismatch():
+    # An EXPLICIT user voice is NOT overridden — we flag the mismatch instead of steering.
+    out = vp.pick_language_voice(_LOCALE_VOICES, "de", current="en-US-GuyNeural", explicit=True)
+    assert out.voice_id == "en-US-GuyNeural" and out.steered is False and out.mismatch is True
+
+
+def test_pick_language_voice_flags_when_no_voice_speaks_the_language():
+    english_only = [v for v in _LOCALE_VOICES if v["locale"].startswith("en-")]
+    out = vp.pick_language_voice(english_only, "de", current="en-US-GuyNeural")
+    assert out.voice_id == "en-US-GuyNeural" and out.steered is False and out.mismatch is True
+
+
+def test_pick_language_voice_untagged_provider_is_left_alone():
+    # ElevenLabs/OpenAI voices carry no locale -> assumed multilingual, never steered.
+    untagged = [{"voice_id": "el_multi", "name": "Rachel", "gender": "female", "locale": ""}]
+    out = vp.pick_language_voice(untagged, "de", current="el_multi")
+    assert out.voice_id == "el_multi" and out.steered is False and out.mismatch is False
+
+
+def _cfg(provider: str, voice: str, reply: str = "German", match: bool = True) -> dict:
+    key = {"edge": ("edge", "voice"), "azure": ("azure", "voice"),
+           "elevenlabs": ("elevenlabs", "voice_id")}[provider]
+    return {
+        "tts": {"provider": provider},
+        key[0]: {key[1]: voice},
+        "language": {"reply": reply, "match_voice": match},
+    }
+
+
+def test_reply_voice_patch_builds_provider_patch_for_edge():
+    patch, out = vp.reply_voice_patch(_cfg("edge", "en-US-GuyNeural"), _LOCALE_VOICES)
+    assert patch == {"edge": {"voice": "de-DE-ConradNeural"}}
+    assert out.steered is True
+
+
+def test_reply_voice_patch_none_when_already_correct():
+    patch, out = vp.reply_voice_patch(_cfg("edge", "de-DE-KatjaNeural"), _LOCALE_VOICES)
+    assert patch is None and out.steered is False and out.mismatch is False
+
+
+def test_reply_voice_patch_english_reply_never_steers():
+    # English reply with an English voice -> no change (the common case stays put).
+    patch, out = vp.reply_voice_patch(_cfg("edge", "en-US-AriaNeural", reply="English"),
+                                      _LOCALE_VOICES)
+    assert patch is None and out.steered is False
+
+
+def test_reply_voice_patch_honors_match_voice_opt_out():
+    patch, _out = vp.reply_voice_patch(_cfg("edge", "en-US-GuyNeural", match=False), _LOCALE_VOICES)
+    assert patch is None
+
+
+def test_reply_voice_patch_skips_untagged_provider():
+    # ElevenLabs is multilingual; even with a non-English reply there's nothing to steer.
+    patch, out = vp.reply_voice_patch(_cfg("elevenlabs", "el_multi"),
+                                      [{"voice_id": "el_multi", "locale": ""}])
+    assert patch is None and out.mismatch is False

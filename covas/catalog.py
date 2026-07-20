@@ -72,6 +72,13 @@ def _dedup_input_devices(devices: list[dict]) -> list[dict]:
     return [{"value": n, "label": n, "meta": ""} for n in kept]
 
 
+def _reply_locale_prefix(cfg: dict) -> str:
+    """The Edge/Azure `Locale` filter for the active reply language (issue #198): e.g. ``"de-"``
+    for German, ``"en-"`` for English or any unmapped/blank language (the historical default)."""
+    from .i18n import locale_prefix, reply_language
+    return locale_prefix(reply_language(cfg)) or "en-"
+
+
 def _cfg(cfg: dict, *keys, default=""):
     node = cfg
     for k in keys:
@@ -136,9 +143,12 @@ def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
             return _ids(merged), None
 
         # --- TTS voice catalogs ---
+        # Locale-aware pool (issue #182 layer 4, #198): show voices that speak the ACTIVE reply
+        # language so a non-English commander can pick (and auto-pairing can find) a voice that
+        # pronounces it. English (or an unmapped language) keeps the historical "en-" pool.
         if source == schema.OPT_EDGE_VOICES:
             from .providers.edge_tts import list_edge_voices
-            return _voices(list_edge_voices()), None
+            return _voices(list_edge_voices(_reply_locale_prefix(cfg))), None
 
         if source == schema.OPT_AZURE_VOICES:
             from .providers.azure_tts import list_azure_voices
@@ -146,7 +156,7 @@ def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
             region = str(_cfg(cfg, "azure", "region")).strip()
             if not key or not region:
                 return None, "Azure voice list needs the key + region"
-            return _voices(list_azure_voices(key, region)), None
+            return _voices(list_azure_voices(key, region, _reply_locale_prefix(cfg))), None
 
         if source == schema.OPT_CARTESIA_VOICES:
             from .providers.cartesia_tts import list_cartesia_voices, _DEFAULT_BASE_URL

@@ -505,11 +505,20 @@ max_uses = 3
 # end-to-end as the later layers land — a half-localized experience feels more broken than an
 # honestly English-only one. Options: English, German, French, Russian, Spanish, Portuguese.
 #
-# SCOPE (layer 1 only): this changes the language COVAS *replies* in. Your speech is still
-# transcribed with [whisper].language (set that to match your spoken language), and the voice that
-# reads the reply is still whichever [tts] voice you've chosen (pick one that speaks your language).
-# Whisper auto/locale selection and locale-aware voice pairing are tracked as #182 child issues.
+# SCOPE: this sets the language COVAS *replies* in. Speech-to-text follows it automatically
+# ([whisper].language = "follow", #197) and, on Edge/Azure, so does the TTS voice (match_voice
+# below, #198) — so this one setting localizes the whole round trip. Use a multilingual Whisper
+# model (e.g. "small", not "small.en") for a non-English language.
 reply = "English"
+
+# Locale-aware voice pairing (issue #182, layer 4 / #198). When the reply language is non-English,
+# prefer a TTS voice that actually speaks it — Edge and Azure tag their neural voices by locale
+# (de-DE-*, fr-FR-*, ...), so COVAS can steer an auto/default voice to one that pronounces the
+# language instead of mangling it. An EXPLICIT voice you picked is always kept (COVAS warns about a
+# mismatch rather than overriding you); only an auto/default voice that would otherwise mispronounce
+# is steered. ElevenLabs/OpenAI voices aren't locale-tagged (multilingual) and are left alone.
+# English is unaffected. Set false to leave the voice exactly as configured.
+match_voice = true
 
 [personality]
 # When ON, the system prompt is composed as Base + selected Persona + your Campaign (N7).

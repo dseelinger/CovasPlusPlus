@@ -1598,6 +1598,81 @@ def reconcile_persona_voice(app: "App", before: dict) -> None:
         app._log("voice", f"persona-voice reconcile failed: {e}")
 
 
+def _locale_voice_catalog(cfg: dict, provider: str) -> list[dict]:
+    """The FULL (all-locale) voice catalog for a locale-tagged TTS provider, so the language steer
+    can both see the CURRENT voice's locale and find a replacement. Fail-soft to [] — no catalog
+    just means no steer. Only edge/azure are locale-tagged; other providers return []."""
+    try:
+        if provider == "edge":
+            from .providers.edge_tts import list_edge_voices
+            return list_edge_voices("")  # blank prefix = every locale
+        if provider == "azure":
+            from . import firstrun
+            from .providers.azure_tts import list_azure_voices
+            key = firstrun.azure_key(cfg)
+            region = str((cfg.get("azure", {}) or {}).get("region") or "").strip()
+            if not key or not region:
+                return []
+            return list_azure_voices(key, region, "")
+    except Exception:  # noqa: BLE001 — offline / unconfigured: no catalog, no steer
+        return []
+    return []
+
+
+def steer_reply_voice_for_language(app: "App", before: dict) -> None:
+    """Locale-aware voice pairing (issue #182 layer 4, #198). When the reply language CHANGES (or
+    'match voice to language' is switched on), point an Edge/Azure reply voice that can't pronounce
+    the new language at one that can — the "would otherwise mispronounce" case. Runs only on that
+    change (never on the common English-default path), on a background thread (the catalog fetch is
+    network), and fully fail-soft. ElevenLabs/OpenAI voices aren't locale-tagged (multilingual), so
+    those providers are left alone. Reuses the persona-apply re-entry guard so our own voice write
+    doesn't recurse."""
+    if app._applying_persona_voice:
+        return
+    try:
+        from . import i18n, voice_pairing as vp
+        if not (app.cfg.get("language", {}) or {}).get("match_voice", True):
+            return
+        code = i18n.language_code(i18n.reply_language(app.cfg))
+        before_code = i18n.language_code(i18n.reply_language(before))
+        before_match = (before.get("language", {}) or {}).get("match_voice", True)
+        # React only to a real trigger: the reply language changed, or match_voice just turned on.
+        if code == before_code and before_match:
+            return
+        provider = str((app.cfg.get("tts", {}) or {}).get("provider") or "").strip().lower()
+        if provider not in ("edge", "azure"):  # only locale-tagged catalogs can steer
+            return
+
+        def _work() -> None:
+            try:
+                voices = _locale_voice_catalog(app.cfg, provider)
+                if not voices:
+                    return
+                # No per-voice "explicit" signal for edge/azure (unlike ElevenLabs personas), so a
+                # mispronouncing default is always steerable; pick_language_voice keeps a voice that
+                # already speaks the language untouched.
+                patch, outcome = vp.reply_voice_patch(app.cfg, voices, explicit=False)
+                if patch is None:
+                    if outcome.mismatch:
+                        app._log("voice", f"no {code} voice available for {provider}; "
+                                          "reply may be mispronounced")
+                    return
+                app._applying_persona_voice = True
+                try:
+                    app.update_settings(patch)
+                    new_id = next(iter(next(iter(patch.values())).values()))
+                    app._log("voice", f"reply language {code} -> voice {new_id}")
+                finally:
+                    app._applying_persona_voice = False
+            except Exception as e:  # noqa: BLE001 — a steer glitch must never crash the loop
+                app._log("voice", f"language voice steer failed: {e}")
+
+        import threading
+        threading.Thread(target=_work, name="steer-language-voice", daemon=True).start()
+    except Exception as e:  # noqa: BLE001
+        app._log("voice", f"language voice steer failed: {e}")
+
+
 # ---- Manifest + entrypoint --------------------------------------------------
 @dataclass(frozen=True)
 class Wiring:
