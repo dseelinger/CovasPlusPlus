@@ -45,6 +45,7 @@ from ..nav import (Ambiguous, AmbiguousShip, NavError, NeedAttrs, Resolved, Reso
 from ..nav.closest import Http, RequestsHttp, _DEFAULT_BASE_URL, _DEFAULT_UA, _SEARCH_SIZE
 from ..nav.modules import TAXONOMY
 from . import _search_support as sup
+from ..i18n import fmt_num   # locale-aware number formatting for callouts (#199)
 from .base import HelpMeta, Slot
 
 
@@ -461,7 +462,7 @@ class FindClosestCapability:
                 f"Largest pad {result.pad}.")
         arrival = result.extra.get("distance_to_arrival")
         if isinstance(arrival, (int, float)) and arrival >= 1:
-            line += f" About {arrival:,.0f} light-seconds from the star."
+            line += f" About {fmt_num(arrival, 0)} light-seconds from the star."
         # Present only when the answer came from the stale fallback (nothing fresh matched).
         line += sup.stale_note(result.extra.get("stock_age_days"), what="that listing",
                                risk="outfitting stock rotates and it may be gone")
@@ -709,10 +710,10 @@ class FindClosestShipCapability:
                  f"{sup.distance_phrase(result.distance_ly)}. Largest pad {result.pad}.")
         arrival = result.extra.get("distance_to_arrival")
         if isinstance(arrival, (int, float)) and arrival >= 1:
-            line += f" About {arrival:,.0f} light-seconds from the star."
+            line += f" About {fmt_num(arrival, 0)} light-seconds from the star."
         price = result.extra.get("ship_price")
         if isinstance(price, (int, float)) and price >= 1:
-            line += f" It runs about {price:,.0f} credits."
+            line += f" It runs about {fmt_num(price, 0)} credits."
         # Present only when the answer came from the stale fallback (nothing fresh matched).
         line += sup.stale_note(result.extra.get("stock_age_days"), what="that listing",
                                risk="shipyard stock rotates and it may be gone")

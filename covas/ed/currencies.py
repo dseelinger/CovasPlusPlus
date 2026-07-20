@@ -108,9 +108,10 @@ def wallet_line(wallet: dict) -> str | None:
     """One hedged status-block clause for the known balances present in `wallet` ({key: amount}),
     or None when none are known. Each row's phrasing hedges on staleness (balances are login-only).
     A wallet key with no registry row is ignored — the wallet can only voice grounded currencies."""
+    from ..i18n import fmt_int
     parts: list[str] = []
     for cur in REGISTRY:
         amt = wallet.get(cur.key)
         if isinstance(amt, (int, float)) and not isinstance(amt, bool):
-            parts.append(cur.phrasing.format(amount=f"{int(amt):,}"))
+            parts.append(cur.phrasing.format(amount=fmt_int(amt)))  # locale grouping (#199)
     return "; ".join(parts) if parts else None

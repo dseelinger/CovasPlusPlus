@@ -78,6 +78,18 @@ def test_wallet_line_hedges_and_groups():
     assert line == "as of login you had 1,234,567 credits"
 
 
+def test_wallet_line_groups_per_active_locale():
+    """The callout routes through the locale formatter (#199): German groups with '.', not ','."""
+    from covas import i18n
+    try:
+        i18n.set_active_language_code("de")
+        assert wallet_line({"credits": 1234567}) == "as of login you had 1.234.567 credits"
+    finally:
+        i18n.set_active_language_code(None)
+    # Back to the English default -> byte-identical to the assertion above.
+    assert wallet_line({"credits": 1234567}) == "as of login you had 1,234,567 credits"
+
+
 def test_wallet_line_both_currencies():
     line = wallet_line({"credits": 1000, "carrier_balance": 2000})
     assert "1,000 credits" in line and "2,000 credits as of login" in line

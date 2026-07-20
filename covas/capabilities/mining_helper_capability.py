@@ -39,6 +39,7 @@ from ..search.mining import (SELL_PRICE_MAX_AGE_DAYS, Hotspot, SellMarket, find_
                              find_hotspots)
 from ..search.routes import RoutePlotter, RouteWaypoint
 from ..search.spansh import Http, _DEFAULT_UA
+from ..i18n import fmt_int, fmt_num   # locale-aware number formatting for callouts (#199)
 from .base import HelpMeta, Slot
 
 _TOOL_NAME = "plan_mining_session"
@@ -257,18 +258,18 @@ class MiningHelperCapability:
 
     def _hotspot_phrase(self, h: Hotspot) -> str:
         overlaps = f"{h.count} overlapping hotspots" if h.count > 1 else "a hotspot"
-        arrival = f", {h.arrival_ls:,.0f} light-seconds in" if h.arrival_ls else ""
+        arrival = f", {fmt_num(h.arrival_ls, 0)} light-seconds in" if h.arrival_ls else ""
         age = h.age_days()
         age_note = f" That ring data is about {age:.0f} days old." if age is not None and age > 30 else ""
-        return (f"Nearest {h.material}: the {h.ring} in {h.system}, {h.distance_ly:.1f} light-years "
-                f"away{arrival} — {overlaps}.{age_note}")
+        return (f"Nearest {h.material}: the {h.ring} in {h.system}, {fmt_num(h.distance_ly, 1)} "
+                f"light-years away{arrival} — {overlaps}.{age_note}")
 
     def _sell_phrase(self, sell: SellMarket | None, stale: bool, commodity: str) -> str:
         if sell is None:
             return (f"I couldn't find a fresh place to sell {commodity} nearby — sell prices swing, "
                     "so check the market before you commit.")
         where = f"{sell.station} in {sell.system}"
-        base = f"Best sell for {commodity}: {sell.sell_price:,} a ton at {where}."
+        base = f"Best sell for {commodity}: {fmt_int(sell.sell_price)} a ton at {where}."
         if stale:
             age = sell.age_days()
             old = f" about {age:.0f} days old" if age is not None else " stale"
@@ -282,7 +283,7 @@ class MiningHelperCapability:
         spoken note rather than sinking the plan."""
         if self._checklist is None:
             return ""
-        sell_step = (f"Sell {commodity} at {sell.station} in {sell.system} (~{sell.sell_price:,}/t)"
+        sell_step = (f"Sell {commodity} at {sell.station} in {sell.system} (~{fmt_int(sell.sell_price)}/t)"
                      if sell else f"Sell {commodity} at the best market you can find")
         steps = [
             f"Fly to {hotspot.system} and drop into the {hotspot.ring} {hotspot.material} hotspot",

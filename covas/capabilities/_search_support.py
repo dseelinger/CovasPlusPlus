@@ -161,8 +161,9 @@ def distance_phrase(distance_ly: float, *, reference_is_current: bool = True) ->
     """'your current system' when the Commander is on top of it, else 'N.N light-years away'.
     Only claims 'your current system' when the reference IS the current system (no `near X`
     override); under an override a ~0 match is the override target, not where they are."""
+    from ..i18n import fmt_num
     return ("your current system" if (reference_is_current and distance_ly < 0.05)
-            else f"{distance_ly:.1f} light-years away")
+            else f"{fmt_num(distance_ly, 1)} light-years away")   # locale decimal (#199)
 
 
 def stale_note(age_days: float | None, *, what: str = "that data",

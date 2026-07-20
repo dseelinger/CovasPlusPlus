@@ -424,11 +424,12 @@ def _transfer_phrase(cost: int | None, time_s: int | None) -> str:
 
 
 def _credits(value: int) -> str:
+    from ..i18n import fmt_int, fmt_num   # locale grouping/decimal for spoken amounts (#199)
     if value <= 0:
         return "nothing"
     if value >= 1_000_000:
-        return f"{value / 1_000_000:.1f} million credits"
-    return f"{value:,} credits"
+        return f"{fmt_num(value / 1_000_000, 1)} million credits"
+    return f"{fmt_int(value)} credits"
 
 
 def _duration(seconds: int) -> str:

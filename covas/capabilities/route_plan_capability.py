@@ -37,6 +37,7 @@ from ..search.routes import (RICHES_ROUTE_URL, ROUTE_URL, TRADE_ROUTE_URL, Route
                              parse_riches_route, parse_trade_route, stale_age_caveat,
                              submit_and_poll)
 from ..search.spansh import Http, _DEFAULT_UA
+from ..i18n import fmt_int   # locale-aware number formatting for spoken callouts (#199)
 from .base import HelpMeta, Slot
 
 
@@ -295,7 +296,7 @@ class RoutePlanCapability(_PlannerBase):
         round_trip = sum(h.profit_total for h in hops)
         legs = " ".join(self._leg_phrase(i, h, age_window) for i, h in enumerate(hops))
         header = (f"Trade loop from {start_station}: {n} hop{'s' if n != 1 else ''}, "
-                  f"round-trip profit about {round_trip:,} credits.")
+                  f"round-trip profit about {fmt_int(round_trip)} credits.")
         caveat = stale_age_caveat(hops, max_age_days=age_window)
         # Plot the first destination — that's where the Commander flies to sell the first haul.
         plot = self._plotter.plot_next([RouteWaypoint(hops[0].destination_system)])
@@ -315,7 +316,7 @@ class RoutePlanCapability(_PlannerBase):
         tag = f" (price ~{age:.0f} days old)" if age is not None and age > age_window else ""
         return (f"{verb} {hop.commodity} at {hop.source_station} and sell at "
                 f"{hop.destination_station} in {hop.destination_system} for about "
-                f"{hop.profit_per_unit:,} a ton{tag}.")
+                f"{fmt_int(hop.profit_per_unit)} a ton{tag}.")
 
 
 # ==========================================================================================
@@ -623,8 +624,8 @@ class RichesPlanCapability(_PlannerBase):
         total = sum(s.total_value for s in systems)
         bodies = "body" if first.body_count == 1 else "bodies"
         line = (f"Road to Riches: start at {first.system} — {first.body_count} {bodies} to scan "
-                f"worth about {first.total_value:,} credits. Across {len(systems)} systems that's "
-                f"roughly {total:,} credits in first-discovery scans.")
+                f"worth about {fmt_int(first.total_value)} credits. Across {len(systems)} systems "
+                f"that's roughly {fmt_int(total)} credits in first-discovery scans.")
         # Plot the first system — that's where the Commander flies to start scanning.
         plot = self._plotter.plot_next([RouteWaypoint(first.system)])
         self._logline(f"riches route: {len(systems)} systems, first -> {first.system} "
