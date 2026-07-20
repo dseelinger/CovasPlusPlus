@@ -137,6 +137,23 @@ def test_confirm_on_new_turn_sends_full_sequence():
     assert "sent" in msg.lower()
 
 
+def test_confirm_restates_the_armed_message_and_channel_from_the_payload():
+    # issue #190 (confused-deputy defence-in-depth): the send confirmation re-states the ACTUAL
+    # composed channel + message straight from the pending payload — not the model's earlier
+    # read-back — so a swapped message is audible when it's sent. Compose a distinctive message
+    # and prove the confirm output names it (and the true channel) at send time.
+    cap, ex, inj, _ = _cap()
+    cap.new_turn()
+    cap.run_tool("send_comms_message",
+                 {"channel": "wing", "message": "forming up at the nav beacon"})
+    cap.new_turn()
+    msg = cap.run_tool("confirm_comms_send", {})
+    assert "Confirming" in msg
+    assert "forming up at the nav beacon" in msg      # the true composed text, from the payload
+    assert "wing" in msg.lower()                       # the true channel, from the payload
+    assert inj.injected == ["forming up at the nav beacon"] and inj.sent == 1
+
+
 def test_confirm_without_compose_is_noop():
     cap, ex, inj, _ = _cap()
     msg = cap.run_tool("confirm_comms_send", {})

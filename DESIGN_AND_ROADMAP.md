@@ -1047,6 +1047,22 @@ proving toggle-landing-gear end-to-end before any generalization:
 
 Next actions stay gated behind a go/no-go after on-hardware validation of this one.
 
+**A separate turn proves an utterance occurred — not consent to THIS action (issue #190).** The
+turn-gate correctly forbids a single-turn arm-and-confirm, and this session's review found no
+single-turn bypass. But `new_turn()` only proves the confirmation is a *later* utterance; it does
+**not** prove the Commander said "confirm" for the *specific* pending action, nor that the arming
+read-back they heard matches what is armed — both the read-back wording and the "was that a yes?"
+judgment are model-mediated. That leaves a two-turn confused-deputy path: an injection arms action B
+while the model narrates action A, and the Commander's genuine next "confirm" is taken for B. The
+defense-in-depth mitigation: the confirm path (`KeybindCapability._confirm` / `CommsSendCapability.
+_confirm`) now **re-states the actual armed action straight from the deterministic pending payload**
+— the resolved macro's `arm_phrase`, or the composed channel + message — leading the confirm output
+(`"Confirming — <armed action>. …"`), NOT the model's earlier narration. So the true pending action
+is audible the moment it fires and any mismatch with what the Commander was originally told is
+spoken back. This is genuine defense-in-depth, not a full fix (it still requires the model to relay
+the tool output, and firing is immediate); a stronger step — a minimal match token surfaced at arm
+time that the confirm utterance must carry — is noted as optional future work.
+
 ### Implemented — generalized action model (Tier-1 foundation, #29)
 Before any *new* action batch lands, the prototype is generalized along four axes — all
 additive, all still behind the same safety layer — so growing the action set is new **modules**

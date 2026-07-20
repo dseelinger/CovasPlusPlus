@@ -602,6 +602,7 @@ Notes:
 > The **Toggle Landing Gear** control must be bound to a key in ED. Only `landing_gear` is allowlisted.
 - [ ] **Arm:** *"COVAS, toggle my landing gear."* → says it's **armed but not done**, asks you to confirm separately. Gear does **not** move yet.
 - [ ] **Confirm on a SEPARATE turn:** *"Confirm."* (or *"do it"*) → the gear toggles in-game.
+- [ ] **Confirm re-states the actual armed action (issue #190):** the confirm reply **names the armed action itself** — a *"Confirming — toggle the landing gear…"* re-statement sourced from the pending action, **not** the model's earlier narration. (Defence-in-depth against a bait-and-switch: if the arming read-back you heard didn't match what actually fires, the confirm output makes the true action audible.)
 - [ ] **Same-turn confirm refused:** arm and, in the *same* utterance, say "…and do it now" → refuses to fire in the arming turn.
 - [ ] **Combat guard:** get **interdicted / into danger**, then ask to toggle → **refuses**. With `[elite]` OFF it also refuses (can't prove it's safe).
 - [ ] **Expiry:** arm it, wait past `confirm_window` (60 s), then *"confirm"* → says it expired; nothing fires.
@@ -739,6 +740,7 @@ Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_
 - [ ] **Startup readiness:** launch reports `Comms: open box QuickCommsPanel -> <key>` (or `Comms UNUSABLE (bind QuickCommsPanel …)`), and a `Comms send ON (read-back-before-send confirmation required).` line.
 - [ ] **Compose reads back, does NOT send:** *"Tell local o7."* → COVAS says it's *ready to send to local/system chat: "o7"* and asks you to confirm. **Nothing is typed into ED yet.**
 - [ ] **Send on a separate turn:** then say *"Send it"* (or "confirm") → the comms box opens, **"o7"** is pasted, and the message sends on your current/local channel. Log: `sent comms to local: 'o7'`.
+- [ ] **Confirm re-states the actual message + channel (issue #190):** the send reply **re-states the composed text and channel from the pending message** — a *"Confirming — sending to local/system chat: "o7"…"* line sourced from what's armed, **not** the model's earlier read-back. (Defence-in-depth: a swapped message is audible at send time.)
 - [ ] **No same-turn send:** confirm in the SAME breath as composing → refused ("that isn't a separate confirmation…"); nothing sends. (The model can't compose-and-send in one turn.)
 - [ ] **Cancel:** compose a message, then *"cancel"* → *"Discarded that message"*; a later "confirm" finds nothing armed.
 - [ ] **Reword:** compose, then compose a DIFFERENT message before confirming → only the **latest** is sent.

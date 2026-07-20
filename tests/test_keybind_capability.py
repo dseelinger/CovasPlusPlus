@@ -103,6 +103,38 @@ def test_confirm_on_new_turn_executes():
     assert "Key_L" in msg
 
 
+def test_confirm_restates_the_armed_action_from_the_payload(monkeypatch):
+    # issue #190 (confused-deputy defence-in-depth): the confirm output re-states the ACTUAL armed
+    # action sourced from the pending payload — the deterministic macro — not the model's earlier
+    # narration. Arm two DISTINCT macros' worth of wording and prove the confirm names the one that
+    # was actually armed, so a bait-and-switch (arm B, narrate A) is audible when it fires.
+    macros = {
+        "gear": Macro(name="gear", tool="toggle_landing_gear", action="LandingGearToggle",
+                      arm_phrase="toggle the landing gear", done_phrase="Landing gear toggled"),
+        "silent": Macro(name="silent", tool="run_silent_running", action="SilentRunning",
+                        arm_phrase="engage silent running", done_phrase="Silent running on"),
+    }
+    binds = {"LandingGearToggle": KeyBinding(action="LandingGearToggle", key="Key_L"),
+             "SilentRunning": KeyBinding(action="SilentRunning", key="Key_Delete")}
+    ex = _FakeExecutor()
+    cap = KeybindCapability(
+        binds=binds, executor=ex,
+        config=KeybindConfig(enabled=True, combat_guard=False,
+                             allowlist=("gear", "silent")),
+        macros=macros, status_snapshot=(lambda: _SAFE), clock=_Clock())
+
+    cap.new_turn()
+    cap.run_tool("run_silent_running", {})   # ARM the silent-running macro (the "true" action)
+    cap.new_turn()
+    msg = cap.run_tool("confirm_keybind", {})
+
+    # The confirm names the ARMED action's own arm_phrase (from the payload)...
+    assert "engage silent running" in msg
+    # ...and does NOT name the OTHER macro the model might have narrated instead.
+    assert "landing gear" not in msg.lower()
+    assert ex.pressed == ["Key_Delete"]      # and it fired the armed action, not the narrated one
+
+
 def test_confirm_without_arm_is_noop():
     cap, ex, _ = _cap()
     msg = cap.run_tool("confirm_keybind", {})
