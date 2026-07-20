@@ -44,36 +44,33 @@
 <body>
 <header>
   <h1>COVAS++</h1>
-  <span class="sub">CHECKLIST</span>
-  <a href="/" class="sub">← control panel</a>
-  <a href="/settings" class="sub">⚙ settings</a>
-  <a href="/memory" class="sub">🧠 memory</a>
-  <a href="/crew" class="sub">🎙 crew</a>
-  <a href="/engineers" class="sub">🔧 engineers</a>
+  <span class="sub">{{ t('CHECKLIST') }}</span>
+  <a href="/" class="sub">{{ t('← control panel') }}</a>
+  <a href="/settings" class="sub">{{ t('⚙ settings') }}</a>
+  <a href="/memory" class="sub">{{ t('🧠 memory') }}</a>
+  <a href="/crew" class="sub">{{ t('🎙 crew') }}</a>
+  <a href="/engineers" class="sub">{{ t('🔧 engineers') }}</a>
   <span class="sub" id="fileName" style="margin-left:auto"></span>
 </header>
 
 <div class="wrap">
   <div class="card">
-    <h2>Ultimate checklist</h2>
+    <h2>{{ t('Ultimate checklist') }}</h2>
     <div id="editor"></div>
     <textarea id="fallback" spellcheck="false"
       placeholder="- [ ] a pending objective&#10;- [x] a completed one"></textarea>
     <div class="conflict" id="conflict">
-      ⚠ The checklist file changed on disk since you loaded it — probably a voice edit.
-      Saving now would overwrite that change.<br>
-      <button id="reloadTheirs">RELOAD THEIR VERSION (discard my edits)</button>
-      <button id="overwrite">OVERWRITE ANYWAY</button>
+      {{ t('⚠ The checklist file changed on disk since you loaded it — probably a voice edit. Saving now would overwrite that change.') }}<br>
+      <button id="reloadTheirs">{{ t('RELOAD THEIR VERSION (discard my edits)') }}</button>
+      <button id="overwrite">{{ t('OVERWRITE ANYWAY') }}</button>
     </div>
     <div class="bar">
-      <button class="primary" id="save">SAVE</button>
-      <button id="reload">RELOAD FROM DISK</button>
+      <button class="primary" id="save">{{ t('SAVE') }}</button>
+      <button id="reload">{{ t('RELOAD FROM DISK') }}</button>
       <span class="msg" id="msg"></span>
     </div>
     <div class="hint">
-      Click a checkbox to toggle it · edit text inline · <b>Tab</b>/<b>Shift+Tab</b> nest and
-      un-nest items · <b>Ctrl+S</b> saves. The voice loop reads this same file live, so saved
-      edits are heard immediately — and its edits show up here on reload.
+      {{ t('Click a checkbox to toggle it · edit text inline · <b>Tab</b>/<b>Shift+Tab</b> nest and un-nest items · <b>Ctrl+S</b> saves. The voice loop reads this same file live, so saved edits are heard immediately — and its edits show up here on reload.') | safe }}
     </div>
   </div>
 </div>
