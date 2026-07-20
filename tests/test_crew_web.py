@@ -36,7 +36,7 @@ def _cfg(tmp_path) -> dict:
                              "pool": [{"provider": "elevenlabs", "ref": r, "gender": "neutral"}
                                       for r in ("VA", "VB", "VC")]}},
         "sound_cues": {},
-        "whisper": {"model": "small", "device": "cpu", "compute_type": "int8", "language": "en"},
+        "whisper": {"model": "small", "n_threads": 4, "language": "en"},
         "anthropic": {
             "model": "claude-sonnet-5",
             "available_models": ["claude-opus-4-8", "claude-sonnet-5"],

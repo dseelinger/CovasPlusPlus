@@ -65,7 +65,7 @@ def _cfg(tmp_path, **crew_over) -> dict:
         "audio": {"enabled": True, "sample_rate": 16000, "mix_sample_rate": 16000,
                   "input_device": "", "cues": {"enabled": False}, "comms": {"enabled": False},
                   "content_root": str(tmp_path)},
-        "whisper": {"model": "small", "device": "cpu", "compute_type": "int8"},
+        "whisper": {"model": "small", "n_threads": 4},
         "keys": {"push_to_talk": "right ctrl"},
     }
 

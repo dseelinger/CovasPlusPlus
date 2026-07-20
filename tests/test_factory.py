@@ -93,7 +93,7 @@ def test_make_tts_unknown_raises_with_name():
 
 # --- make_stt --------------------------------------------------------------
 
-def test_make_stt_returns_whisper(monkeypatch):
-    # Real WhisperSTT loads a model on construction, so stub it.
-    stub = _stub_provider(monkeypatch, "whisper_stt", "WhisperSTT")
+def test_make_stt_returns_whispercpp(monkeypatch):
+    # Real WhisperCppSTT loads a ggml model on construction, so stub it.
+    stub = _stub_provider(monkeypatch, "whispercpp_stt", "WhisperCppSTT")
     assert isinstance(factory.make_stt({}), stub)

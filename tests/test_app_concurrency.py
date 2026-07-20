@@ -39,7 +39,7 @@ def _cfg(tmp_path) -> dict:
         "logging": {"dir": str(tmp_path / "logs")},
         "audio": {"sample_rate": 16000, "input_device": ""},
         "sound_cues": {},
-        "whisper": {"model": "small", "device": "cpu", "compute_type": "int8"},
+        "whisper": {"model": "small", "n_threads": 4},
         "keys": {"push_to_talk": "right ctrl", "tap_cancel_ms": 400},
     }
 
@@ -126,7 +126,7 @@ def test_reset_setting_keeps_cfg_keys_readable_throughout(tmp_path, monkeypatch)
         return {
             "anthropic": {"model": "claude-haiku-4-5"},
             "audio": {"input_device": ""},
-            "whisper": {"model": "small", "device": "cpu", "compute_type": "int8"},
+            "whisper": {"model": "small", "n_threads": 4},
             "keys": {"push_to_talk": "right ctrl", "tap_cancel_ms": 400},
         }
 

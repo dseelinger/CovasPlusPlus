@@ -35,7 +35,7 @@ def _cfg(tmp_path, **personality) -> dict:
         "conversation": {"max_turns": 20},
         "logging": {"dir": str(tmp_path / "logs")},
         "audio": {"sample_rate": 16000, "input_device": ""},
-        "whisper": {"model": "small", "device": "cpu", "compute_type": "int8"},
+        "whisper": {"model": "small", "n_threads": 4},
         "keys": {"push_to_talk": "right ctrl"},
     }
 

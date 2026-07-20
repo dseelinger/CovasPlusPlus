@@ -79,3 +79,12 @@ def test_language_none_when_unset_for_autodetect():
 def test_clean_collapses_whitespace():
     assert _clean("  hello   world  ") == "hello world"
     assert _clean("") == ""
+
+
+def test_missing_model_raises_not_segfaults(tmp_path):
+    # whisper.cpp segfaults on a missing ggml file; the provider must raise a catchable error
+    # instead (so the voice loop fails soft) — building the REAL backend, no fake injected.
+    import pytest
+    cfg = {"whisper": {"model": str(tmp_path / "ggml-nope.bin"), "language": "en"}}
+    with pytest.raises(FileNotFoundError):
+        WhisperCppSTT(cfg)

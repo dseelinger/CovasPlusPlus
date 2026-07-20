@@ -72,6 +72,10 @@ music/
 # Piper voice models (large binaries)
 *.onnx
 *.onnx.json
+# whisper.cpp STT weights (large ggml/gguf binaries, downloaded per-user; issue #206)
+/models/
+*.bin
+*.gguf
 
 # --- Python ---
 .venv/

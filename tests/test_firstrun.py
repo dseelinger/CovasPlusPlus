@@ -1,8 +1,8 @@
 """Offline unit tests for the first-run gate + helpers (covas/firstrun.py, I3).
 
-Pure logic only — the "configured?" gate, key presence/round-trip, STT-cache lookup (with a
-monkeypatched huggingface_hub), and the default-voice resolution. The real model download,
-mic enumeration, and ElevenLabs fetch are on-hardware and not exercised here.
+Pure logic only — the "configured?" gate, key presence/round-trip, STT model-path/availability
+resolution, and the default-voice resolution. The real model download, mic enumeration, and
+ElevenLabs fetch are on-hardware and not exercised here (the download test mocks requests.get).
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import base64
 import sys
 
 import pytest
+import requests
 
 from covas import dpapi, firstrun
 
@@ -137,40 +138,82 @@ def test_undecryptable_blob_reads_as_no_key(tmp_path, capsys):
 
 # ---- STT availability (monkeypatched cache lookup) ----------------------------------
 
-def test_stt_available_when_cache_hits(tmp_path, monkeypatch):
-    hit = tmp_path / "model.bin"
-    hit.write_bytes(b"x")
-    monkeypatch.setattr(firstrun, "try_to_load_from_cache", lambda **k: str(hit))
+def test_stt_available_when_ggml_present(tmp_path, monkeypatch):
+    # The named model resolves to <models dir>/ggml-<name>.bin; present on disk => available.
+    monkeypatch.setattr(firstrun, "data_dir", lambda: tmp_path)
+    models = tmp_path / "models"
+    models.mkdir()
+    (models / "ggml-small.en.bin").write_bytes(b"x")
     assert firstrun.stt_model_available(_cfg(tmp_path)) is True
 
 
-def test_stt_unavailable_when_cache_misses(tmp_path, monkeypatch):
-    # try_to_load_from_cache returns None (or a sentinel) when the file isn't cached.
-    monkeypatch.setattr(firstrun, "try_to_load_from_cache", lambda **k: None)
+def test_stt_unavailable_when_ggml_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(firstrun, "data_dir", lambda: tmp_path)
     assert firstrun.stt_model_available(_cfg(tmp_path)) is False
 
 
 def test_stt_available_for_local_path_model(tmp_path):
-    model_dir = tmp_path / "my-model"
-    model_dir.mkdir()
-    cfg = _cfg(tmp_path, model=str(model_dir))
-    assert firstrun.stt_model_available(cfg) is True
-    cfg2 = _cfg(tmp_path, model=str(tmp_path / "missing-model"))
-    assert firstrun.stt_model_available(cfg2) is False
+    # A direct ggml file path passes through and is available iff it exists.
+    ggml = tmp_path / "my-model.bin"
+    ggml.write_bytes(b"x")
+    assert firstrun.stt_model_available(_cfg(tmp_path, model=str(ggml))) is True
+    assert firstrun.stt_model_available(_cfg(tmp_path, model=str(tmp_path / "missing.bin"))) is False
 
 
-def test_stt_download_root_source_vs_frozen(tmp_path, monkeypatch):
+def test_stt_models_dir_source_vs_frozen_and_override(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path)
-    # Source run: None (default HF cache — dev models reused).
-    monkeypatch.setattr(firstrun, "_frozen", lambda: False)
-    assert firstrun.stt_download_root(cfg) is None
-    # Frozen: under data_dir/models.
-    monkeypatch.setattr(firstrun, "_frozen", lambda: True)
+    # Always concrete now (no None): data_dir()/models in both source and frozen.
     monkeypatch.setattr(firstrun, "data_dir", lambda: tmp_path)
-    assert firstrun.stt_download_root(cfg) == str(tmp_path / "models")
+    assert firstrun.stt_models_dir(cfg) == tmp_path / "models"
     # Explicit override always wins.
     cfg2 = _cfg(tmp_path, download_root=str(tmp_path / "custom"))
-    assert firstrun.stt_download_root(cfg2) == str(tmp_path / "custom")
+    assert firstrun.stt_models_dir(cfg2) == tmp_path / "custom"
+
+
+def test_stt_model_path_resolves_ggml_filename(tmp_path, monkeypatch):
+    monkeypatch.setattr(firstrun, "data_dir", lambda: tmp_path)
+    assert firstrun.stt_model_path(_cfg(tmp_path, model="small.en")) \
+        == str(tmp_path / "models" / "ggml-small.en.bin")
+    # A direct path is handed through untouched.
+    direct = str(tmp_path / "weights" / "ggml-base.bin")
+    assert firstrun.stt_model_path(_cfg(tmp_path, model=direct)) == direct
+
+
+def test_download_stt_model_fetches_ggml_atomically(tmp_path, monkeypatch):
+    """The download targets ggml-<name>.bin at the whisper.cpp repo and lands atomically (writes a
+    .part, then renames) — verified with a mocked requests.get so no network is touched."""
+    captured = {}
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def raise_for_status(self): pass
+        def iter_content(self, _n): return [b"ggml-", b"weights"]
+
+    def _fake_get(url, **_k):
+        captured["url"] = url
+        # The .part temp must exist mid-download and the final file must not yet.
+        captured["part_before"] = list(tmp_path.glob("*.part"))
+        return _Resp()
+
+    monkeypatch.setattr(requests, "get", _fake_get)
+    firstrun.download_stt_model("small.en", tmp_path)
+
+    assert captured["url"] == f"{firstrun._WHISPERCPP_BASE_URL}/ggml-small.en.bin"
+    dest = tmp_path / "ggml-small.en.bin"
+    assert dest.read_bytes() == b"ggml-weights"
+    assert not list(tmp_path.glob("*.part"))   # temp renamed away, no truncated leftovers
+
+
+def test_download_stt_model_skips_when_present(tmp_path, monkeypatch):
+    (tmp_path / "ggml-small.en.bin").write_bytes(b"already here")
+
+    def _boom(*a, **k):  # must not be reached
+        raise AssertionError("download attempted though the model was already on disk")
+
+    monkeypatch.setattr(requests, "get", _boom)
+    firstrun.download_stt_model("small.en", tmp_path)
+    assert (tmp_path / "ggml-small.en.bin").read_bytes() == b"already here"
 
 
 # ---- the gate -----------------------------------------------------------------------

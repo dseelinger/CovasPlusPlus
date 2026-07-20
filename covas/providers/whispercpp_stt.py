@@ -2,14 +2,14 @@
 (whisper.cpp is MIT; reads float32 PCM directly, so no FFmpeg / PyAV / GPL x264/x265 in the
 installer). Satisfies the `STTProvider` Protocol so `app.py` and the provider seam are unchanged.
 
-Issue #206 replaces the faster-whisper + ctranslate2 + av stack with this. This module is the
-provider only (checkpoint C1); the config surface, factory selection, and per-user model-path
-resolution (mirroring `stt_download_root`) are wired in C2. The real whisper.cpp `Model` is built
-lazily *and* is injectable, so the unit tests stay offline — they drive a fake backend and never
-import `pywhispercpp` or load a ~465 MB ggml model.
+Issue #206 replaces the faster-whisper + ctranslate2 + av stack with this. The real whisper.cpp
+`Model` is built lazily *and* is injectable, so the unit tests stay offline — they drive a fake
+backend and never import `pywhispercpp` or load a ~465 MB ggml model. Model-path resolution lives
+in `firstrun.stt_model_path` (per-user models dir); the factory selects this provider.
 """
 from __future__ import annotations
 
+import os
 import re
 
 import numpy as np
@@ -55,10 +55,12 @@ class WhisperCppSTT:
     @staticmethod
     def _build_model(cfg: dict):
         """Construct the real CPU whisper.cpp model. `pywhispercpp` is imported lazily so the local
-        STT stack isn't a hard dependency for tests or the cloud-only providers. Robust per-user
-        model-path resolution (a ggml-*.bin under the writable models dir, mirroring
-        `stt_download_root`) is wired in C2; here we pass the configured value through as-is."""
+        STT stack isn't a hard dependency for tests or the cloud-only providers. The model file is
+        resolved to a ggml-*.bin under the per-user models dir (mirrors `stt_download_root`) by
+        `firstrun.stt_model_path`, so weights stay out of the read-only install tree."""
         from pywhispercpp.model import Model  # heavy native dep — only at the app entry
+
+        from ..firstrun import DEFAULT_STT_MODEL, stt_model_path
 
         w = cfg.get("whisper", {}) or {}
         params: dict = {
@@ -75,7 +77,16 @@ class WhisperCppSTT:
             params["language"] = str(w["language"])
         else:
             params["detect_language"] = True
-        return Model(str(w.get("model", "")), **params)
+        model_ref = stt_model_path(cfg)
+        # whisper.cpp SEGFAULTS (native access violation) on a missing/unreadable ggml file rather
+        # than raising, and a fatal crash slips past the voice loop's fail-soft `except` guards.
+        # Validate here so a missing model degrades cleanly (text mode / keeps the previous STT on a
+        # live reload) — we manage downloads ourselves, so we never want pywhispercpp to auto-fetch.
+        if not os.path.exists(model_ref):
+            raise FileNotFoundError(
+                f"whisper.cpp model not found: {model_ref} — run setup to download the "
+                f"'{w.get('model', DEFAULT_STT_MODEL)}' model.")
+        return Model(model_ref, **params)
 
     def transcribe(self, audio: np.ndarray) -> str:
         """Turn mono float32 audio into text (empty string if nothing was heard)."""

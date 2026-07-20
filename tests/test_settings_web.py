@@ -29,7 +29,7 @@ def _cfg(tmp_path) -> dict:
         "keys": {"push_to_talk": "[", "tap_cancel_ms": 400, "cancel": ""},
         "audio": {"sample_rate": 16000, "input_device": ""},
         "sound_cues": {},
-        "whisper": {"model": "small", "device": "cpu", "compute_type": "int8", "language": "en"},
+        "whisper": {"model": "small", "n_threads": 4, "language": "en"},
         "anthropic": {
             "model": "claude-sonnet-5",
             "available_models": ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5-20251001"],

@@ -7,6 +7,7 @@ persist, and the voice step skips cleanly with no ElevenLabs key.
 """
 from __future__ import annotations
 
+import pathlib
 import threading
 import time
 
@@ -151,8 +152,8 @@ def test_model_download_runs_and_flips_ready(client, monkeypatch):
     c, cfg, _, _ = client
     called = {}
     monkeypatch.setattr(firstrun, "download_stt_model",
-                        lambda model, root: called.setdefault("model", model))
-    monkeypatch.setattr(firstrun, "stt_download_root", lambda cfg: None)
+                        lambda model, models_dir: called.setdefault("model", model))
+    monkeypatch.setattr(firstrun, "stt_models_dir", lambda cfg: pathlib.Path("models"))
     r = c.post("/api/setup/model")
     assert r.status_code == 200 and r.get_json()["state"] == "downloading"
     # The worker thread is a daemon; give it a moment to finish the (fake) download.

@@ -23,7 +23,7 @@ def _cfg(tmp_path, llm_provider="anthropic", tts_provider="elevenlabs") -> dict:
         "keys": {"push_to_talk": "[", "tap_cancel_ms": 400, "cancel": ""},
         "audio": {"sample_rate": 16000, "input_device": ""},
         "sound_cues": {},
-        "whisper": {"model": "small", "device": "cpu", "compute_type": "int8", "language": "en"},
+        "whisper": {"model": "small", "n_threads": 4, "language": "en"},
         "llm": {"provider": llm_provider},
         "tts": {"provider": tts_provider, "speed": 1.0},
         "anthropic": {

@@ -158,7 +158,7 @@ def create_setup_app(cfg: dict, done: threading.Event, *, native: bool = False) 
         def worker():
             try:
                 firstrun.download_stt_model(
-                    firstrun.DEFAULT_STT_MODEL, firstrun.stt_download_root(cfg))
+                    firstrun.DEFAULT_STT_MODEL, firstrun.stt_models_dir(cfg))
                 # Record the installed model so the app (and the gate) use small.en, then flip
                 # the state — order matters so a status poll that sees "ready" also sees it set.
                 firstrun.apply_override(cfg, {"whisper": {"model": firstrun.DEFAULT_STT_MODEL}})

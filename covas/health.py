@@ -113,7 +113,7 @@ def friendly_provider_error(provider: str, exc: Exception) -> str:
 
 _IMPORTS = [
     ("anthropic", "anthropic"),
-    ("faster_whisper", "faster-whisper"),
+    ("pywhispercpp", "pywhispercpp"),
     ("sounddevice", "sounddevice"),
     ("soundfile", "soundfile"),
     ("numpy", "numpy"),
