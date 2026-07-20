@@ -126,7 +126,7 @@ RESTART_REQUIRED: frozenset[str] = frozenset({
 LIVE_SECTIONS: tuple[str, ...] = (
     "llm", "openai", "gemini", "tts", "edge", "azure", "openai_tts",
     "cartesia", "anthropic", "elevenlabs", "piper", "router", "web_search",
-    "conversation", "keys", "listen", "whisper", "personality", "crew", "elite",
+    "conversation", "keys", "listen", "whisper", "personality", "crew", "elite", "language",
     "proactive", "route", "nav", "star_systems", "search", "route_plan",
     "neutron_plan", "riches_plan", "keybinds", "macros", "honk", "reflex",
     "comms_send", "audio", "music", "hud", "crash_report",

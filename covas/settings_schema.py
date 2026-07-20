@@ -27,6 +27,12 @@ WHISPER_SIZES = ["tiny", "tiny.en", "base", "base.en", "small", "small.en",
 WHISPER_DEVICES = ["cpu"]  # CPU-only (issue #128): no local GPU ML compute competes with ED
 WHISPER_COMPUTE = ["int8", "float16", "float32"]
 THINKING_TIERS = ["Off", "Low", "Medium", "High", "Extra", "Max"]
+# Reply languages (issue #182, layer 1). DELIBERATELY CURATED — the languages we intend to deliver
+# end-to-end as the later localization layers land, NOT "any language" (a half-localized experience
+# feels more broken than an honestly English-only one). The value is the plain English language name
+# so it drops straight into the LLM instruction ("Respond in German."). The big non-English ED
+# communities (DE/FR/RU) plus ES/PT. Keep in lock-step with `covas/llm.py` if it grows.
+REPLY_LANGUAGES = ["English", "German", "French", "Russian", "Spanish", "Portuguese"]
 CACHE_TTLS = ["5m", "1h"]
 # Canonical tiers (issue #11) plus the Anthropic-flavored aliases the router still accepts.
 ROUTER_PINS = ["", "cheap", "standard", "premium", "haiku", "sonnet", "opus"]
@@ -505,6 +511,17 @@ SCHEMA: list[Setting] = [
             "Force a language code (en), or blank to auto-detect.",
             default="en", phrasings=("whisper language", "transcription language"),
             example="set the whisper language to auto"),
+
+    # --- Language (issue #182, layer 1) ------------------------------------
+    Setting("language.reply", ("language", "reply"), "enum",
+            "Reply language", "Language",
+            "The language the companion REPLIES in, regardless of what you type or speak. Curated to "
+            "languages we deliver end-to-end. Note: your speech is still transcribed with the "
+            "Whisper language below, and the reply is read by your chosen TTS voice — set both to "
+            "match for the best result.",
+            default="English", options=REPLY_LANGUAGES,
+            phrasings=("language", "reply language", "response language", "speak my language"),
+            example="reply in German"),
 
     # --- Personality -------------------------------------------------------
     Setting("personality.enabled", ("personality", "enabled"), "bool",

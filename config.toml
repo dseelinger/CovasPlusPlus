@@ -493,6 +493,21 @@ enabled = true
 max_uses = 3
 
 
+[language]
+# Reply language (issue #182, layer 1 of the localization epic). The companion RESPONDS in this
+# language regardless of what the Commander types or speaks. This is a prompt instruction to the
+# LLM, so it works on every LLM provider and rides the cached system prefix.
+#
+# DELIBERATELY CURATED, not "any language": we only offer languages we intend to deliver
+# end-to-end as the later layers land — a half-localized experience feels more broken than an
+# honestly English-only one. Options: English, German, French, Russian, Spanish, Portuguese.
+#
+# SCOPE (layer 1 only): this changes the language COVAS *replies* in. Your speech is still
+# transcribed with [whisper].language (set that to match your spoken language), and the voice that
+# reads the reply is still whichever [tts] voice you've chosen (pick one that speaks your language).
+# Whisper auto/locale selection and locale-aware voice pairing are tracked as #182 child issues.
+reply = "English"
+
 [personality]
 # When ON, the system prompt is composed as Base + selected Persona + your Campaign (N7).
 # When OFF, no system prompt is sent — replies are plain/neutral (and the "Commander" address

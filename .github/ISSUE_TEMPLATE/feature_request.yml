@@ -1,0 +1,57 @@
+name: "💡 Feature request"
+description: Suggest an idea or improvement for COVAS++.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! COVAS++ organizes features around three product pillars — **Assist**
+        (answer / look up / track, never touches the game), **Act** (press guarded controls in
+        Elite), and **Immerse** (personas, crew, soundscape). A request that clearly strengthens
+        one of those is the easiest to say yes to. See `DESIGN_AND_ROADMAP.md` §2.1.
+
+        > This is a solo project (see the README's maintainer-status note) — new features land as
+        > time allows, and not every good idea will fit the roadmap.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before filing
+      options:
+        - label: I searched existing issues and this isn't already requested.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The user need or friction, in terms of playing Elite with COVAS++.
+      placeholder: "When I'm doing X, I have to…, which…"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you'd like COVAS++ to do. A concrete example voice command helps.
+      placeholder: "I'd say '…' and COVAS would…"
+    validations:
+      required: true
+  - type: dropdown
+    id: pillar
+    attributes:
+      label: Which pillar does this strengthen?
+      description: See DESIGN_AND_ROADMAP.md §2.1. (Docs/tooling/refactors are "Foundation".)
+      options:
+        - "Assist — answer, look up, track (never touches the game)"
+        - "Act — press guarded ship controls in Elite"
+        - "Immerse — personas, crew, ambient audio, HUD"
+        - "Foundation — docs, tooling, tests, refactor"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered (optional)
+      description: Other approaches, existing workarounds, or how other tools handle it.
+    validations:
+      required: false

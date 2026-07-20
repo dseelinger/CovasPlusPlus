@@ -79,6 +79,7 @@ nav:
       - Hands-free listening: getting-started/hands-free.md
   - Talking to COVAS:
       - Personas & voice: using/personas-voice.md
+      - Reply language: using/language.md
       - Interactive crew: using/crew.md
       - The checklist: using/checklist.md
       - Persistent memory: using/memory.md

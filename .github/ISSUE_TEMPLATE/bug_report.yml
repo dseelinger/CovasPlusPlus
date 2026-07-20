@@ -1,0 +1,94 @@
+name: "🐛 Bug report"
+description: Something in COVAS++ is broken or behaving wrong.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The single most useful thing you can attach is
+        the **`check_setup.py` output** — it captures your environment, keys (presence, never the
+        values), audio devices, and data freshness, and saves a lot of back-and-forth.
+
+        > COVAS++ is solo-maintained (see the README's maintainer-status note). A clear, complete
+        > report is the fastest path to a fix.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before filing
+      options:
+        - label: I'm on the latest release (checked the [Releases](https://github.com/dseelinger/CovasPlusPlus/releases) / the in-app update notice).
+          required: true
+        - label: I searched existing issues and this isn't already reported.
+          required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect instead?
+      placeholder: "I asked '…' and COVAS…, but I expected…"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact steps — the voice command or action, and what you saw/heard.
+      placeholder: |
+        1. Held PTT and said "…"
+        2. …
+        3. See error / wrong reply
+    validations:
+      required: true
+  - type: textarea
+    id: check-setup
+    attributes:
+      label: "`check_setup.py` output"
+      description: |
+        Run `.venv\Scripts\python.exe check_setup.py` (or `check_setup.bat`) and paste the **full**
+        output here. It's change- and cost-free and reports no secret values — only whether keys
+        are present, your devices, and data freshness.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines (optional)
+      description: |
+        Paste any relevant lines from the log (`logs/` in a source run, or
+        `%APPDATA%\COVAS++\logs` in an installed build). **Redact anything personal** — logs can
+        contain your conversation.
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: COVAS++ version
+      description: From the control-panel footer, the release tag, or `covas/__version__.py`.
+      placeholder: "e.g. 0.18.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running it?
+      options:
+        - Installed build (Windows installer)
+        - From source (cloned repo + venv)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Windows version
+      placeholder: "e.g. Windows 11 23H2"
+    validations:
+      required: true
+  - type: textarea
+    id: providers
+    attributes:
+      label: Providers in use (optional)
+      description: Which LLM / TTS / STT providers (e.g. Anthropic + ElevenLabs + Whisper small.en).
+    validations:
+      required: false
