@@ -13,6 +13,24 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.22.0] — 2026-07-20
+
+An **Immerse & reach** release: your TTS voice now speaks your reply language too.
+
+### Changed
+- **The voice follows your reply language.** Set a non-English **Reply language** and COVAS steers
+  an Edge or Azure voice that can't pronounce it to a locale-matched one (e.g. a `de-DE-…` voice for
+  German) — so the reply is *read* in that language, not mangled by an English voice. A voice you
+  explicitly picked is kept (COVAS flags a mismatch rather than overriding you); ElevenLabs/OpenAI
+  voices are multilingual and left alone; English is unaffected. New `[language].match_voice`
+  (default on) is the opt-out, and the Edge/Azure voice pickers now list voices for the active
+  language. With STT (#197) already following the reply language, one setting now localizes the
+  whole round trip. ([#198])
+
+### Migration
+- Nothing to do. On-by-default, and it only ever steers an Edge/Azure voice that would otherwise
+  mispronounce a non-English reply; set `[language].match_voice = false` to keep your voice fixed.
+
 ## [0.21.0] — 2026-07-20
 
 An **Immerse & reach** release: speak to COVAS in your language and it now *hears* you in that
@@ -159,7 +177,9 @@ Feature and polish wave. See the
 Releases before 0.15.0 are listed on the
 [GitHub Releases page](https://github.com/dseelinger/CovasPlusPlus/releases).
 
-[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.22.0
+[0.21.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.21.0
 [0.20.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.20.0
 [0.19.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.19.0
 [0.18.1]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.18.1
@@ -215,4 +235,5 @@ Releases before 0.15.0 are listed on the
 [#189]: https://github.com/dseelinger/CovasPlusPlus/issues/189
 [#190]: https://github.com/dseelinger/CovasPlusPlus/issues/190
 [#197]: https://github.com/dseelinger/CovasPlusPlus/issues/197
+[#198]: https://github.com/dseelinger/CovasPlusPlus/issues/198
 [#206]: https://github.com/dseelinger/CovasPlusPlus/issues/206
