@@ -2003,6 +2003,10 @@ Notes:
 - [ ] 📋 **Size delta:** note the onedir folder MB and `COVAS++ Setup.exe` MB the build prints;
   dropping the av/ctranslate2 stack (the ~63 MB `av.libs` FFmpeg blob + ctranslate2 DLL) should
   **shrink** the bundle vs. the pre-#206 baseline — record here: ____.
+  (Measured at v0.19.0 after #206: onedir **107.3 MB** — down from the 264.4 MB v0.5.0 baseline
+  below, a ~157 MB drop from removing the av/ctranslate2/onnxruntime stack; whisper.cpp adds only
+  the ~2.6 MB of ggml/whisper DLLs. Frozen `--selftest` printed `SELFTEST STT OK: whisper.cpp
+  transcribed a numpy PCM buffer` and the bundle grep for libx264/libx265/avcodec/ffmpeg found zero.)
   (Measured at v0.5.0: onedir **264.4 MB**, Setup.exe **74.7 MB**; the `aiohttp`+`edge_tts` files
   total **~3 MB uncompressed** → **~1–2 MB** of the installer — negligible, as expected.)
 - [ ] **Default Edge voice actually plays (not just imports):** launch the packaged `COVAS++.exe`
