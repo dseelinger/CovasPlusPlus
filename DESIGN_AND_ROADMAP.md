@@ -2210,18 +2210,35 @@ product-pillar justification (mostly **Foundation**) before it becomes one.
   and walls off deaf/HoH/non-verbal ones. Keep the text-in/text-out path a first-class *mode* (not
   just the TTS-failure fallback), consider on-screen captions of what COVAS says, and give the web
   panel keyboard nav, ARIA labels, colorblind-safe status colors, and `prefers-reduced-motion`.
-- **OSS community + legal hygiene (Foundation).** Missing: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
-  issue/PR templates, a user-visible `CHANGELOG` (SemVer bumps already happen — expose them). The one
-  genuine legal item: a third-party attributions / `NOTICE` file for bundled+redistributed models
-  and voices (Piper, Whisper, etc.), whose *redistribution* licenses must be compatible with ours.
-  Also confirm the README carries an explicit "not affiliated with Frontier Developments" fan-content
-  disclaimer, and point users to a real support channel (Discord, where ED players are).
+- **OSS community + legal hygiene (Foundation).** ✅ **Done (#185).** Added `CONTRIBUTING.md`,
+  `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1; private GitHub reporting), `.github/` issue forms
+  (the bug form asks for `check_setup.py` output) + a PR template, a user-visible `CHANGELOG.md`
+  (recent releases in Keep-a-Changelog form, pointing at GitHub Releases as the source of truth),
+  and the one genuine legal item — `NOTICE.md`, a third-party bill-of-materials. The BOM correction
+  worth recording: the models people worry about (Piper voices, Whisper models) are **not**
+  redistributed — they're user-downloaded at runtime. What the frozen installer actually
+  redistributes is Python libraries + their native DLLs + FDev-derived community game data. Most are
+  cleanly permissive, but three carry copyleft/attribution obligations documented in NOTICE:
+  **edge-tts** (LGPL-3.0, pure-Python, replaceable), **libsndfile** via `soundfile` (LGPL-2.1),
+  and — the one **open review item** — **FFmpeg via PyAV**, whose wheel self-reports LGPLv3 but also
+  bundles the **GPL** `libx264`/`libx265` encoder DLLs (COVAS uses PyAV for audio decode only, never
+  those encoders). Resolving that (LGPL-only FFmpeg build, drop the codec DLLs, or honor GPL for
+  them) is a build/dependency change tracked separately, not a docs change. The community game data
+  (EDCD/coriolis-data, EDCD/FDevIDs, Spansh) is Frontier IP under fan-content — attributed, not
+  claimed as MIT. README fan-content disclaimer confirmed present; a real support channel (Discord +
+  GitHub Issues) is now linked from the README and `docs/support.md`.
 - **Operational maturity for machines we don't own (Foundation).** Opt-in, off-by-default crash/error
   reporting (can't fix what we never see); an update *notifier* so users aren't running stale builds
   when they file bugs; documented minimum system requirements + graceful degradation on low-VRAM
   machines (smaller Whisper model, Piper TTS) so COVAS never stutters the game.
-- **Sustainability / bus factor (Foundation).** Confirm a contributor can build from a clean checkout
-  without Doug's machine, and set honest maintainer-response expectations in the README.
+- **Sustainability / bus factor (Foundation).** ✅ **Done (#187).** Verified a contributor can build
+  from a clean checkout without the author's machine — a fresh `git archive` export + a new Python
+  3.11 venv + `requirements-dev.txt` byte-compiles and runs the full offline unit suite green, with
+  no absolute paths or host-specific assumptions (config paths are relative; all personal files are
+  git-ignored). Steps captured in `CONTRIBUTING.md`; the one honest host requirement is Windows
+  (DPAPI key encryption, global PTT hotkeys, `SendInput`, the PyWebView window). Honest
+  maintainer-status / response expectations are now a README section
+  (`#maintainer-status--response-expectations`).
 
 ---
 
