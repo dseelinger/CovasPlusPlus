@@ -6,16 +6,15 @@
 # Onedir (not onefile): faster startup and far fewer AV false-positives than a temp-unpacking
 # onefile (INSTALLER_DESIGN "The stack"). Entry is run_covas_app.py — the native PyWebView window.
 #
-# Trim decisions were VERIFIED against the code + a frozen self-test, not cut blind (the prompt's
-# explicit warning). Both of the design doc's "biggest wins" turned out UNSAFE with this env:
-#   * onnxruntime STAYS — STT runs with vad_filter=True, and faster_whisper.vad imports it LAZILY
-#     (inside a function), so PyInstaller's static analysis misses it. Pinned as a hiddenimport.
-#   * PyAV (av) STAYS WHOLE — faster_whisper.__init__ imports it eagerly, so it can't be excluded
-#     without breaking `import faster_whisper`. And its ffmpeg VIDEO-codec DLLs can't be individually
-#     dropped either: avcodec-62.dll HARD-LINKS libx264/libx265/libvpx/libSvtAv1Enc/libdav1d via its
-#     import table, so removing any (even ones we never use) makes `import av` fail with
-#     "DLL load failed while importing _core". A frozen --selftest proved this, so no av trim.
-# Net: ~260 MB onedir, no trims. Inno LZMA (I6) still gets that to a ~120-150 MB download.
+# STT is whisper.cpp via pywhispercpp (issue #206): MIT, CPU-only, reads float32 PCM directly. This
+# REMOVED the faster-whisper + ctranslate2 + av/FFmpeg + onnxruntime(Silero-VAD) stack — and with av
+# went the GPL-2.0 x264/x265 codec DLLs that used to be unavoidable dead weight (avcodec HARD-LINKED
+# libx264/libx265/libvpx/libSvtAv1Enc/libdav1d via its import table, so they couldn't be trimmed even
+# though COVAS++ never encoded video). The bundle is now 100% permissive BY CONSTRUCTION, and smaller
+# (drops the ~63 MB av.libs FFmpeg blob + the ctranslate2 native DLL). pywhispercpp ships a top-level
+# _pywhispercpp extension + loose ggml-*/whisper-* DLLs (delvewheel layout) that collect_all misses,
+# so they're pinned/globbed in explicitly below; the frozen --selftest imports the backend and FAILS
+# LOUD if any are missing.
 import os
 import sys
 
@@ -41,16 +40,25 @@ datas += collect_data_files("covas")
 #     freeze the shipped app's default voice silently degrades to text. collect_all + the --selftest
 #     import below make the freeze include it and FAIL LOUDLY if it doesn't. (The other cloud
 #     providers — azure/openai/cartesia/gemini — ride `requests`, already bundled, so no entry here.)
-for _pkg in ("ctranslate2", "sounddevice", "soundfile", "faster_whisper", "onnxruntime",
-             "webview", "av", "edge_tts", "aiohttp"):
+for _pkg in ("pywhispercpp", "sounddevice", "soundfile",
+             "webview", "edge_tts", "aiohttp"):
     _d, _b, _h = collect_all(_pkg)
     datas += _d
     binaries += _b
     hiddenimports += _h
 
-# onnxruntime + the VAD module are imported lazily (see header) — pin them so the freeze includes
-# them even though nothing imports them at module top level.
-hiddenimports += ["onnxruntime", "faster_whisper.vad"]
+# whisper.cpp STT (issue #206): pywhispercpp's native extension is a TOP-LEVEL `_pywhispercpp` module
+# (not under the package), and its whisper.cpp/ggml DLLs are loose, hashed files in site-packages
+# root (delvewheel repair) that collect_all("pywhispercpp") doesn't see. Pin the extension and glob
+# the DLLs in so the frozen backend can load — the --selftest importing _pywhispercpp fails LOUD if
+# any are missing. (PyInstaller's own analysis of these DLLs pulls the MSVC runtime they depend on.)
+hiddenimports += ["_pywhispercpp"]
+import glob
+import sysconfig
+
+_purelib = sysconfig.get_paths()["purelib"]
+for _dll in glob.glob(os.path.join(_purelib, "ggml*.dll")) + glob.glob(os.path.join(_purelib, "whisper*.dll")):
+    binaries.append((_dll, "."))
 
 # Pillow renders the VR HUD's Segoe UI text (issue #48). It's imported lazily inside the renderer
 # and falls back to a bitmap font if absent — so a freeze that missed it would SILENTLY ship the
@@ -110,7 +118,8 @@ a = Analysis(
     optimize=0,
 )
 
-# (No binary trim — see the header: av's codec DLLs are hard-linked by avcodec and can't be dropped.)
+# (No binary trim — the GPL av/x264/x265 codec DLLs are gone with the whisper.cpp move (issue #206);
+# the whisper.cpp/ggml DLLs bundled above are MIT.)
 
 pyz = PYZ(a.pure)
 
