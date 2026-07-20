@@ -163,6 +163,36 @@ def test_settings_page_has_test_my_setup(client):
     assert "Test my setup" in html and "/api/health" in html and "healthCard" in html
 
 
+# --- accessibility markup (issue #184) -------------------------------------
+
+def test_index_has_a11y_landmarks_and_live_log(client):
+    c, _, _ = client
+    html = c.get("/").get_data(as_text=True)
+    assert 'class="skip-link"' in html                      # keyboard skip link
+    assert '<main' in html                                   # main landmark
+    assert 'role="log"' in html and 'aria-live="polite"' in html   # captions announced
+    assert 'aria-label="Type a message to COVAS"' in html    # labelled text input
+    assert 'role="switch"' in html and 'aria-checked' in html  # accessible personality toggle
+    assert 'role="status"' in html                           # connection status region
+
+
+def test_settings_page_has_a11y_landmarks(client):
+    c, _, _ = client
+    html = c.get("/settings").get_data(as_text=True)
+    assert 'class="skip-link"' in html
+    assert 'aria-label="Filter settings"' in html
+    # The bool-toggle switch a11y is wired in JS — assert the code is present.
+    assert 'role","switch"' in html and 'aria-checked' in html
+
+
+def test_reduced_motion_and_focus_visible_in_theme():
+    from pathlib import Path
+    css = Path("covas/static/theme.css").read_text(encoding="utf-8")
+    assert "prefers-reduced-motion" in css
+    assert ":focus-visible" in css
+    assert ".skip-link" in css
+
+
 # --- combobox accepts a custom value (issue #92) ---------------------------
 
 def test_combobox_custom_model_id_accepted(client):

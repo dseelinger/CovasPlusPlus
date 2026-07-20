@@ -2215,10 +2215,20 @@ product-pillar justification (mostly **Foundation**) before it becomes one.
   the config/provider seam now carries a language dimension the remaining layers extend. Layers
   1/2/3/5 (UI strings — after #181/#184 land template changes; Whisper locale auto-select;
   locale-aware voice pairing; number/date formatting) are filed as child issues of #182.
-- **Accessibility, both directions (Foundation).** Voice-first helps motor/vision-impaired players
-  and walls off deaf/HoH/non-verbal ones. Keep the text-in/text-out path a first-class *mode* (not
-  just the TTS-failure fallback), consider on-screen captions of what COVAS says, and give the web
-  panel keyboard nav, ARIA labels, colorblind-safe status colors, and `prefers-reduced-motion`.
+- **Accessibility, both directions (Foundation).** ✅ **Done (#184).** Voice-first helps
+  motor/vision-impaired players and walls off deaf/HoH/non-verbal ones — so text is now a
+  **first-class input path, not a TTS-failure fallback**: the typed-prompt box (#76) is documented
+  and labelled as the always-available way to run a full turn without a mic, and every spoken reply
+  is mirrored as text in the live log (on-screen captions). The log is an ARIA live region
+  (`role="log"`, `aria-live="polite"`) so a screen reader announces replies/status as they arrive.
+  The control-panel a11y pass (index + settings) added: skip-to-content links, page landmarks
+  (`banner`/`nav`/`main`/`status`), labels on every input, **keyboard-operable switches**
+  (custom toggles became `role="switch"`, focusable, Space/Enter, `aria-checked`), a global
+  `:focus-visible` ring, colorblind-safe status (colour always paired with a word/symbol — the
+  connection state name, and `✓[OK]/![warn]/✗[FAIL]` on Test-my-setup), and a
+  `prefers-reduced-motion` block that disables animation/transition/auto-scroll. Documented in
+  `docs/using/accessibility.md`. Text mode is now a documented input path (this §), not just the
+  fail-soft degradation.
 - **OSS community + legal hygiene (Foundation).** ✅ **Done (#185).** Added `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1; private GitHub reporting), `.github/` issue forms
   (the bug form asks for `check_setup.py` output) + a PR template, a user-visible `CHANGELOG.md`
