@@ -228,3 +228,18 @@
   --accent2-tint: rgba(40, 200, 255, .16);
   --veil: rgba(255, 206, 158, .06);
 }
+
+/* --- "Test my setup" health report (issue #181) ------------------------------------------
+   Status is signalled THREE ways so it never depends on colour alone (a11y / colorblind-safe,
+   reinforced in #184): a text mark (✓ ! ✗), the word [OK]/[warn]/[FAIL], and the colour below. */
+.health-out{ margin-top:12px; font-size:13px; line-height:1.5; }
+.health-summary{ font-weight:600; padding:8px 10px; border-radius:8px; border:1px solid var(--edge); margin-bottom:8px; }
+.health-summary.ok{ color:var(--ok); background:var(--ok-bg); border-color:var(--ok-edge); }
+.health-summary.fail{ color:var(--err); background:var(--err-bg); border-color:var(--err-edge); }
+.health-section{ font-weight:600; color:var(--muted); margin:10px 0 2px; text-transform:uppercase; letter-spacing:.04em; font-size:11px; }
+.health-line{ display:flex; align-items:baseline; gap:2px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+.health-line.ok .health-mark{ color:var(--ok); }
+.health-line.warn .health-mark{ color:var(--warn-text); }
+.health-line.fail .health-mark{ color:var(--err); }
+.health-mark{ font-weight:700; width:1em; display:inline-block; text-align:center; }
+.health-detail{ color:var(--muted); margin:0 0 4px 1.6em; font-size:12px; }
