@@ -58,48 +58,47 @@
 <body>
 <header>
   <h1>COVAS++</h1>
-  <span class="sub">MEMORY</span>
-  <a href="/" class="sub">← control panel</a>
-  <a href="/settings" class="sub">⚙ settings</a>
-  <a href="/checklist" class="sub">☑ checklist</a>
-  <a href="/crew" class="sub">🎙 crew</a>
-  <a href="/engineers" class="sub">🔧 engineers</a>
+  <span class="sub">{{ t('MEMORY') }}</span>
+  <a href="/" class="sub">{{ t('← control panel') }}</a>
+  <a href="/settings" class="sub">{{ t('⚙ settings') }}</a>
+  <a href="/checklist" class="sub">{{ t('☑ checklist') }}</a>
+  <a href="/crew" class="sub">{{ t('🎙 crew') }}</a>
+  <a href="/engineers" class="sub">{{ t('🔧 engineers') }}</a>
   <span class="sub" id="fileName" style="margin-left:auto"></span>
 </header>
 
 <div class="wrap">
   <div class="card">
-    <h2>Add a memory</h2>
+    <h2>{{ t('Add a memory') }}</h2>
     <div class="row">
-      <input class="grow" id="addText" placeholder="A durable fact — e.g. Prefers to be addressed as Commander">
-      <select id="addType" title="Kind of fact">
-        <option value="note">note</option>
-        <option value="preference">preference</option>
-        <option value="fact">fact</option>
+      <input class="grow" id="addText" placeholder="{{ t('A durable fact — e.g. Prefers to be addressed as Commander') }}">
+      <select id="addType" title="{{ t('Kind of fact') }}">
+        <option value="note">{{ t('note') }}</option>
+        <option value="preference">{{ t('preference') }}</option>
+        <option value="fact">{{ t('fact') }}</option>
       </select>
-      <input id="addTags" style="flex:1 1 160px" placeholder="tags, comma-separated">
-      <button class="primary" id="add">ADD</button>
+      <input id="addTags" style="flex:1 1 160px" placeholder="{{ t('tags, comma-separated') }}">
+      <button class="primary" id="add">{{ t('ADD') }}</button>
     </div>
     <div class="hint">
-      Memories live in a plain JSON-lines file the voice loop shares live. What you add here is
-      recalled in conversation; what the companion learns shows up here on reload.
+      {{ t('Memories live in a plain JSON-lines file the voice loop shares live. What you add here is recalled in conversation; what the companion learns shows up here on reload.') }}
     </div>
   </div>
 
   <div class="card">
-    <h2>Remembered</h2>
+    <h2>{{ t('Remembered') }}</h2>
     <div class="row">
-      <input class="grow" id="search" placeholder="search text, tags, or type…">
-      <button id="reload">RELOAD FROM DISK</button>
+      <input class="grow" id="search" placeholder="{{ t('search text, tags, or type…') }}">
+      <button id="reload">{{ t('RELOAD FROM DISK') }}</button>
       <span class="count" id="count"></span>
     </div>
     <span class="msg" id="msg"></span>
     <div class="conflict" id="conflict">
-      ⚠ The memory file changed on disk since you loaded it — probably a voice edit.<br>
-      <button id="reloadTheirs" class="small">RELOAD (discard my pending edit)</button>
+      {{ t('⚠ The memory file changed on disk since you loaded it — probably a voice edit.') }}<br>
+      <button id="reloadTheirs" class="small">{{ t('RELOAD (discard my pending edit)') }}</button>
     </div>
     <ul id="list" style="margin-top:12px"></ul>
-    <div class="empty" id="empty" style="display:none">No memories yet.</div>
+    <div class="empty" id="empty" style="display:none">{{ t('No memories yet.') }}</div>
   </div>
 </div>
 
