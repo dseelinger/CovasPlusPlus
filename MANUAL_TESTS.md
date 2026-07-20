@@ -155,6 +155,30 @@ Notes:
 
 Notes:
 
+## 3d. Accessibility — text mode, keyboard-only, screen reader (issue #184)  🌐 PANEL
+> Text is a **first-class mode**, and the panel is usable without a mouse or voice. See
+> [docs/using/accessibility.md](docs/using/accessibility.md).
+- [ ] 🌐 **Full text mode (no mic):** using ONLY the typed-prompt box, run a few turns → each reply
+      appears **as text in the live log** (on-screen captions). You never touch the mic and get the
+      complete companion by keyboard. If you also have no TTS voice configured, it's still fully
+      usable — text mode isn't gated on a working voice.
+- [ ] 🌐 **Keyboard-only:** from a fresh page load press **Tab** → the first stop is a visible
+      **"Skip to…"** link (Enter jumps to the content). Continue tabbing → every link, input, button,
+      and **toggle** is reachable **in a sensible order** with a **visible focus ring**. Focus a
+      **toggle** (e.g. Personality, or any Settings on/off) and press **Space** or **Enter** → it
+      flips; a screen reader reads it as a **switch, on/off**.
+- [ ] 🌐 **Screen reader captions:** with a screen reader on, send a typed (or spoken) prompt → the
+      reply is **announced automatically** from the live log (it's an `aria-live` region) without
+      moving focus there.
+- [ ] 🌐 **Colour-independent status:** the connection indicator always shows a **word**
+      (CONNECTING…/READY), and **Test my setup** marks lines `✓ [OK]` / `! [warn]` / `✗ [FAIL]` — all
+      legible with the monitor set to greyscale.
+- [ ] 🌐 **Reduced motion:** turn on Windows *Settings → Accessibility → Visual effects → Animation
+      effects OFF*, reload the panel → the status dot doesn't pulse, spinners/transitions are stilled,
+      and the log doesn't smooth-scroll (it jumps).
+
+Notes:
+
 ## 3d. Concurrency & lifecycle edge cases (#156)  🌐 PANEL 🔊 HW 🎮 ED
 > Foundation hardening for four near-zero-probability races in `app.py`. No new behavior — these
 > confirm nothing regressed and nothing doubles up. Covered offline by `tests/test_app_concurrency.py`;

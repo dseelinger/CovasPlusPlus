@@ -99,7 +99,8 @@
 </style>
 </head>
 <body>
-<header>
+<a href="#main" class="skip-link">Skip to settings</a>
+<header role="banner">
   <h1>COVAS++</h1>
   <span class="sub">SETTINGS</span>
   <a href="/" class="sub" style="color:var(--accent2)">← control panel</a>
@@ -107,11 +108,12 @@
   <a href="/memory" class="sub" style="color:var(--accent2);text-decoration:none">🧠 memory</a>
   <a href="/crew" class="sub" style="color:var(--accent2);text-decoration:none">🎙 crew</a>
   <span class="spacer"></span>
-  <input class="search" id="search" placeholder="Filter settings…" autocomplete="off">
+  <label for="search" class="sr-only">Filter settings</label>
+  <input class="search" id="search" placeholder="Filter settings…" aria-label="Filter settings" autocomplete="off">
 </header>
 
 <div class="wrap">
-  <nav class="groups" id="groupNav"></nav>
+  <nav class="groups" id="groupNav" aria-label="Settings sections"></nav>
   <main id="main"><div class="empty">Loading settings…</div></main>
 </div>
 
@@ -298,7 +300,13 @@ function buildControl(control, s){
   if(s.type==="bool"){
     const t = document.createElement("div");
     t.className="toggle"+(s.value?" on":""); t.innerHTML='<div class="knob"></div>';
-    t.onclick=()=>{ const v=!t.classList.contains("on"); t.classList.toggle("on",v); edit(s.key,v); };
+    // #184: an accessible switch — role, keyboard focus, and aria-checked kept in sync.
+    t.setAttribute("role","switch"); t.tabIndex=0;
+    t.setAttribute("aria-label", s.label); t.setAttribute("aria-checked", s.value?"true":"false");
+    const run=()=>{ const v=!t.classList.contains("on"); t.classList.toggle("on",v);
+      t.setAttribute("aria-checked",v?"true":"false"); edit(s.key,v); };
+    t.onclick=run;
+    t.addEventListener("keydown",e=>{ if(e.key===" "||e.key==="Enter"||e.key==="Spacebar"){ e.preventDefault(); run(); } });
     control.appendChild(t); return;
   }
   if(s.type==="enum"){

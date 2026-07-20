@@ -124,17 +124,20 @@
 </style>
 </head>
 <body>
-<header>
+<a href="#log" class="skip-link">Skip to the conversation log</a>
+<header role="banner">
   <h1>COVAS++</h1>
   <span class="sub">CONTROL PANEL</span>
+  <nav aria-label="Control panel sections" class="sub">
   <a href="/settings" class="sub" style="color:var(--accent2);text-decoration:none">⚙ settings</a>
   <a href="/checklist" class="sub" style="color:var(--accent2);text-decoration:none">☑ checklist</a>
   <a href="/memory" class="sub" style="color:var(--accent2);text-decoration:none">🧠 memory</a>
   <a href="/crew" class="sub" style="color:var(--accent2);text-decoration:none">🎙 crew</a>
   <a href="/macros" class="sub" style="color:var(--accent2);text-decoration:none">🎛 macros</a>
   <a href="/engineers" class="sub" style="color:var(--accent2);text-decoration:none">🔧 engineers</a>
-  <div class="status">
-    <span class="dot" id="dot"></span>
+  </nav>
+  <div class="status" role="status" aria-live="polite" aria-label="Connection and companion status">
+    <span class="dot" id="dot" aria-hidden="true"></span>
     <span class="state-name" id="stateName">CONNECTING…</span>
   </div>
 </header>
@@ -146,7 +149,7 @@
   <button class="dismiss" id="updateDismiss" title="Dismiss">✕</button>
 </div>
 
-<div class="wrap">
+<main class="wrap" id="main">
   <div class="leftcol">
     <div class="card">
       <h2>Configuration</h2>
@@ -156,7 +159,7 @@
       <div class="pblock" id="llmBlock"></div>
       <div class="row"><label>Whisper model</label><select id="whisper"></select></div>
       <div class="pblock" id="ttsBlock"></div>
-      <div class="row"><label>Personality</label><div class="toggle" id="personality"><div class="knob"></div></div></div>
+      <div class="row"><label id="personalityLabel">Personality</label><div class="toggle" id="personality" role="switch" tabindex="0" aria-checked="false" aria-labelledby="personalityLabel"><div class="knob"></div></div></div>
       <button class="cancel" id="cancelBtn">■ CANCEL / STOP</button>
       <div class="prow"><button id="openCues">OPEN CUES FOLDER</button><span class="pmsg" id="cuesMsg"></span></div>
       <div class="prow"><button id="reloadCues">RELOAD CUES</button><span class="pmsg" id="cuesReloadMsg"></span></div>
@@ -176,18 +179,23 @@
   </div>
 
   <div class="card">
-    <h2>Live Log <span class="logfilter"><a id="copyLog" title="Copy the whole log to the clipboard (respects the Conversation/All filter)">Copy log</a> · <a id="fConv">Conversation</a> · <a id="fAll">All</a></span></h2>
-    <!-- #76: type a prompt to the AI (no mic). Enter or ✈ sends a full normal turn. -->
+    <h2>Live Log <span class="logfilter"><a id="copyLog" role="button" tabindex="0" title="Copy the whole log to the clipboard (respects the Conversation/All filter)">Copy log</a> · <a id="fConv" role="button" tabindex="0">Conversation</a> · <a id="fAll" role="button" tabindex="0">All</a></span></h2>
+    <!-- #76 + #184: type to COVAS (no mic) — a first-class TEXT input, not a fallback. Enter or ✈
+         sends a full normal turn; the reply appears in the live log below (also announced to a
+         screen reader via aria-live, so text mode fully serves non-verbal/deaf/blind Commanders). -->
+    <label for="promptInput" class="sr-only">Type a message to COVAS</label>
     <div class="promptrow">
-      <input type="text" id="promptInput" placeholder="Type a message to COVAS…" autocomplete="off" spellcheck="false">
+      <input type="text" id="promptInput" placeholder="Type a message to COVAS…"
+             aria-label="Type a message to COVAS" autocomplete="off" spellcheck="false">
       <button id="promptSend" title="Send (Enter)" aria-label="Send prompt">&#9992;</button>
     </div>
     <div class="logwrap">
-      <div class="log" id="log"></div>
+      <div class="log" id="log" role="log" aria-live="polite"
+           aria-label="Conversation and status log — what COVAS hears and says"></div>
       <button type="button" class="jumpLatest" id="jumpLatest" title="Jump to the latest log line">↓ Jump to latest</button>
     </div>
   </div>
-</div>
+</main>
 
 <!-- #75: fallback right-click menu for a text selection, since the packaged webview eats the native one -->
 <div class="selmenu" id="selMenu"><button type="button" id="selMenuCopy">Copy</button></div>
@@ -376,7 +384,9 @@ async function init(){
   await renderLLM(st.settings.llm);
   await renderTTS(st.settings.tts);
 
-  $("personality").onclick = () => { const v=!getToggle("personality"); setToggle("personality",v); postKey("personality.enabled", v); };
+  const togglePersonality = () => { const v=!getToggle("personality"); setToggle("personality",v); postKey("personality.enabled", v); };
+  $("personality").onclick = togglePersonality;
+  wireSwitchKeys($("personality"), togglePersonality);
   $("cancelBtn").onclick = () => fetch("/api/cancel",{method:"POST"});
 
   // Typed prompt (#76): Enter or ✈ sends a FULL normal turn (skips STT). Clears on send; the
@@ -490,9 +500,13 @@ function buildControl(field, opts){
   if(t === "bool"){
     const tg = document.createElement("div"); tg.className = "toggle";
     tg.innerHTML = '<div class="knob"></div>';
-    const set = on => tg.classList.toggle("on", !!on);
+    tg.setAttribute("role","switch"); tg.tabIndex = 0;
+    if(field.label) tg.setAttribute("aria-label", field.label);
+    const set = on => { tg.classList.toggle("on", !!on); tg.setAttribute("aria-checked", on?"true":"false"); };
     set(field.value);
-    tg.onclick = () => { const v = !tg.classList.contains("on"); set(v); postKey(key, v); };
+    const run = () => { const v = !tg.classList.contains("on"); set(v); postKey(key, v); };
+    tg.onclick = run;
+    wireSwitchKeys(tg, run);
     register(set);
     return tg;
   }
@@ -774,8 +788,15 @@ function initLogFilter(){
   try{ saved = localStorage.getItem("logFilter") || "conversation"; }catch(e){}
   apply(saved);
 }
-function setToggle(id,on){$(id).classList.toggle("on",!!on);}
+function setToggle(id,on){const el=$(id);el.classList.toggle("on",!!on);el.setAttribute("aria-checked",on?"true":"false");}
 function getToggle(id){return $(id).classList.contains("on");}
+// #184: make a custom <div role="switch"> keyboard-operable — Space/Enter toggle it, like a
+// native checkbox. `run` performs the same toggle the click handler does.
+function wireSwitchKeys(el, run){
+  el.addEventListener("keydown", e => {
+    if(e.key===" "||e.key==="Enter"||e.key==="Spacebar"){ e.preventDefault(); run(); }
+  });
+}
 
 function connectWS(){
   const ws = new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
