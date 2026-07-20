@@ -80,6 +80,7 @@ nav:
   - Talking to COVAS:
       - Personas & voice: using/personas-voice.md
       - Reply language: using/language.md
+      - Translating the UI: using/translating-the-ui.md
       - Interactive crew: using/crew.md
       - The checklist: using/checklist.md
       - Persistent memory: using/memory.md

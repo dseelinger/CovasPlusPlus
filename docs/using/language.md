@@ -44,7 +44,9 @@ English-only one, so the list grows only as the rest of the pipeline catches up.
     The one caveat for STT: a `.en` Whisper model (e.g. `small.en`) is **English-only**. Before
     setting a non-English reply language, switch to a **multilingual** model (e.g. `small`) on the
     [Settings page](../control-panel.md) — otherwise COVAS logs a warning and transcribes your
-    speech poorly. The remaining roadmap item is translated control-panel text.
+    speech poorly. The control-panel text is now **extracted for translation** (the strings are
+    wrapped and ready), and the panel ships an English baseline; a language activates once someone
+    contributes a complete catalog — see [translating the UI](translating-the-ui.md).
 
 ## How it works
 

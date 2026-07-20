@@ -2241,8 +2241,21 @@ product-pillar justification (mostly **Foundation**) before it becomes one.
   profit, distances in light-seconds and light-years, the CG expiry short date); diagnostic loglines
   and stored-memory fact text stay English by design (they aren't callouts). **This completes the
   localization epic's runtime round trip** — reply (#182) → STT (#197) → voice (#198) → formatting
-  (#199); the one remaining layer, control-panel **UI-string** translation, waits on the #181/#184
-  template changes and is filed as the last child issue of #182.
+  (#199). **UI-string extraction (layer 2) is now done too — issue #196.** The control panel gains a
+  tiny stdlib-only, gettext-style `t()` (`covas/ui_i18n.py`) — NO Flask-Babel — keyed by the English
+  SOURCE string, so `translate(s, "en") == s` and wiring a template through `{{ t('…') }}` cannot
+  change the English render (guarded by a parametrized render test). A Flask `context_processor` in
+  both `web.py` and `setup_web.py` (the first-run wizard is a separate app) binds `t()` per render to
+  the active UI language, which follows `[language].reply` **but only when a complete catalog exists**
+  — `CATALOGS` ships English-only, so a non-English reply language yields a fully-English panel, never
+  a half-translated one (the epic's gate, enforced in code, not just discipline). We deliberately ship
+  the **extraction mechanism + English baseline only**, no machine translations; a human contributes a
+  language by adding one catalog dict (`docs/using/translating-the-ui.md`). Scope: the server-rendered
+  chrome of every panel + the wizard is wired; **JS-built strings** (live status/log/provider blocks in
+  each page's inline script) and the **settings-schema** label/help/category text (rendered client-side
+  from the API payload) localize at those layers and are a documented follow-up on the same mechanism.
+  With this, **every child layer of #182 is delivered** (1: UI strings; 2: STT; 3: voice; 4: reply;
+  5: formatting) — the epic's remaining work is completing the actual per-language catalogs.
 - **Accessibility, both directions (Foundation).** ✅ **Done (#184).** Voice-first helps
   motor/vision-impaired players and walls off deaf/HoH/non-verbal ones — so text is now a
   **first-class input path, not a TTS-failure fallback**: the typed-prompt box (#76) is documented
