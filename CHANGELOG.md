@@ -13,6 +13,29 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.19.0] — 2026-07-20
+
+A **Foundation & reach** release: talk to COVAS in your language, an easier front door, real
+accessibility, operational maturity, and the standard open-source project files.
+
+### Added
+- **Reply in your language.** A new reply-language setting makes COVAS respond in German, French,
+  Russian, Spanish, or Portuguese (English default) — say *"reply in German"* or set it on the
+  Settings page. Layer 1 of the localization epic. ([#182])
+- **Text mode is now first-class + an accessible control panel.** Type to COVAS and read replies in
+  the live log without a mic; the panel gained keyboard navigation, screen-reader live captions,
+  labelled controls, keyboard-operable switches, colorblind-safe status, and `prefers-reduced-motion`.
+  ([#184])
+- **One-click "Test my setup."** A button on the Settings page runs the full health check (keys,
+  providers, game data, audio, RAM, updates) and shows a readable, screenshot-able report — no
+  terminal, no tracebacks. ([#181])
+- **Opt-in crash reports.** Off by default; when enabled, a crash is written to a **redacted** local
+  file (keys/username scrubbed) you can attach to a bug — nothing is ever transmitted. ([#186])
+- **Documented system requirements** with low-end guidance (smaller Whisper model, CPU-only), and
+  the update check now also surfaces in "Test my setup." ([#186])
+- **Project files:** `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue/PR templates, this changelog, a
+  third-party `NOTICE.md`, README maintainer-status + Discord/community links. ([#185], [#187])
+
 ## [0.18.1] — 2026-07-19
 
 A focused **security-hardening sweep** — four fixes that shrink the prompt-injection blast radius
@@ -99,7 +122,8 @@ Feature and polish wave. See the
 Releases before 0.15.0 are listed on the
 [GitHub Releases page](https://github.com/dseelinger/CovasPlusPlus/releases).
 
-[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.18.1...HEAD
+[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.19.0
 [0.18.1]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.18.1
 [0.18.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.18.0
 [0.17.3]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.17.3
@@ -142,7 +166,13 @@ Releases before 0.15.0 are listed on the
 [#178]: https://github.com/dseelinger/CovasPlusPlus/issues/178
 [#179]: https://github.com/dseelinger/CovasPlusPlus/issues/179
 [#180]: https://github.com/dseelinger/CovasPlusPlus/issues/180
+[#181]: https://github.com/dseelinger/CovasPlusPlus/issues/181
+[#182]: https://github.com/dseelinger/CovasPlusPlus/issues/182
 [#183]: https://github.com/dseelinger/CovasPlusPlus/issues/183
+[#184]: https://github.com/dseelinger/CovasPlusPlus/issues/184
+[#185]: https://github.com/dseelinger/CovasPlusPlus/issues/185
+[#186]: https://github.com/dseelinger/CovasPlusPlus/issues/186
+[#187]: https://github.com/dseelinger/CovasPlusPlus/issues/187
 [#188]: https://github.com/dseelinger/CovasPlusPlus/issues/188
 [#189]: https://github.com/dseelinger/CovasPlusPlus/issues/189
 [#190]: https://github.com/dseelinger/CovasPlusPlus/issues/190
