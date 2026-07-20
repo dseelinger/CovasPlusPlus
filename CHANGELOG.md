@@ -13,6 +13,21 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.23.0] — 2026-07-20
+
+An **Immerse & reach** release: numbers and dates now read in your locale — completing the
+localization round trip (reply → speech-to-text → voice → formatting).
+
+### Changed
+- **Numbers and dates in callouts are formatted for your reply language.** With a non-English
+  reply language, credits, distances and short dates in spoken and on-screen callouts use your
+  locale's separators — a balance reads `2.000.000` in German (or `2 000 000` in French) where
+  English says `2,000,000`, and a Community Goal ends `15. Juli` instead of `Jul 15`. Automatic
+  (driven off your reply language); nothing to set. English output is unchanged. ([#199])
+
+### Migration
+- Nothing to do. English (and any unmapped language) formats exactly as before.
+
 ## [0.22.0] — 2026-07-20
 
 An **Immerse & reach** release: your TTS voice now speaks your reply language too.
@@ -177,7 +192,8 @@ Feature and polish wave. See the
 Releases before 0.15.0 are listed on the
 [GitHub Releases page](https://github.com/dseelinger/CovasPlusPlus/releases).
 
-[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/dseelinger/CovasPlusPlus/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.23.0
 [0.22.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.22.0
 [0.21.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.21.0
 [0.20.0]: https://github.com/dseelinger/CovasPlusPlus/releases/tag/v0.20.0
@@ -236,4 +252,5 @@ Releases before 0.15.0 are listed on the
 [#190]: https://github.com/dseelinger/CovasPlusPlus/issues/190
 [#197]: https://github.com/dseelinger/CovasPlusPlus/issues/197
 [#198]: https://github.com/dseelinger/CovasPlusPlus/issues/198
+[#199]: https://github.com/dseelinger/CovasPlusPlus/issues/199
 [#206]: https://github.com/dseelinger/CovasPlusPlus/issues/206
