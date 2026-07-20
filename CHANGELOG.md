@@ -13,6 +13,23 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.21.0] — 2026-07-20
+
+An **Immerse & reach** release: speak to COVAS in your language and it now *hears* you in that
+language too — no extra setup.
+
+### Changed
+- **Speech-to-text follows your reply language automatically.** `[whisper].language` now ships as
+  `"follow"`, so setting **Reply language** to German (or French, Russian, Spanish, Portuguese)
+  also transcribes your speech in that language — no separate Whisper setting to change. English
+  installs are unchanged. If you set a non-English language, use a **multilingual** Whisper model
+  (e.g. `small`): a `.en` model is English-only and COVAS now warns you to switch rather than
+  transcribing poorly in silence. ([#197])
+
+### Migration
+- Nothing to do. Existing configs with an explicit `[whisper].language` (e.g. `en`) keep that
+  forced value; the new default only applies where the key is unset.
+
 ## [0.20.0] — 2026-07-20
 
 A **Foundation** release: a fully permissive speech-to-text stack. Nothing changes in how you talk
@@ -197,4 +214,5 @@ Releases before 0.15.0 are listed on the
 [#188]: https://github.com/dseelinger/CovasPlusPlus/issues/188
 [#189]: https://github.com/dseelinger/CovasPlusPlus/issues/189
 [#190]: https://github.com/dseelinger/CovasPlusPlus/issues/190
+[#197]: https://github.com/dseelinger/CovasPlusPlus/issues/197
 [#206]: https://github.com/dseelinger/CovasPlusPlus/issues/206
