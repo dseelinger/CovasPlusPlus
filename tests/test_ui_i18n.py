@@ -6,6 +6,8 @@ is GATED off until it ships a complete catalog (no half-translated panel). Stdli
 """
 from __future__ import annotations
 
+import pytest
+
 import covas.ui_i18n as ui
 
 
@@ -36,3 +38,48 @@ def test_ui_language_code_activates_a_shipped_catalog(monkeypatch):
 
 def test_available_ui_languages_is_english_only_by_default():
     assert ui.available_ui_languages() == ["en"]
+
+
+# ---- render guard: every wired template renders with t() resolved to English ----------------
+import covas.web as web            # noqa: E402
+import covas.setup_web as setup_web  # noqa: E402
+from flask import render_template  # noqa: E402
+
+
+class _Core:
+    cfg = {"language": {"reply": "English"}, "ui": {"port": 8765, "host": "127.0.0.1"}}
+
+
+# The templates wired through t() so far, each with a representative English string that must
+# survive rendering unchanged (the "English renders identically" guarantee, automated).
+_WIRED = {
+    "index.html": ["CONTROL PANEL", "Configuration", "Live Log"],
+    "settings.html": ["SETTINGS", "SAVE CHANGES", "Loading settings…"],
+    "checklist.html": ["CHECKLIST", "Ultimate checklist", ">SAVE<"],
+    "memory.html": ["MEMORY", "Add a memory", "No memories yet."],
+    "engineers.html": ["ENGINEERS", "Engineer unlock status"],
+    "macros.html": ["CUSTOM MACROS", "Author a macro", "SAVE MACRO"],
+    "crew.html": ["CREW", "Crew roster", "SAVE ROSTER"],
+    "_command_palette.html": ["navigate", "select", "esc close"],
+}
+
+
+@pytest.mark.parametrize("template,needles", list(_WIRED.items()))
+def test_wired_template_renders_english_without_t_leak(template, needles):
+    app = web.create_app(_Core())
+    with app.app_context(), app.test_request_context("/"):
+        html = render_template(template, theme="dark")
+    assert "{{ t(" not in html and "{{t(" not in html   # every t() resolved
+    for s in needles:
+        assert s in html, f"{s!r} missing from rendered {template}"
+
+
+def test_setup_wizard_renders_english_without_t_leak():
+    import threading
+    app = setup_web.create_setup_app({"ui": {"theme": "dark"}, "language": {"reply": "English"}},
+                                     threading.Event())
+    app.testing = True
+    html = app.test_client().get("/").get_data(as_text=True)
+    assert "{{ t(" not in html
+    for s in ("FIRST-RUN SETUP", "Save AI provider", "Launch COVAS++"):
+        assert s in html
