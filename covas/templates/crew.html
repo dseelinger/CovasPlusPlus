@@ -68,62 +68,50 @@
 <body>
 <header>
   <h1>COVAS++</h1>
-  <span class="sub">CREW</span>
-  <a href="/" class="sub">← control panel</a>
-  <a href="/settings" class="sub">⚙ settings</a>
-  <a href="/checklist" class="sub">☑ checklist</a>
-  <a href="/memory" class="sub">🧠 memory</a>
-  <a href="/engineers" class="sub">🔧 engineers</a>
+  <span class="sub">{{ t('CREW') }}</span>
+  <a href="/" class="sub">{{ t('← control panel') }}</a>
+  <a href="/settings" class="sub">{{ t('⚙ settings') }}</a>
+  <a href="/checklist" class="sub">{{ t('☑ checklist') }}</a>
+  <a href="/memory" class="sub">{{ t('🧠 memory') }}</a>
+  <a href="/engineers" class="sub">{{ t('🔧 engineers') }}</a>
   <span class="sub" id="fileName" style="margin-left:auto"></span>
 </header>
 
 <div class="wrap">
   <div class="banner" id="offBanner">
-    Interactive crew is currently <b>off</b>. Your roster is saved, but crew members won't speak
-    until you enable it on the <a href="/settings">settings</a> page (or say "turn crew on").
+    {{ t("Interactive crew is currently <b>off</b>. Your roster is saved, but crew members won't speak until you enable it on the <a href=\"/settings\">settings</a> page (or say \"turn crew on\").") | safe }}
   </div>
 
   <div class="card">
-    <h2>Crew roster</h2>
+    <h2>{{ t('Crew roster') }}</h2>
     <div class="hint">
-      Each character has a <b>name</b> (how the companion refers to them and their line prefix), an
-      optional <b>role</b> (a function like <i>Fighter pilot</i> or <i>Quartermaster</i>, woven into
-      the prompt so the model plays the part), an optional <b>personality</b>, and a <b>voice</b>.
-      Leave the voice on <i>Auto</i> to let COVAS++ pick a stable one deterministically, or pin a
-      specific cast voice.<br>
-      The <b>Name</b> box also suggests your <b>hired NPC fighter pilots</b> (from your journal):
-      pick one to <b>adopt</b> them — role and a generated personality are prefilled for you to edit.
-      Typing a custom name works exactly as before.<br>
-      Rosters are <b>per-ship</b> (issue #127): pick a ship below to give it its own crew. The ship
-      you're flying uses its own roster; ships without one inherit <b>Default</b>. Seed a new ship
-      fast with <b>Copy crew from…</b>. Your fleet comes from your journal (owned + current ship).
+      {{ t("Each character has a <b>name</b> (how the companion refers to them and their line prefix), an optional <b>role</b> (a function like <i>Fighter pilot</i> or <i>Quartermaster</i>, woven into the prompt so the model plays the part), an optional <b>personality</b>, and a <b>voice</b>. Leave the voice on <i>Auto</i> to let COVAS++ pick a stable one deterministically, or pin a specific cast voice.<br>The <b>Name</b> box also suggests your <b>hired NPC fighter pilots</b> (from your journal): pick one to <b>adopt</b> them — role and a generated personality are prefilled for you to edit. Typing a custom name works exactly as before.<br>Rosters are <b>per-ship</b> (issue #127): pick a ship below to give it its own crew. The ship you're flying uses its own roster; ships without one inherit <b>Default</b>. Seed a new ship fast with <b>Copy crew from…</b>. Your fleet comes from your journal (owned + current ship).") | safe }}
     </div>
     <div class="shipbar">
-      <label for="shipSel">EDITING ROSTER</label>
+      <label for="shipSel">{{ t('EDITING ROSTER') }}</label>
       <select id="shipSel"></select>
       <span class="seats" id="seats"></span>
       <span class="copybar">
-        <label for="copyFrom">COPY CREW FROM</label>
+        <label for="copyFrom">{{ t('COPY CREW FROM') }}</label>
         <select id="copyFrom"></select>
-        <button class="small" id="copyBtn">COPY</button>
+        <button class="small" id="copyBtn">{{ t('COPY') }}</button>
       </span>
     </div>
-    <p class="inherit" id="inherit">This ship currently inherits the <b>Default</b> roster — add a
-      character (or copy one in) to give it its own crew.</p>
+    <p class="inherit" id="inherit">{{ t('This ship currently inherits the <b>Default</b> roster — add a character (or copy one in) to give it its own crew.') | safe }}</p>
     <datalist id="hiredList"></datalist>
     <ul id="list" style="margin-top:12px"></ul>
-    <div class="empty" id="empty" style="display:none">No crew yet. Add a character to begin.</div>
+    <div class="empty" id="empty" style="display:none">{{ t('No crew yet. Add a character to begin.') }}</div>
     <div class="row" style="margin-top:12px">
-      <button id="addRow">+ ADD CHARACTER</button>
-      <button class="primary" id="save">SAVE ROSTER</button>
-      <button id="reload">RELOAD FROM DISK</button>
+      <button id="addRow">{{ t('+ ADD CHARACTER') }}</button>
+      <button class="primary" id="save">{{ t('SAVE ROSTER') }}</button>
+      <button id="reload">{{ t('RELOAD FROM DISK') }}</button>
       <span class="count" id="count"></span>
     </div>
     <span class="msg" id="msg"></span>
     <div class="conflict" id="conflict">
-      ⚠ The crew file changed on disk since you loaded it.<br>
-      <button id="reloadTheirs" class="small">RELOAD (discard my pending edits)</button>
-      <button id="overwrite" class="small danger">SAVE ANYWAY (overwrite)</button>
+      {{ t('⚠ The crew file changed on disk since you loaded it.') }}<br>
+      <button id="reloadTheirs" class="small">{{ t('RELOAD (discard my pending edits)') }}</button>
+      <button id="overwrite" class="small danger">{{ t('SAVE ANYWAY (overwrite)') }}</button>
     </div>
   </div>
 </div>

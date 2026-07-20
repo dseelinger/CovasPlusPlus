@@ -99,28 +99,28 @@
 </style>
 </head>
 <body>
-<a href="#main" class="skip-link">Skip to settings</a>
+<a href="#main" class="skip-link">{{ t('Skip to settings') }}</a>
 <header role="banner">
   <h1>COVAS++</h1>
-  <span class="sub">SETTINGS</span>
-  <a href="/" class="sub" style="color:var(--accent2)">← control panel</a>
-  <a href="/checklist" class="sub" style="color:var(--accent2);text-decoration:none">☑ checklist</a>
-  <a href="/memory" class="sub" style="color:var(--accent2);text-decoration:none">🧠 memory</a>
-  <a href="/crew" class="sub" style="color:var(--accent2);text-decoration:none">🎙 crew</a>
+  <span class="sub">{{ t('SETTINGS') }}</span>
+  <a href="/" class="sub" style="color:var(--accent2)">{{ t('← control panel') }}</a>
+  <a href="/checklist" class="sub" style="color:var(--accent2);text-decoration:none">{{ t('☑ checklist') }}</a>
+  <a href="/memory" class="sub" style="color:var(--accent2);text-decoration:none">{{ t('🧠 memory') }}</a>
+  <a href="/crew" class="sub" style="color:var(--accent2);text-decoration:none">{{ t('🎙 crew') }}</a>
   <span class="spacer"></span>
-  <label for="search" class="sr-only">Filter settings</label>
-  <input class="search" id="search" placeholder="Filter settings…" aria-label="Filter settings" autocomplete="off">
+  <label for="search" class="sr-only">{{ t('Filter settings') }}</label>
+  <input class="search" id="search" placeholder="{{ t('Filter settings…') }}" aria-label="{{ t('Filter settings') }}" autocomplete="off">
 </header>
 
 <div class="wrap">
-  <nav class="groups" id="groupNav" aria-label="Settings sections"></nav>
-  <main id="main"><div class="empty">Loading settings…</div></main>
+  <nav class="groups" id="groupNav" aria-label="{{ t('Settings sections') }}"></nav>
+  <main id="main"><div class="empty">{{ t('Loading settings…') }}</div></main>
 </div>
 
 <div class="savebar" id="savebar">
   <span class="count" id="dirtyCount"></span>
-  <button class="btn-revert" id="revertBtn">REVERT</button>
-  <button class="btn-save" id="saveBtn">SAVE CHANGES</button>
+  <button class="btn-revert" id="revertBtn">{{ t('REVERT') }}</button>
+  <button class="btn-save" id="saveBtn">{{ t('SAVE CHANGES') }}</button>
 </div>
 <div class="toast" id="toast"></div>
 

@@ -46,11 +46,11 @@
   <div class="cmdp">
     <div class="cmdp-searchrow">
       <span class="cmdp-mag">🔍</span>
-      <input class="cmdp-input" id="cmdpInput" type="text" placeholder="Search…" autocomplete="off" spellcheck="false">
-      <button class="cmdp-clear" id="cmdpClear" title="Clear">✕</button>
+      <input class="cmdp-input" id="cmdpInput" type="text" placeholder="{{ t('Search…') }}" autocomplete="off" spellcheck="false">
+      <button class="cmdp-clear" id="cmdpClear" title="{{ t('Clear') }}">✕</button>
     </div>
     <div class="cmdp-list" id="cmdpList"></div>
-    <div class="cmdp-foot"><span>↑↓ navigate</span><span>⏎ select</span><span>esc close</span></div>
+    <div class="cmdp-foot"><span>{{ t('↑↓ navigate') }}</span><span>{{ t('⏎ select') }}</span><span>{{ t('esc close') }}</span></div>
   </div>
 </div>
 <script>

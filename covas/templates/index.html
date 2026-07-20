@@ -124,81 +124,81 @@
 </style>
 </head>
 <body>
-<a href="#log" class="skip-link">Skip to the conversation log</a>
+<a href="#log" class="skip-link">{{ t('Skip to the conversation log') }}</a>
 <header role="banner">
   <h1>COVAS++</h1>
-  <span class="sub">CONTROL PANEL</span>
-  <nav aria-label="Control panel sections" class="sub">
-  <a href="/settings" class="sub" style="color:var(--accent2);text-decoration:none">⚙ settings</a>
-  <a href="/checklist" class="sub" style="color:var(--accent2);text-decoration:none">☑ checklist</a>
-  <a href="/memory" class="sub" style="color:var(--accent2);text-decoration:none">🧠 memory</a>
-  <a href="/crew" class="sub" style="color:var(--accent2);text-decoration:none">🎙 crew</a>
-  <a href="/macros" class="sub" style="color:var(--accent2);text-decoration:none">🎛 macros</a>
-  <a href="/engineers" class="sub" style="color:var(--accent2);text-decoration:none">🔧 engineers</a>
+  <span class="sub">{{ t('CONTROL PANEL') }}</span>
+  <nav aria-label="{{ t('Control panel sections') }}" class="sub">
+  <a href="/settings" class="sub" style="color:var(--accent2);text-decoration:none">{{ t('⚙ settings') }}</a>
+  <a href="/checklist" class="sub" style="color:var(--accent2);text-decoration:none">{{ t('☑ checklist') }}</a>
+  <a href="/memory" class="sub" style="color:var(--accent2);text-decoration:none">{{ t('🧠 memory') }}</a>
+  <a href="/crew" class="sub" style="color:var(--accent2);text-decoration:none">{{ t('🎙 crew') }}</a>
+  <a href="/macros" class="sub" style="color:var(--accent2);text-decoration:none">{{ t('🎛 macros') }}</a>
+  <a href="/engineers" class="sub" style="color:var(--accent2);text-decoration:none">{{ t('🔧 engineers') }}</a>
   </nav>
-  <div class="status" role="status" aria-live="polite" aria-label="Connection and companion status">
+  <div class="status" role="status" aria-live="polite" aria-label="{{ t('Connection and companion status') }}">
     <span class="dot" id="dot" aria-hidden="true"></span>
-    <span class="state-name" id="stateName">CONNECTING…</span>
+    <span class="state-name" id="stateName">{{ t('CONNECTING…') }}</span>
   </div>
 </header>
-<span class="verlabel" id="verLabel" title="COVAS++ version"></span>
+<span class="verlabel" id="verLabel" title="{{ t('COVAS++ version') }}"></span>
 
 <div class="banner" id="updateBanner">
   <span id="updateText"></span>
-  <button id="updateBtn">Update &amp; restart</button>
-  <button class="dismiss" id="updateDismiss" title="Dismiss">✕</button>
+  <button id="updateBtn">{{ t('Update & restart') }}</button>
+  <button class="dismiss" id="updateDismiss" title="{{ t('Dismiss') }}">✕</button>
 </div>
 
 <main class="wrap" id="main">
   <div class="leftcol">
     <div class="card">
-      <h2>Configuration</h2>
+      <h2>{{ t('Configuration') }}</h2>
       <!-- #86: the LLM + Speech blocks REFLECT the active [llm]/[tts].provider — rendered
            generically from the schema payload (see renderProviderBlock). Switch providers on
            the Settings page. -->
       <div class="pblock" id="llmBlock"></div>
-      <div class="row"><label>Whisper model</label><select id="whisper"></select></div>
+      <div class="row"><label>{{ t('Whisper model') }}</label><select id="whisper"></select></div>
       <div class="pblock" id="ttsBlock"></div>
-      <div class="row"><label id="personalityLabel">Personality</label><div class="toggle" id="personality" role="switch" tabindex="0" aria-checked="false" aria-labelledby="personalityLabel"><div class="knob"></div></div></div>
-      <button class="cancel" id="cancelBtn">■ CANCEL / STOP</button>
-      <div class="prow"><button id="openCues">OPEN CUES FOLDER</button><span class="pmsg" id="cuesMsg"></span></div>
-      <div class="prow"><button id="reloadCues">RELOAD CUES</button><span class="pmsg" id="cuesReloadMsg"></span></div>
+      <div class="row"><label id="personalityLabel">{{ t('Personality') }}</label><div class="toggle" id="personality" role="switch" tabindex="0" aria-checked="false" aria-labelledby="personalityLabel"><div class="knob"></div></div></div>
+      <button class="cancel" id="cancelBtn">{{ t('■ CANCEL / STOP') }}</button>
+      <div class="prow"><button id="openCues">{{ t('OPEN CUES FOLDER') }}</button><span class="pmsg" id="cuesMsg"></span></div>
+      <div class="prow"><button id="reloadCues">{{ t('RELOAD CUES') }}</button><span class="pmsg" id="cuesReloadMsg"></span></div>
       <div class="keys" id="keys"></div>
     </div>
 
     <div class="card">
-      <h2>Personality</h2>
-      <div class="row"><label>Persona</label><select id="persona"></select></div>
+      <h2>{{ t('Personality') }}</h2>
+      <div class="row"><label>{{ t('Persona') }}</label><select id="persona"></select></div>
       <div class="pv" id="personaPreview"></div>
       <textarea id="personaBody" class="pbox" spellcheck="false"></textarea>
-      <div class="prow"><button id="saveCustom">SAVE AS CUSTOM</button><span class="pmsg" id="personaMsg"></span></div>
-      <label class="plabel">Campaign — your Commander's personal facts (kept when you switch persona)</label>
-      <textarea id="campaign" class="pbox" spellcheck="false" placeholder="e.g. I'm CMDR …, Elite in exploration, I fly an Anaconda named …"></textarea>
-      <div class="prow"><button id="saveCampaign">SAVE CAMPAIGN</button><span class="pmsg" id="campaignMsg"></span></div>
+      <div class="prow"><button id="saveCustom">{{ t('SAVE AS CUSTOM') }}</button><span class="pmsg" id="personaMsg"></span></div>
+      <label class="plabel">{{ t("Campaign — your Commander's personal facts (kept when you switch persona)") }}</label>
+      <textarea id="campaign" class="pbox" spellcheck="false" placeholder="{{ t("e.g. I'm CMDR …, Elite in exploration, I fly an Anaconda named …") }}"></textarea>
+      <div class="prow"><button id="saveCampaign">{{ t('SAVE CAMPAIGN') }}</button><span class="pmsg" id="campaignMsg"></span></div>
     </div>
   </div>
 
   <div class="card">
-    <h2>Live Log <span class="logfilter"><a id="copyLog" role="button" tabindex="0" title="Copy the whole log to the clipboard (respects the Conversation/All filter)">Copy log</a> · <a id="fConv" role="button" tabindex="0">Conversation</a> · <a id="fAll" role="button" tabindex="0">All</a></span></h2>
+    <h2>{{ t('Live Log') }} <span class="logfilter"><a id="copyLog" role="button" tabindex="0" title="{{ t('Copy the whole log to the clipboard (respects the Conversation/All filter)') }}">{{ t('Copy log') }}</a> · <a id="fConv" role="button" tabindex="0">{{ t('Conversation') }}</a> · <a id="fAll" role="button" tabindex="0">{{ t('All') }}</a></span></h2>
     <!-- #76 + #184: type to COVAS (no mic) — a first-class TEXT input, not a fallback. Enter or ✈
          sends a full normal turn; the reply appears in the live log below (also announced to a
          screen reader via aria-live, so text mode fully serves non-verbal/deaf/blind Commanders). -->
-    <label for="promptInput" class="sr-only">Type a message to COVAS</label>
+    <label for="promptInput" class="sr-only">{{ t('Type a message to COVAS') }}</label>
     <div class="promptrow">
-      <input type="text" id="promptInput" placeholder="Type a message to COVAS…"
-             aria-label="Type a message to COVAS" autocomplete="off" spellcheck="false">
-      <button id="promptSend" title="Send (Enter)" aria-label="Send prompt">&#9992;</button>
+      <input type="text" id="promptInput" placeholder="{{ t('Type a message to COVAS…') }}"
+             aria-label="{{ t('Type a message to COVAS') }}" autocomplete="off" spellcheck="false">
+      <button id="promptSend" title="{{ t('Send (Enter)') }}" aria-label="{{ t('Send prompt') }}">&#9992;</button>
     </div>
     <div class="logwrap">
       <div class="log" id="log" role="log" aria-live="polite"
-           aria-label="Conversation and status log — what COVAS hears and says"></div>
-      <button type="button" class="jumpLatest" id="jumpLatest" title="Jump to the latest log line">↓ Jump to latest</button>
+           aria-label="{{ t('Conversation and status log — what COVAS hears and says') }}"></div>
+      <button type="button" class="jumpLatest" id="jumpLatest" title="{{ t('Jump to the latest log line') }}">{{ t('↓ Jump to latest') }}</button>
     </div>
   </div>
 </main>
 
 <!-- #75: fallback right-click menu for a text selection, since the packaged webview eats the native one -->
-<div class="selmenu" id="selMenu"><button type="button" id="selMenuCopy">Copy</button></div>
+<div class="selmenu" id="selMenu"><button type="button" id="selMenuCopy">{{ t('Copy') }}</button></div>
 
 <script>
 // Status-dot colours live in theme.css as var(--state-*) so each theme can retune them. Resolve
