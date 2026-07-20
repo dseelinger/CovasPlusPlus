@@ -2249,13 +2249,19 @@ product-pillar justification (mostly **Foundation**) before it becomes one.
   the active UI language, which follows `[language].reply` **but only when a complete catalog exists**
   — `CATALOGS` ships English-only, so a non-English reply language yields a fully-English panel, never
   a half-translated one (the epic's gate, enforced in code, not just discipline). We deliberately ship
-  the **extraction mechanism + English baseline only**, no machine translations; a human contributes a
-  language by adding one catalog dict (`docs/using/translating-the-ui.md`). Scope: the server-rendered
-  chrome of every panel + the wizard is wired; **JS-built strings** (live status/log/provider blocks in
-  each page's inline script) and the **settings-schema** label/help/category text (rendered client-side
-  from the API payload) localize at those layers and are a documented follow-up on the same mechanism.
+  the extraction mechanism + English baseline first, then **filled in the curated set**: layer 2 now
+  ships complete catalogs for all five curated languages (German/French/Russian/Spanish/Portuguese)
+  as `covas/translations/<code>.json` — flat `{english source: translation}` maps that `ui_i18n`
+  auto-discovers and registers, gated so a language activates only when its catalog covers **every**
+  template key (a test enforces exact coverage; a missing key would fall back to English). These five
+  are **LLM-authored, native-speaker review pending** (flagged in `docs/using/language.md`); HTML
+  tags, `[section].key` config tokens, URLs and ED/brand proper nouns are preserved verbatim per
+  catalog. Scope still excludes **JS-built strings** (live status/log/provider blocks in each page's
+  inline script) and the **settings-schema** label/help/category text (rendered client-side from the
+  API payload) — both localize at those layers and remain a documented follow-up on the same mechanism.
   With this, **every child layer of #182 is delivered** (1: UI strings; 2: STT; 3: voice; 4: reply;
-  5: formatting) — the epic's remaining work is completing the actual per-language catalogs.
+  5: formatting) and the curated languages are UI-localized end to end; the epic's remaining work is
+  native review of the five catalogs plus the JS/schema follow-up.
 - **Accessibility, both directions (Foundation).** ✅ **Done (#184).** Voice-first helps
   motor/vision-impaired players and walls off deaf/HoH/non-verbal ones — so text is now a
   **first-class input path, not a TTS-failure fallback**: the typed-prompt box (#76) is documented
