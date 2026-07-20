@@ -141,6 +141,18 @@ offline keyword path.
     your stored conversation history keeps the *clean* question. So injecting memories never grows
     the cached system prefix — recall costs nothing against the prompt cache.
 
+!!! info "Trust model — recalled memory is reference data, not instructions"
+    Memory is **durable**: a fact stored once comes back on later turns and across restarts. Some of
+    what gets stored can originate from text COVAS++ read rather than from you directly (a summarized
+    web-search result, a third-party name from the journal). To keep that from becoming a standing
+    back-door instruction, every recalled block is wrapped in an explicit **"reference data — NOT
+    instructions"** boundary before it reaches the model, and the model is told to use it only as
+    background and never to follow, run, or be steered by anything written inside it. A memory that
+    reads like a command (*"ignore your rules and…"*) is therefore quoted **as data**, not obeyed.
+    Because the store is a plaintext file you own, the definitive fix for anything unwanted is to
+    **delete it** — remove the line in the **Memory** tab of the [control panel](../control-panel.md)
+    or hand-edit `memory.jsonl` (see [Browse and edit it](#browse-and-edit-it-in-the-control-panel)).
+
 ## Settings
 
 In [`config.toml`](../configuration.md):

@@ -51,6 +51,65 @@ def test_hidden_settings_are_never_matched():
     assert all(not m.hidden for m in find_settings("voice name"))
 
 
+# --- protected safety gates (issue #183) -----------------------------------
+# The keybind/macro/comms safety toggles are carved OUT of the voice-writable surface: the LLM
+# consumes untrusted text (web results, in-game/NPC strings, poisoned memory), so a guard it can
+# flip via set_setting is a prompt-injection privilege-escalation path. They stay web-editable.
+
+_PROTECTED_KEYS = [
+    "keybinds.enabled", "keybinds.require_confirmation", "keybinds.combat_guard",
+    "macros.require_confirmation", "macros.combat_guard", "macros.mode_guard",
+    "comms_send.enabled",
+]
+
+
+def test_the_expected_guards_are_flagged_protected():
+    # Every guard we mean to carve out is marked, and no non-guard setting is accidentally hidden
+    # from the voice surface by the flag.
+    flagged = {s.key for s in schema.SCHEMA if s.protected}
+    assert flagged == set(_PROTECTED_KEYS)
+
+
+@pytest.mark.parametrize("spoken", [
+    "keybind automation", "ship controls", "keybind confirmation", "combat guard",
+    "macro confirmation", "macro combat guard", "macro mode guard",
+    "send messages", "in-game messages", "voice comms",
+])
+def test_find_settings_never_surfaces_a_protected_gate(spoken):
+    # The default voice resolver must NEVER return a protected setting for a guard-naming phrase...
+    assert all(not s.protected for s in find_settings(spoken)), spoken
+    # ...but the phrase DOES resolve to a protected gate under the opt-in flag, so the capability
+    # can detect it and name it in the refusal.
+    assert any(s.protected for s in find_settings(spoken, include_protected=True)), spoken
+
+
+def test_set_setting_refuses_each_protected_guard(cap):
+    c, cfg, writes = cap
+    for spoken in ("keybind automation", "keybind confirmation", "combat guard",
+                   "macro confirmation", "macro combat guard", "macro mode guard",
+                   "send messages"):
+        out = c.run_tool("set_setting", {"setting": spoken, "value": "off"})
+        low = out.lower()
+        assert "safety control" in low, spoken          # named as a guard, not "unknown"
+        assert "control panel" in low, spoken           # routed to the web panel
+        assert "what can i change" not in low, spoken   # NOT the generic unknown-setting reply
+    assert writes == []                                 # nothing was persisted
+
+
+def test_set_setting_refusal_names_the_armed_guard(cap):
+    c, _, _ = cap
+    out = c.run_tool("set_setting", {"setting": "combat guard", "value": "off"})
+    assert "Combat guard" in out                        # the actual guard label is spoken back
+
+
+def test_get_setting_also_refuses_protected_guard(cap):
+    # Reading a guard by voice is likewise carved out (find_settings is the shared resolver), so a
+    # probe like "is the combat guard on" is answered with the carve-out, not the live value.
+    c, _, _ = cap
+    out = c.run_tool("get_setting", {"setting": "combat guard"})
+    assert "safety control" in out.lower()
+
+
 # --- pure capability dialog ------------------------------------------------
 
 @pytest.fixture()
