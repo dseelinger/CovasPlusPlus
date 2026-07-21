@@ -1,0 +1,78 @@
+# Build the Windows installer and attach it to the GitHub Release.
+#
+# WHY: the docs (docs/getting-started/install.md) tell users to "grab the latest
+# COVAS++ Setup.exe from the Releases page" — but a release is source-only unless
+# something uploads that asset. build.ps1 already produces it; this workflow runs
+# build.ps1 on a Windows runner and uploads the result to the release, so the docs
+# are true for every version.
+#
+# Triggers:
+#   * release: published    — the normal path. Publish a release (gh release create /
+#                             the Releases UI) and CI attaches "COVAS++ Setup.exe" to it.
+#   * workflow_dispatch      — manual. Pass a tag to (re)build and attach to an EXISTING
+#                             release — used to backfill releases cut before this workflow
+#                             existed (e.g. v0.25.0).
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build and attach the installer to (e.g. v0.25.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write        # upload the built installer as a release asset
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v4
+        with:
+          # For a release trigger, build the exact commit the release points at; for a
+          # manual run, build that tag. Either way the frozen version matches the release.
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+
+      - name: Create the .venv build.ps1 expects
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python.exe -m pip install --upgrade pip
+          # build deps (freeze/installer) + dev deps (pytest) so we can gate on tests below.
+          .venv\Scripts\python.exe -m pip install -r requirements-build.txt -r requirements-dev.txt
+
+      - name: Run unit tests (offline, free — gates the build)
+        # Bare pytest is unit-only by config (addopts = -m 'not integration'): no network,
+        # no paid APIs, no hardware. A test failure fails the job BEFORE we freeze or upload,
+        # so a broken commit never ships an installer.
+        run: .venv\Scripts\python.exe -m pytest
+
+      - name: Install Inno Setup (ISCC)
+        run: choco install innosetup --no-progress -y
+
+      - name: Freeze, self-test, and compile the installer
+        run: .\build.ps1 -Installer -SelfTest
+
+      - name: Attach installer to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # release trigger provides the tag; manual run passes it as an input.
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          $asset = "dist\installer\COVAS++ Setup.exe"
+          if (-not (Test-Path $asset)) { throw "installer not found at $asset" }
+          $mb = [math]::Round((Get-Item $asset).Length / 1MB, 1)
+          Write-Host "Uploading $asset ($mb MB) to release $env:TAG"
+          # --clobber so a re-run (or a manual backfill) replaces an existing asset in place.
+          gh release upload "$env:TAG" "$asset" --clobber
