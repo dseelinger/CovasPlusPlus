@@ -619,6 +619,42 @@ Notes:
 
 Notes:
 
+### 5.4b Ship loadout & engineering by voice (N9)  🎮 ED 🔊 HW 📝 checklist
+> Reads your **current** ship's fitted modules and engineering from the live journal loadout
+> (the `LoadoutSnapshot` the watcher keeps on `EDContext`, `ed/loadout.py`) via three LLM-native
+> tools — `ship_engineering`, `list_experimental_effects`, `ship_modules`. Everything spoken comes
+> from the snapshot plus the offline symbol→name tables, so a module can only be named if it's
+> **genuinely fitted** and every stat comes from the journal's own `Modifiers` — nothing invented.
+> Needs `[elite].enabled = true`; **board your ship / open outfitting once** so a `Loadout` event
+> has been seen. (Distinct from §5.4 material *sourcing* and §9a-3 per-ship engineering *planning*.)
+- [ ] **Engineering on a named module:** *"What's the engineering on my FSD?"* → names the
+      **blueprint + grade**, the **experimental effect** (if any), and the **key modified stats**
+      (spoken as `+N% <stat>` fragments). Cross-check a couple against the in-game module panel — the
+      figures come from the journal, not invented numbers.
+- [ ] **Broad match is capped:** ask by a class name that matches several (*"what's the engineering
+      on my lasers"*) → it reads a few (not an endless list) and names each.
+- [ ] **Whole-ship engineering rundown:** *"How is my ship engineered?"* (no module named) → one line
+      per **engineered** module. A fully stock ship says every module is stock — no fabricated grades.
+- [ ] **Experimental effects:** *"What experimental effects do I have?"* → each experimental effect
+      and the module it's on; none fitted → an honest "no experimental effects" (not silence).
+- [ ] **Fitted-modules rundown:** *"What's fitted on my ship?"* → grouped **hardpoints / utilities /
+      core / optional internals**, duplicates **collapsed** (*"3 medium Multi-Cannon"*), engineered
+      items marked **(engineered)**, ending with the **max jump range**. Ask for one (*"what shield
+      generator am I running?"*) → just that module's detail.
+- [ ] **Switched-off / damaged notes:** a module that's **powered off** or **damaged** in-game reads
+      back with that note (e.g. *"(switched off)"*, *"(damaged, 82%)"*).
+- [ ] **No invented module (grounding):** ask about something **not fitted** (*"what's on my mining
+      laser"* on a combat build) → it does **NOT** pretend; it says it doesn't see that and names a
+      few modules you **do** have, so you can re-ask.
+- [ ] **No loadout yet (honest when blind):** on a fresh session before any `Loadout` event →
+      *"what's on my FSD"* → the *"I haven't read your ship's loadout yet…"* prompt, never a guess.
+- [ ] **Upgrade advice → checklist offer (cross-capability):** *"What should I upgrade on my FSD?"* →
+      it reasons over the **real** loadout and **offers** to add a specific upgrade to your checklist,
+      adding it **only if you say yes** (via `add_objective`), never unasked. For "best current meta"
+      it uses **web search** and admits uncertainty rather than inventing blueprint effects.
+
+Notes:
+
 ## 6. Ship controls — keybinds, auto-honk & comms  🎮 ED ⌨️ INJECT 🔊 HW
 > These send **real keypresses** into ED. Keybinds/auto-honk need `[elite].enabled = true` (combat guard) — do them **parked/docked and safe**. Comms send (§6.4) needs no ED monitoring but is **outward-facing**, so test it in a quiet/solo instance.
 
@@ -949,6 +985,30 @@ Notes:
 - [ ] **Already-there rule:** if the nearest match is a body **in your current system**, it says you're already there and does **NOT** copy.
 - [ ] **Near-override copies (not "already there"):** from a system that is NOT the target, ask *"…near \<other system\>"* where that system itself is the top match (distance 0 from the reference) → it **copies** the target and does **not** wrongly say "you're already there". (Applies to every `near X` search — systems, stations, factions, signals, faction states, bodies.)
 - [ ] **Fail-soft:** with the internet briefly off, ask for a body → a spoken "couldn't reach the bodies database" note, and the voice loop keeps working (no crash).
+
+Notes:
+
+## 8f. Copy to clipboard by voice (N11)  🔊 HW 📋 clipboard
+> A **general** "copy that to my clipboard" command (`copy_to_clipboard`): the **model** resolves
+> what "that" refers to from the recent conversation and copies the **exact value** — there's no
+> parsing/reference heuristic here, the conversation history is the state. Distinct from the search
+> tools' built-in result-copy and from §9's fixed `copy_current_system`; this copies **anything the
+> companion just named** (a system, station, ship, coordinates). Clipboard access is injected, so
+> the default `pytest` run never touches the real clipboard.
+- [ ] **Copy a conversational referent:** get COVAS to **name** something mid-conversation (e.g. ask
+      it about a station or a ship, no search-copy involved), then *"copy that to my clipboard"* → it
+      copies the **exact name** (just the value, **not** the whole sentence) and confirms *"Copied …
+      to your clipboard."* **Paste** (Ctrl-V) to verify the value landed.
+- [ ] **Right referent among several:** after a reply mentioning multiple things, *"copy the station
+      name"* vs *"copy that system"* → it copies the **correct** one, and the spoken confirmation
+      names exactly what it copied.
+- [ ] **Explicit request is always honoured:** *"copy that"* referring to a value it just gave copies
+      it even if it's your **current** system — an explicit copy does **not** apply the search tools'
+      skip-when-already-there rule (contrast §8e / §9.1, where an *unrequested* copy is suppressed).
+- [ ] **Empty referent:** *"copy that"* with nothing copyable in context → it **asks what to copy**
+      rather than copying a sentence or guessing.
+- [ ] **Fail-soft:** it never crashes the loop — if the clipboard can't be reached the failure is
+      **spoken** (with the text read aloud), never raised.
 
 Notes:
 
@@ -1987,6 +2047,31 @@ Notes:
 - [ ] `.venv\Scripts\python.exe check_setup.py` → the **Game data freshness** section shows no `[warn]` (nothing older than ~6 months).
 - [ ] `pytest` is green, then commit the regenerated data + manifest as part of release prep.
 
+### 19.0b Release automation — CI builds & attaches the installer (PR #213)  🌍 NET
+> Cutting a release must leave a **downloadable installer on the Releases page**, not a source-only
+> tag (the "Source code (zip/tar.gz)" links GitHub auto-generates are **not** the app).
+> `.github/workflows/release.yml` closes that gap: on a **published** release it creates the `.venv`
+> `build.ps1` expects, installs the build **+ dev** deps, runs the **offline unit suite as a gate**,
+> then `build.ps1 -Installer -SelfTest` (freeze → frozen `--selftest` → Inno Setup compile) and
+> `gh release upload`s the installer to that release. It uses the built-in `github.token` (no
+> secrets) and the build stays **unsigned by design** — SmartScreen still warns (that's §19.1).
+- [ ] **Publish → asset attached:** publish a release (Releases UI or `gh release create`) → the
+  **release** workflow runs **green** (Actions tab) and, within a few minutes, the installer appears
+  as a **release asset** on that release's page. GitHub stores the space in the name as a dot, so the
+  asset reads **`COVAS++.Setup.exe`** (same file the docs call `COVAS++ Setup.exe`).
+- [ ] **Tests gate the build:** the **Run unit tests** step runs *before* the freeze; a red unit
+  suite **fails the job before** any installer is built or uploaded — a broken commit never ships an
+  installer. (Sanity-check: the job log shows the `pytest` step passing ahead of the freeze step.)
+- [ ] **Backfill / rebuild an existing release (manual dispatch):** Actions → **release** → *Run
+  workflow* → enter an existing tag (e.g. `v0.25.0`) → the same build runs and `--clobber`s the
+  asset onto that release (replaces in place on a re-run). Used once to backfill releases cut before
+  this workflow existed.
+- [ ] **Version matches the tag:** install the attached `COVAS++.Setup.exe` → the Setup wizard title
+  / **Apps & features** entry shows the **release tag's version** (the workflow checks out the tagged
+  commit, so the frozen `covas/__version__.py` matches — no drift between tag and installer).
+
+Notes:
+
 ### 19.0 Provider bundle & default-voice self-test (issue #20)  📦 🔊 HW 🌍 NET
 > The multi-provider epic (#10) added swappable providers imported **lazily** from
 > `covas/providers/factory.py`, and **Edge (`edge-tts`) is the default TTS**. A lazy import the
@@ -2028,7 +2113,7 @@ Notes:
 Notes:
 
 ### 19.1 Install (clean VM)  📦 🖥️
-- [ ] Download **`COVAS++ Setup.exe`** from the Releases page → SmartScreen shows *"unknown publisher"* → **More info → Run anyway** installs (documented, expected).
+- [ ] Download the installer asset (**`COVAS++.Setup.exe`** — CI-attached, §19.0b) from the Releases page → SmartScreen shows *"unknown publisher"* → **More info → Run anyway** installs (documented, expected).
 - [ ] The installer runs **per-user with NO admin/UAC prompt** (installs to `%LOCALAPPDATA%\Programs\COVAS++`).
 - [ ] It creates a **Start-menu entry** and a **desktop icon** (custom icon, not the generic exe icon), and registers an uninstaller.
 
