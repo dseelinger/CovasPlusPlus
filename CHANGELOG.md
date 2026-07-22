@@ -13,6 +13,21 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.25.1] — 2026-07-22
+
+A **Foundation** patch: the Releases page finally hands you an installer.
+
+### Fixed
+- **The Releases page now actually carries the Windows installer.** The install docs pointed you to
+  a `COVAS++ Setup.exe` download that never existed — every release was source-only. A new CI
+  workflow builds the frozen app and Inno Setup installer on each **published** release and attaches
+  it (gated on the unit suite, so a broken commit never ships), so the download the docs promise is
+  really there. The build stays unsigned by design — SmartScreen still warns on first run. ([#213])
+
+### Migration
+- Nothing to do. If you've been running from source, you're unaffected; installer users can now
+  update straight from the Releases page.
+
 ## [0.25.0] — 2026-07-20
 
 An **Immerse & reach** release: the control panel now speaks your language.
@@ -287,3 +302,4 @@ Releases before 0.15.0 are listed on the
 [#196]: https://github.com/dseelinger/CovasPlusPlus/issues/196
 [#199]: https://github.com/dseelinger/CovasPlusPlus/issues/199
 [#206]: https://github.com/dseelinger/CovasPlusPlus/issues/206
+[#213]: https://github.com/dseelinger/CovasPlusPlus/issues/213
