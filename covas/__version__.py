@@ -4,4 +4,4 @@ Two consumers: the runtime update-check (`covas/updates.py`) compares this again
 latest GitHub Release tag, and the eventual PyInstaller/Inno build stamps the installer
 from it. Bump this — nothing else — to cut a release.
 """
-__version__ = "0.25.1"
+__version__ = "0.25.2"

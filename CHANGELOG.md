@@ -13,6 +13,27 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.25.2] — 2026-07-23
+
+A **Foundation** patch: automated tests now guard every change, not just releases.
+
+### Changed
+- **CI runs lint + unit tests on every PR and every push to `main`.** Until now the test suite
+  only ran when an installer was cut, so `main` could move with no test run at all and `ruff` —
+  though configured — was never actually enforced. A new workflow makes **`ruff check .` →
+  byte-compile → unit `pytest`** a required merge gate, with a separate best-effort job for the
+  free integration set. The ruff rule set is pinned so a future ruff release can't silently
+  change what the gate enforces. ([#215])
+
+### Fixed
+- **Corrected a latent bug in the system RAM probe** surfaced by the newly-enforced linter: the
+  non-Windows fallback referenced an unimported name and would have quietly failed. Windows users
+  were never affected. ([#215])
+
+### Migration
+- Nothing to do — this release changes only the project's own CI and developer tooling; the app
+  itself is unchanged.
+
 ## [0.25.1] — 2026-07-22
 
 A **Foundation** patch: the Releases page finally hands you an installer.
@@ -303,3 +324,4 @@ Releases before 0.15.0 are listed on the
 [#199]: https://github.com/dseelinger/CovasPlusPlus/issues/199
 [#206]: https://github.com/dseelinger/CovasPlusPlus/issues/206
 [#213]: https://github.com/dseelinger/CovasPlusPlus/issues/213
+[#215]: https://github.com/dseelinger/CovasPlusPlus/issues/215
