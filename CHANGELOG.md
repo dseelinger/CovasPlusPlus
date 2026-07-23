@@ -13,6 +13,21 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.25.3] — 2026-07-23
+
+A **Foundation** patch — **test-only; the shipped app is byte-for-byte unchanged from 0.25.2.**
+
+### Changed
+- **Hardened the transient-outage test coverage** feeding the #215 CI gate. An audit for #217
+  confirmed the retry/backoff and bad-journal-line behaviours were already well covered; this adds
+  the one missing seam — a provider *exhausting* its retries (repeated 503s) surfacing the degraded
+  "service is overloaded" signal through the real OpenAI/Gemini connect paths, plus Gemini
+  retry-then-recover parity. `scripts/flaky_llm_stub.py` is reduced to an optional live-hardware
+  smoke aid, its cases now mapped to the automated tests that supersede it. ([#217])
+
+### Migration
+- Nothing to do — no runtime code changed.
+
 ## [0.25.2] — 2026-07-23
 
 A **Foundation** patch: automated tests now guard every change, not just releases.
@@ -325,3 +340,4 @@ Releases before 0.15.0 are listed on the
 [#206]: https://github.com/dseelinger/CovasPlusPlus/issues/206
 [#213]: https://github.com/dseelinger/CovasPlusPlus/issues/213
 [#215]: https://github.com/dseelinger/CovasPlusPlus/issues/215
+[#217]: https://github.com/dseelinger/CovasPlusPlus/issues/217
