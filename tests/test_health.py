@@ -8,7 +8,8 @@ from __future__ import annotations
 import covas.health as health
 from covas.health import (HealthReport, run_health, friendly_provider_error,
                           check_anthropic, check_audio, check_keys_and_files,
-                          check_updates, check_system, OK, WARN, FAIL)
+                          check_datasets, check_updates, check_system, OK, WARN, FAIL)
+from covas.nav.datasets import DatasetInfo
 from covas.providers._retry import ProviderError
 
 
@@ -172,3 +173,60 @@ def test_run_health_offline_produces_a_report(monkeypatch):
     # No network sections when network=False.
     assert "Anthropic" not in titles
     assert isinstance(report.to_dict(), dict)
+
+
+# --- game-data freshness section (issue #219) ------------------------------
+# The Test-my-setup "Game data freshness" section is the installed-app replacement for the old
+# `check_setup.py` freshness step retired from MANUAL_TESTS §7.3/§0.1 in the #216 re-scope. The
+# underlying stale_datasets math is tested in test_game_data_status_capability.py; these lock the
+# health-report rendering (a stale dataset surfaces a WARN, fresh ones OK, fail-soft on error).
+def _dataset(name, generated_at, rows=100):
+    return DatasetInfo(name=name, source="src", source_ref="ref",
+                       generated_at=generated_at, row_count=rows)
+
+
+def test_datasets_freshness_flags_stale_and_passes_fresh(monkeypatch):
+    fresh = _dataset("ship_specs", "2026-06-01")
+    stale = _dataset("ship_roster", "2020-01-01")
+    monkeypatch.setattr("covas.nav.datasets.load_manifest", lambda: (fresh, stale))
+    monkeypatch.setattr("covas.nav.datasets.stale_datasets", lambda max_age: [stale])
+
+    r = HealthReport()
+    check_datasets(r)
+    checks = r.sections[-1].checks
+    status_for = {c.label.split(":")[0]: c.status for c in checks if ":" in c.label}
+    assert status_for["ship specifications"] == OK
+    assert status_for["ship roster (names)"] == WARN
+    assert any(c.status == WARN and "over 6 months" in c.label for c in checks)  # summary nudge
+
+
+def test_datasets_freshness_all_fresh_has_no_summary_warn(monkeypatch):
+    fresh1 = _dataset("ship_specs", "2026-06-01")
+    fresh2 = _dataset("module_taxonomy", "2026-06-15")
+    monkeypatch.setattr("covas.nav.datasets.load_manifest", lambda: (fresh1, fresh2))
+    monkeypatch.setattr("covas.nav.datasets.stale_datasets", lambda max_age: [])
+
+    r = HealthReport()
+    check_datasets(r)
+    checks = r.sections[-1].checks
+    assert checks and all(c.status == OK for c in checks)
+    assert not any("over 6 months" in c.label for c in checks)
+
+
+def test_datasets_freshness_no_manifest_warns(monkeypatch):
+    monkeypatch.setattr("covas.nav.datasets.load_manifest", lambda: ())
+    r = HealthReport()
+    check_datasets(r)
+    c = r.sections[-1].checks[0]
+    assert c.status == WARN and "No dataset manifest" in c.label
+
+
+def test_datasets_freshness_is_fail_soft(monkeypatch):
+    """A crash in the probe must never fail the report — it degrades to a WARN 'skipped' line."""
+    def _boom():
+        raise RuntimeError("disk gone")
+    monkeypatch.setattr("covas.nav.datasets.load_manifest", _boom)
+    r = HealthReport()
+    check_datasets(r)  # must not raise
+    c = r.sections[-1].checks[0]
+    assert c.status == WARN and "skipped" in c.label.lower()
