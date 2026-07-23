@@ -1,0 +1,96 @@
+# Gate every PR and every push to main on the offline checks: lint + byte-compile + unit tests.
+#
+# WHY: the suite already existed (tests/, marker-split in pyproject.toml) but only ran inside
+# release.yml, gated on `release: published` — so a PR could merge and main could move with NO
+# test run, ruff was configured but never enforced, and the free integration set never ran in CI
+# at all (issue #215). This workflow makes the unit + lint checks the required merge gate.
+#
+# Runner: windows-latest, mirroring the proven setup in release.yml. COVAS++ is a Windows app and
+# several runtime deps lean Windows-only (keyboard, openvr, sounddevice), so a Linux unit job would
+# need an import audit first — deferred; windows-latest is the safe, known-green choice.
+name: tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch/PR supersedes an in-flight run — don't burn minutes on stale commits.
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The REQUIRED gate. Red here blocks merge (set as a required check in Settings -> Branches).
+  unit:
+    name: lint + compile + unit
+    runs-on: windows-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Create the .venv and install dev deps
+        # requirements-dev.txt is a superset of the runtime env (pytest + ruff on top of
+        # requirements.txt). Build-only deps (pyinstaller/pywebview) aren't needed to run tests.
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python.exe -m pip install --upgrade pip
+          .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        # Rule set is pinned in pyproject.toml ([tool.ruff.lint] select) so a ruff bump can't
+        # flip this red — see the note there.
+        run: .venv\Scripts\python.exe -m ruff check .
+
+      - name: Byte-compile
+        run: .venv\Scripts\python.exe -m compileall covas
+
+      - name: Unit tests (offline, free)
+        # Bare pytest is unit-only by config (addopts = -m 'not integration'): no network, no
+        # paid APIs, no hardware. This is the merge gate.
+        run: .venv\Scripts\python.exe -m pytest
+
+  # Best-effort, NON-blocking. The free integration set (Piper/Whisper/audio/network) is opt-in
+  # locally; on a hosted runner there is no audio playback device and no provider keys, so some of
+  # it can't run. Until the headless subset is audited (issue #215 open question), this job runs the
+  # marker set for signal but never blocks a merge — only the `unit` job above is a required check.
+  # Paid integration (-m paid) is NEVER run in CI.
+  integration-local:
+    name: free integration (best-effort)
+    runs-on: windows-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Create the .venv and install dev deps
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python.exe -m pip install --upgrade pip
+          .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+
+      - name: Free integration tests (report-only)
+        # continue-on-error: a failure/skip here annotates the run but does NOT fail the workflow.
+        continue-on-error: true
+        run: .venv\Scripts\python.exe -m pytest -m "integration and local"

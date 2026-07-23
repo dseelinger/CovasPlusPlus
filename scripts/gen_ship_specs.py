@@ -169,7 +169,7 @@ def main() -> None:
         raise SystemExit(
             "Unmatched coriolis ship file(s) — new FDev hull(s)? Regenerate the roster "
             "(scripts/gen_ship_roster.py --fetch) so these get a canonical id, or add a "
-            f"_NAME_EXCEPTIONS override:\n  " + "\n  ".join(unmatched))
+            "_NAME_EXCEPTIONS override:\n  " + "\n  ".join(unmatched))
     rows.sort(key=lambda r: r["id"])
 
     lines = [

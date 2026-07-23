@@ -245,7 +245,7 @@ class EngineersCapability:
     def _specialties(self, eng: Engineer, n: int = 5) -> str:
         specs = list(eng.specialties)
         head = ", ".join(specs[:n])
-        return head + (f", and more" if len(specs) > n else "")
+        return head + (", and more" if len(specs) > n else "")
 
     def _deliver(self, eng: Engineer) -> str:
         """Copy the engineer's system for plotting, unless the Commander is already there."""

@@ -7,9 +7,7 @@ and the seat cap (§5) truncating a per-ship save. The client JS is exercised by
 """
 from __future__ import annotations
 
-import json
 
-import pytest
 
 from covas import config, crew
 from covas.app import App

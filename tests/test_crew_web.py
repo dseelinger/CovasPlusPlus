@@ -13,7 +13,6 @@ what these tests lock is every server guarantee:
 """
 from __future__ import annotations
 
-import json
 
 import pytest
 

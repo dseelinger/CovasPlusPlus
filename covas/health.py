@@ -355,6 +355,7 @@ def _probe_ram_gb() -> Optional[float]:
         return stat.ullTotalPhys / (1024 ** 3)
     except Exception:  # noqa: BLE001 — not Windows, or the call failed
         try:
+            import os  # local, like the ctypes import above — only the POSIX fallback needs it
             return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / (1024 ** 3)
         except Exception:  # noqa: BLE001
             return None

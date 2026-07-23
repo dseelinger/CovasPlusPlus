@@ -22,7 +22,7 @@ path for that (issue #36); we don't offer a trigger the guard would always veto.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

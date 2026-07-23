@@ -41,7 +41,7 @@ can join live unlock status the same way the ship path does.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # --- grade-upgrade recipe pattern -----------------------------------------------------------
 # Every suit/weapon shares ONE upgrade shape, verified against Inara's equipment-blueprint

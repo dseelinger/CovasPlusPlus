@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
 from covas.keybinds.binds import KeyBinding
-from covas.keybinds.registry import Macro
 from covas.keybinds.sequence import (AWAIT_STATUS, HOLD, PRESS, RELEASE, REQUIRE_STATUS, WAIT,
                                       Step, run_sequence)
 

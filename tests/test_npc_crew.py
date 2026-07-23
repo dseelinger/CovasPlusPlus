@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 
-from covas.ed import npc_crew
 from covas.ed.context import EDContext
 from covas.ed.journal import apply_journal_event
 from covas.ed.npc_crew import NpcCrewRegistry, combat_rank_name, fold

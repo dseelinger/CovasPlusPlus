@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from covas.capabilities.base import CapabilityRegistry, help_meta_problems
 from covas.capabilities.ship_metrics_capability import ShipMetricsCapability
-from covas.ed.loadout import Engineering, LoadoutSnapshot, Modifier, ShipModule
+from covas.ed.loadout import Engineering, LoadoutSnapshot, ShipModule
 from covas.nav.jump_range import resolve_fsd, single_jump_range
-from covas.nav.ship_metrics import (LiveState, Metric, MetricInput, MetricRegistry, MetricResult,
+from covas.nav.ship_metrics import (Metric, MetricInput, MetricRegistry, MetricResult,
                                     default_registry)
 
 

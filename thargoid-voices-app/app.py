@@ -246,7 +246,7 @@ def api_save():
 
 def main() -> None:
     url = f"http://{HOST}:{PORT}/"
-    print(f"\n  Thargoid Voices — generator & curator")
+    print("\n  Thargoid Voices — generator & curator")
     print(f"  Serving at {url}  (localhost only)\n")
     try:
         import webbrowser

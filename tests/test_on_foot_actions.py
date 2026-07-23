@@ -9,7 +9,6 @@ Two things to prove, both offline:
 """
 from __future__ import annotations
 
-import pytest
 
 from covas.ed.modes import MODE_ON_FOOT
 from covas.keybinds import actions as _actions  # noqa: F401 — populates the registry

@@ -13,7 +13,6 @@ from pathlib import Path
 
 from covas.capabilities.mining_helper_capability import (MiningHelperCapability, MiningHelperConfig,
                                                          resolve_material)
-from covas.search import NavError
 from covas.search.routes import RoutePlotter
 
 FIXTURES = Path(__file__).parent / "fixtures"

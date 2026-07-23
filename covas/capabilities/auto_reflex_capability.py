@@ -39,7 +39,7 @@ from typing import Callable, Optional
 
 from ..keybinds.binds import KeyBinding
 from .keybind_capability import COMBAT, INTERDICTION, combat_state
-from .reflex_capability import REFLEX_ACTIONS, ReflexAction, fire_reflex_action
+from .reflex_capability import REFLEX_ACTIONS, fire_reflex_action
 
 # Global governor default: no two auto-reflexes of ANY kind fire within this many seconds, so a
 # burst of overlapping transitions (enter danger -> interdicted -> overheat) can't stack presses.

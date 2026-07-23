@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from covas.capabilities.hud_capability import (
     _ROW_ORDER, HudCapability, HudModel, HudSnapshot, _plain, _row_pack_before, checklist_line,
-    make_view,
 )
 
 

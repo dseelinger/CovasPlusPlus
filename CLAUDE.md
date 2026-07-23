@@ -30,6 +30,16 @@ you generally **cannot** run the full loop in CI/sandbox. Byte-compile, add unit
 for pure logic (parsing, routing, checklist ops), and state clearly what needs manual
 on-hardware testing.
 
+**CI gate (`.github/workflows/tests.yml`, issue #215).** Every PR and every push to `main`
+runs **lint (`ruff check .`) → `compileall covas` → unit `pytest`** on windows-latest; a red
+result **blocks merge** (required check on `main`). The ruff rule set is pinned in
+`pyproject.toml` (`[tool.ruff.lint] select`) so a ruff bump can't flip the gate red. A second,
+**non-blocking** job runs the free-integration set best-effort (no audio device / provider keys
+on a hosted runner; paid integration never runs in CI). This draws the **automated-vs-manual
+boundary**: correctness that a hosted runner can prove is CI's job; `MANUAL_TESTS.md` is for
+installed-app acceptance only (mic, speakers, the panel, ED running) — don't hand-walk what CI
+already enforces.
+
 ## Architecture (where things live)
 - `covas/app.py` — orchestration: PTT handling, threading, cancellation, worker loop.
 - `covas/providers/` — the swappable seam. `base.py` = Protocols (LLM/TTS/STT);

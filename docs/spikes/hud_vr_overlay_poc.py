@@ -35,7 +35,6 @@ like the guard below when SteamVR is absent.
 from __future__ import annotations
 
 import ctypes
-import sys
 import time
 
 # NOTE: `openvr` is intentionally NOT a project dependency. Import lazily so this file

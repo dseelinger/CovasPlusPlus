@@ -11,7 +11,6 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from covas import audio
 from covas.audio import (
     CUE_TYPES,
     CuePlayer,

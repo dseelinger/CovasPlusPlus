@@ -25,7 +25,14 @@ target-version = "py311"
 line-length = 100
 extend-exclude = [".venv", "logs", "voicelines", "sounds"]
 
-# Ruff runs its default lint rule set (pyflakes `F` + a pycodestyle `E` subset):
-# unused imports, undefined names, and real errors. E501 (line-too-long) is not
-# in the default set and is left off on purpose — this codebase uses long
-# explanatory comment lines by design.
+[tool.ruff.lint]
+# The CI gate (`.github/workflows/tests.yml`) runs `ruff check .`, so the enforced rule
+# set is PINNED here rather than left to ruff's default — the default has grown across ruff
+# releases (0.16 flags ~1300 issues on this tree) and an unpinned gate would flip red on a
+# routine ruff bump. We select the high-signal, low-noise pyflakes set:
+#   F  — real errors: unused imports, undefined names, unused locals, bad f-strings.
+#   E9 — syntax / IO errors (always worth failing on).
+# Deliberately EXCLUDED: pycodestyle style rules (E1/E2/E5/E7 — semicolons, `l` names,
+# E501 line-length) — this codebase uses compact statements and long explanatory comments
+# by design; and the pyupgrade/isort/etc. opinion rules, which are churn, not correctness.
+select = ["F", "E9"]

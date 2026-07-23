@@ -220,7 +220,6 @@ class ShipMetricsCapability:
 
         ships: list[tuple[str, MetricInput]] = []
         no_build: list[str] = []
-        active_sid = self._active_ship_id()
         for rec in owned:
             sid = rec.get("ship_id")
             if sid is None:

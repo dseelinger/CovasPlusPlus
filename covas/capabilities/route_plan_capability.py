@@ -444,7 +444,7 @@ class NeutronPlanCapability(_PlannerBase):
         except (NavError, TypeError, ValueError) as e:
             self._logline(f"neutron plot failed: {e}")
             return str(e) if isinstance(e, NavError) else (
-                f"I couldn't read that jump range — give me a number in light-years.")
+                "I couldn't read that jump range — give me a number in light-years.")
 
         waypoints = parse_galaxy_route(result)
         if not waypoints:

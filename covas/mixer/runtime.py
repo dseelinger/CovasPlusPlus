@@ -309,7 +309,6 @@ class AudioLayer:
         Fail-soft: never raises into the caller (a bad bundle leaves the live content in place).
         Returns per-category counts for a confirmation message."""
         try:
-            audio = self.cfg.get("audio", {}) or {}
             # 1. Cue registry: re-overlay SFX + chatter onto fresh cue defs, keep the carrier cues.
             overlaid = overlay_cues(list(chatter_cues()) + list(sfx_cues(self.cfg)), content)
             self._registry.replace_all(list(overlaid) + list(carrier_cues()))

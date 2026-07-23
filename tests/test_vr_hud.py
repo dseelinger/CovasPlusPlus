@@ -286,7 +286,7 @@ def test_shutdown_closes_the_vr_overlay():
 def test_the_two_surfaces_are_independent():
     """A headless 2D surface (factory -> None) must not stop the VR surface from showing."""
     vr_view = FakeView()
-    cap = HudCapability(
+    _cap = HudCapability(  # kept referenced so the capability isn't GC'd mid-assert
         HudModel(),
         is_enabled=lambda: True,
         view_factory=lambda p: None,       # 2D headless
@@ -416,7 +416,6 @@ def test_look_down_pin_fixture_yields_low_panel_tilted_toward_viewer():
 def test_resolve_transform_offset_moves_centre_at_yaw_zero_and_pinned_yaw():
     """Lateral offset slides the panel centre view-relatively at yaw 0 AND after a pin (#144):
     the offset acts in the YAWED frame, so it's never a dead knob — just view-relative."""
-    import math
     at0 = resolve_transform(VrPlacement(offset_x_m=0.5, forward_m=1.3, yaw_deg=0.0))
     assert at0[0][3] == 0.5                              # straight to world +X at yaw 0
     yaw = 90.0

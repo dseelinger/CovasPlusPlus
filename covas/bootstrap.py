@@ -822,7 +822,7 @@ def build_reflex(app: "App") -> None:
     firing a reflex)."""
     try:
         from .capabilities.reflex_capability import (
-            REFLEX_ACTIONS, ReflexCapability, ReflexConfig)
+            ReflexCapability, ReflexConfig)
 
         rcfg = ReflexConfig.from_cfg(app.cfg)
         binds = ed_binds(app)

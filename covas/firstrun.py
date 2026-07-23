@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 
 from . import dpapi
-from .config import _frozen, data_dir, deep_merge, load_overrides, save_overrides
+from .config import data_dir, deep_merge, load_overrides, save_overrides
 
 # The shipped STT default (INSTALLER_DESIGN "Resolved"): English-only `small.en` — smaller and
 # more accurate than multilingual `small` at the same size, right for an English companion.
