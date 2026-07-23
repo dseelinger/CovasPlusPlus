@@ -29,6 +29,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from ..search.spansh import _DEFAULT_UA
+
 # The roster's normalization is the one true name-folding ("Krait Mk II" == "Krait MkII");
 # imported once here and re-exported so every stock comparison shares it.
 from .ships import _norm as norm_ship_name

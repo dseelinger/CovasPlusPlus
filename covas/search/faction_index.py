@@ -18,7 +18,7 @@ rather than blocking the search.
 from __future__ import annotations
 
 import difflib
-from typing import Callable
+from collections.abc import Callable
 
 from . import vocab
 from .spansh import _DEFAULT_UA

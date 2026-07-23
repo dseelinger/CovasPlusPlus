@@ -6,8 +6,7 @@ Ambiguous, and Unknown, plus the ED size-word / mount-word mapping.
 """
 from __future__ import annotations
 
-from covas.nav.modules import (Ambiguous, NeedAttrs, Resolved, Unknown, resolve)
-
+from covas.nav.modules import Ambiguous, NeedAttrs, Resolved, Unknown, resolve
 
 # --- exact + misheard resolution -----------------------------------------------------------
 

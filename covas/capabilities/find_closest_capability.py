@@ -35,19 +35,30 @@ unit-testable offline and the default `pytest` never hits the network or the rea
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
-from ..nav import (Ambiguous, AmbiguousShip, NavError, NeedAttrs, Resolved, ResolvedShip,
-                   SHIP_NAMES, Unknown, UnknownShip, copy as _default_copy, find_closest_module,
-                   find_closest_ship, resolve as _default_resolve,
-                   resolve_ship as _default_resolve_ship)
-from ..nav.closest import Http, RequestsHttp, _DEFAULT_BASE_URL, _DEFAULT_UA, _SEARCH_SIZE
+from ..i18n import fmt_num  # locale-aware number formatting for callouts (#199)
+from ..nav import (
+    SHIP_NAMES,
+    Ambiguous,
+    AmbiguousShip,
+    NavError,
+    NeedAttrs,
+    Resolved,
+    ResolvedShip,
+    Unknown,
+    UnknownShip,
+    find_closest_module,
+    find_closest_ship,
+)
+from ..nav import copy as _default_copy
+from ..nav import resolve as _default_resolve
+from ..nav import resolve_ship as _default_resolve_ship
+from ..nav.closest import _DEFAULT_BASE_URL, _DEFAULT_UA, _SEARCH_SIZE, Http, RequestsHttp
 from ..nav.modules import TAXONOMY
 from . import _search_support as sup
-from ..i18n import fmt_num   # locale-aware number formatting for callouts (#199)
 from .base import HelpMeta, Slot
-
 
 # ---- config -------------------------------------------------------------------------------
 
@@ -74,7 +85,7 @@ class NavConfig:
     verify_stock: bool = True
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "NavConfig":
+    def from_cfg(cls, cfg: dict) -> NavConfig:
         n = cfg.get("nav", {}) or {}
         d = cls()
         pad = str(n.get("default_pad_size", d.default_pad_size) or "").strip()

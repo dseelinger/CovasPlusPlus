@@ -109,7 +109,8 @@ def fetch_harvest(*, timeout: float = 30.0) -> list[dict] | None:
     None on any error so the committed snapshot is kept (Spansh outages never block a release)."""
     try:
         import requests  # local import: keeps the offline stack importable without hitting it
-        from covas.search.spansh import STATIONS_URL, _DEFAULT_UA, distance_sort
+
+        from covas.search.spansh import _DEFAULT_UA, STATIONS_URL, distance_sort
         body = {"filters": {"has_shipyard": {"value": True}}, "sort": distance_sort(),
                 "size": 250, "page": 0, "reference_system": "Shinrarta Dezhra"}
         resp = requests.post(STATIONS_URL, json=body, timeout=timeout,

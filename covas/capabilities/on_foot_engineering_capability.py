@@ -18,7 +18,7 @@ what's NEEDED, not what you're short on. Fail soft: any error is spoken, never r
 """
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ..ed import odyssey_engineering as ody
 from ..ed.engineers import EngineerStatus, status_for
@@ -82,7 +82,7 @@ class OnFootEngineeringCapability:
         self,
         *,
         get_progress: Callable[[], dict] | None = None,
-        get_current_system: Callable[[], Optional[str]] | None = None,
+        get_current_system: Callable[[], str | None] | None = None,
         clipboard: Callable[[str], None] | None = None,
         log: Callable[[str], None] | None = None,
     ) -> None:
@@ -175,7 +175,7 @@ class OnFootEngineeringCapability:
         mods = self._weapon_mod_offers()
         return f"{head} {recipe} {mods}"
 
-    def _recipe_line(self, step: Optional[ody.GradeStep], grade: int) -> str:
+    def _recipe_line(self, step: ody.GradeStep | None, grade: int) -> str:
         if step is None:
             return (f"Grade {grade} is the base item — no upgrade materials. Upgrades run "
                     "grade 2 to 5, applied at any Pioneer Supplies vendor.")
@@ -246,7 +246,7 @@ class OnFootEngineeringCapability:
         parts.append(self._deliver(eng))
         return " ".join(p for p in parts if p)
 
-    def _status_sentence(self, eng: ody.OnFootEngineer, status: Optional[EngineerStatus],
+    def _status_sentence(self, eng: ody.OnFootEngineer, status: EngineerStatus | None,
                          progress: dict) -> str:
         """The grounded 'where you stand + what's left' sentence for one engineer."""
         if not progress:

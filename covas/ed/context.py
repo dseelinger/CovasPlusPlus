@@ -381,7 +381,7 @@ class EDContext:
             store.persist(body)
         return changed
 
-    def ship_loadout(self, ship_id) -> "object | None":
+    def ship_loadout(self, ship_id) -> object | None:
         """The remembered `LoadoutSnapshot` for an owned ship's ShipID (accepts int or str), or None
         when nothing is remembered for it / no store is installed. The rebuilt snapshot is a fresh
         copy, so handing out the reference is thread-safe."""

@@ -12,7 +12,7 @@ from pathlib import Path
 from covas.ed.context import EDContext
 from covas.ed.journal import apply_journal_event
 from covas.ed.loadout import Engineering, LoadoutSnapshot, Modifier, ShipModule, parse_loadout
-from covas.ed.ship_loadouts import (ShipLoadoutStore, snapshot_from_dict, snapshot_to_dict)
+from covas.ed.ship_loadouts import ShipLoadoutStore, snapshot_from_dict, snapshot_to_dict
 
 _CORSAIR = Path(__file__).parent / "fixtures" / "journal_loadout_corsair.json"
 

@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import ctypes
 import sys
-from typing import Callable, Optional
+from collections.abc import Callable
 
 # ED's process image name (the single-instance guard and the VR toggle script key on this too)
 # and a title substring used only as a fallback matcher — robust to title localisation. Compared
@@ -81,7 +81,7 @@ class Win32Backend:
         self._user32.ShowWindow.argtypes = (ctypes.c_void_p, ctypes.c_int)
 
     # -- foreground / enumeration -----------------------------------------------------
-    def foreground_window(self) -> Optional[int]:
+    def foreground_window(self) -> int | None:
         return self._user32.GetForegroundWindow() or None
 
     def enum_windows(self) -> list[int]:
@@ -97,7 +97,7 @@ class Win32Backend:
         self._user32.EnumWindows(self._ENUMPROC(_cb), 0)
         return out
 
-    def window_pid(self, hwnd: int) -> Optional[int]:
+    def window_pid(self, hwnd: int) -> int | None:
         pid = ctypes.c_uint32(0)
         self._user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
         return pid.value or None
@@ -118,7 +118,7 @@ class Win32Backend:
         self._user32.GetWindowTextW(hwnd, buf, length + 1)
         return buf.value
 
-    def image_name(self, pid: int) -> Optional[str]:
+    def image_name(self, pid: int) -> str | None:
         """The base image name (e.g. `EliteDangerous64.exe`) for `pid`, or None if it can't be
         opened. Uses PROCESS_QUERY_LIMITED_INFORMATION so it works against another user's/elevated
         process without needing full rights."""
@@ -183,11 +183,11 @@ class WindowFocuser:
         name = self._backend.image_name(pid)
         return bool(name) and name.lower() == ELITE_IMAGE
 
-    def find_ed_window(self) -> Optional[int]:
+    def find_ed_window(self) -> int | None:
         """The visible top-level ED window, matched by PROCESS image name (robust to title
         localisation); a title-substring match is a fallback only. None if ED isn't running.
         This is the enumerating path — deliberately NOT called by `is_foreground()`."""
-        title_fallback: Optional[int] = None
+        title_fallback: int | None = None
         for hwnd in self._backend.enum_windows():
             if self._is_elite(hwnd):
                 return hwnd

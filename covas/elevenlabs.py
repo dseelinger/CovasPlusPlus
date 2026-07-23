@@ -1,5 +1,6 @@
 """Fetch the user's ElevenLabs voices and TTS-capable models for the UI dropdowns."""
 from __future__ import annotations
+
 import requests
 
 BASE = "https://api.elevenlabs.io/v1"

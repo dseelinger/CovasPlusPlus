@@ -8,18 +8,25 @@ live 2026-07 — see the module docstring in `covas/search/mining.py`.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from covas.search import NavError
-from covas.search.mining import (build_hotspot_request, build_sell_request, best_sell,
-                                 find_best_sell, find_hotspots, parse_hotspots, parse_sell_markets)
+from covas.search.mining import (
+    best_sell,
+    build_hotspot_request,
+    build_sell_request,
+    find_best_sell,
+    find_hotspots,
+    parse_hotspots,
+    parse_sell_markets,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 # The fixtures' newest timestamps are 2026-07-15; anchor "now" just after so freshness is stable.
-NOW = datetime(2026, 7, 15, 18, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 15, 18, 0, tzinfo=UTC)
 
 
 class _FakeHttp:

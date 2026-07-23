@@ -16,8 +16,8 @@ from __future__ import annotations
 import random
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import replace
-from typing import Callable, Optional
 
 from ..capabilities.base import HelpMeta, Slot
 from ..config import experimental
@@ -82,7 +82,7 @@ def _default_sting() -> str:
     return str(p) if p.is_file() else ""
 
 
-def _text_generator(llm, model: Optional[str]):  # noqa: ANN001
+def _text_generator(llm, model: str | None):  # noqa: ANN001
     """Adapt an LLMProvider to `generate(prompt) -> str` (used for chatter flavor musings)."""
     if llm is None:
         return None
@@ -112,13 +112,13 @@ class AudioLayer:
         *,
         ed_ctx=None,  # noqa: ANN001 — EDContext (fuel %); also the driver's context
         llm=None,  # noqa: ANN001 — for comms variants + chatter flavor (cheap tier); None = pool/verbatim only
-        cheap_model: Optional[str] = None,
-        cast_synth: Optional[Callable] = None,  # noqa: ANN001 — (Voice, text) -> (pcm, sr)
-        content: Optional[ContentBundle] = None,
+        cheap_model: str | None = None,
+        cast_synth: Callable | None = None,  # noqa: ANN001 — (Voice, text) -> (pcm, sr)
+        content: ContentBundle | None = None,
         allow_chatter_flavor: bool = True,  # tiering (#84): False -> canned chatter only, no LLM
         allow_comms_variants: bool = True,  # tiering (#84): False -> verbatim comms only, no LLM
         clock: Callable[[], float] = time.monotonic,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
         persona_arbiter=None,  # noqa: ANN001 — PersonaSpeechArbiter (issue #146); None -> direct
     ) -> None:
         self.cfg = cfg
@@ -143,7 +143,7 @@ class AudioLayer:
         # The famous-filtered live EL voice list, cached from the first successful fetch so a later
         # settings change (which rebuilds via apply_settings, without re-fetching) still seeds the
         # random default pool instead of collapsing the whole cast to the single persona voice.
-        self._el_voices: Optional[list[dict]] = None
+        self._el_voices: list[dict] | None = None
         self._cast: VoiceCast = build_cast(cfg, synth=self._cast_synth)
         self._clock = clock
         # Crew best-fit voice pairings (issue #124): {name.lower() -> voice_id}, pushed in by the
@@ -168,7 +168,7 @@ class AudioLayer:
             self._cast.pool, rng=self._rng, fallback=self._cast.persona(),
             anti_repeat=_ANTI_REPEAT_WINDOW)
         # Live game state that drives chatter frequency + comms re-casting.
-        self._population: Optional[float] = None
+        self._population: float | None = None
         self._system: str = ""
 
         audio = cfg.get("audio", {}) or {}
@@ -345,7 +345,7 @@ class AudioLayer:
             self._comms_voices.clear()
 
     # -- fuel for the driver ----------------------------------------------------
-    def _fuel(self) -> Optional[float]:
+    def _fuel(self) -> float | None:
         if self._ed_ctx is None:
             return None
         try:
@@ -378,7 +378,7 @@ class AudioLayer:
         except Exception:  # noqa: BLE001 — a context glitch just means no event-anchored line
             return (False, False)
 
-    def _owned_carrier_id(self) -> Optional[int]:
+    def _owned_carrier_id(self) -> int | None:
         """The owned carrier's CarrierID (== its MarketID), so an undock from a DIFFERENT carrier
         in the same system isn't mistaken for leaving ours (#137). None when unknown/unavailable."""
         if self._ed_ctx is None:
@@ -488,7 +488,7 @@ class AudioLayer:
             return False
         return self._submit_voice(voice, text, COMMS)
 
-    def _crew_chatter_interval(self) -> Optional[float]:
+    def _crew_chatter_interval(self) -> float | None:
         """The CREW-specific seconds-between-ambient-crew-lines (issue #126) — a sparse gap drawn
         from `[crew].chatter_min_seconds`..`chatter_max_seconds`. Deliberately NOT population-scaled
         (crew are aboard your ship, so the local system's population is irrelevant): a randomized
@@ -501,7 +501,7 @@ class AudioLayer:
             lo, hi = hi, lo
         return self._rng.uniform(lo, hi)
 
-    def _chatter_interval(self) -> Optional[float]:
+    def _chatter_interval(self) -> float | None:
         """Current required seconds between chatter lines, scaled by the live system population
         (see chatter.chatter_interval). Read live so a Settings-page change applies immediately."""
         ch = (self.cfg.get("audio", {}) or {}).get("chatter", {}) or {}
@@ -763,7 +763,7 @@ class AudioLayer:
         self.mixer.set_bus_config(self.cfg)
         return new
 
-    def set_crew_pairings(self, mapping: Optional[dict]) -> None:
+    def set_crew_pairings(self, mapping: dict | None) -> None:
         """Push the crew best-fit voice pairings (issue #124) computed by the background pairing
         worker — `{name.lower() -> voice_id}` — so the VERY NEXT `speak_crew` line honors them.
         None/empty clears the map (e.g. no persona'd auto members left), falling back to the
@@ -787,7 +787,7 @@ class AudioLayer:
             mem.set_pool(self._cast.pool, fallback=persona)
 
     def set_providers(self, *, tts=None, cast_synth=None, llm=None,  # noqa: ANN001
-                      cheap_model: Optional[str] = None) -> None:
+                      cheap_model: str | None = None) -> None:
         """Re-point the ambient layer's TTS/LLM after a live provider hot-swap (issue #90 review).
         Without this, the layer keeps the TTS/LLM it captured at construction, so a Settings-page
         voice/model switch would leave ambient musings, interdiction/comms lines and the cast synth
@@ -869,7 +869,7 @@ class AudioControlsCapability:
     """LLM tool + help for the ambient-audio voice controls, delegating to an AudioLayer. Also
     forwards bus events to the layer (so registering this one capability wires both)."""
 
-    def __init__(self, layer: AudioLayer, *, log: Optional[Callable[[str], None]] = None) -> None:
+    def __init__(self, layer: AudioLayer, *, log: Callable[[str], None] | None = None) -> None:
         self.layer = layer
         self._log = log or (lambda _m: None)
 

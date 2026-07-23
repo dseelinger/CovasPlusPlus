@@ -7,10 +7,10 @@ test_keybind_capability.py's style, constructed with our macros + an allowlist i
 """
 from __future__ import annotations
 
+from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
 from covas.ed.modes import MODE_FIGHTER, MODE_MAINSHIP
 from covas.keybinds.binds import KeyBinding
 from covas.keybinds.registry import registered_macros
-from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
 
 
 class _FakeExecutor:

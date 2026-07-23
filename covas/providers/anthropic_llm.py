@@ -3,7 +3,7 @@ satisfies LLMProvider. No behavior change; this is just the seam."""
 from __future__ import annotations
 
 import threading
-from typing import Iterator, Optional
+from collections.abc import Iterator
 
 import anthropic
 
@@ -41,10 +41,10 @@ class AnthropicLLM:
         messages: list[dict],
         cancel: threading.Event,
         on_event: OnEvent,
-        tool_handler: Optional[ToolHandler] = None,
-        tools: Optional[list[dict]] = None,
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
+        tool_handler: ToolHandler | None = None,
+        tools: list[dict] | None = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
     ) -> Iterator[tuple[str, str]]:
         yield from llm.stream_reply(
             self.client, self.cfg, messages, cancel, on_event,

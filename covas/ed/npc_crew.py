@@ -29,7 +29,6 @@ import json
 import sys
 import threading
 from pathlib import Path
-from typing import Optional
 
 # The events we care about, and which key holds the CrewID / the pilot's name in each. The
 # Npc*-prefixed events use `NpcCrewId` / `NpcCrewName`; the older Crew* events use `CrewID` / `Name`.
@@ -53,7 +52,7 @@ def combat_rank_name(rank: object) -> str:
     return ""
 
 
-def _crew_id(event: dict) -> Optional[str]:
+def _crew_id(event: dict) -> str | None:
     """The CrewID for this event as a string key (JSON object keys are strings), or None."""
     for k in _ID_KEYS:
         if k in event and event[k] is not None:
@@ -117,9 +116,9 @@ class NpcCrewRegistry:
     `_io_lock`, which serialises the DISK write so the journal thread can persist OUTSIDE the
     EDContext lock without a slow disk stalling readers (#161). Fail-soft throughout."""
 
-    def __init__(self, entries: Optional[dict] = None, path: Optional[Path | str] = None) -> None:
+    def __init__(self, entries: dict | None = None, path: Path | str | None = None) -> None:
         self._entries: dict = dict(entries or {})
-        self._path: Optional[Path] = Path(path) if path else None
+        self._path: Path | None = Path(path) if path else None
         # Serialises DISK writes only (never held during a state mutation), so the journal thread
         # can persist OUTSIDE the EDContext lock without a slow disk stalling readers, yet two
         # writers can't corrupt the shared temp file (#161). State reads happen under the caller's
@@ -127,7 +126,7 @@ class NpcCrewRegistry:
         self._io_lock = threading.Lock()
 
     @classmethod
-    def load(cls, path: Optional[Path | str]) -> "NpcCrewRegistry":
+    def load(cls, path: Path | str | None) -> NpcCrewRegistry:
         """Read the registry from disk, fail-soft. A missing/corrupt/non-dict file yields an EMPTY
         registry (never raises) so a bad file can't wedge the journal watcher."""
         p = Path(path) if path else None
@@ -154,7 +153,7 @@ class NpcCrewRegistry:
             self.persist(body)
         return changed
 
-    def apply_event_deferred(self, event: dict) -> tuple[bool, Optional[str]]:
+    def apply_event_deferred(self, event: dict) -> tuple[bool, str | None]:
         """Fold `event` into the registry IN MEMORY and render the body to persist, WITHOUT touching
         disk. Returns `(changed, body)` — `body` is the JSON to write (None when nothing changed or
         no path is configured). The caller mutates under its state lock, then `persist()`s the body

@@ -22,7 +22,7 @@ NOT here — that's issue #61, which extends the capability. This half is captur
 from __future__ import annotations
 
 import re
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from .retrieval import keyword_score
 from .store import MemoryRecord, MemoryStore
@@ -57,7 +57,7 @@ def _norm(text: str) -> str:
     return _WS.sub(" ", text.strip().lower()).strip(" .!,;:")
 
 
-def _credits(event: dict, *keys: str) -> Optional[int]:
+def _credits(event: dict, *keys: str) -> int | None:
     """First present numeric credit field among `keys`, as an int, or None."""
     for k in keys:
         v = event.get(k)
@@ -72,7 +72,7 @@ def _credits(event: dict, *keys: str) -> Optional[int]:
 # type is always HIGHLIGHT_TYPE. Deliberately a SMALL, high-signal set — quality over volume,
 # so the milestone log stays worth reading.
 
-def _died(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
+def _died(e: dict) -> tuple[str, tuple[str, ...]] | None:
     # Died carries no system; the killer (if any) differentiates otherwise-identical deaths.
     killer = e.get("KillerName_Localised") or e.get("KillerName")
     if not killer and isinstance(e.get("Killers"), list) and e["Killers"]:
@@ -81,7 +81,7 @@ def _died(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
     return text, ("death",)
 
 
-def _promotion(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
+def _promotion(e: dict) -> tuple[str, tuple[str, ...]] | None:
     # A Promotion event sets one (occasionally more) rank field to the NEW numeric rank.
     ranks = ("Combat", "Trade", "Explore", "Exobiologist", "Soldier",
              "CQC", "Empire", "Federation")
@@ -92,27 +92,27 @@ def _promotion(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
     return f"Promoted: reached {parts}", ("rank", "promotion")
 
 
-def _saa_scan(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
+def _saa_scan(e: dict) -> tuple[str, tuple[str, ...]] | None:
     body = e.get("BodyName")
     if not body:
         return None
     return f"Fully mapped {body}", ("exploration", "mapping")
 
 
-def _carrier_buy(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
+def _carrier_buy(e: dict) -> tuple[str, tuple[str, ...]] | None:
     cs = e.get("Callsign")
     return (f"Bought a fleet carrier ({cs})" if cs else "Bought a fleet carrier",
             ("carrier", "milestone"))
 
 
-def _shipyard_new(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
+def _shipyard_new(e: dict) -> tuple[str, tuple[str, ...]] | None:
     ship = e.get("ShipType_Localised") or e.get("ShipType")
     if not ship:
         return None
     return f"Added a {_title(ship)} to the fleet", ("ship", "purchase")
 
 
-def _mission_completed(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
+def _mission_completed(e: dict) -> tuple[str, tuple[str, ...]] | None:
     reward = _credits(e, "Reward")
     if reward is None or reward < NOTABLE_CREDITS:
         return None
@@ -120,14 +120,14 @@ def _mission_completed(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
     return f"Completed a lucrative mission: {name} ({reward:,} cr)", ("mission", "credits")
 
 
-def _sell_exploration(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
+def _sell_exploration(e: dict) -> tuple[str, tuple[str, ...]] | None:
     earned = _credits(e, "TotalEarnings", "Earnings", "BaseValue")
     if earned is None or earned < NOTABLE_CREDITS:
         return None
     return f"Sold exploration data for {earned:,} credits", ("exploration", "credits")
 
 
-def _redeem_voucher(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
+def _redeem_voucher(e: dict) -> tuple[str, tuple[str, ...]] | None:
     amount = _credits(e, "Amount")
     if amount is None or amount < NOTABLE_CREDITS:
         return None
@@ -135,7 +135,7 @@ def _redeem_voucher(e: dict) -> Optional[tuple[str, tuple[str, ...]]]:
     return f"Redeemed {kind} vouchers for {amount:,} credits", ("credits", kind.lower())
 
 
-_HIGHLIGHTS: dict[str, Callable[[dict], Optional[tuple[str, tuple[str, ...]]]]] = {
+_HIGHLIGHTS: dict[str, Callable[[dict], tuple[str, tuple[str, ...]] | None]] = {
     "Died": _died,
     "Promotion": _promotion,
     "SAAScanComplete": _saa_scan,
@@ -148,7 +148,7 @@ _HIGHLIGHTS: dict[str, Callable[[dict], Optional[tuple[str, tuple[str, ...]]]]] 
 }
 
 
-def describe_highlight(event: dict) -> Optional[tuple[str, str, tuple[str, ...]]]:
+def describe_highlight(event: dict) -> tuple[str, str, tuple[str, ...]] | None:
     """A durable (text, type, tags) memory for a milestone-worthy journal event, or None.
 
     Deterministic and offline — a curated table lookup, no LLM. `Scan` is special-cased like
@@ -190,7 +190,7 @@ class MemoryCapture:
 
     def __init__(self, store: MemoryStore, *, cap: int = DEFAULT_CAP,
                  dedup_threshold: float = DEDUP_THRESHOLD,
-                 log: Optional[Callable[[str], None]] = None) -> None:
+                 log: Callable[[str], None] | None = None) -> None:
         self._store = store
         self._cap = max(1, int(cap))
         self._dedup = float(dedup_threshold)
@@ -204,7 +204,7 @@ class MemoryCapture:
         return self._store
 
     # -- journal highlights ------------------------------------------------------------
-    def capture_journal_event(self, event: dict) -> Optional[MemoryRecord]:
+    def capture_journal_event(self, event: dict) -> MemoryRecord | None:
         """Fold one journal event into memory when it's a curated milestone. Returns the new
         record, or None when the event isn't milestone-worthy or is a duplicate."""
         try:
@@ -219,7 +219,7 @@ class MemoryCapture:
 
     # -- conversation facts ------------------------------------------------------------
     def remember(self, text: str, *, type: str = "note",  # noqa: A002 — mirrors the record field
-                 tags: object = ()) -> Optional[MemoryRecord]:
+                 tags: object = ()) -> MemoryRecord | None:
         """Store a fact the Commander stated (via the `remember_this` tool). Returns the new
         record, or None when the text is empty or already known. No model call — the LLM
         already produced this as part of the current turn's tool use."""
@@ -230,7 +230,7 @@ class MemoryCapture:
             return None
 
     # -- shared write path -------------------------------------------------------------
-    def _add_deduped(self, text: str, type: str, tags: object) -> Optional[MemoryRecord]:
+    def _add_deduped(self, text: str, type: str, tags: object) -> MemoryRecord | None:
         text = text.strip()
         if not text:
             return None

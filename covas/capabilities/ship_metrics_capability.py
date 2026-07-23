@@ -22,7 +22,7 @@ default `pytest` run is offline and free (DESIGN §9).
 """
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ..ed.loadout import LoadoutSnapshot
 from ..ed.owned_ships import display_name, match_ships
@@ -269,7 +269,7 @@ class ShipMetricsCapability:
             return f"I don't compute '{spoken}' yet. I can do: {have}."
         return metric
 
-    def _resolve_class(self, inp: dict) -> tuple[Optional[int], str]:
+    def _resolve_class(self, inp: dict) -> tuple[int | None, str]:
         raw = str(inp.get("ship_class") or "").strip().lower()
         if not raw:
             return None, ""
@@ -304,7 +304,7 @@ class ShipMetricsCapability:
                     "numbers.")
         return label, snap, spec
 
-    def _spec_for_symbol(self, symbol) -> Optional[Spec]:
+    def _spec_for_symbol(self, symbol) -> Spec | None:
         sym = str(symbol or "").strip()
         if not sym:
             return None
@@ -327,12 +327,12 @@ class ShipMetricsCapability:
             self._logline(f"live-state read failed: {e}")
             return {}
 
-    def _active_ship_id(self) -> Optional[str]:
+    def _active_ship_id(self) -> str | None:
         active = self._get_active_loadout()
         sid = getattr(active, "ship_id", None) if active is not None else None
         return str(sid) if sid is not None else None
 
-    def _active_label(self, active: LoadoutSnapshot, spec: Optional[Spec]) -> str:
+    def _active_label(self, active: LoadoutSnapshot, spec: Spec | None) -> str:
         name = spec.name if spec is not None else (active.ship or "ship").replace("_", " ").title()
         return f'{name} "{active.ship_name}"' if active.ship_name else name
 

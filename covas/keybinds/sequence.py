@@ -31,8 +31,8 @@ executor's `release_all()` so a hold can never strand a key down.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Callable, Sequence
 
 from .binds import KeyBinding
 from .executor import ExecutorError

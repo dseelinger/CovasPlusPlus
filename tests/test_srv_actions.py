@@ -10,10 +10,10 @@ These import the batch through the registry / capability, same as production wir
 """
 from __future__ import annotations
 
+from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
+from covas.ed.modes import MODE_SRV
 from covas.keybinds.binds import KeyBinding
 from covas.keybinds.registry import registered_macros
-from covas.ed.modes import MODE_SRV
-from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
 
 # The macros this batch ships: name -> (ED action token, confirm_required).
 _SRV_MACROS = {

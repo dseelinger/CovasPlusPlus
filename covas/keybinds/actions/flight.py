@@ -20,8 +20,8 @@ binding spec). None are in the DEFAULT allowlist — a Commander opts each in vi
 """
 from __future__ import annotations
 
-from ..registry import Macro, register
 from ...ed.modes import MODE_FIGHTER, MODE_MAINSHIP
+from ..registry import Macro, register
 
 _SHIP = frozenset({MODE_MAINSHIP})
 _SHIP_OR_FIGHTER = frozenset({MODE_MAINSHIP, MODE_FIGHTER})

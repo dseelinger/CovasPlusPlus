@@ -26,13 +26,24 @@ line-length = 100
 extend-exclude = [".venv", "logs", "voicelines", "sounds"]
 
 [tool.ruff.lint]
-# The CI gate (`.github/workflows/tests.yml`) runs `ruff check .`, so the enforced rule
-# set is PINNED here rather than left to ruff's default — the default has grown across ruff
-# releases (0.16 flags ~1300 issues on this tree) and an unpinned gate would flip red on a
-# routine ruff bump. We select the high-signal, low-noise pyflakes set:
+# The CI gate (`.github/workflows/tests.yml`) runs `ruff check .`, so the enforced rule set is
+# PINNED here rather than left to ruff's default — the default has grown across ruff releases (0.16
+# flags ~1300 issues on this tree) and an unpinned gate would flip red on a routine ruff bump.
+#
+# ADOPTED (issue #218 — decision per family):
 #   F  — real errors: unused imports, undefined names, unused locals, bad f-strings.
 #   E9 — syntax / IO errors (always worth failing on).
-# Deliberately EXCLUDED: pycodestyle style rules (E1/E2/E5/E7 — semicolons, `l` names,
-# E501 line-length) — this codebase uses compact statements and long explanatory comments
-# by design; and the pyupgrade/isort/etc. opinion rules, which are churn, not correctness.
-select = ["F", "E9"]
+#   I  — isort: deterministic import order. Auto-fixable; behaviour-preserving (verified: full
+#        unit suite unchanged after the reorder).
+#   UP — pyupgrade: modernize to the 3.11 idioms the project already targets (`X | None` over
+#        `Optional[X]`, `list` over `List`, `datetime.UTC`, …). Auto-fixable, syntax-only.
+#
+# DELIBERATELY EXCLUDED:
+#   E1/E2/E5/E7 (pycodestyle style — semicolons, `l` names) and E501 (line length): this codebase
+#     uses compact statements and long explanatory comment lines by design.
+#   S110 / BLE001 (try-except-pass / blind-except): the fail-soft `except Exception` guards are
+#     intentional (CLAUDE.md "fail soft") and already carry documentary `# noqa: BLE001`.
+#   RUF100 (unused-noqa): would strip those intentional `# noqa: BLE001/SLF001/ANN…` markers, which
+#     document intent (and pre-arm rules we don't enforce). Keep them.
+#   Docstring/annotation-coverage maximalism (D/ANN) and other opinion rules: churn, not correctness.
+select = ["E9", "F", "I", "UP"]

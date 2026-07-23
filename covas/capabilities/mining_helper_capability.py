@@ -30,16 +30,21 @@ on-hardware per the issue; this capability is unaffected by a field-name correct
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
+from ..i18n import fmt_int, fmt_num  # locale-aware number formatting for callouts (#199)
 from ..nav import copy as _default_copy
 from ..search import NavError, RequestsHttp
-from ..search.mining import (SELL_PRICE_MAX_AGE_DAYS, Hotspot, SellMarket, find_best_sell,
-                             find_hotspots)
+from ..search.mining import (
+    SELL_PRICE_MAX_AGE_DAYS,
+    Hotspot,
+    SellMarket,
+    find_best_sell,
+    find_hotspots,
+)
 from ..search.routes import RoutePlotter, RouteWaypoint
-from ..search.spansh import Http, _DEFAULT_UA
-from ..i18n import fmt_int, fmt_num   # locale-aware number formatting for callouts (#199)
+from ..search.spansh import _DEFAULT_UA, Http
 from .base import HelpMeta, Slot
 
 _TOOL_NAME = "plan_mining_session"
@@ -81,7 +86,7 @@ class MiningHelperConfig:
     add_to_checklist: bool = True
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "MiningHelperConfig":
+    def from_cfg(cls, cfg: dict) -> MiningHelperConfig:
         m = cfg.get("mining_helper", {}) or {}
         d = cls()
         return cls(

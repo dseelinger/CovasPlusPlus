@@ -18,8 +18,8 @@ players carry a "CMDR"/$cmdr_decorate-prefixed From_Localised; NPCs do not.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional
 
 # ---- channels --------------------------------------------------------------------------------
 PLAYER = "player"       # a real human DM'ing the Commander directly -> voice VERBATIM
@@ -227,7 +227,7 @@ def evaluate(event: dict) -> VoiceableComms:
     )
 
 
-def capture(event: dict) -> Optional[VoiceableComms]:
+def capture(event: dict) -> VoiceableComms | None:
     """The capture entry point: a VoiceableComms record for a ReceiveText event, else None. C5
     subscribes to the bus, calls this, and voices records whose `voiceable` is True."""
     if not is_receive_text(event):

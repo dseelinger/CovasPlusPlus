@@ -71,7 +71,7 @@ class ContextDetectorConfig:
     ])
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "ContextDetectorConfig":
+    def from_cfg(cls, cfg: dict) -> ContextDetectorConfig:
         e = cfg.get("elite", {}) or {}
         d = cls()
 
@@ -94,7 +94,7 @@ class ContextDetector:
         self.cfg = cfg
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "ContextDetector":
+    def from_cfg(cls, cfg: dict) -> ContextDetector:
         return cls(ContextDetectorConfig.from_cfg(cfg))
 
     def decide(self, text: str) -> ContextRef:

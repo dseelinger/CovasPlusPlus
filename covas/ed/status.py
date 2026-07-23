@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import json
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from ..events import EventBus
 from .context import EDContext

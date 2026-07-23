@@ -6,7 +6,7 @@ capability behind the registry (DESIGN §3.3). Behavior is unchanged.
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from ..checklist import Checklist, checklist_event
 from .base import HelpMeta

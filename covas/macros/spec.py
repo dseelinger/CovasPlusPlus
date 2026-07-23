@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # Step kinds (the persisted vocabulary). PRESS/HOLD/RELEASE from the sequence framework are an
 # implementation detail an `ACTION` compiles down to — the spec never spells them.
@@ -36,7 +36,7 @@ STEP_KINDS = frozenset({ACTION, WAIT, REQUIRE_STATUS, AWAIT_STATUS})
 
 def _now_iso() -> str:
     """UTC second-precision timestamp — enough to order macros, no locale surprises."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 @dataclass(frozen=True)
@@ -66,7 +66,7 @@ class MacroStepSpec:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict) -> "MacroStepSpec":
+    def from_dict(cls, d: dict) -> MacroStepSpec:
         """Build from a parsed dict, forgiving of hand edits. Raises ValueError only when the
         kind itself is unusable — a wrong field is tolerated (defaults fill in) so the compiler,
         not the loader, produces the templated 'unknown action/status' message the user sees."""
@@ -115,7 +115,7 @@ class MacroSpec:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "MacroSpec":
+    def from_dict(cls, d: dict) -> MacroSpec:
         """Parse one stored macro. Raises ValueError for a spec with no name or no steps (those
         can't be a macro); everything else defaults. Trigger/action/status VALUES are not checked
         here — that's the compiler's templated-error job, so a spec that references an action you

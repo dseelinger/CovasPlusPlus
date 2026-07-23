@@ -29,8 +29,9 @@ from __future__ import annotations
 
 import random
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional, TypeVar
+from typing import TypeVar
 
 # HTTP statuses worth retrying: rate-limit (429), the transient 5xx family, and Anthropic's
 # 529 "Overloaded". Everything else — 400/401/403/404 and other 4xx auth/validation errors —
@@ -51,8 +52,8 @@ class TransientError(Exception):
     (a retryable HTTP status, optionally carrying the server's `Retry-After`). Distinct from a
     hard :class:`RuntimeError` so :func:`run_with_retry` retries it without re-parsing status."""
 
-    def __init__(self, message: str, *, status: Optional[int] = None,
-                 retry_after: Optional[float] = None, provider: str = "") -> None:
+    def __init__(self, message: str, *, status: int | None = None,
+                 retry_after: float | None = None, provider: str = "") -> None:
         super().__init__(message)
         self.status = status
         self.retry_after = retry_after
@@ -65,7 +66,7 @@ class ProviderError(RuntimeError):
     line; `retryable=False` is a fail-fast/cancelled outcome. Carries the provider name, last HTTP
     status, and attempt count so the log reason is precise."""
 
-    def __init__(self, message: str, *, provider: str = "", status: Optional[int] = None,
+    def __init__(self, message: str, *, provider: str = "", status: int | None = None,
                  retryable: bool = False, attempts: int = 0) -> None:
         super().__init__(message)
         self.provider = provider
@@ -87,7 +88,7 @@ class RetryPolicy:
     jitter: float = 0.25       # add up to this fraction of the base delay, at random
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "RetryPolicy":
+    def from_cfg(cls, cfg: dict) -> RetryPolicy:
         """Build from `[llm.retry]` (all keys optional). `enabled = false` collapses to a single
         try (no retry) so an operator can turn the whole behaviour off."""
         r = ((cfg.get("llm", {}) or {}).get("retry", {}) or {})
@@ -108,7 +109,7 @@ class RetryPolicy:
         e.g. 0.5, 1, 2, 4, 4, … This is the schedule tests assert against."""
         return min(self.base * (self.factor ** (attempt - 1)), self.max_delay)
 
-    def delay_for(self, attempt: int, retry_after: Optional[float] = None) -> float:
+    def delay_for(self, attempt: int, retry_after: float | None = None) -> float:
         """Backoff before the next try. Honor a server `Retry-After` verbatim (capped at the
         total budget); otherwise exponential-with-jitter off :meth:`base_exp`."""
         if retry_after is not None and retry_after >= 0:
@@ -116,7 +117,7 @@ class RetryPolicy:
         return self.base_exp(attempt) * (1.0 + random.random() * self.jitter)
 
 
-def parse_retry_after(value) -> Optional[float]:  # noqa: ANN001 — header value: str | None
+def parse_retry_after(value) -> float | None:  # noqa: ANN001 — header value: str | None
     """Parse a `Retry-After` header. Only the delta-seconds form is honored (the HTTP-date form
     is rare for these APIs and not worth a dependency); anything unparseable -> None."""
     if value is None:
@@ -128,12 +129,12 @@ def parse_retry_after(value) -> Optional[float]:  # noqa: ANN001 — header valu
     return max(0.0, secs)
 
 
-def is_retryable_status(code: Optional[int]) -> bool:
+def is_retryable_status(code: int | None) -> bool:
     """True iff an HTTP status is worth retrying (see :data:`RETRYABLE_STATUS`)."""
     return code in RETRYABLE_STATUS
 
 
-def _status_of(exc: BaseException) -> Optional[int]:
+def _status_of(exc: BaseException) -> int | None:
     """Best-effort HTTP status off an exception: our TransientError.status, or the SDK-style
     `.status_code` the Anthropic client puts on APIStatusError."""
     for attr in ("status", "status_code"):
@@ -190,7 +191,7 @@ def run_with_retry(
     policy: RetryPolicy,
     *,
     provider: str = "",
-    on_retry: Optional[Callable[[int, float, BaseException], None]] = None,
+    on_retry: Callable[[int, float, BaseException], None] | None = None,
 ) -> T:
     """Call `connect()` and return its result, retrying TRANSIENT failures with exponential
     backoff + jitter — cancel-aware and total-wait-capped.

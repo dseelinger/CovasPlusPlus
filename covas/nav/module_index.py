@@ -23,10 +23,10 @@ outfitting data — harvested from the stations around a hub that stocks the ful
 from __future__ import annotations
 
 import threading
-from typing import Callable
+from collections.abc import Callable
 
+from ..search.spansh import _DEFAULT_UA, STATIONS_URL, distance_sort
 from .modules import MODULE_NAMES
-from ..search.spansh import STATIONS_URL, _DEFAULT_UA, distance_sort
 
 # Shinrarta Dezhra (Jameson Memorial) is the community hub whose stations stock essentially the
 # entire outfitting catalogue, so a few hundred nearby stations union to the full module list.

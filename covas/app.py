@@ -6,6 +6,7 @@ Cancel key aborts the in-flight Claude call and any TTS playback. Pressing PTT a
 also interrupts current speech.
 """
 from __future__ import annotations
+
 import datetime as _dt
 import queue
 import sys
@@ -15,27 +16,33 @@ from pathlib import Path
 
 import keyboard
 
-from .config import (load_config, load_overrides, save_overrides, deep_merge,
-                     mock_enabled, experimental)
+from . import bootstrap, tiering
+from . import crew as crew_mod
 from . import settings_schema as schema
 from .audio import CuePlayer, Recorder
-from .listen import VadListener
-from .wake import WakeWordGate
-from .reflex_spotter import PhraseSpotter
-from .events import EventBus
-from .checklist import Checklist
 from .capabilities import CapabilityRegistry
+from .checklist import Checklist
+from .config import (
+    deep_merge,
+    experimental,
+    load_config,
+    load_overrides,
+    mock_enabled,
+    save_overrides,
+)
+from .ed import ContextDetector
+from .events import EventBus
+from .keybinds.abort import AbortController
+from .listen import VadListener
+from .memory import MemoryDetector
+from .persona_speech import PersonaSpeechArbiter, Priority
+from .providers import _retry
 from .providers.base import LLMProvider, STTProvider, TTSProvider
 from .providers.factory import make_llm, make_stt, make_tts
-from .providers import _retry
+from .reflex_spotter import PhraseSpotter
 from .router import Router
-from . import tiering
-from .ed import ContextDetector
-from .keybinds.abort import AbortController
-from .memory import MemoryDetector
-from . import crew as crew_mod
-from . import bootstrap
-from .persona_speech import PersonaSpeechArbiter, Priority
+from .wake import WakeWordGate
+
 
 def _harden_streams(streams) -> None:
     """Make console output lossy-safe. Claude replies can contain Unicode (arrows, em-dashes,
@@ -158,7 +165,7 @@ class _LatencyWatchdog:
         self._lock = threading.Lock()
         self._spent = False  # True once the line has fired OR the watchdog was disarmed
 
-    def arm(self) -> "_LatencyWatchdog":
+    def arm(self) -> _LatencyWatchdog:
         if self._seconds and self._seconds > 0:
             self._timer = threading.Timer(self._seconds, self._fire)
             self._timer.daemon = True
@@ -1718,7 +1725,7 @@ class App:
 
     # ---- provider reliability (issue #97) ---------------------------------
     def _arm_latency_watchdog(self, cancel: threading.Event, *, tts=None,  # noqa: ANN001
-                              text_only=None) -> "_LatencyWatchdog":
+                              text_only=None) -> _LatencyWatchdog:
         """Arm the >Ns latency watchdog for a turn (issue #97). Threshold from
         ``[llm].slow_warning_seconds`` (default 30; <=0 disables). When it fires it speaks a canned,
         plain-language "the AI service is being slow, still trying" line in the CURRENT voice via

@@ -15,11 +15,10 @@ from __future__ import annotations
 
 import inspect
 
-from covas.keybinds.focus import WindowFocuser, ELITE_IMAGE
-from covas.keybinds.binds import KeyBinding
 from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
 from covas.comms.injector import ClipboardTextInjector
-
+from covas.keybinds.binds import KeyBinding
+from covas.keybinds.focus import ELITE_IMAGE, WindowFocuser
 
 # --- fakes -----------------------------------------------------------------
 

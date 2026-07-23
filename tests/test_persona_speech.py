@@ -11,9 +11,12 @@ from __future__ import annotations
 import threading
 import time
 
-from covas.persona_speech import (DEFAULT_QUEUE_DEPTH, PersonaSpeechArbiter, Priority,
-                                   SAFETY_SUBJECTS)
-
+from covas.persona_speech import (
+    DEFAULT_QUEUE_DEPTH,
+    SAFETY_SUBJECTS,
+    PersonaSpeechArbiter,
+    Priority,
+)
 
 # ---- helpers -----------------------------------------------------------------------------
 

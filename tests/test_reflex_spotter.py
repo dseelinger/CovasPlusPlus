@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import pytest
 
-from covas.reflex_spotter import ABORT, REFLEX_VOCABULARY, PhraseSpotter
 from covas.capabilities.reflex_capability import COMBAT_PERMISSIVE
+from covas.reflex_spotter import ABORT, REFLEX_VOCABULARY, PhraseSpotter
 
 
 @pytest.fixture()

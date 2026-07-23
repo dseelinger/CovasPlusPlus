@@ -34,8 +34,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from .spansh import (BODIES_URL, STATIONS_URL, Http, data_age_days, distance_sort, execute_search,
-                     is_fleet_carrier)
+from .spansh import (
+    BODIES_URL,
+    STATIONS_URL,
+    Http,
+    data_age_days,
+    distance_sort,
+    execute_search,
+    is_fleet_carrier,
+)
 
 # Mining commodity price freshness: prices rotate constantly (a filled sell order moves the price),
 # so a quote older than this many days is spoken WITH an age caveat rather than trusted silently.

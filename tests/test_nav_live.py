@@ -9,8 +9,14 @@ import sys
 
 import pytest
 
-from covas.nav import (RequestsHttp, copy, find_closest_module, find_closest_ship, resolve,
-                       resolve_ship)
+from covas.nav import (
+    RequestsHttp,
+    copy,
+    find_closest_module,
+    find_closest_ship,
+    resolve,
+    resolve_ship,
+)
 from covas.nav.clipboard import ClipboardError
 
 

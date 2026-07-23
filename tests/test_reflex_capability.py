@@ -14,8 +14,6 @@ A recording fake executor + a fake Status feed keep it hermetic — no real pres
 """
 from __future__ import annotations
 
-from covas.keybinds.binds import KeyBinding
-from covas.keybinds.executor import KeyExecutor
 from covas.capabilities.reflex_capability import (
     ALWAYS_REFUSED,
     COMBAT_PERMISSIVE,
@@ -23,7 +21,8 @@ from covas.capabilities.reflex_capability import (
     ReflexConfig,
     combat_permissive_verdict,
 )
-
+from covas.keybinds.binds import KeyBinding
+from covas.keybinds.executor import KeyExecutor
 
 # --- recording fake executor + fake Status feed ----------------------------
 

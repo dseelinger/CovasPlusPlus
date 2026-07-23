@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -45,7 +45,7 @@ class ShipyardSnapshot:
         """Snapshot age in days, or None when it carries no timestamp (treat as untrusted)."""
         if self.timestamp is None:
             return None
-        now = now if now is not None else datetime.now(timezone.utc)
+        now = now if now is not None else datetime.now(UTC)
         return max(0.0, (now - self.timestamp).total_seconds() / 86400.0)
 
 
@@ -57,7 +57,7 @@ def _parse_timestamp(raw) -> datetime | None:
         ts = datetime.fromisoformat(str(raw))
     except ValueError:
         return None
-    return ts if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
+    return ts if ts.tzinfo is not None else ts.replace(tzinfo=UTC)
 
 
 def read_shipyard_snapshot(path: str | Path) -> ShipyardSnapshot | None:

@@ -27,7 +27,7 @@ never hits the network (DESIGN §9).
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Protocol
 
 # Spansh search endpoints (the three real POST /search targets; bodies is a seam for now).
@@ -128,7 +128,7 @@ def freshness_filter(field: str, max_age_days: int, *, today: date | None = None
     DATE-ONLY strings here — a datetime is rejected with HTTP 400 — so the window is whole
     days: `max_age_days` ago through tomorrow (upper bound padded so "today" is always inside
     the window regardless of timezone). `today` is injectable for tests."""
-    today = today if today is not None else datetime.now(timezone.utc).date()
+    today = today if today is not None else datetime.now(UTC).date()
     lo = today - timedelta(days=int(max_age_days))
     hi = today + timedelta(days=1)
     return {field: {"comparison": "<=>", "value": [lo.isoformat(), hi.isoformat()]}}
@@ -143,7 +143,7 @@ def _parse_updated_at(raw) -> datetime | None:
         ts = datetime.fromisoformat(str(raw))
     except ValueError:
         return None
-    return ts if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
+    return ts if ts.tzinfo is not None else ts.replace(tzinfo=UTC)
 
 
 def is_fresh(result: dict, field: str, max_age_days: int, *, today: date | None = None) -> bool:
@@ -153,8 +153,8 @@ def is_fresh(result: dict, field: str, max_age_days: int, *, today: date | None 
     ts = _parse_updated_at(result.get(field))
     if ts is None:
         return True
-    today = today if today is not None else datetime.now(timezone.utc).date()
-    return ts.astimezone(timezone.utc).date() >= today - timedelta(days=int(max_age_days))
+    today = today if today is not None else datetime.now(UTC).date()
+    return ts.astimezone(UTC).date() >= today - timedelta(days=int(max_age_days))
 
 
 def data_age_days(result: dict, field: str, *, now: datetime | None = None) -> float | None:
@@ -163,7 +163,7 @@ def data_age_days(result: dict, field: str, *, now: datetime | None = None) -> f
     ts = _parse_updated_at(result.get(field))
     if ts is None:
         return None
-    now = now if now is not None else datetime.now(timezone.utc)
+    now = now if now is not None else datetime.now(UTC)
     return max(0.0, (now - ts).total_seconds() / 86400.0)
 
 

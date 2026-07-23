@@ -21,7 +21,6 @@ from __future__ import annotations
 import asyncio
 import io
 import threading
-from typing import Optional
 
 # Default persona/status voice when [edge].voice is blank. A neutral US English neural voice.
 _DEFAULT_VOICE = "en-US-AriaNeural"
@@ -36,7 +35,7 @@ class EdgeTTS:
     only checks it's importable) so the default offline test run never pulls the SDK unless asked."""
 
     def __init__(self, cfg: dict, *, mixer=None, bus: str = "covas",  # noqa: ANN001
-                 fallback: Optional[object] = None) -> None:
+                 fallback: object | None = None) -> None:
         # Import lazily so the rest of the stack doesn't require edge-tts installed.
         import edge_tts  # noqa: F401  (import-check only; used in the helpers below)
 
@@ -152,8 +151,8 @@ class EdgeTTS:
 
 # ---- module helpers (pure-ish; the network lives here) --------------------
 def _collect_mp3(text: str, voice: str,
-                 cancel: Optional[threading.Event],
-                 rate: Optional[str] = None) -> tuple[bytes, bool]:
+                 cancel: threading.Event | None,
+                 rate: str | None = None) -> tuple[bytes, bool]:
     """Drive edge-tts to completion, returning (mp3_bytes, cancelled). Pulls audio chunks in a
     fresh event loop (the app is thread-based, no running loop), checking `cancel` between chunks
     so a barge-in stops synthesis promptly. A partial (cancelled) buffer is discarded by callers.

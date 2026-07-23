@@ -10,8 +10,16 @@ from __future__ import annotations
 from datetime import datetime
 
 from covas import i18n
-from covas.i18n import (FOLLOW, format_date_short, format_decimal, format_int, language_code,
-                        locale_prefix, resolve_whisper_language, voice_speaks)
+from covas.i18n import (
+    FOLLOW,
+    format_date_short,
+    format_decimal,
+    format_int,
+    language_code,
+    locale_prefix,
+    resolve_whisper_language,
+    voice_speaks,
+)
 
 
 def test_language_code_maps_curated_names():

@@ -9,6 +9,7 @@ COVAS_APP_DIR / COVAS_DATA_DIR override either — a test seam, and a way to rel
 without touching the repo (parity with the [audio].content_root seam).
 """
 from __future__ import annotations
+
 import json
 import os
 import shutil

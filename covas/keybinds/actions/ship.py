@@ -7,8 +7,8 @@ policy. No edit to `KeybindCapability` is needed to add an action.
 """
 from __future__ import annotations
 
-from ..registry import Macro, register
 from ...ed.modes import MODE_MAINSHIP
+from ..registry import Macro, register
 
 register(Macro(
     name="landing_gear",

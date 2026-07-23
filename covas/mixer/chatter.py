@@ -23,7 +23,7 @@ import math
 import re
 import time
 from collections import deque
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from .buses import COMMS, COVAS
 from .cues import CREW, PERSONA, Cue
@@ -42,8 +42,8 @@ _DEDUPE_WINDOW = 8
 _NEAR_REPEAT_JACCARD = 0.6
 
 
-def chatter_interval(min_s: float, max_s: float, population: Optional[float],
-                     full_population: float) -> Optional[float]:
+def chatter_interval(min_s: float, max_s: float, population: float | None,
+                     full_population: float) -> float | None:
     """The current required seconds-BETWEEN-chatter-lines, scaled by system population.
 
     A dense system (population >= `full_population`) chatters at the fast `min_s` gap; a sparse
@@ -96,8 +96,8 @@ _CHATTER_PREFIX = (
 )
 
 
-def situation_context(snapshot: dict, recent: Optional[list] = None,
-                      population: Optional[float] = None) -> str:
+def situation_context(snapshot: dict, recent: list | None = None,
+                      population: float | None = None) -> str:
     """A COMPACT, cheap situation slice for grounding a flavor musing (issue #85), derived purely
     from an EDContext snapshot (+ its recent-events feed + the live system population). It shapes
     only the MOOD — the output validator (`is_flavor_safe`) still strips any name/number that leaks
@@ -172,7 +172,7 @@ def _normalize_line(text: str) -> str:
     return " ".join(_WORD.findall((text or "").lower()))
 
 
-def _near_repeat(candidate: str, recent: "deque[str]") -> bool:
+def _near_repeat(candidate: str, recent: deque[str]) -> bool:
     """True when `candidate` exactly matches, or heavily overlaps (token Jaccard), any of the
     recently-spoken normalized lines — so the flavor path won't repeat itself (issue #85)."""
     norm = _normalize_line(candidate)
@@ -214,11 +214,11 @@ class ChatterPlayer:
         self,
         speak: Callable[[str, str], bool],
         *,
-        generate: Optional[Callable[[str], str]] = None,
-        context: Optional[Callable[[], str]] = None,
-        min_interval: Optional[Callable[[], Optional[float]]] = None,
+        generate: Callable[[str], str] | None = None,
+        context: Callable[[], str] | None = None,
+        min_interval: Callable[[], float | None] | None = None,
         clock: Callable[[], float] = time.monotonic,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._speak = speak
         self._generate = generate
@@ -231,7 +231,7 @@ class ChatterPlayer:
         # De-dupe window (issue #85): normalized recently-spoken flavor lines, newest last.
         self._recent: deque[str] = deque(maxlen=_DEDUPE_WINDOW)
 
-    def set_generate(self, generate: Optional[Callable[[str], str]]) -> None:
+    def set_generate(self, generate: Callable[[str], str] | None) -> None:
         """Swap the LLM flavor generator after a live provider hot-swap (issue #90). None =>
         pool-only, exactly as construction with no LLM — the layer never keeps a stale provider."""
         self._generate = generate
@@ -438,11 +438,11 @@ class CrewChatterPlayer:
         roster: Callable[[], list],
         speak_crew: Callable[[str, str], bool],
         *,
-        generate: Optional[Callable[[str], str]] = None,
-        context: Optional[Callable[[], str]] = None,
-        min_interval: Optional[Callable[[], Optional[float]]] = None,
+        generate: Callable[[str], str] | None = None,
+        context: Callable[[], str] | None = None,
+        min_interval: Callable[[], float | None] | None = None,
         clock: Callable[[], float] = time.monotonic,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._roster = roster
         self._speak_crew = speak_crew
@@ -455,7 +455,7 @@ class CrewChatterPlayer:
         self._last_spoken: float = float("-inf")   # monotonic time of the last ATTEMPTED line
         self._recent: deque[str] = deque(maxlen=_DEDUPE_WINDOW)
 
-    def set_generate(self, generate: Optional[Callable[[str], str]]) -> None:
+    def set_generate(self, generate: Callable[[str], str] | None) -> None:
         """Swap the flavor generator after a live provider hot-swap (issue #90). None => silence."""
         self._generate = generate
 

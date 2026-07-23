@@ -24,9 +24,9 @@ The LLM only SELECTS this named macro; it never assembles the step list itself.
 """
 from __future__ import annotations
 
+from ...ed.modes import MODE_MAINSHIP
 from ..registry import Macro, register
 from ..sequence import AWAIT_STATUS, HOLD, PRESS, REQUIRE_STATUS, WAIT, Step
-from ...ed.modes import MODE_MAINSHIP
 
 register(Macro(
     name="launch",

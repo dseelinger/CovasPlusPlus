@@ -13,9 +13,8 @@ import threading
 
 import numpy as np
 
-from covas.app import _BARGE_IN_MUTE_MS
+from covas.app import _BARGE_IN_MUTE_MS, App
 from covas.audio import Recorder
-from covas.app import App
 from tests.fakes import FakeLLM, FakeSTT, FakeTTS
 
 

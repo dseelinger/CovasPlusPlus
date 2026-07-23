@@ -42,7 +42,6 @@ import json
 import sys
 import threading
 from pathlib import Path
-from typing import Optional
 
 from .stored import _prettify_ship  # readable hull name from a raw ShipType symbol (fallback)
 
@@ -51,7 +50,7 @@ from .stored import _prettify_ship  # readable hull name from a raw ShipType sym
 SHIPYARD_EVENTS = frozenset({"ShipyardBuy", "ShipyardNew", "ShipyardSell", "ShipyardSwap"})
 
 
-def _sid(value: object) -> Optional[str]:
+def _sid(value: object) -> str | None:
     """A ShipID normalised to a string key (JSON object keys are strings), or None. Accepts the
     raw int the journal writes; rejects bools / non-numerics."""
     if isinstance(value, bool):
@@ -63,7 +62,7 @@ def _sid(value: object) -> Optional[str]:
     return None
 
 
-def _str(value: object) -> Optional[str]:
+def _str(value: object) -> str | None:
     text = str(value).strip() if value is not None else ""
     return text or None
 
@@ -273,15 +272,15 @@ class OwnedShipsRegistry:
     which serialises the DISK write so the journal thread can persist OUTSIDE the EDContext lock
     without a slow disk stalling readers (#161). Fail-soft throughout, mirroring `NpcCrewRegistry`."""
 
-    def __init__(self, entries: Optional[dict] = None, path: Optional[Path | str] = None) -> None:
+    def __init__(self, entries: dict | None = None, path: Path | str | None = None) -> None:
         self._entries: dict = dict(entries or {})
-        self._path: Optional[Path] = Path(path) if path else None
+        self._path: Path | None = Path(path) if path else None
         # Serialises DISK writes only (never held during a state mutation) so the journal thread can
         # persist OUTSIDE the EDContext lock without a slow disk stalling readers (#161).
         self._io_lock = threading.Lock()
 
     @classmethod
-    def load(cls, path: Optional[Path | str]) -> "OwnedShipsRegistry":
+    def load(cls, path: Path | str | None) -> OwnedShipsRegistry:
         """Read the registry from disk, fail-soft. A missing/corrupt/non-dict file yields an EMPTY
         registry (never raises) so a bad file can't wedge the journal watcher."""
         p = Path(path) if path else None
@@ -317,21 +316,21 @@ class OwnedShipsRegistry:
     # Deferred siblings of the three journal folds: mutate IN MEMORY + render the body, WITHOUT
     # touching disk. The journal path (EDContext) mutates under its state lock, then `persist()`s
     # the returned body OUTSIDE the lock so a slow disk never stalls readers (#161).
-    def apply_event_deferred(self, event: dict) -> tuple[bool, Optional[str]]:
+    def apply_event_deferred(self, event: dict) -> tuple[bool, str | None]:
         """Fold one ownership-change event; return `(changed, body-to-write-or-None)`, no disk."""
         return self._mutate_deferred(lambda e: fold(e, event))
 
-    def reconcile_loadout_deferred(self, snapshot) -> tuple[bool, Optional[str]]:
+    def reconcile_loadout_deferred(self, snapshot) -> tuple[bool, str | None]:
         """Reconcile the active ship from a `LoadoutSnapshot`; return `(changed, body)`, no disk."""
         return self._mutate_deferred(lambda e: reconcile_loadout(e, snapshot))
 
-    def reconcile_stored_deferred(self, snapshot) -> tuple[bool, Optional[str]]:
+    def reconcile_stored_deferred(self, snapshot) -> tuple[bool, str | None]:
         """Reconcile stored-ship locations; return `(changed, body)`, no disk."""
         return self._mutate_deferred(lambda e: reconcile_stored(e, snapshot))
 
     # -- manual CRUD --------------------------------------------------------------------
     def add(self, ship_type: str, *, name: str | None = None, ident: str | None = None,
-            ship_id: object = None, timestamp: str | None = None) -> Optional[dict]:
+            ship_id: object = None, timestamp: str | None = None) -> dict | None:
         """Manually add an owned ship (a correction, or a pre-existing ship no event was captured
         for). Marked `manual` so a later journal reconcile won't clobber its name/ident. When no
         `ship_id` is given a synthetic NEGATIVE key is minted (real ShipIDs are non-negative, so
@@ -396,7 +395,7 @@ class OwnedShipsRegistry:
         """A shallow copy of the raw `{ship_id: record}` map (safe to snapshot)."""
         return {k: dict(v) for k, v in self._entries.items()}
 
-    def active(self) -> Optional[dict]:
+    def active(self) -> dict | None:
         """The active ship's record (with `ship_id`), or None when none is flagged."""
         for sid, rec in self._entries.items():
             if rec.get("active"):
@@ -411,7 +410,7 @@ class OwnedShipsRegistry:
             self.persist(body)
         return changed
 
-    def _mutate_deferred(self, op) -> tuple[bool, Optional[str]]:
+    def _mutate_deferred(self, op) -> tuple[bool, str | None]:
         """Apply a pure `entries -> entries` op IN MEMORY and render the body to persist, WITHOUT
         touching disk. Returns `(changed, body)` — `body` is None when nothing changed or no path."""
         before = json.dumps(self._entries, sort_keys=True, ensure_ascii=False)

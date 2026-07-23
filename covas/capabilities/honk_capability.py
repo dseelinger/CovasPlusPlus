@@ -28,13 +28,13 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from ..ed.status import GUI_FOCUS_SAA
 from ..keybinds.binds import KeyBinding
 from ..keybinds.executor import ExecutorError
-from .keybind_capability import SAFE, _GUARD_MESSAGES, combat_state
+from .keybind_capability import _GUARD_MESSAGES, SAFE, combat_state
 
 # ED binding action tokens the honk drives. The model never sees these — deterministic macro.
 PRIMARY_FIRE = "PrimaryFire"
@@ -70,7 +70,7 @@ class HonkConfig:
     combat_guard: bool = True
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "HonkConfig":
+    def from_cfg(cls, cfg: dict) -> HonkConfig:
         h = cfg.get("honk", {}) or {}
         d = cls()
         trigger = str(h.get("trigger", d.trigger) or "").strip().lower()
@@ -115,11 +115,11 @@ class HonkCapability:
         *,
         binds: dict[str, KeyBinding],
         executor: object,
-        status_snapshot: Optional[Callable[[], Optional[dict]]] = None,
-        spawn: Optional[Callable[[Callable[[], None]], None]] = None,
-        speak: Optional[Callable[[str], object]] = None,
+        status_snapshot: Callable[[], dict | None] | None = None,
+        spawn: Callable[[Callable[[], None]], None] | None = None,
+        speak: Callable[[str], object] | None = None,
         sleep: Callable[[float], None] = time.sleep,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._cfg = config
         self._binds = binds or {}
@@ -276,7 +276,7 @@ class HonkCapability:
             self._logline(f"re-armed ({reason}).")
 
     # -- guards / state ---------------------------------------------------------------
-    def _guard(self) -> Optional[str]:
+    def _guard(self) -> str | None:
         """Combat/interdiction guard, mirroring the keybind capability. Returns a refusal
         message when it's not safe to act, or None when clear (or when `combat_guard` is off)."""
         if not self._cfg.combat_guard:

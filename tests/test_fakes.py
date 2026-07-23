@@ -12,7 +12,6 @@ from covas.providers import factory
 from covas.providers.base import LLMProvider, STTProvider, TTSProvider
 from tests.fakes import FakeLLM, FakeSTT, FakeTTS
 
-
 # --- Protocol conformance --------------------------------------------------
 
 def test_fakes_satisfy_protocols():

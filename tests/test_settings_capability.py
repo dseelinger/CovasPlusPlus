@@ -20,7 +20,6 @@ from covas.app import App
 from covas.capabilities.settings_capability import SettingsCapability, find_settings
 from tests.fakes import FakeLLM, FakeSTT, FakeTTS
 
-
 # --- pure matching ---------------------------------------------------------
 
 @pytest.mark.parametrize("spoken,key", [

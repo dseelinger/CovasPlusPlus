@@ -12,7 +12,7 @@ JSON, no network, and any error is spoken rather than raised into the voice loop
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from ..nav.datasets import load_manifest
 from .base import HelpMeta

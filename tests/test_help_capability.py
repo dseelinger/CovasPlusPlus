@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import pytest
 
-from covas.capabilities.base import (CapabilityRegistry, HelpMeta, Slot,
-                                     validate_help_meta)
-from covas.capabilities.help_capability import (_IDLE_EMPTY, _IDLE_FRAMES,
-                                                _TOPIC_MISS, HelpCapability)
-
+from covas.capabilities.base import CapabilityRegistry, HelpMeta, Slot, validate_help_meta
+from covas.capabilities.help_capability import (
+    _IDLE_EMPTY,
+    _IDLE_FRAMES,
+    _TOPIC_MISS,
+    HelpCapability,
+)
 
 # --- fakes -----------------------------------------------------------------
 
@@ -301,8 +303,7 @@ def test_recovery_never_recites_the_capability_list():
 def test_recovery_against_the_real_outfitting_capability():
     # Exercise the actual retrofit, not just a stub: the outfitting capability contributes a
     # real module vocabulary, so recovery resolves a mishear against it.
-    from covas.capabilities.find_closest_capability import (FindClosestCapability,
-                                                            NavConfig)
+    from covas.capabilities.find_closest_capability import FindClosestCapability, NavConfig
     reg = CapabilityRegistry()
     help_cap = HelpCapability(reg)
     reg.register(help_cap)

@@ -40,7 +40,8 @@ doesn't contend with the game's rendering.
 from __future__ import annotations
 
 import threading
-from typing import Callable, Iterator, Optional, Protocol, runtime_checkable
+from collections.abc import Callable, Iterator
+from typing import Protocol, runtime_checkable
 
 import numpy as np
 
@@ -61,7 +62,7 @@ class TTSProvider(Protocol):
     def speak(self, text: str, cancel: threading.Event) -> None:
         """Synthesize and play `text`, stopping promptly if `cancel` is set."""
 
-    def synth_pcm(self, text: str, voice_id: Optional[str] = None) -> tuple[bytes, int]:
+    def synth_pcm(self, text: str, voice_id: str | None = None) -> tuple[bytes, int]:
         """Return (raw 16-bit mono PCM bytes, sample_rate). Used for cached status lines and
         for rendering a line to a chosen BUS/VOICE via the mixer (C1). `voice_id=None` uses
         the provider's configured voice; providers with a single voice ignore it."""
@@ -74,10 +75,10 @@ class LLMProvider(Protocol):
         messages: list[dict],
         cancel: threading.Event,
         on_event: OnEvent,
-        tool_handler: Optional[ToolHandler] = None,
-        tools: Optional[list[dict]] = None,
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
+        tool_handler: ToolHandler | None = None,
+        tools: list[dict] | None = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
     ) -> Iterator[tuple[str, str]]:
         """Stream a reply for the given conversation. `tools` are the client-side
         tool schemas the LLM may call (from the capability registry); `tool_handler`

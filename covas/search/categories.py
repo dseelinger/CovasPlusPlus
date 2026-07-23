@@ -28,8 +28,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .spansh import (BODIES_URL, STATIONS_URL, SYSTEMS_URL, distance_sort, is_fleet_carrier,
-                     largest_pad, pad_filter_key)
+from .spansh import (
+    BODIES_URL,
+    STATIONS_URL,
+    SYSTEMS_URL,
+    distance_sort,
+    is_fleet_carrier,
+    largest_pad,
+    pad_filter_key,
+)
 
 # Spansh filter "kinds" — how a slot value is rendered into the request. Each maps a plain
 # Python value (what a capability fills a slot with) to the structured shape Spansh accepts.

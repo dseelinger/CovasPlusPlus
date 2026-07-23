@@ -7,8 +7,12 @@ channel routing, fail-soft on unbound keys, and message sanitisation.
 """
 from __future__ import annotations
 
-from covas.capabilities.comms_capability import (CommsSendCapability, CommsSendConfig,
-                                                 clean_message, MAX_MESSAGE_CHARS)
+from covas.capabilities.comms_capability import (
+    MAX_MESSAGE_CHARS,
+    CommsSendCapability,
+    CommsSendConfig,
+    clean_message,
+)
 from covas.comms.injector import PASTE_BINDING, SEND_BINDING
 from covas.keybinds.binds import KeyBinding
 

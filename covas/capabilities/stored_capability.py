@@ -25,11 +25,10 @@ from __future__ import annotations
 
 import difflib
 import re
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ..ed.module_names import module_name
-from ..ed.stored import (StoredModule, StoredModulesSnapshot, StoredShip,
-                         StoredShipsSnapshot)
+from ..ed.stored import StoredModule, StoredModulesSnapshot, StoredShip, StoredShipsSnapshot
 from .base import HelpMeta, Slot
 
 _SHIP_TOOL = "find_stored_ship"
@@ -113,9 +112,9 @@ class StoredCapability:
     def __init__(
         self,
         *,
-        get_stored_ships: Callable[[], Optional[StoredShipsSnapshot]],
-        get_stored_modules: Callable[[], Optional[StoredModulesSnapshot]],
-        get_current_system: Callable[[], Optional[str]],
+        get_stored_ships: Callable[[], StoredShipsSnapshot | None],
+        get_stored_modules: Callable[[], StoredModulesSnapshot | None],
+        get_current_system: Callable[[], str | None],
         clipboard: Callable[[str], None],
         log: Callable[[str], None] | None = None,
     ) -> None:
@@ -424,7 +423,7 @@ def _transfer_phrase(cost: int | None, time_s: int | None) -> str:
 
 
 def _credits(value: int) -> str:
-    from ..i18n import fmt_int, fmt_num   # locale grouping/decimal for spoken amounts (#199)
+    from ..i18n import fmt_int, fmt_num  # locale grouping/decimal for spoken amounts (#199)
     if value <= 0:
         return "nothing"
     if value >= 1_000_000:

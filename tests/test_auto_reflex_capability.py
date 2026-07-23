@@ -17,8 +17,6 @@ real waiting.
 """
 from __future__ import annotations
 
-from covas.keybinds.binds import KeyBinding
-from covas.keybinds.executor import KeyExecutor
 from covas.capabilities.auto_reflex_capability import (
     AUTO_REFLEXES,
     AutoReflexCapability,
@@ -27,7 +25,8 @@ from covas.capabilities.auto_reflex_capability import (
     ReflexSetting,
 )
 from covas.capabilities.reflex_capability import ALWAYS_REFUSED, COMBAT_PERMISSIVE, REFLEX_ACTIONS
-
+from covas.keybinds.binds import KeyBinding
+from covas.keybinds.executor import KeyExecutor
 
 # --- recording fake executor + a fake, advanceable clock -------------------
 

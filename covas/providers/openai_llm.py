@@ -27,13 +27,20 @@ from __future__ import annotations
 import json
 import re
 import threading
-from typing import Iterator, Optional
+from collections.abc import Iterator
 
 import requests
 
 from ..llm import build_system, estimate_cost
-from ._retry import (ProviderError, RetryPolicy, TransientError, is_retryable_status,
-                     parse_retry_after, retry_event, run_with_retry)
+from ._retry import (
+    ProviderError,
+    RetryPolicy,
+    TransientError,
+    is_retryable_status,
+    parse_retry_after,
+    retry_event,
+    run_with_retry,
+)
 from .base import OnEvent, ToolHandler
 
 _DEFAULT_BASE_URL = "https://api.openai.com/v1"
@@ -82,7 +89,7 @@ class OpenAILLM:
                 provider="OpenAI", status=401, retryable=False)
         return key
 
-    def _messages(self, messages: list[dict], system: Optional[str]) -> list[dict]:
+    def _messages(self, messages: list[dict], system: str | None) -> list[dict]:
         """Convert the app's conversation history to OpenAI chat messages (system first). History
         turns carry plain-string content; an Anthropic-style block list is flattened to its text.
         `system` is the per-turn system prompt (issue #151), or None when personality/crew add none."""
@@ -105,10 +112,10 @@ class OpenAILLM:
         messages: list[dict],
         cancel: threading.Event,
         on_event: OnEvent,
-        tool_handler: Optional[ToolHandler] = None,
-        tools: Optional[list[dict]] = None,
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
+        tool_handler: ToolHandler | None = None,
+        tools: list[dict] | None = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
     ) -> Iterator[tuple[str, str]]:
         key = self._key()
         # Build the system prompt PER TURN (issue #151) so a ship swap's crew roster (#127) — stamped
@@ -133,8 +140,8 @@ class OpenAILLM:
 
             text_parts: list[str] = []
             tool_calls: dict[int, dict] = {}
-            finish: Optional[str] = None
-            usage: Optional[dict] = None
+            finish: str | None = None
+            usage: dict | None = None
 
             for chunk in _stream_chat(self.base_url, key, body, cancel, policy=policy,
                                       on_retry=_on_retry):
@@ -231,7 +238,7 @@ def list_openai_models(base_url: str, key: str, *, timeout=(5, 15)) -> list[str]
     return parse_openai_models(r.json())
 
 
-def _translate_tools(tools: Optional[list[dict]]) -> list[dict]:
+def _translate_tools(tools: list[dict] | None) -> list[dict]:
     """Translate the shared Anthropic-style tool schemas ({name, description, input_schema}) into
     OpenAI function tools ({type:'function', function:{name, description, parameters}})."""
     out: list[dict] = []
@@ -285,7 +292,7 @@ def _usage_event(cfg: dict, model: str, usage: dict) -> dict:
 
 
 def _stream_chat(base_url: str, key: str, body: dict, cancel: threading.Event,
-                 *, policy: Optional[RetryPolicy] = None, on_retry=None,
+                 *, policy: RetryPolicy | None = None, on_retry=None,
                  timeout=(10, 600)) -> Iterator[dict]:  # noqa: ANN001
     """POST `chat/completions` with stream=True and yield each parsed SSE `data:` chunk as a dict.
     Stops on `[DONE]` or `cancel`.
@@ -300,7 +307,7 @@ def _stream_chat(base_url: str, key: str, body: dict, cancel: threading.Event,
                "User-Agent": _USER_AGENT}
     policy = policy or RetryPolicy()
 
-    def _connect() -> "requests.Response":
+    def _connect() -> requests.Response:
         r = requests.post(url, data=json.dumps(body), headers=headers, stream=True, timeout=timeout)
         if r.status_code != 200:
             detail = f"OpenAI LLM {r.status_code}: {r.text[:200]}"

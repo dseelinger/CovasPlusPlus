@@ -52,16 +52,32 @@ def build_family_surface() -> list[dict]:
     """
     # Imports are local so a construction problem surfaces as a test error, not a collection error.
     from covas.capabilities._search_support import SearchConfig
-    from covas.capabilities.find_closest_capability import (FindClosestCapability,
-                                                            FindClosestShipCapability, NavConfig)
-    from covas.capabilities.mining_helper_capability import (MiningHelperCapability,
-                                                             MiningHelperConfig)
-    from covas.capabilities.route_plan_capability import (NeutronPlanCapability, NeutronPlanConfig,
-                                                          RichesPlanCapability, RichesPlanConfig,
-                                                          RoutePlanCapability, RoutePlanConfig)
-    from covas.capabilities.search_family import (FACTION_STATES_CATEGORY, MINOR_FACTIONS,
-                                                  SIGNALS, STATIONS, BodySearchCapability,
-                                                  SpecSearchCapability, SystemSearchCapability)
+    from covas.capabilities.find_closest_capability import (
+        FindClosestCapability,
+        FindClosestShipCapability,
+        NavConfig,
+    )
+    from covas.capabilities.mining_helper_capability import (
+        MiningHelperCapability,
+        MiningHelperConfig,
+    )
+    from covas.capabilities.route_plan_capability import (
+        NeutronPlanCapability,
+        NeutronPlanConfig,
+        RichesPlanCapability,
+        RichesPlanConfig,
+        RoutePlanCapability,
+        RoutePlanConfig,
+    )
+    from covas.capabilities.search_family import (
+        FACTION_STATES_CATEGORY,
+        MINOR_FACTIONS,
+        SIGNALS,
+        STATIONS,
+        BodySearchCapability,
+        SpecSearchCapability,
+        SystemSearchCapability,
+    )
 
     http, clip = _NoHttp(), _noop_copy
     common = dict(http=http, get_current_system=_current_system, clipboard=clip)

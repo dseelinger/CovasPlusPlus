@@ -28,12 +28,11 @@ import json
 import sys
 import threading
 from pathlib import Path
-from typing import Optional
 
 from .loadout import Engineering, LoadoutSnapshot, Modifier, ShipModule
 
 
-def _sid(value: object) -> Optional[str]:
+def _sid(value: object) -> str | None:
     """A ShipID normalised to a string key (JSON object keys are strings), or None. Accepts the
     raw int the journal writes; rejects bools / non-numerics — mirrors owned_ships._sid so the two
     stores key on the SAME identity."""
@@ -169,15 +168,15 @@ class ShipLoadoutStore:
     serialises the DISK write so the journal thread can persist OUTSIDE the EDContext lock without a
     slow disk stalling readers (#161). Fail-soft throughout, mirroring `owned_ships.OwnedShipsRegistry`."""
 
-    def __init__(self, loadouts: Optional[dict] = None, path: Optional[Path | str] = None) -> None:
+    def __init__(self, loadouts: dict | None = None, path: Path | str | None = None) -> None:
         self._loadouts: dict = dict(loadouts or {})
-        self._path: Optional[Path] = Path(path) if path else None
+        self._path: Path | None = Path(path) if path else None
         # Serialises DISK writes only (never held during a state mutation) so the journal thread can
         # persist OUTSIDE the EDContext lock without a slow disk stalling readers (#161).
         self._io_lock = threading.Lock()
 
     @classmethod
-    def load(cls, path: Optional[Path | str]) -> "ShipLoadoutStore":
+    def load(cls, path: Path | str | None) -> ShipLoadoutStore:
         """Read the store from disk, fail-soft. A missing/corrupt/non-dict file yields an EMPTY
         store (never raises) so a bad file can't wedge the journal watcher."""
         p = Path(path) if path else None
@@ -207,7 +206,7 @@ class ShipLoadoutStore:
             self.persist(body)
         return changed
 
-    def capture_deferred(self, snapshot: LoadoutSnapshot | None) -> tuple[bool, Optional[str]]:
+    def capture_deferred(self, snapshot: LoadoutSnapshot | None) -> tuple[bool, str | None]:
         """Capture ONE ship's loadout IN MEMORY and render the body to persist, WITHOUT touching
         disk. Returns `(changed, body)` — `body` is None when nothing changed or no path. The
         journal path mutates under its state lock, then `persist()`s OUTSIDE it so a slow disk never

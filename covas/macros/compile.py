@@ -25,8 +25,12 @@ Two safety properties are computed, not trusted from the author:
 from __future__ import annotations
 
 from ..keybinds.registry import Macro
-from ..keybinds.sequence import (AWAIT_STATUS as _AWAIT, HOLD as _HOLD, PRESS as _PRESS,
-                                  REQUIRE_STATUS as _REQUIRE, WAIT as _WAIT, Step)
+from ..keybinds.sequence import AWAIT_STATUS as _AWAIT
+from ..keybinds.sequence import HOLD as _HOLD
+from ..keybinds.sequence import PRESS as _PRESS
+from ..keybinds.sequence import REQUIRE_STATUS as _REQUIRE
+from ..keybinds.sequence import WAIT as _WAIT
+from ..keybinds.sequence import Step
 from .registry import STATUS_CONDITIONS, TRIGGERS
 from .spec import ACTION, AWAIT_STATUS, REQUIRE_STATUS, WAIT, MacroSpec
 

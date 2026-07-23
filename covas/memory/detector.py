@@ -61,7 +61,7 @@ class MemoryDetectorConfig:
     ])
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "MemoryDetectorConfig":
+    def from_cfg(cls, cfg: dict) -> MemoryDetectorConfig:
         m = cfg.get("memory", {}) or {}
         d = cls()
 
@@ -84,7 +84,7 @@ class MemoryDetector:
         self.cfg = cfg
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "MemoryDetector":
+    def from_cfg(cls, cfg: dict) -> MemoryDetector:
         return cls(MemoryDetectorConfig.from_cfg(cfg))
 
     def decide(self, text: str) -> MemoryRef:

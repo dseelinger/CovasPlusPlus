@@ -58,7 +58,7 @@ def _blob(data: bytes) -> tuple[_DATA_BLOB, ctypes.Array]:
     return _DATA_BLOB(len(data), ctypes.cast(buf, ctypes.POINTER(ctypes.c_char))), buf
 
 
-def _crypt32() -> "ctypes.WinDLL":
+def _crypt32() -> ctypes.WinDLL:
     crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
     proto = [ctypes.POINTER(_DATA_BLOB), ctypes.c_wchar_p, ctypes.POINTER(_DATA_BLOB),
              ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32, ctypes.POINTER(_DATA_BLOB)]

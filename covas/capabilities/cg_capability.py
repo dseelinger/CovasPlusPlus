@@ -15,7 +15,7 @@ key). Fail-soft: no feed -> journal-only with a clear note. All I/O injected (DE
 """
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ..cg.feed import CGFeedError
 from ..cg.models import CommunityGoal, match_goal, merge, standing_phrase, summarize
@@ -60,10 +60,10 @@ class CGCapability:
         self,
         *,
         get_journal_goals: Callable[[], list[CommunityGoal]],
-        get_current_system: Callable[[], Optional[str]],
+        get_current_system: Callable[[], str | None],
         clipboard: Callable[[str], None],
-        fetch_external: Optional[Callable[[], list[CommunityGoal]]] = None,
-        log: Optional[Callable[[str], None]] = None,
+        fetch_external: Callable[[], list[CommunityGoal]] | None = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._get_journal = get_journal_goals
         self._current_system = get_current_system
@@ -102,7 +102,7 @@ class CGCapability:
             return f"Community-goal lookup error: {e}"
 
     # -- gather (journal + optional external) -----------------------------------------
-    def _gather(self) -> tuple[list[CommunityGoal], Optional[str]]:
+    def _gather(self) -> tuple[list[CommunityGoal], str | None]:
         """The active-CG set and a feed-status note: None (feed merged in), 'unconfigured'
         (no external source), or 'failed' (feed configured but unreachable)."""
         journal = list(self._get_journal() or [])
@@ -115,7 +115,7 @@ class CGCapability:
             return journal, "failed"
         return merge(external, journal), None
 
-    def _feed_note(self, note: Optional[str]) -> str:
+    def _feed_note(self, note: str | None) -> str:
         if note == "unconfigured":
             return (" I can only see the goals you've visited — add an Inara API key in the "
                     "community-goal settings to see every active one.")
@@ -184,7 +184,7 @@ class CGCapability:
             self._log(msg)
 
 
-def _same_system(a: Optional[str], b: Optional[str]) -> bool:
+def _same_system(a: str | None, b: str | None) -> bool:
     return bool(a and b and a.strip().lower() == b.strip().lower())
 
 

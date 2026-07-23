@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Optional
 
 AUDIO_EXTS = (".wav", ".ogg", ".flac")
 MUSIC_EXTS = (".wav", ".ogg", ".flac", ".mp3")
@@ -202,6 +201,6 @@ def ensure_skeleton(base) -> None:  # noqa: ANN001 — a path-like (project root
         pass
 
 
-def threat_lines(bundle: ContentBundle, default: Optional[tuple[str, ...]] = None) -> tuple[str, ...]:
+def threat_lines(bundle: ContentBundle, default: tuple[str, ...] | None = None) -> tuple[str, ...]:
     """The interdiction threat pool: dropped-in lines if present, else the provided default."""
     return tuple(bundle.threat) if bundle.threat else tuple(default or ())

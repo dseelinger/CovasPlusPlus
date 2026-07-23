@@ -39,7 +39,7 @@ def test_harden_streams_makes_odd_glyphs_safe():
     s.write(ODD)          # must not raise
     s.flush()
     assert s.buffer.getvalue()          # bytes were actually written
-    assert "→".encode("utf-8") in s.buffer.getvalue()   # the arrow survived as utf-8
+    assert "→".encode() in s.buffer.getvalue()   # the arrow survived as utf-8
 
 
 def test_harden_streams_is_best_effort_on_odd_streams():

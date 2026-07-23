@@ -12,7 +12,6 @@ from covas.mixer import CastSynth, Voice
 from covas.mixer.voices import EL, PIPER
 from covas.providers.registry import TTSProviderRegistry, resolve_provider
 
-
 # ---- TTSProviderRegistry -------------------------------------------------------------------
 
 def test_register_has_names_and_synth():

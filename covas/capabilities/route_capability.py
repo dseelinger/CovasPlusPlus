@@ -27,8 +27,8 @@ Off by default ([route].enabled = false).
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from ..ed.route import RouteTracker, is_hazardous_star, is_scoopable
 
@@ -54,7 +54,7 @@ class RouteConfig:
     callout_hazard: bool = True      # neutron star / white dwarf heads-up (#147)
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "RouteConfig":
+    def from_cfg(cls, cfg: dict) -> RouteConfig:
         r = cfg.get("route", {}) or {}
         d = cls()
         return cls(
@@ -82,9 +82,9 @@ class RouteCalloutCapability:
         config: RouteConfig,
         *,
         speak_line: Callable[[str], bool],
-        load_navroute: Callable[[], Optional[dict]],
-        is_muted: Optional[Callable[[], bool]] = None,
-        log: Optional[Callable[[str], None]] = None,
+        load_navroute: Callable[[], dict | None],
+        is_muted: Callable[[], bool] | None = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._cfg = config
         self._speak = speak_line
@@ -92,7 +92,7 @@ class RouteCalloutCapability:
         self._is_muted = is_muted or (lambda: False)
         self._log = log
         self._tracker = RouteTracker()
-        self._last_target: Optional[str] = None   # system of the last scoopable callout
+        self._last_target: str | None = None   # system of the last scoopable callout
 
     # -- capability interface ---------------------------------------------------------
     # No LLM tools and no help metadata: this capability is purely event-driven (ambient),

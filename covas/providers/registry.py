@@ -20,7 +20,7 @@ cheap cloud → premium) that mirrors the LLM cost router.
 """
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 # A cast synth backend: (text, ref) -> (pcm_bytes, sample_rate). ref '' = the provider default voice.
 TTSBackend = Callable[[str, str], "tuple[bytes, int]"]
@@ -41,7 +41,7 @@ class TTSProviderRegistry:
     def __init__(self) -> None:
         self._backends: dict[str, TTSBackend] = {}
 
-    def register(self, name: str, backend: TTSBackend) -> "TTSProviderRegistry":
+    def register(self, name: str, backend: TTSBackend) -> TTSProviderRegistry:
         """Register (or replace) a provider's backend. Returns self so registrations can chain."""
         self._backends[str(name).lower()] = backend
         return self
@@ -52,13 +52,13 @@ class TTSProviderRegistry:
     def names(self) -> list[str]:
         return sorted(self._backends)
 
-    def synth(self, provider: str, text: str, ref: str = "") -> "tuple[bytes, int]":
+    def synth(self, provider: str, text: str, ref: str = "") -> tuple[bytes, int]:
         """Synthesize `text` in `provider`'s voice `ref`. Raises KeyError if the provider isn't
         registered — callers (CastSynth) catch it and fall back to silence."""
         return self._backends[str(provider).lower()](text, ref or "")
 
 
-def resolve_provider(cfg: dict, role: str, *, default: Optional[str] = None) -> str:
+def resolve_provider(cfg: dict, role: str, *, default: str | None = None) -> str:
     """Which TTS provider a cast ROLE should use: a `[audio.voices.providers].<role>` override if
     set, else `default`, else the cast umbrella `[audio.voices].cast_provider` (`elevenlabs` if
     unset). Always lower-cased. Pure — no I/O. Persona/status is not a cast role; use

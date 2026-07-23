@@ -15,7 +15,7 @@ only on a real play. The driver builds NO audio itself and is off by default (th
 from __future__ import annotations
 
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from .cues import Cue, CueRegistry
 from .eligibility import EligibilityEngine
@@ -32,7 +32,7 @@ class CueDriver:
         *,
         context=None,  # noqa: ANN001 — optional EDContext, read for the live fuel percentage
         clock: Callable[[], float] = time.monotonic,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self.registry = registry
         self.engine = engine

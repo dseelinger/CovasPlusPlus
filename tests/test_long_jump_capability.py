@@ -9,7 +9,6 @@ from __future__ import annotations
 from covas.capabilities.long_jump_capability import LongJumpCapability, build_long_jump_prompt
 from covas.capabilities.proactive_capability import ProactiveConfig, ProactivePolicy
 
-
 # --- flavor prompt --------------------------------------------------------------------
 
 def test_prompt_is_flavor_and_asserts_no_facts():

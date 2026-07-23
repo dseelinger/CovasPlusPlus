@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from covas.nav.closest import ClosestResult, NavError
-from covas.nav.ship_search import (build_ship_payload, find_closest_ship, _sells_ship)
+from covas.nav.ship_search import _sells_ship, build_ship_payload, find_closest_ship
 from covas.nav.ships import resolve_ship
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "spansh_stations_ship_anaconda.json"

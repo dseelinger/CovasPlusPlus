@@ -17,9 +17,9 @@ of `run_health`.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
 
 # Check statuses. Only FAIL blocks "all systems go"; WARN is informational (optional key, stale data).
 OK = "ok"
@@ -133,7 +133,7 @@ def check_imports(report: HealthReport) -> None:
             s.add(FAIL, f"{label} won't import", str(e).splitlines()[0] if str(e) else "")
 
 
-def check_keys_and_files(report: HealthReport, cfg: dict) -> tuple[Optional[str], Optional[str]]:
+def check_keys_and_files(report: HealthReport, cfg: dict) -> tuple[str | None, str | None]:
     from . import firstrun
     s = report.section("Keys & files")
 
@@ -160,8 +160,8 @@ def check_keys_and_files(report: HealthReport, cfg: dict) -> tuple[Optional[str]
     return anth_key, el_key
 
 
-def check_anthropic(report: HealthReport, anth_key: Optional[str],
-                    probe: Optional[Callable[[str], int]] = None) -> None:
+def check_anthropic(report: HealthReport, anth_key: str | None,
+                    probe: Callable[[str], int] | None = None) -> None:
     """Free model-list reachability check. `probe(key)->count` is injected for tests; the default
     hits the live SDK. A missing key WARNs (the key check already FAILED it)."""
     s = report.section("Anthropic")
@@ -175,8 +175,8 @@ def check_anthropic(report: HealthReport, anth_key: Optional[str],
         s.add(FAIL, "Anthropic not reachable", friendly_provider_error("Anthropic", e))
 
 
-def check_elevenlabs(report: HealthReport, el_key: Optional[str],
-                     probe: Optional[Callable[[str], int]] = None) -> None:
+def check_elevenlabs(report: HealthReport, el_key: str | None,
+                     probe: Callable[[str], int] | None = None) -> None:
     s = report.section("ElevenLabs")
     if not el_key:
         s.add(WARN, "ElevenLabs check skipped (no key)")
@@ -189,7 +189,7 @@ def check_elevenlabs(report: HealthReport, el_key: Optional[str],
 
 
 def check_gemini(report: HealthReport, cfg: dict,
-                 probe: Optional[Callable[[str, str], list]] = None) -> None:
+                 probe: Callable[[str, str], list] | None = None) -> None:
     """Gemini model-id guard (issue #91) - only when [llm].provider == gemini. WARNS (never FAILS)
     if a configured model id isn't in the live list, catching a first-word 404 before it happens.
     `probe(base_url, key)->[model_ids]` injected for tests."""
@@ -206,7 +206,7 @@ def check_gemini(report: HealthReport, cfg: dict,
         if probe is not None:
             live = probe(str(g.get("base_url", "")).strip(), key)
         else:
-            from .providers.gemini_llm import list_gemini_models, _DEFAULT_BASE_URL
+            from .providers.gemini_llm import _DEFAULT_BASE_URL, list_gemini_models
             base_url = str(g.get("base_url", "")).strip().rstrip("/") or _DEFAULT_BASE_URL
             live = list_gemini_models(base_url, key)
         s.add(OK, f"Gemini reachable - {len(live)} models")
@@ -225,8 +225,8 @@ def check_gemini(report: HealthReport, cfg: dict,
         s.add(WARN, "Gemini model check skipped", friendly_provider_error("Gemini", e))
 
 
-def check_updates(report: HealthReport, current: Optional[str] = None,
-                  probe: Optional[Callable[[str], dict]] = None) -> None:
+def check_updates(report: HealthReport, current: str | None = None,
+                  probe: Callable[[str], dict] | None = None) -> None:
     """Update-available check (issue #186): nudge a stale build before the user files a bug against
     one. Reuses the fail-soft `updates.check_for_update` (GitHub Releases). `probe(current)->info`
     injected for tests; fail-soft (a network hiccup WARNs, never FAILs)."""
@@ -253,7 +253,7 @@ _WHISPER_RAM_GB = {
 
 
 def check_system(report: HealthReport, cfg: dict,
-                 probe: Optional[Callable[[], Optional[float]]] = None) -> None:
+                 probe: Callable[[], float | None] | None = None) -> None:
     """Minimum-requirements / graceful-degradation check (issue #186). Reports total RAM and WARNs
     if the configured Whisper model is heavy for it, pointing at a lighter model. `probe()->RAM GB`
     (or None if unknown) is injected for tests. Speech is CPU-only, so RAM — not VRAM — is the real
@@ -297,7 +297,7 @@ def check_datasets(report: HealthReport) -> None:
         s.add(WARN, "Data freshness check skipped", str(e).splitlines()[0] if str(e) else "")
 
 
-def check_audio(report: HealthReport, probe: Optional[Callable[[], dict]] = None) -> None:
+def check_audio(report: HealthReport, probe: Callable[[], dict] | None = None) -> None:
     """Microphone/speaker visibility. `probe()` returns {inputs, outputs, default_in, default_out};
     injected for tests, defaults to sounddevice."""
     s = report.section("Audio devices")
@@ -338,7 +338,7 @@ def _probe_updates(current: str) -> dict:
     return check_for_update(current)
 
 
-def _probe_ram_gb() -> Optional[float]:
+def _probe_ram_gb() -> float | None:
     """Total physical RAM in GB, Windows-first (GlobalMemoryStatusEx) with an os.sysconf fallback;
     None if it can't be determined. No new dependency."""
     try:
@@ -374,7 +374,7 @@ def _probe_audio() -> dict:
 
 # ---- orchestration ------------------------------------------------------------------------
 
-def run_health(cfg: Optional[dict] = None, *, network: bool = True) -> HealthReport:
+def run_health(cfg: dict | None = None, *, network: bool = True) -> HealthReport:
     """Run every check and return a structured report. `cfg` defaults to the app's loaded config
     (so the web route passes its live cfg and the CLI lets it load). `network=False` skips the
     provider-reachability probes (used by the offline test run / a quick local-only check)."""

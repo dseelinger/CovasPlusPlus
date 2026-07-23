@@ -10,9 +10,9 @@ endpoint anymore (every candidate path 404s), so the external source is Inara's
 `getCommunityGoalsRecent`, which needs a free generic Inara API key. Without a key, CG
 commands run journal-only — your standing and visited CGs, but not ones you haven't seen.
 """
-from .models import CommunityGoal, match_goal, standing_phrase, summarize
-from .journal import cg_from_journals, parse_cg_event
 from .feed import CGConfig, CGFeedError, fetch_inara_goals
+from .journal import cg_from_journals, parse_cg_event
+from .models import CommunityGoal, match_goal, standing_phrase, summarize
 
 __all__ = [
     "CommunityGoal",

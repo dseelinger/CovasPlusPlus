@@ -11,8 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from covas.nav.modules import (TAXONOMY, Ambiguous, NeedAttrs, Resolved, Unknown,
-                               _ALIASES, resolve)
+from covas.nav.modules import _ALIASES, TAXONOMY, Ambiguous, NeedAttrs, Resolved, Unknown, resolve
 
 _CSV = Path(__file__).parent / "fixtures" / "fdevids_outfitting.csv"
 

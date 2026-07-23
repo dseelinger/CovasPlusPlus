@@ -17,7 +17,7 @@ current-system getter, the carrier state getter, the squadron-name getter, and t
 """
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ..nav import CarrierInfo
 from .base import HelpMeta
@@ -58,10 +58,10 @@ class LocationCarrierCapability:
     def __init__(
         self,
         *,
-        get_current_system: Callable[[], Optional[str]],
+        get_current_system: Callable[[], str | None],
         clipboard: Callable[[str], None],
-        get_fleet_carrier: Callable[[], Optional[CarrierInfo]],
-        get_squadron_name: Callable[[], Optional[str]] | None = None,
+        get_fleet_carrier: Callable[[], CarrierInfo | None],
+        get_squadron_name: Callable[[], str | None] | None = None,
         log: Callable[[str], None] | None = None,
     ) -> None:
         self._current_system = get_current_system
@@ -161,6 +161,6 @@ class LocationCarrierCapability:
             self._log(msg)
 
 
-def _same_system(a: Optional[str], b: Optional[str]) -> bool:
+def _same_system(a: str | None, b: str | None) -> bool:
     """Case-insensitive system-name equality (both present)."""
     return bool(a and b and a.strip().lower() == b.strip().lower())

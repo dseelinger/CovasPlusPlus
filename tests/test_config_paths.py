@@ -10,7 +10,6 @@ from pathlib import Path
 
 from covas import config
 
-
 # --- _abs ------------------------------------------------------------------
 
 def test_abs_makes_relative_absolute_under_root():

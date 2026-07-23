@@ -46,7 +46,7 @@ class Group:
 # tokenized). Priority order encodes "what to keep when the budget is tight": conversation-critical
 # utility + the checklist first, live-Commander context next, then the heavier optional clusters
 # (engineering, Spansh/EDSM search) last. A capability names its group via `TIERING_GROUP`.
-GROUPS: dict[str, "Group"] = {
+GROUPS: dict[str, Group] = {
     "core":            Group("core",            0, 1450),  # help / settings / clipboard / version / ship-spec / HUD / audio
     "checklist":       Group("checklist",       1, 930),
     "commander_state": Group("commander_state", 2, 600),   # ED context / loadout / on-foot SRV
@@ -85,7 +85,7 @@ _BUDGET_LEAN = 3000             # core + checklist + commander_state
 _BUDGET_MINIMAL = 2400          # core + checklist
 _BUDGET_BARE = 0                # no tools
 
-LEVELS: dict[str, "Level"] = {
+LEVELS: dict[str, Level] = {
     "Full":     Level("Full",     _BUDGET_FULL,     proactive=True,  chatter_flavor=True,  comms_variants=True),
     "Standard": Level("Standard", _BUDGET_STANDARD, proactive=True,  chatter_flavor=False, comms_variants=False),
     "Lean":     Level("Lean",     _BUDGET_LEAN,     proactive=False, chatter_flavor=False, comms_variants=False),
@@ -111,7 +111,7 @@ def included_groups(budget: int) -> set[str]:
     return out
 
 
-def included_groups_for_level(level: "Level | str") -> set[str]:
+def included_groups_for_level(level: Level | str) -> set[str]:
     """The included tiering groups for a Level (or a level name)."""
     lvl = level if isinstance(level, Level) else LEVELS[normalize_level_name(level)]
     return included_groups(lvl.budget)
@@ -179,7 +179,7 @@ def auto_level_name(provider: str, base_url: str = "", custom_tpm: int | None = 
     return "Full"
 
 
-def resolve_level(cfg: dict) -> "Level":
+def resolve_level(cfg: dict) -> Level:
     """The active Level for a config: the `[llm].optimization_level` override if it names one of the
     five, else auto-selected from the provider (+ base_url + optional `[llm].custom_tpm`). Resolved
     ONCE at startup so the tool set — and the prompt cache — stay stable for the whole session."""

@@ -22,7 +22,7 @@ import ctypes
 import sys
 import threading
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from .binds import KeyBinding
 from .scancodes import scancode_for

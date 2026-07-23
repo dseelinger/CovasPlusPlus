@@ -15,8 +15,9 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -33,7 +34,7 @@ class ConfirmVerdict(Generic[T]):
     """Outcome of a `confirm()` call. `status` is one of the CONFIRM_* constants; `payload` is the
     armed value only when `status == CONFIRM_OK` (consumed — the gate is cleared)."""
     status: str
-    payload: Optional[T] = None
+    payload: T | None = None
 
 
 class ConfirmGate(Generic[T]):
@@ -53,7 +54,7 @@ class ConfirmGate(Generic[T]):
         self._window = float(confirm_window)
         self._clock = clock
         self._lock = threading.Lock()
-        self._payload: Optional[T] = None
+        self._payload: T | None = None
         self._armed_turn = 0
         self._armed_at = 0.0
         self._turn = 0
@@ -69,7 +70,7 @@ class ConfirmGate(Generic[T]):
             self._armed_at = self._clock()
 
     @property
-    def pending(self) -> Optional[T]:
+    def pending(self) -> T | None:
         with self._lock:
             return self._payload
 

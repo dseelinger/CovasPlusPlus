@@ -24,8 +24,8 @@ default `pytest` run covers it for free (DESIGN §9).
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from ..ed.loadout import LoadoutSnapshot
 from .jump_range import compute_jump_range
@@ -47,8 +47,8 @@ class MetricInput:
     live) `LoadoutSnapshot`; `spec` its bundled hull spec (None for a hull not in the table); `live`
     is present only for the ship currently being flown."""
     snapshot: LoadoutSnapshot
-    spec: Optional[Spec] = None
-    live: Optional[LiveState] = None
+    spec: Spec | None = None
+    live: LiveState | None = None
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ class MetricResult:
     (e.g. no FSD resolvable) — the capability then reports it UNKNOWN, never a guess. `basis` is a
     short spoken description of the load/assumptions the figure used; `approximate` hedges a
     best-effort figure (e.g. the hull-only jump-range fallback)."""
-    value: Optional[float]
+    value: float | None
     unit: str
     basis: str = ""
     known: bool = True
@@ -98,10 +98,10 @@ class MetricRegistry:
         for name in metric.names:
             self._by_name[_norm(name)] = metric
 
-    def get(self, key: str) -> Optional[Metric]:
+    def get(self, key: str) -> Metric | None:
         return self._by_key.get(str(key or "").strip())
 
-    def resolve(self, spoken: str) -> Optional[Metric]:
+    def resolve(self, spoken: str) -> Metric | None:
         """The metric a spoken name refers to ('jump range', 'range', 'jump_range'), or None. Exact
         normalised match first, then loose containment so 'my jump range' still resolves."""
         q = _norm(spoken)

@@ -7,16 +7,26 @@ No network, no real waiting.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from covas.search import NavError
-from covas.search.routes import (RESULTS_URL, RoutePlotter, RouteWaypoint, build_galaxy_request,
-                                 build_riches_request, build_trade_request, hop_age_days,
-                                 parse_galaxy_route, parse_riches_route, parse_trade_route,
-                                 stale_age_caveat, submit_and_poll)
+from covas.search.routes import (
+    RESULTS_URL,
+    RoutePlotter,
+    RouteWaypoint,
+    build_galaxy_request,
+    build_riches_request,
+    build_trade_request,
+    hop_age_days,
+    parse_galaxy_route,
+    parse_riches_route,
+    parse_trade_route,
+    stale_age_caveat,
+    submit_and_poll,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -226,13 +236,13 @@ def _hop(updated):
 
 
 def test_stale_age_caveat_none_when_fresh():
-    now = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=UTC)
     hops = [_hop("2026-07-15 06:00:00+00")]               # ~0.25 days old
     assert stale_age_caveat(hops, now=now) is None
 
 
 def test_stale_age_caveat_flags_old_prices():
-    now = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=UTC)
     hops = [_hop("2026-07-05 12:00:00+00"), _hop("2026-07-10 12:00:00+00")]  # youngest ~5d
     msg = stale_age_caveat(hops, now=now)
     assert msg is not None and "5 days old" in msg
@@ -244,13 +254,13 @@ def test_stale_age_caveat_none_without_timestamps():
 
 def test_stale_age_caveat_fresh_when_youngest_within_window():
     # A mix of one fresh + one old leg: the summary caveat stays quiet (per-leg tags cover it).
-    now = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=UTC)
     hops = [_hop("2026-07-15 06:00:00+00"), _hop("2026-07-01 12:00:00+00")]  # 0.25d + 14d
     assert stale_age_caveat(hops, now=now) is None
 
 
 def test_hop_age_days_reads_price_timestamp():
-    now = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 15, 12, 0, tzinfo=UTC)
     assert hop_age_days(_hop("2026-07-10 12:00:00+00"), now=now) == pytest.approx(5.0, abs=0.01)
     assert hop_age_days(_hop(None)) is None
 

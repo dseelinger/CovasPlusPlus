@@ -21,8 +21,8 @@ from __future__ import annotations
 import re
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from .buses import COMMS
 from .comms import TIER_PARAPHRASE, TIER_RIFF, TIER_VERBATIM, VoiceableComms
@@ -131,7 +131,7 @@ def build_variant_prompt(source: str, tier: str) -> str:
 
 
 def make_variant_generator(
-    llm, *, model: Optional[str] = None, max_tokens: int = 80  # noqa: ANN001 — LLMProvider
+    llm, *, model: str | None = None, max_tokens: int = 80  # noqa: ANN001 — LLMProvider
 ) -> Callable[[str, str], str]:
     """Adapt an LLMProvider into a `generate(source, tier) -> text` callable by accumulating its
     streamed reply. Kept thin; the app injects the cheap tier via `model`. Faked in unit tests
@@ -175,12 +175,12 @@ class CommsVoicer:
 
     def __init__(
         self,
-        play: Callable[[str, "VoiceableComms"], bool],
+        play: Callable[[str, VoiceableComms], bool],
         *,
-        generate: Optional[Callable[[str, str], str]] = None,
-        governor: Optional[CueGovernor] = None,
+        generate: Callable[[str, str], str] | None = None,
+        governor: CueGovernor | None = None,
         clock: Callable[[], float] = time.monotonic,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._play = play
         self._generate = generate
@@ -188,12 +188,12 @@ class CommsVoicer:
         self._clock = clock
         self._log = log
 
-    def set_generate(self, generate: Optional[Callable[[str, str], str]]) -> None:
+    def set_generate(self, generate: Callable[[str, str], str] | None) -> None:
         """Swap the LLM variant generator after a live provider hot-swap (issue #90). None =>
         always verbatim, exactly as construction with no LLM — no stale provider is kept."""
         self._generate = generate
 
-    def resolve_text(self, record: VoiceableComms, tier: Optional[str]) -> tuple[str, str, str]:
+    def resolve_text(self, record: VoiceableComms, tier: str | None) -> tuple[str, str, str]:
         """Decide the final SAFE text to voice and the tier actually applied. Verbatim needs no
         generation; a generated variant that fails validation falls back to the verbatim source.
         Returns (text, applied_tier, reason). Pure aside from the injected generator."""
@@ -215,7 +215,7 @@ class CommsVoicer:
         # governor reads name + cooldown_s, never the (empty) eligibility set.
         return Cue(record.dedup_key, COMMS, frozenset())
 
-    def voice(self, record: VoiceableComms, *, tier: Optional[str] = None) -> VoicedComms:
+    def voice(self, record: VoiceableComms, *, tier: str | None = None) -> VoicedComms:
         """Validate, govern, and route one record. Never raises. A non-voiceable or governed or
         empty line is simply not spoken."""
         if not record.voiceable:

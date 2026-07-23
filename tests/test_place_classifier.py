@@ -6,11 +6,17 @@ facts; ordinary arrivals carry none).
 """
 from __future__ import annotations
 
-from covas.ed.place_classifier import (KIND_ENGINEER, KIND_FIRST_SYSTEM, KIND_LANDMARK,
-                                       KIND_OWN_CARRIER, classify_station, classify_system,
-                                       place_facts, render_facts)
+from covas.ed.place_classifier import (
+    KIND_ENGINEER,
+    KIND_FIRST_SYSTEM,
+    KIND_LANDMARK,
+    KIND_OWN_CARRIER,
+    classify_station,
+    classify_system,
+    place_facts,
+    render_facts,
+)
 from covas.ed.visit_ledger import VisitStats
-
 
 # --- classify_station -----------------------------------------------------------------
 

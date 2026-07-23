@@ -19,7 +19,6 @@ from covas.memory import (
 )
 from covas.memory.embedding import build_embedder, cosine
 
-
 # --- MemoryRecord ------------------------------------------------------------
 
 def test_record_autofills_id_and_when_and_normalizes_tags():

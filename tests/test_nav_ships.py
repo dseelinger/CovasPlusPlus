@@ -6,9 +6,14 @@ stations), the genuine-family disambiguation, mishear handling, and the Unknown 
 """
 from __future__ import annotations
 
-from covas.nav.ships import (AmbiguousShip, ResolvedShip, ROSTER, SHIP_NAMES, UnknownShip,
-                            resolve_ship)
-
+from covas.nav.ships import (
+    ROSTER,
+    SHIP_NAMES,
+    AmbiguousShip,
+    ResolvedShip,
+    UnknownShip,
+    resolve_ship,
+)
 
 # --- exact / canonical -------------------------------------------------------------------
 

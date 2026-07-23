@@ -7,8 +7,10 @@ text, and calls on_event(kind, data) for side-channel status:
 Breaking out of the generator (or the caller setting `cancel`) aborts the HTTP call.
 """
 from __future__ import annotations
+
 import threading
-from typing import TYPE_CHECKING, Callable, Iterator
+from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING
 
 from .providers._retry import ProviderError
 

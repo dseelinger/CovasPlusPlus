@@ -9,7 +9,7 @@ date-window fragment (`freshness_filter`), the client backstop (`is_fresh`), the
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -22,7 +22,7 @@ from covas.search.categories import category
 from covas.search.spansh import NavError, data_age_days, freshness_filter, is_fresh
 
 _TODAY = date(2026, 7, 11)
-_NOW = datetime(2026, 7, 11, 16, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 7, 11, 16, 0, tzinfo=UTC)
 
 
 class ScriptedHttp:

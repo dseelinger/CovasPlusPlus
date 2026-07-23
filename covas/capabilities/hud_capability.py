@@ -34,8 +34,8 @@ from __future__ import annotations
 
 import re
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from ..ed.route import RouteTracker, is_scoopable
 from .base import HelpMeta
@@ -62,9 +62,9 @@ class HudSnapshot:
     """The four display fields, resolved to ready-to-show strings. Immutable, so it can be
     handed across threads (the model builds it; the view renders it) without a lock."""
     voice_state: str = "Idle"
-    checklist: Optional[str] = None
-    route: Optional[str] = None
-    callout: Optional[str] = None
+    checklist: str | None = None
+    route: str | None = None
+    callout: str | None = None
 
 
 # Inline Markdown the checklist/callout source text may legitimately contain (it comes from the
@@ -87,7 +87,7 @@ _MD_ITALIC_RE = re.compile(
 _MD_CODE_RE = re.compile(r"`([^`]*)`")                              # `code`
 
 
-def _plain(text: Optional[str]) -> Optional[str]:
+def _plain(text: str | None) -> str | None:
     """Strip inline Markdown to plain prose for the HUD (issue #122): bold/italic emphasis,
     inline code backticks, and a leading list/heading marker collapse to readable text so
     'Elvira Martuuk - **Location:** ...' shows as 'Elvira Martuuk - Location: ...' instead of
@@ -106,7 +106,7 @@ def _plain(text: Optional[str]) -> Optional[str]:
         return text
 
 
-def checklist_line(checklist) -> Optional[str]:
+def checklist_line(checklist) -> str | None:
     """The current checklist step for the HUD: the first PENDING item plus a done/total count
     ('Scan the nav beacon  (3/10 done)'), or None when there's nothing to show. Pure over a
     `Checklist`-like object (anything with `next_pending`); reads the file fresh so a hand-edit
@@ -142,8 +142,8 @@ class HudModel:
     def __init__(
         self,
         *,
-        checklist_provider: Optional[Callable[[], Optional[str]]] = None,
-        load_navroute: Optional[Callable[[], Optional[dict]]] = None,
+        checklist_provider: Callable[[], str | None] | None = None,
+        load_navroute: Callable[[], dict | None] | None = None,
         state: str = "Idle",
     ) -> None:
         self._lock = threading.Lock()
@@ -152,8 +152,8 @@ class HudModel:
         self._load_navroute = load_navroute or (lambda: None)
         self._tracker = RouteTracker()
         # None = unknown (no target locked yet); True/False = the last locked target's star.
-        self._next_scoopable: Optional[bool] = None
-        self._callout: Optional[str] = None
+        self._next_scoopable: bool | None = None
+        self._callout: str | None = None
 
     # -- ingest ------------------------------------------------------------------------
     def on_event(self, event: dict) -> None:
@@ -242,13 +242,13 @@ class HudModel:
             callout=callout,
         )
 
-    def _safe_checklist(self) -> Optional[str]:
+    def _safe_checklist(self) -> str | None:
         try:
             return self._checklist_provider()
         except Exception:  # noqa: BLE001
             return None
 
-    def _route_line(self) -> Optional[str]:
+    def _route_line(self) -> str | None:
         """The route-progress row, or None when no route is plotted. Called under the lock."""
         if not self._tracker.active:
             return None
@@ -278,7 +278,7 @@ _TRANSPARENT_KEY = "#010203"
 _ROW_ORDER: tuple[str, ...] = ("voice_state", "checklist", "route", "callout")
 
 
-def _row_pack_before(order: tuple[str, ...], visible: set[str], key: str) -> Optional[str]:
+def _row_pack_before(order: tuple[str, ...], visible: set[str], key: str) -> str | None:
     """Which currently-visible row should `key` be packed BEFORE to keep the fixed order?
 
     Pure ordering logic (unit-testable without a display): returns the first row after `key`
@@ -310,7 +310,7 @@ class HudView:
     POLL_MS = 400  # redraw cadence — glanceable, not a game loop; cheap next to ED
 
     def __init__(self, snapshot_provider: Callable[[], HudSnapshot],
-                 *, log: Optional[Callable[[str], None]] = None) -> None:
+                 *, log: Callable[[str], None] | None = None) -> None:
         self._provider = snapshot_provider
         self._log = log
         self._lock = threading.Lock()
@@ -321,7 +321,7 @@ class HudView:
         self._root = None
         self._rows: dict[str, object] = {}
         self._visible_rows: set[str] = set()   # which rows are currently packed (for stable order)
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
 
     # -- lifecycle ---------------------------------------------------------------------
     def start(self, timeout: float = 5.0) -> bool:
@@ -494,7 +494,7 @@ class HudView:
 
 
 def make_view(snapshot_provider: Callable[[], HudSnapshot],
-              *, log: Optional[Callable[[str], None]] = None) -> Optional[HudView]:
+              *, log: Callable[[str], None] | None = None) -> HudView | None:
     """Build and start a `HudView`, or return None when tkinter / a display is unavailable
     (headless CI, no toolkit). This is the single guarded entry point for creating a window —
     the capability calls it only when the HUD is enabled, so the default test run never does."""
@@ -517,7 +517,7 @@ class WebHudView:
     `run_covas_ui.py` (headless `run_covas.py` starts no Flask server), so a None keeps the surface
     off with the standard "unavailable" log rather than failing silently."""
 
-    def __init__(self, url: str, *, log: Optional[Callable[[str], None]] = None) -> None:
+    def __init__(self, url: str, *, log: Callable[[str], None] | None = None) -> None:
         self._url = url
         self._log = log
         self._announced = False   # log the paste-in URL once per enable, not every reconcile
@@ -565,13 +565,13 @@ class HudCapability:
         model: HudModel,
         *,
         is_enabled: Callable[[], bool],
-        view_factory: Callable[[Callable[[], HudSnapshot]], Optional["HudView"]] = make_view,
-        vr_is_enabled: Optional[Callable[[], bool]] = None,
-        vr_view_factory: Optional[Callable[[Callable[[], HudSnapshot]], Optional[object]]] = None,
-        vr_permanent: Optional[Callable[[], bool]] = None,
-        web_is_enabled: Optional[Callable[[], bool]] = None,
-        web_view_factory: Optional[Callable[[Callable[[], HudSnapshot]], Optional[object]]] = None,
-        log: Optional[Callable[[str], None]] = None,
+        view_factory: Callable[[Callable[[], HudSnapshot]], HudView | None] = make_view,
+        vr_is_enabled: Callable[[], bool] | None = None,
+        vr_view_factory: Callable[[Callable[[], HudSnapshot]], object | None] | None = None,
+        vr_permanent: Callable[[], bool] | None = None,
+        web_is_enabled: Callable[[], bool] | None = None,
+        web_view_factory: Callable[[Callable[[], HudSnapshot]], object | None] | None = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self.model = model
         self._is_enabled = is_enabled
@@ -585,11 +585,11 @@ class HudCapability:
         self._web_is_enabled = web_is_enabled or (lambda: False)
         self._web_view_factory = web_view_factory
         self._log = log
-        self._view: Optional[HudView] = None
+        self._view: HudView | None = None
         self._view_tried = False  # don't re-attempt a failed/headless window every settings change
-        self._vr_view: Optional[object] = None
+        self._vr_view: object | None = None
         self._vr_view_tried = False
-        self._web_view: Optional[object] = None
+        self._web_view: object | None = None
         self._web_view_tried = False
         # Serializes the check-then-act in `_reconcile_surface`: reconcile() can be called from
         # more than one thread (startup, a settings change, `on_web_ui_ready`), and an unlocked
@@ -738,7 +738,7 @@ class HudCapability:
     def _reconcile_surface(self, view_attr: str, tried_attr: str,
                            is_enabled: Callable[[], bool], factory, *,
                            label: str, unavailable: str,
-                           latch_on_fail: Optional[Callable[[], bool]] = None) -> None:
+                           latch_on_fail: Callable[[], bool] | None = None) -> None:
         """Match one surface's view to its enable flag: create+show when on, hide when off. The
         view is created lazily on first enable and reused thereafter (a toggle just hides/shows),
         so the underlying toolkit/runtime is only touched once the Commander opts in.

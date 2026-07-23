@@ -12,8 +12,13 @@ from pathlib import Path
 
 from covas.capabilities._search_support import SearchConfig
 from covas.capabilities.base import CapabilityRegistry, help_meta_problems
-from covas.capabilities.search_family import (FACTION_STATES_CATEGORY, MINOR_FACTIONS, SIGNALS,
-                                              STATIONS, SpecSearchCapability)
+from covas.capabilities.search_family import (
+    FACTION_STATES_CATEGORY,
+    MINOR_FACTIONS,
+    SIGNALS,
+    STATIONS,
+    SpecSearchCapability,
+)
 
 _FIX = Path(__file__).parent / "fixtures"
 _SYSTEMS = json.loads((_FIX / "spansh_systems_federation_sol.json").read_text("utf-8"))
@@ -119,7 +124,7 @@ def test_stations_no_slots_asks():
 
 
 def test_stations_outfitting_routing_note_is_mutual():
-    from covas.capabilities.find_closest_capability import _DESC_NO_CONFIRM, _DESC_CONFIRM
+    from covas.capabilities.find_closest_capability import _DESC_CONFIRM, _DESC_NO_CONFIRM
     st = SpecSearchCapability(STATIONS, SearchConfig(enabled=True)).tools()[0]["description"]
     # stations -> points a module/ship ask at outfitting; outfitting -> points service/type here.
     assert "find_closest_module" in st or "outfitting" in st.lower()

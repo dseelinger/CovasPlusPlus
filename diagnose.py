@@ -3,10 +3,13 @@
 Run this to isolate audio vs. keyboard problems.
 """
 from __future__ import annotations
+
 import time
+
 import keyboard
-from covas.config import load_config
+
 from covas.audio import CuePlayer
+from covas.config import load_config
 
 cfg = load_config()
 

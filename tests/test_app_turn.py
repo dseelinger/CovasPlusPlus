@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Iterator, Optional
+from collections.abc import Iterator
 
 from covas.app import App
 from covas.providers._retry import ProviderError
@@ -199,7 +199,7 @@ class _CapturingLLM:
     """Records the tools + tool_handler App hands to the LLM, then yields text."""
 
     def __init__(self) -> None:
-        self.tools_seen: Optional[list[dict]] = None
+        self.tools_seen: list[dict] | None = None
         self.handler = None
 
     def stream_reply(self, messages, cancel, on_event,
@@ -297,7 +297,7 @@ class _MsgCapturingLLM:
     """Records the content of the last user message App hands the LLM."""
 
     def __init__(self) -> None:
-        self.last_user: Optional[str] = None
+        self.last_user: str | None = None
 
     def stream_reply(self, messages, cancel, on_event,
                      tool_handler=None, tools=None,
@@ -357,7 +357,7 @@ class _MsgListCapturingLLM:
     untouched)."""
 
     def __init__(self) -> None:
-        self.messages: Optional[list] = None
+        self.messages: list | None = None
 
     def stream_reply(self, messages, cancel, on_event,
                      tool_handler=None, tools=None,

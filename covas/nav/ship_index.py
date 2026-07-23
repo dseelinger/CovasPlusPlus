@@ -22,10 +22,10 @@ harvested from the shipyards around a hub that stocks the full roster.
 from __future__ import annotations
 
 import threading
-from typing import Callable
+from collections.abc import Callable
 
+from ..search.spansh import _DEFAULT_UA, STATIONS_URL, distance_sort
 from .ships import SHIP_NAMES
-from ..search.spansh import STATIONS_URL, _DEFAULT_UA, distance_sort
 
 # Jameson Memorial (Shinrarta Dezhra) is the community hub whose shipyards stock the entire
 # roster, so a few hundred nearby shipyards union to the full, current ship list.

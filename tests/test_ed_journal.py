@@ -9,9 +9,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from covas.ed import EDContext, JournalWatcher
-from covas.ed.journal import (apply_journal_event, apply_scan_organic, default_journal_dir,
-                              describe_journal_event, parse_journal_line,
-                              resolve_journal_dir, srv_hull_transitions)
+from covas.ed.journal import (
+    apply_journal_event,
+    apply_scan_organic,
+    default_journal_dir,
+    describe_journal_event,
+    parse_journal_line,
+    resolve_journal_dir,
+    srv_hull_transitions,
+)
 from covas.ed.modes import MODE_MAINSHIP, MODE_SRV
 from covas.events import EventBus
 

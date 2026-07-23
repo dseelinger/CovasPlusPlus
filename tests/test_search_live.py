@@ -13,8 +13,15 @@ from __future__ import annotations
 
 import pytest
 
-from covas.search import (RequestsHttp, StationRecord, SystemRecord, build_query, category,
-                          execute_search, parse_results)
+from covas.search import (
+    RequestsHttp,
+    StationRecord,
+    SystemRecord,
+    build_query,
+    category,
+    execute_search,
+    parse_results,
+)
 
 pytestmark = [pytest.mark.integration, pytest.mark.local]
 
@@ -45,7 +52,8 @@ def test_live_query_per_category(cat_key):
 
 def test_live_outfitting_still_round_trips():
     """Outfitting keeps its bespoke path (nav/closest.py) on top of the shared transport."""
-    from covas.nav import RequestsHttp as NavHttp, find_closest_module, resolve
+    from covas.nav import RequestsHttp as NavHttp
+    from covas.nav import find_closest_module, resolve
     r = resolve("Multi-Cannon", "medium", "fixed")
     result = find_closest_module(r, "Sol", NavHttp(), pad_size="L")
     assert result.system and result.station and result.pad in ("S", "M", "L")

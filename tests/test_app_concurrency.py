@@ -18,7 +18,7 @@ sleeps, so there's no timing flakiness.
 from __future__ import annotations
 
 import threading
-from typing import Iterator
+from collections.abc import Iterator
 
 from covas import app as app_mod
 from covas import tiering

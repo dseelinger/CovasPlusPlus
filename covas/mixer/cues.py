@@ -20,8 +20,8 @@ contract. The LLM is never in this path; C2 only declares and routes.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from .buses import BUS_NAMES
 

@@ -1,6 +1,7 @@
 """Unit tests for the C3 driver — state -> eligible -> governed -> played. Offline, no device."""
 from __future__ import annotations
 
+from covas.ed.status import FLAGS
 from covas.mixer import (
     COMMS,
     MUSIC,
@@ -11,7 +12,6 @@ from covas.mixer import (
     EligibilityEngine,
     GovernorConfig,
 )
-from covas.ed.status import FLAGS
 
 
 class _Clock:

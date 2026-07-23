@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import random
 from collections import OrderedDict, deque
-from typing import Optional
 
 from .voices import Voice
 
@@ -38,22 +37,22 @@ class StickyVoicePool:
     `anti_repeat=N` avoids re-handing-out any of the last N voices picked (0 = off, today's
     behaviour), widening the EFFECTIVE variety of the ambient cast."""
 
-    def __init__(self, pool, *, rng: Optional[random.Random] = None,
-                 capacity: Optional[int] = None, fallback: Optional[Voice] = None,
+    def __init__(self, pool, *, rng: random.Random | None = None,
+                 capacity: int | None = None, fallback: Voice | None = None,
                  anti_repeat: int = 0) -> None:
         self._pool: list[Voice] = list(pool or [])
         self._rng = rng or random.Random()
         self._capacity = capacity
         self._fallback = fallback
-        self._assigned: "OrderedDict[str, Voice]" = OrderedDict()
+        self._assigned: OrderedDict[str, Voice] = OrderedDict()
         # Rolling window of the most-recently-picked voices, avoided on the next pick for variety.
-        self._recent: "deque[Voice]" = deque(maxlen=max(0, int(anti_repeat)))
+        self._recent: deque[Voice] = deque(maxlen=max(0, int(anti_repeat)))
 
     @property
     def pool(self) -> list[Voice]:
         return list(self._pool)
 
-    def _candidates(self, gender_hint: Optional[str]) -> list[Voice]:
+    def _candidates(self, gender_hint: str | None) -> list[Voice]:
         """Pool voices matching a male/female hint when any exist, else the whole pool."""
         if gender_hint in ("male", "female"):
             gendered = [v for v in self._pool if v.gender == gender_hint]
@@ -61,7 +60,7 @@ class StickyVoicePool:
                 return gendered
         return list(self._pool)
 
-    def _pick(self, gender_hint: Optional[str]) -> Optional[Voice]:
+    def _pick(self, gender_hint: str | None) -> Voice | None:
         """A random voice from the candidates, PREFERRING one that is neither currently assigned
         (so distinct speakers sound distinct until the pool is exhausted) nor in the anti-repeat
         window (so the ambient cast doesn't cluster on a few voices). Relaxes step by step when the
@@ -82,12 +81,12 @@ class StickyVoicePool:
             self._recent.append(choice)
         return choice
 
-    def random(self, gender_hint: Optional[str] = None) -> Voice:
+    def random(self, gender_hint: str | None = None) -> Voice:
         """A fresh RANDOM voice with no memory — for per-line chatter, where each line should sound
         like a different anonymous speaker. Falls back to the fallback/persona on an empty pool."""
         return self._pick(gender_hint) or self._fallback or Voice("elevenlabs", "", "neutral")
 
-    def assign(self, identity: str, gender_hint: Optional[str] = None) -> Voice:
+    def assign(self, identity: str, gender_hint: str | None = None) -> Voice:
         """The sticky assignment: the SAME `identity` returns the SAME voice until it's cleared or
         evicted; a new identity draws a fresh random voice. Touching an identity marks it
         most-recently-used (LRU)."""
@@ -106,7 +105,7 @@ class StickyVoicePool:
                 self._assigned.popitem(last=False)   # evict the least-recently-used
         return voice
 
-    def set_pool(self, pool, *, fallback: Optional[Voice] = None) -> None:
+    def set_pool(self, pool, *, fallback: Voice | None = None) -> None:
         """Swap the pool (e.g. after the EL voice list lands or a settings change). Assignments to
         voices that are no longer in the pool are dropped so they re-cast from the new pool; stable
         ones are kept, so the player LRU survives a rebuild."""

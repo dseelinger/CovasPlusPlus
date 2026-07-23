@@ -9,7 +9,7 @@ symbol), the skip-to-next-nearest behavior with the `skipped_local` tag, and the
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -18,7 +18,7 @@ from covas.nav.ship_search import find_closest_ship
 from covas.nav.ships import ResolvedShip
 from covas.search.spansh import NavError
 
-_NOW = datetime(2026, 7, 11, 16, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 7, 11, 16, 0, tzinfo=UTC)
 
 # The real shape ED writes (the recorded du Fresne visit, trimmed): PriceList held ONLY the
 # Corsair while the vendor's browse UI showed — and Spansh listed — the Type-8.
@@ -176,7 +176,7 @@ def test_capability_says_why_the_nearest_station_was_skipped():
                                     clipboard=copied.append)
     # Freeze time via the snapshot's own recency: it's dated 2026-07-11 and the veto compares
     # against the real clock, so re-date it to "now" to keep the test time-independent.
-    fresh = _snapshot(when=datetime.now(timezone.utc).isoformat())
+    fresh = _snapshot(when=datetime.now(UTC).isoformat())
     cap._local_shipyard = lambda: fresh
     line = cap.run_tool("find_closest_ship", {"ship": "type 8"})
     assert "Spansh lists it at du Fresne Exchange" in line

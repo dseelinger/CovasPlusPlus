@@ -7,13 +7,20 @@ from __future__ import annotations
 
 import pytest
 
-from covas.keybinds.confirm import (CONFIRM_EXPIRED, CONFIRM_NONE_PENDING, CONFIRM_OK,
-                                     CONFIRM_SAME_TURN, ConfirmGate)
+from covas.keybinds.confirm import (
+    CONFIRM_EXPIRED,
+    CONFIRM_NONE_PENDING,
+    CONFIRM_OK,
+    CONFIRM_SAME_TURN,
+    ConfirmGate,
+)
 from covas.keybinds.registry import Macro
 from covas.keybinds.sequence import AWAIT_STATUS, PRESS, REQUIRE_STATUS, WAIT
 from covas.macros.compile import CUSTOM_TOOL_PREFIX, MacroValidationError, compile_macro
-from covas.macros.spec import (ACTION, AWAIT_STATUS as SPEC_AWAIT, REQUIRE_STATUS as SPEC_REQUIRE,
-                               WAIT as SPEC_WAIT, MacroSpec, MacroStepSpec)
+from covas.macros.spec import ACTION, MacroSpec, MacroStepSpec
+from covas.macros.spec import AWAIT_STATUS as SPEC_AWAIT
+from covas.macros.spec import REQUIRE_STATUS as SPEC_REQUIRE
+from covas.macros.spec import WAIT as SPEC_WAIT
 from covas.macros.store import MacroStore
 
 # ---- a small hermetic action registry (no reliance on the shipped catalog) ----------------

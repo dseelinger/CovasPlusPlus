@@ -34,8 +34,8 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Optional
 
 from ..keybinds.binds import KeyBinding
 from .keybind_capability import COMBAT, INTERDICTION, combat_state
@@ -79,7 +79,7 @@ class ReflexTrigger:
     supplies the per-reflex enable/threshold/cooldown at runtime."""
     name: str
     wake_events: frozenset[str]
-    condition: Callable[[Optional[dict], float], bool]
+    condition: Callable[[dict | None, float], bool]
     default_threshold: float
     default_cooldown: float
     summary: str
@@ -144,7 +144,7 @@ class AutoReflexConfig:
     reflexes: dict[str, ReflexSetting] = field(default_factory=dict)
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "AutoReflexConfig":
+    def from_cfg(cls, cfg: dict) -> AutoReflexConfig:
         r = cfg.get("reflex", {}) or {}
         a = r.get("auto", {}) or {}
         d = cls()
@@ -241,10 +241,10 @@ class AutoReflexCapability:
         executor: object,
         config: AutoReflexConfig,
         triggers: dict[str, ReflexTrigger] | None = None,
-        status_snapshot: Optional[Callable[[], Optional[dict]]] = None,
-        policy: Optional[AutoReflexPolicy] = None,
+        status_snapshot: Callable[[], dict | None] | None = None,
+        policy: AutoReflexPolicy | None = None,
         clock: Callable[[], float] = time.monotonic,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._binds = binds or {}
         self._executor = executor

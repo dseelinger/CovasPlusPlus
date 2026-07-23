@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import json
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from ..events import EventBus
 from . import currencies
@@ -23,7 +23,7 @@ from .materials import parse_materials
 from .modes import MODE_SRV
 from .owned_ships import SHIPYARD_EVENTS
 from .status import describe_transition
-from .stored import parse_stored_ships, parse_stored_modules
+from .stored import parse_stored_modules, parse_stored_ships
 from .visit_ledger import ARRIVAL_EVENTS
 
 # SRV hull integrity (0..1) below which a proactive "hull's getting low" callout is worth it
@@ -530,7 +530,7 @@ class JournalWatcher(threading.Thread):
         tail from the end. On rollover (`prime=False`) the file is fresh, so read it from
         the top and publish every line."""
         self._close()
-        self._f = open(path, "r", encoding="utf-8", errors="replace")
+        self._f = open(path, encoding="utf-8", errors="replace")
         self._path = path
         self._buf = ""
         if prime:

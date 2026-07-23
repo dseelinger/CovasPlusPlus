@@ -25,7 +25,6 @@ from covas.mixer.carrier import CAPTAIN, CHATTER, TOWER
 from covas.mixer.eligibility import AT_OWN_CARRIER, NEAR_OWN_CARRIER, STATES, unknown_states
 from covas.mixer.voices import Voice
 
-
 # ============================================================================================
 # 1. Context detection — EDContext predicates + journal field capture
 # ============================================================================================

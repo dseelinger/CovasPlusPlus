@@ -26,7 +26,6 @@ from covas.mixer.music import (
     CTX_POPULATED,
 )
 
-
 # ---- context selection ---------------------------------------------------------------------
 
 def test_music_context_priority():

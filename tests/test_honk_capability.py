@@ -8,10 +8,9 @@ key sequence; no journal, no audio, no real key injection.
 """
 from __future__ import annotations
 
+from covas.capabilities.honk_capability import _PROBE_SECONDS, HonkCapability, HonkConfig
 from covas.ed.status import GUI_FOCUS_SAA
 from covas.keybinds.binds import KeyBinding
-from covas.capabilities.honk_capability import HonkCapability, HonkConfig, _PROBE_SECONDS
-
 
 # --- recording fake executor -----------------------------------------------
 

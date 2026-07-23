@@ -11,17 +11,22 @@ byte-identical to legacy behavior when no `stock_lookup` is injected (the existi
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
-from covas.nav.edsm_stock import (EdsmStockLookup, EdsmUnavailable, SHIPYARD_URL,
-                                  fetch_ship_stock, norm_ship_name)
+from covas.nav.edsm_stock import (
+    SHIPYARD_URL,
+    EdsmStockLookup,
+    EdsmUnavailable,
+    fetch_ship_stock,
+    norm_ship_name,
+)
 from covas.nav.ship_search import _STOCK_CHECK_LIMIT, find_closest_ship
 from covas.nav.ships import ResolvedShip
 from covas.search.spansh import NavError
 
-_NOW = datetime(2026, 7, 11, 16, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 7, 11, 16, 0, tzinfo=UTC)
 
 # Trimmed from the live EDSM response for Laplace Ring / Balante (2026-07-11) — note the
 # "Mk III" spacing EDSM uses where Spansh writes "MkIII".

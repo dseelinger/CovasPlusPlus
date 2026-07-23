@@ -19,16 +19,27 @@ spoken lines. `http` is injected so the default test run never hits the network 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 # The reusable transport + pad logic now live in the shared Spansh client. Re-exported here
 # (Http / RequestsHttp / NavError / _DEFAULT_UA) so the outfitting capability's existing
 # imports from `nav.closest` keep working unchanged.
-from ..search.spansh import (Http, NavError, RequestsHttp as RequestsHttp, STATIONS_URL,
-                             STOCK_MAX_AGE_DAYS, _DEFAULT_UA, data_age_days, execute_search,
-                             freshness_filter, is_fleet_carrier, is_fresh,
-                             largest_pad as _largest_pad,
-                             pad_filter_key as _pad_filter_key, pad_ok as _pad_ok)
+from ..search.spansh import (
+    _DEFAULT_UA,
+    STATIONS_URL,
+    STOCK_MAX_AGE_DAYS,
+    Http,
+    NavError,
+    data_age_days,
+    execute_search,
+    freshness_filter,
+    is_fleet_carrier,
+    is_fresh,
+)
+from ..search.spansh import RequestsHttp as RequestsHttp
+from ..search.spansh import largest_pad as _largest_pad
+from ..search.spansh import pad_filter_key as _pad_filter_key
+from ..search.spansh import pad_ok as _pad_ok
 
 # Nearest-station search window. We fetch this many nearest stations that sell the module
 # (name+class, pad filtered server-side), then post-filter locally by mount + carrier. Amply
@@ -158,7 +169,7 @@ def find_closest_module(resolved, current_system: str, http: Http, *,
         raise NavError("I don't know your current system yet — is Elite Dangerous running "
                        "with monitoring on? Jump somewhere and I'll have it.")
 
-    today = now.astimezone(timezone.utc).date() if now is not None else None
+    today = now.astimezone(UTC).date() if now is not None else None
 
     payload = build_payload(resolved, current_system, pad_size=pad_size, size=search_size,
                             fresh_within_days=STOCK_MAX_AGE_DAYS, today=today)

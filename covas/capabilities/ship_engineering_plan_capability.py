@@ -25,7 +25,7 @@ getter, engineer-progress getter, blueprint library) so the default `pytest` run
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from ..ed.blueprints import Blueprint, BlueprintLibrary
 from ..ed.engineers import Engineer, find_by_specialty, status_for

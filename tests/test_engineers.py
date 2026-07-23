@@ -10,9 +10,15 @@ import json
 from pathlib import Path
 
 from covas.ed import EDContext
-from covas.ed.engineers import (ENGINEERS, EngineerStatus, engineer_dashboard,
-                                find_by_specialty, find_engineer, parse_engineer_progress,
-                                status_for)
+from covas.ed.engineers import (
+    ENGINEERS,
+    EngineerStatus,
+    engineer_dashboard,
+    find_by_specialty,
+    find_engineer,
+    parse_engineer_progress,
+    status_for,
+)
 from covas.ed.journal import apply_journal_event
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "ed" / "engineer_progress.json"

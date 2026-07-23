@@ -7,10 +7,8 @@ and dispatches through the registry. All offline.
 from __future__ import annotations
 
 from covas.capabilities import Capability, CapabilityRegistry
-from covas.capabilities.ed_context_capability import (ED_CONTEXT_TOOLS,
-                                                      EDContextCapability)
+from covas.capabilities.ed_context_capability import ED_CONTEXT_TOOLS, EDContextCapability
 from covas.ed import EDContext
-
 
 # --- EDContext -------------------------------------------------------------
 

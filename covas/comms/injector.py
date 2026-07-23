@@ -23,7 +23,7 @@ tokens and let the shared scancode executor press them exactly like any other bi
 from __future__ import annotations
 
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ..keybinds.binds import KeyBinding
 from ..keybinds.executor import ExecutorError
@@ -62,7 +62,7 @@ class ClipboardTextInjector:
         self,
         *,
         executor: object,
-        copy: Optional[Callable[[str], None]] = None,
+        copy: Callable[[str], None] | None = None,
         sleep: Callable[[float], None] = time.sleep,
         settle: float = DEFAULT_SETTLE_SECONDS,
         focuser: object | None = None,

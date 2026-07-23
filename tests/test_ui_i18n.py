@@ -78,9 +78,10 @@ def test_shipped_catalog_covers_every_template_key(code):
 
 
 # ---- render guard: every wired template renders with t() resolved to English ----------------
-import covas.web as web            # noqa: E402
-import covas.setup_web as setup_web  # noqa: E402
 from flask import render_template  # noqa: E402
+
+import covas.setup_web as setup_web  # noqa: E402
+import covas.web as web  # noqa: E402
 
 
 class _Core:

@@ -17,7 +17,7 @@ PURE — it never reads config or the network; callers pass values in. That keep
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 # --- static option vocabularies (shared with the UI) -----------------------
 # English-only ".en" variants sit beside the multilingual sizes: same size, more accurate for
@@ -140,10 +140,10 @@ class Setting:
     group: str                        # UI section
     help: str                         # one-line inline explanation
     default: Any                      # mirrors config.toml (drift-tested)
-    options: Optional[list] = None    # static enum options
-    options_source: Optional[str] = None  # dynamic enum options (sentinel above)
-    min: Optional[float] = None       # numeric lower bound (inclusive)
-    max: Optional[float] = None       # numeric upper bound (inclusive)
+    options: list | None = None    # static enum options
+    options_source: str | None = None  # dynamic enum options (sentinel above)
+    min: float | None = None       # numeric lower bound (inclusive)
+    max: float | None = None       # numeric upper bound (inclusive)
     unit: str = ""                    # display suffix (ms, s, tokens)
     phrasings: tuple = ()             # spoken names for the voice layer
     example: str = ""                 # example spoken command
@@ -154,7 +154,7 @@ class Setting:
                                       # path. Editable only via the CSRF-guarded web panel or by
                                       # hand-editing config.toml/overrides.json.
     allow_custom: bool = False        # enum: accept a value outside options (like a combobox source)
-    doc_url: Optional[str] = None     # optional "Setup guide →" link shown under the help (#121)
+    doc_url: str | None = None     # optional "Setup guide →" link shown under the help (#121)
 
 
 # The schema. Order here is the order groups first appear in the web page.
@@ -1248,7 +1248,7 @@ def is_combobox(setting: Setting) -> bool:
     return setting.options_source in _COMBOBOX_SOURCES or setting.allow_custom
 
 
-def resolve_options(setting: Setting, dynamic: Optional[dict] = None) -> Optional[list]:
+def resolve_options(setting: Setting, dynamic: dict | None = None) -> list | None:
     """The concrete option list for an enum: static options, or a dynamic list
     supplied by the caller for an `options_source`. None when a dynamic source
     is declared but unavailable (offline) — validation then type-checks only."""
@@ -1267,7 +1267,7 @@ _FALSE = {"false", "off", "no", "0"}
 
 
 def validate_value(setting: Setting, value: Any,
-                   options: Optional[list] = None) -> tuple[Any, Optional[str]]:
+                   options: list | None = None) -> tuple[Any, str | None]:
     """Validate + coerce a proposed value against a setting.
 
     Returns ``(coerced_value, None)`` on success, or ``(None, error_message)``
@@ -1345,7 +1345,7 @@ _EXPERIMENTAL_CHOICES = {
 }
 
 
-def public_options(cfg: dict, s: Setting, opts: Optional[list]) -> Optional[list]:
+def public_options(cfg: dict, s: Setting, opts: list | None) -> list | None:
     """Drop experimental-gated choices from an enum's option list for the public UI (issue #123).
     A no-op for any setting/choice not in `_EXPERIMENTAL_CHOICES`, and for one whose flag is on."""
     if not opts:
@@ -1357,7 +1357,7 @@ def public_options(cfg: dict, s: Setting, opts: Optional[list]) -> Optional[list
 
 
 def field_payload(cfg: dict, overrides: dict, s: Setting,
-                  dynamic: Optional[dict] = None, readonly: bool = False) -> dict:
+                  dynamic: dict | None = None, readonly: bool = False) -> dict:
     """Serialize ONE setting into the dict the web surfaces render from: type + display metadata,
     resolved options, current value, and the overridden flag. `readonly` marks a control the quick
     panel shows but edits on the Settings page (issue #86). Shared by `public_schema` (the full
@@ -1384,7 +1384,7 @@ def field_payload(cfg: dict, overrides: dict, s: Setting,
 
 
 def panel_fields(cfg: dict, overrides: dict, keys, readonly=(),
-                 dynamic: Optional[dict] = None) -> list[dict]:
+                 dynamic: dict | None = None) -> list[dict]:
     """The quick-panel payload for a provider (issue #86): serialize each schema key in `keys`
     (skipping any unknown one) into a field dict the control panel renders GENERICALLY. `readonly`
     is the set of keys shown but not editable there. Order follows `keys`."""
@@ -1399,7 +1399,7 @@ def panel_fields(cfg: dict, overrides: dict, keys, readonly=(),
 
 
 def public_schema(cfg: dict, overrides: dict,
-                  dynamic: Optional[dict] = None) -> list[dict]:
+                  dynamic: dict | None = None) -> list[dict]:
     """Serialize the (visible) schema into groups for the web page, folding in
     each setting's current value, resolved options, and overridden flag."""
     groups: list[dict] = []

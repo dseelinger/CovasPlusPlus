@@ -11,8 +11,7 @@ import json
 
 from covas.ed.context import EDContext
 from covas.ed.journal import apply_carrier_event
-from covas.nav.carrier import (CarrierInfo, carrier_from_journals,
-                               squadron_name_from_journals)
+from covas.nav.carrier import CarrierInfo, carrier_from_journals, squadron_name_from_journals
 
 _OWN = 3700005632          # the owned carrier's CarrierID
 _OTHER = 3999999999        # a different (e.g. squadron) carrier's id

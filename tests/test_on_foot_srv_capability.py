@@ -6,8 +6,7 @@ live EDContext — on-foot vitals, SRV hull/cargo, and exobiology sample progres
 from __future__ import annotations
 
 from covas.capabilities import Capability, CapabilityRegistry
-from covas.capabilities.on_foot_srv_capability import (ON_FOOT_SRV_TOOLS,
-                                                       OnFootSrvCapability)
+from covas.capabilities.on_foot_srv_capability import ON_FOOT_SRV_TOOLS, OnFootSrvCapability
 from covas.ed import EDContext
 
 

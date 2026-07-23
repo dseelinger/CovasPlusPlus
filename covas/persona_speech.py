@@ -43,9 +43,9 @@ import heapq
 import itertools
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Callable, List, Optional, Tuple
 
 
 class Priority(IntEnum):
@@ -89,8 +89,8 @@ class Line:
     priority: int
     subject: str = ""
     preempt: bool = False
-    ttl: Optional[float] = None
-    speak: Optional[Callable[[threading.Event], None]] = None
+    ttl: float | None = None
+    speak: Callable[[threading.Event], None] | None = None
     cancel: threading.Event = field(default_factory=threading.Event)
     # --- internal bookkeeping (set by the arbiter) ---
     enqueued_at: float = 0.0
@@ -98,13 +98,13 @@ class Line:
     done: threading.Event = field(default_factory=threading.Event)
     dropped: bool = False
     spoken: bool = False
-    error: Optional[BaseException] = None
+    error: BaseException | None = None
 
     def expired(self, now: float) -> bool:
         """True once a TTL-bearing line has waited longer than its freshness window."""
         return self.ttl is not None and (now - self.enqueued_at) > float(self.ttl)
 
-    def wait(self, timeout: Optional[float] = None) -> bool:
+    def wait(self, timeout: float | None = None) -> bool:
         """Block until the line is spoken, cancelled, or dropped. Returns done-ness."""
         return self.done.wait(timeout)
 
@@ -117,7 +117,7 @@ class Line:
 
 
 # Heap entries: (-priority, seq, line) so highest priority pops first, FIFO within a priority.
-_Entry = Tuple[int, int, Line]
+_Entry = tuple[int, int, Line]
 
 
 class PersonaSpeechArbiter:
@@ -131,10 +131,10 @@ class PersonaSpeechArbiter:
 
     def __init__(
         self,
-        default_speak: Optional[Callable[[str, threading.Event], None]] = None,
+        default_speak: Callable[[str, threading.Event], None] | None = None,
         *,
         clock: Callable[[], float] = time.monotonic,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
         max_depth: int = DEFAULT_QUEUE_DEPTH,
     ) -> None:
         self._default_speak = default_speak
@@ -142,10 +142,10 @@ class PersonaSpeechArbiter:
         self._log = log or (lambda _m: None)
         self._max_depth = max(1, int(max_depth))
         self._cond = threading.Condition()
-        self._heap: List[_Entry] = []
+        self._heap: list[_Entry] = []
         self._counter = itertools.count()
-        self._current: Optional[Line] = None
-        self._thread: Optional[threading.Thread] = None
+        self._current: Line | None = None
+        self._thread: threading.Thread | None = None
         self._stop = threading.Event()
 
     # ---- configuration (live) --------------------------------------------
@@ -162,9 +162,9 @@ class PersonaSpeechArbiter:
         priority: int,
         subject: str = "",
         preempt: bool = False,
-        ttl: Optional[float] = None,
-        speak: Optional[Callable[[threading.Event], None]] = None,
-        cancel: Optional[threading.Event] = None,
+        ttl: float | None = None,
+        speak: Callable[[threading.Event], None] | None = None,
+        cancel: threading.Event | None = None,
     ) -> Line:
         """Enqueue a persona-voice line and return its :class:`Line` handle.
 
@@ -229,7 +229,7 @@ class PersonaSpeechArbiter:
 
     # ---- introspection (tests / diagnostics) ------------------------------
     @property
-    def current(self) -> Optional[Line]:
+    def current(self) -> Line | None:
         return self._current
 
     def pending(self) -> int:
@@ -248,7 +248,7 @@ class PersonaSpeechArbiter:
             return True  # safety line subsumes whatever is playing
         return new.priority > current.priority  # unrelated higher priority still jumps the queue
 
-    def _select_next(self) -> Optional[Line]:
+    def _select_next(self) -> Line | None:
         """Pop the highest-priority live, non-expired line (dropping expired/ dead ones as it
         goes), or None when the queue holds nothing speakable. Directly testable with the
         injected clock — the speaker thread calls it under the condition lock."""
@@ -269,7 +269,7 @@ class PersonaSpeechArbiter:
         victim = min(live, key=lambda q: (q.priority, q.seq))
         self._drop_locked(victim, f"queue full (>{self._max_depth}), lowest priority evicted")
 
-    def _pop_ready_locked(self) -> Optional[Line]:
+    def _pop_ready_locked(self) -> Line | None:
         now = self._clock()
         while self._heap:
             _, _, line = heapq.heappop(self._heap)

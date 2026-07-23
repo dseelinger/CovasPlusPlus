@@ -16,6 +16,7 @@ matches the file on disk (a voice edit landed meanwhile) is refused with HTTP 40
 so the panel can warn instead of clobbering.
 """
 from __future__ import annotations
+
 import hashlib
 import json
 import threading
@@ -25,18 +26,15 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request
 from flask_sock import Sock
 
-from . import bootstrap
-from . import catalog
+from . import bootstrap, catalog, firstrun, updates
 from . import crew as crew_mod
 from . import elevenlabs as el
-from . import firstrun
 from . import personality as persona
 from . import settings_schema as schema
-from . import updates
 from .__version__ import __version__
 from .checklist import ITEM_RE, checklist_event
-from .memory.store import MemoryRecord, MemoryStore, store_from_config
 from .macros.store import store_from_config as macros_store_from_config
+from .memory.store import MemoryRecord, MemoryStore, store_from_config
 
 # Config sections whose `api_key_file` the masked "API keys" Settings card manages (issue #23),
 # in display order. The card is write-only: keys are stored ENCRYPTED per section and never read
@@ -904,8 +902,8 @@ def create_app(core) -> Flask:
         if llm is None or not name:
             return _CANNED_PERSONA
         try:
-            from .router import Router
             from .ed.npc_crew import combat_rank_name
+            from .router import Router
             cheap = Router.from_cfg(core.cfg).cheap_route(None).model
             rank_txt = (combat_rank_name(combat_rank) if isinstance(combat_rank, int)
                         else str(combat_rank or "").strip())

@@ -23,7 +23,7 @@ the queue, not here; this capability just offers the line via the normal never-i
 from __future__ import annotations
 
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from ..ed.route import is_long_jump, jump_distance, route_coords
 

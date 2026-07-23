@@ -9,9 +9,14 @@ from __future__ import annotations
 import pytest
 
 from covas.capabilities.route_capability import RouteCalloutCapability, RouteConfig
-from covas.ed.route import (RouteTracker, is_hazardous_star, is_long_jump, is_scoopable,
-                            jump_distance, route_coords)
-
+from covas.ed.route import (
+    RouteTracker,
+    is_hazardous_star,
+    is_long_jump,
+    is_scoopable,
+    jump_distance,
+    route_coords,
+)
 
 # --- scoopable classification (KGBFOAM) ------------------------------------
 

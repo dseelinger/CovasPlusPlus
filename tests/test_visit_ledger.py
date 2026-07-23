@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import calendar
 
-from covas.ed.visit_ledger import (ARRIVAL_EVENTS, VisitLedger, VisitStats, _parse_ts)
+from covas.ed.visit_ledger import ARRIVAL_EVENTS, VisitLedger, VisitStats, _parse_ts
 
 _DAY = 86400.0
 

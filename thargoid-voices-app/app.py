@@ -14,6 +14,7 @@ import time
 from collections import OrderedDict
 from pathlib import Path
 
+import synth
 from flask import (
     Flask,
     Response,
@@ -22,8 +23,6 @@ from flask import (
     request,
     send_from_directory,
 )
-
-import synth
 
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = APP_DIR / "config.json"
@@ -34,7 +33,7 @@ CACHE_LIMIT = 256  # most-recent rendered variants kept in memory for audition/s
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 # In-memory render cache: id -> {type, wav(bytes), seed, meta}. Bounded LRU-ish.
-_cache: "OrderedDict[str, dict]" = OrderedDict()
+_cache: OrderedDict[str, dict] = OrderedDict()
 _cache_lock = threading.Lock()
 _counter = 0
 _counter_lock = threading.Lock()

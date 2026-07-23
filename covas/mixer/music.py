@@ -17,7 +17,6 @@ Generation is a DELIBERATE SEAM, NOT a runtime dependency: Suno has no official 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 
@@ -115,14 +114,14 @@ class MusicLibrary:
     Track paths are local, git-ignored assets (supply your own); an empty context is simply
     silent."""
 
-    def __init__(self, tracks: Optional[dict[str, list[str]]] = None) -> None:
+    def __init__(self, tracks: dict[str, list[str]] | None = None) -> None:
         self._tracks: dict[str, list[str]] = {
             str(ctx): [str(p) for p in (paths or [])]
             for ctx, paths in (tracks or {}).items()
         }
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "MusicLibrary":
+    def from_cfg(cls, cfg: dict) -> MusicLibrary:
         tracks = (cfg.get("music", {}) or {}).get("tracks", {}) or {}
         return cls({str(k): list(v) for k, v in tracks.items() if isinstance(v, (list, tuple))})
 
@@ -147,7 +146,7 @@ class MusicTransition:
     """A decided change for the app's music player to realize (via `crossfade`). `crossfade` is
     False for the very first track (a plain fade-in, nothing to blend from)."""
 
-    from_track: Optional[str]
+    from_track: str | None
     to_track: str
     context: str
     crossfade: bool
@@ -162,12 +161,12 @@ class MusicDirector:
     def __init__(self, library: MusicLibrary, *, enabled: bool = False) -> None:
         self._lib = library
         self._enabled = enabled
-        self._context: Optional[str] = None
-        self._track: Optional[str] = None
+        self._context: str | None = None
+        self._track: str | None = None
         self._rot: int = 0
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "MusicDirector":
+    def from_cfg(cls, cfg: dict) -> MusicDirector:
         # EXPERIMENTAL (issue #123): the music layer is gated behind [experimental.music]
         # (off by default) AT this seam — a flag-off director is built disabled, so update()
         # decides no transitions and nothing ever plays, even with [music].enabled = true.
@@ -185,14 +184,14 @@ class MusicDirector:
         self._lib = library
 
     @property
-    def current_track(self) -> Optional[str]:
+    def current_track(self) -> str | None:
         return self._track
 
     @property
-    def current_context(self) -> Optional[str]:
+    def current_context(self) -> str | None:
         return self._context
 
-    def update(self, states) -> Optional[MusicTransition]:
+    def update(self, states) -> MusicTransition | None:
         """Given the live eligibility state set, decide whether to change tracks. Returns a
         transition when the context changed (and the new context has a track), else None."""
         if not self._enabled:

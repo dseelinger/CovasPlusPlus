@@ -23,8 +23,8 @@ providers:
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 EL = "elevenlabs"
 PIPER = "piper"
@@ -52,7 +52,7 @@ class VoiceCast:
 
     def __init__(self, pool, *, persona: Voice, player: Voice,
                  cast_provider: str = EL,
-                 synth: Optional[Callable[[Voice, str], tuple[bytes, int]]] = None) -> None:
+                 synth: Callable[[Voice, str], tuple[bytes, int]] | None = None) -> None:
         self._pool = list(pool)
         self._persona = persona
         self._player = player
@@ -71,7 +71,7 @@ class VoiceCast:
         """The fixed voice for direct player DMs (C4: a real human, read verbatim)."""
         return self._player
 
-    def assign(self, identity: str, gender_hint: Optional[str] = None) -> Voice:
+    def assign(self, identity: str, gender_hint: str | None = None) -> Voice:
         """Deterministically map an identity to a pool voice. A male/female `gender_hint` narrows
         to matching voices when the pool has any; an empty pool degrades to the persona voice
         (i.e. today's single-voice behaviour). Same identity -> same voice, always."""
@@ -116,9 +116,9 @@ class VoiceCast:
 def build_cast(
     cfg: dict,
     *,
-    synth: Optional[Callable[[Voice, str], tuple[bytes, int]]] = None,
-    el_voices: Optional[list[dict]] = None,
-    exclude: Optional[Callable[[Voice], bool]] = None,
+    synth: Callable[[Voice, str], tuple[bytes, int]] | None = None,
+    el_voices: list[dict] | None = None,
+    exclude: Callable[[Voice], bool] | None = None,
 ) -> VoiceCast:
     """Build the cast from [audio.voices]. The EXCLUSION HOOK: an ElevenLabs voice not in the
     allowed `el_voices` list (which already filters 'famous'/™ voices at elevenlabs.list_voices)
@@ -198,9 +198,9 @@ class CastSynth:
         self,
         *,
         registry=None,  # noqa: ANN001 — a TTSProviderRegistry (lazy import to avoid a cycle)
-        el_synth: Optional[Callable[[str, Optional[str]], tuple[bytes, int]]] = None,
-        piper_loader: Optional[Callable[[str], object]] = None,
-        log: Optional[Callable[[str], None]] = None,
+        el_synth: Callable[[str, str | None], tuple[bytes, int]] | None = None,
+        piper_loader: Callable[[str], object] | None = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         from ..providers.registry import TTSProviderRegistry
 

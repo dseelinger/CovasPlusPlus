@@ -17,7 +17,7 @@ import pytest
 
 from covas import app as app_mod
 from covas import settings_schema as schema
-from covas.app import App, LIVE_SECTIONS, RESTART_REQUIRED
+from covas.app import LIVE_SECTIONS, RESTART_REQUIRED, App
 from tests.fakes import FakeLLM, FakeSTT, FakeTTS
 
 

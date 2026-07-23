@@ -32,7 +32,7 @@ class CGConfig:
     inara_api_key: str = ""
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "CGConfig":
+    def from_cfg(cls, cfg: dict) -> CGConfig:
         c = cfg.get("cg", {}) or {}
         d = cls()
         return cls(

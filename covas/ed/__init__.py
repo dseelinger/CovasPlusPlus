@@ -14,21 +14,49 @@ later phase — nothing here initiates a reply.
 """
 from .context import EDContext
 from .detector import ContextDetector, ContextRef
-from .engineers import (ENGINEERS, Engineer, EngineerStatus, find_by_specialty,
-                        find_engineer, parse_engineer_progress, status_for)
-from .journal import (JournalWatcher, apply_carrier_event, apply_journal_event,
-                      apply_scan_organic, default_journal_dir, describe_journal_event,
-                      parse_journal_line, resolve_journal_dir, srv_hull_transitions)
-from .place_classifier import (Place, classify_station, classify_system,
-                               place_facts, render_facts)
-from .route import (RouteStep, RouteTracker, is_scoopable, is_long_jump,
-                    jump_distance, read_navroute, route_coords)
-from .visit_ledger import VisitLedger, VisitStats
-from .modes import (GAME_MODES, MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV)
+from .engineers import (
+                        ENGINEERS,
+                        Engineer,
+                        EngineerStatus,
+                        find_by_specialty,
+                        find_engineer,
+                        parse_engineer_progress,
+                        status_for,
+)
+from .journal import (
+                        JournalWatcher,
+                        apply_carrier_event,
+                        apply_journal_event,
+                        apply_scan_organic,
+                        default_journal_dir,
+                        describe_journal_event,
+                        parse_journal_line,
+                        resolve_journal_dir,
+                        srv_hull_transitions,
+)
+from .modes import GAME_MODES, MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV
+from .place_classifier import Place, classify_station, classify_system, place_facts, render_facts
+from .route import (
+                        RouteStep,
+                        RouteTracker,
+                        is_long_jump,
+                        is_scoopable,
+                        jump_distance,
+                        read_navroute,
+                        route_coords,
+)
 from .ships import ship_pad_size
-from .status import (StatusWatcher, apply_status, decode_flags, describe_transition,
-                     flag_transitions, game_mode_from_flags, low_vital_transitions,
-                     status_path)
+from .status import (
+                        StatusWatcher,
+                        apply_status,
+                        decode_flags,
+                        describe_transition,
+                        flag_transitions,
+                        game_mode_from_flags,
+                        low_vital_transitions,
+                        status_path,
+)
+from .visit_ledger import VisitLedger, VisitStats
 
 __all__ = [
     "ContextDetector",

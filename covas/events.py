@@ -1,5 +1,6 @@
 """A tiny thread-safe pub/sub bus so the voice loop can stream events to the UI."""
 from __future__ import annotations
+
 import queue
 import threading
 import time

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json as _json
 import threading
-from typing import Iterator
+from collections.abc import Iterator
 
 import requests
 

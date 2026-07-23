@@ -16,8 +16,8 @@ import threading
 
 import pytest
 
-from covas.web import create_app
 from covas.setup_web import create_setup_app
+from covas.web import create_app
 
 # The main-app routes that render a full HTML page (each must stamp data-theme on <html>).
 PAGE_ROUTES = ["/", "/settings", "/checklist", "/memory", "/crew", "/macros"]

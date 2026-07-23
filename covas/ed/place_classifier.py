@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 from .engineers import ENGINEERS
 from .visit_ledger import VisitStats
@@ -54,7 +53,7 @@ class Landmark:
     otherwise a STATION landmark (matched on docking). Add a row to extend — that's the whole
     extension surface."""
     system: str
-    station: Optional[str]
+    station: str | None
     label: str
     detail: str = ""
 
@@ -94,7 +93,7 @@ def _engineer_specialties(engineer, limit: int = 3) -> str:
 
 
 def classify_station(system: object, station: object,
-                     *, at_own_carrier: bool = False) -> Optional[Place]:
+                     *, at_own_carrier: bool = False) -> Place | None:
     """Classify a DOCKED location, or None for an ordinary station. Precedence: engineer base >
     own fleet carrier > station landmark. Pure lookup — no I/O, no invention."""
     if not station:
@@ -113,7 +112,7 @@ def classify_station(system: object, station: object,
     return None
 
 
-def classify_system(system: object, *, first_visit: bool = False) -> Optional[Place]:
+def classify_system(system: object, *, first_visit: bool = False) -> Place | None:
     """Classify arrival in a SYSTEM, or None for an ordinary one. A system landmark wins over a
     bare first-visit note. Pure."""
     if not system:
@@ -126,7 +125,7 @@ def classify_system(system: object, *, first_visit: bool = False) -> Optional[Pl
     return None
 
 
-def place_facts(place: Optional[Place], stats: Optional[VisitStats]) -> Optional[dict]:
+def place_facts(place: Place | None, stats: VisitStats | None) -> dict | None:
     """Build the STRUCTURED, grounded facts to feed the proactive prompt — or None when neither the
     place nor the visit pattern is notable enough to remark on (so ordinary arrivals stay generic).
 

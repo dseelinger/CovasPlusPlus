@@ -19,9 +19,12 @@ import pytest
 
 from covas.capabilities.hud_capability import HudCapability, HudModel, HudSnapshot
 from covas.capabilities.vr_hud import (
-    VR_PLACEMENTS, VrPlacement, as_overlay_buffer, render_snapshot_rgba, resolve_transform,
+    VR_PLACEMENTS,
+    VrPlacement,
+    as_overlay_buffer,
+    render_snapshot_rgba,
+    resolve_transform,
 )
-
 
 # --- fakes -----------------------------------------------------------------
 
@@ -259,7 +262,7 @@ def test_action_grounding_guardrail_is_in_the_system_prompt():
     """#143/§3.8.1 truthfulness: the no-invented-ACTIONS rule ships in the static system prompt
     (even with personality + crew off) and is cache-safe, so the model can't confirm a HUD change
     it never made."""
-    from covas.llm import build_system, _ACTION_GROUNDING_GUARDRAIL
+    from covas.llm import _ACTION_GROUNDING_GUARDRAIL, build_system
 
     bare = build_system({"personality": {"enabled": False}, "crew": {"enabled": False}})
     assert bare is not None and _ACTION_GROUNDING_GUARDRAIL in bare
@@ -396,6 +399,7 @@ def test_look_down_pin_fixture_yields_low_panel_tilted_toward_viewer():
     tilts its top toward you. Mirrors `_pin_to_gaze`'s pure math on a known look-down pose, so it
     needs no VR runtime."""
     import math
+
     from covas.capabilities.vr_hud import hmd_pitch_deg, hmd_yaw_deg
 
     def rx(deg):  # HMD pitched by +deg about X (looking up); forward = -Z column
@@ -475,6 +479,7 @@ def test_hmd_yaw_deg_from_known_matrices():
 def test_hmd_pitch_deg_from_known_matrices():
     """Elevation from the HMD pose: level -> 0, looking up -> positive, down -> negative (#107)."""
     import math
+
     from covas.capabilities.vr_hud import hmd_pitch_deg
     ident = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]        # level gaze
     assert abs(hmd_pitch_deg(ident) - 0.0) < 1e-9

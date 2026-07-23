@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import math
 import sys
-from typing import Protocol, Sequence, runtime_checkable
+from collections.abc import Sequence
+from typing import Protocol, runtime_checkable
 
 
 @runtime_checkable

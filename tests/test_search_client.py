@@ -17,10 +17,19 @@ from pathlib import Path
 
 import pytest
 
-from covas.search import (BODIES, CATEGORIES, NavError, StationRecord, SystemRecord,
-                          build_query, category, execute_search, parse_stations,
-                          parse_systems)
-from covas.search.categories import (UnknownParamError, build_filters, parse_results)
+from covas.search import (
+    BODIES,
+    CATEGORIES,
+    NavError,
+    StationRecord,
+    SystemRecord,
+    build_query,
+    category,
+    execute_search,
+    parse_stations,
+    parse_systems,
+)
+from covas.search.categories import UnknownParamError, build_filters, parse_results
 
 _FIX = Path(__file__).parent / "fixtures"
 _SYSTEMS = _FIX / "spansh_systems_federation_sol.json"

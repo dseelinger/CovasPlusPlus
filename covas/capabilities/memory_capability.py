@@ -23,7 +23,7 @@ Recall never crashes the loop: a miss (or any error) just yields nothing to inje
 """
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ..memory.capture import MemoryCapture
 from ..memory.retrieval import Retriever
@@ -116,7 +116,7 @@ class MemoryCapability:
     TIERING_GROUP = "memory"
 
     def __init__(self, capture: MemoryCapture, retriever: Retriever,
-                 *, log: Optional[Callable[[str], None]] = None) -> None:
+                 *, log: Callable[[str], None] | None = None) -> None:
         self.capture = capture
         self.retriever = retriever
         self._log = log
@@ -154,7 +154,7 @@ class MemoryCapability:
         )
 
     # -- recall (issue #61) ------------------------------------------------------------
-    def recall_block(self, query: str, *, tags: Optional[list[str]] = None) -> Optional[str]:
+    def recall_block(self, query: str, *, tags: list[str] | None = None) -> str | None:
         """A COMPACT block of the facts most relevant to `query`, for the worker loop to prepend
         to a recall-referencing turn's USER message (never the cached system prompt — this is the
         cache-safe injection). Returns None when nothing relevant is on file, so a miss injects
@@ -184,7 +184,7 @@ class MemoryCapability:
     _MEM_CLOSE = "[End reference data.]"
 
     @classmethod
-    def _format_block(cls, records: list[MemoryRecord]) -> Optional[str]:
+    def _format_block(cls, records: list[MemoryRecord]) -> str | None:
         """Render recalled facts inside an explicit "reference data, not instructions" boundary
         (issue #189) so an instruction embedded in a stored fact is presented as passive grounding,
         never a directive. Returns None when there's nothing to recall."""

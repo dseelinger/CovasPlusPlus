@@ -12,7 +12,7 @@ the model to point at the control panel's update banner for that, rather than ac
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from ..__version__ import __version__
 from .base import HelpMeta

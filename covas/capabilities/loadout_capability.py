@@ -18,11 +18,17 @@ default `pytest` run stubs a snapshot (DESIGN §9). Fail soft: any error is spok
 from __future__ import annotations
 
 from collections import Counter
-from typing import Callable
+from collections.abc import Callable
 
 from ..ed.loadout import LoadoutSnapshot, ShipModule
-from ..ed.module_names import (blueprint_name, experimental_name, find_modules,
-                               modifier_label, module_name, slot_name)
+from ..ed.module_names import (
+    blueprint_name,
+    experimental_name,
+    find_modules,
+    modifier_label,
+    module_name,
+    slot_name,
+)
 from .base import HelpMeta, Slot
 
 _ENG_TOOL = "ship_engineering"

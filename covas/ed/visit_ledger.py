@@ -36,9 +36,9 @@ import json
 import sys
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
 
 # The arrival events we fold. System grain vs station grain — see the module docstring.
 _SYSTEM_ARRIVALS = frozenset({"FSDJump", "CarrierJump"})
@@ -70,8 +70,8 @@ class VisitStats:
     visits_24h: int = 0
     visits_7d: int = 0
     first_visit: bool = False
-    first_seen: Optional[float] = None
-    last_seen: Optional[float] = None
+    first_seen: float | None = None
+    last_seen: float | None = None
 
 
 def _norm(text: object) -> str:
@@ -87,7 +87,7 @@ def _stn_key(system: object, station: object) -> str:
     return f"stn::{_norm(system)}::{_norm(station)}"
 
 
-def _parse_ts(ts: object) -> Optional[float]:
+def _parse_ts(ts: object) -> float | None:
     """Best-effort epoch seconds from an ED ISO timestamp ('2026-07-08T12:05:00Z'), or None.
     Kept dependency-free (stdlib `time.strptime`) and fail-soft — a bad stamp just means the
     caller falls back to the injected clock.
@@ -113,8 +113,8 @@ class VisitLedger:
 
     def __init__(
         self,
-        entries: Optional[dict] = None,
-        path: Optional[Path | str] = None,
+        entries: dict | None = None,
+        path: Path | str | None = None,
         *,
         clock: Callable[[], float] = time.time,
         retention_days: float = DEFAULT_RETENTION_DAYS,
@@ -122,7 +122,7 @@ class VisitLedger:
         max_locations: int = DEFAULT_MAX_LOCATIONS,
     ) -> None:
         self._entries: dict = dict(entries or {})
-        self._path: Optional[Path] = Path(path) if path else None
+        self._path: Path | None = Path(path) if path else None
         self._clock = clock
         self._retention_s = max(1.0, float(retention_days) * _DAY_S)
         self._max_recent = max(1, int(max_recent))
@@ -133,7 +133,7 @@ class VisitLedger:
 
     # -- persistence (mirrors ed/npc_crew.py) ------------------------------------------
     @classmethod
-    def load(cls, path: Optional[Path | str], **kw) -> "VisitLedger":
+    def load(cls, path: Path | str | None, **kw) -> VisitLedger:
         """Read the ledger from disk, fail-soft. A missing/corrupt/non-dict file yields an EMPTY
         ledger (never raises) so a bad file can't wedge the journal watcher."""
         p = Path(path) if path else None
@@ -179,7 +179,7 @@ class VisitLedger:
             self.persist(self._render())
 
     # -- recording ---------------------------------------------------------------------
-    def record_arrival(self, event: dict, *, when: Optional[float] = None) -> bool:
+    def record_arrival(self, event: dict, *, when: float | None = None) -> bool:
         """Fold one arrival event into the ledger (and persist on change). Records a SYSTEM visit
         for FSDJump/CarrierJump and a STATION visit for Docked. `when` (epoch seconds) defaults to
         the event's own `timestamp`, then the injected clock. Returns True if anything changed.
@@ -190,7 +190,7 @@ class VisitLedger:
         return changed
 
     def record_arrival_deferred(self, event: dict, *,
-                                when: Optional[float] = None) -> tuple[bool, Optional[str]]:
+                                when: float | None = None) -> tuple[bool, str | None]:
         """Fold one arrival event IN MEMORY and render the body to persist, WITHOUT touching disk.
         Returns `(changed, body)` — `body` is the JSON to write (None when nothing changed or no
         path). The caller mutates under its state lock, then `persist()`s OUTSIDE it so a slow disk
@@ -253,15 +253,15 @@ class VisitLedger:
 
     # -- pure stats --------------------------------------------------------------------
     def stats_for_station(self, system: object, station: object,
-                          *, now: Optional[float] = None) -> VisitStats:
+                          *, now: float | None = None) -> VisitStats:
         """Visit stats for a station (system+station), as of `now` (default: injected clock)."""
         return self._stats(_stn_key(system, station), now)
 
-    def stats_for_system(self, system: object, *, now: Optional[float] = None) -> VisitStats:
+    def stats_for_system(self, system: object, *, now: float | None = None) -> VisitStats:
         """Visit stats for a system, as of `now` (default: injected clock)."""
         return self._stats(_sys_key(system), now)
 
-    def _stats(self, key: str, now: Optional[float]) -> VisitStats:
+    def _stats(self, key: str, now: float | None) -> VisitStats:
         rec = self._entries.get(key)
         if not rec:
             return VisitStats()

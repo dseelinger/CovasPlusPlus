@@ -27,8 +27,8 @@ have no I/O; only the injected `speak`/`voice_for` seams touch synthesis.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from ..providers.registry import resolve_provider
 from .buses import COMMS
@@ -56,7 +56,7 @@ class CarrierRole:
 
     role: str
     name: str
-    voice: Optional[Voice]
+    voice: Voice | None
 
 
 @dataclass(frozen=True)
@@ -87,7 +87,7 @@ def build_carrier_config(cfg: dict) -> CarrierConfig:
             prov_override = str(sub.get("voice_provider", "") or "").strip().lower()
             provider = prov_override or resolve_provider(cfg, role, default=None)
             gender = str(sub.get("gender", "neutral") or "neutral").strip().lower()
-            voice: Optional[Voice] = Voice(provider, ref, gender)
+            voice: Voice | None = Voice(provider, ref, gender)
         else:
             voice = None
         roles[role] = CarrierRole(role, name, voice)
@@ -265,9 +265,9 @@ class CarrierEventResponder:
         play: Callable[[Cue], bool],
         *,
         at_near: Callable[[], tuple[bool, bool]],
-        owned_id: Optional[Callable[[], Optional[int]]] = None,
-        dedup: Optional[CaptainDedup] = None,
-        log: Optional[Callable[[str], None]] = None,
+        owned_id: Callable[[], int | None] | None = None,
+        dedup: CaptainDedup | None = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._play = play
         self._at_near = at_near
@@ -365,8 +365,8 @@ class CarrierPlayer:
         speak: Callable[[Voice, str, str], bool],
         voice_for: Callable[[str], Voice],
         *,
-        names: Optional[dict[str, str]] = None,
-        log: Optional[Callable[[str], None]] = None,
+        names: dict[str, str] | None = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._speak = speak
         self._voice_for = voice_for

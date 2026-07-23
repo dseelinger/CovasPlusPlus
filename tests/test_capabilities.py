@@ -7,10 +7,8 @@ the same code path the LLM drives by voice.
 from __future__ import annotations
 
 from covas.capabilities import Capability, CapabilityRegistry
-from covas.capabilities.checklist_capability import (CHECKLIST_TOOLS,
-                                                     ChecklistCapability)
+from covas.capabilities.checklist_capability import CHECKLIST_TOOLS, ChecklistCapability
 from covas.checklist import Checklist
-
 
 # --- a tiny stand-in capability for registry tests -------------------------
 

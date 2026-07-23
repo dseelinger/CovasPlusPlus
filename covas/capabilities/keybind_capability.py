@@ -23,8 +23,8 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from ..ed.modes import MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV
 from ..keybinds import actions as _actions  # noqa: F401 — import populates the macro registry
@@ -71,7 +71,7 @@ class KeybindConfig:
     focus_before_inject: bool = True
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "KeybindConfig":
+    def from_cfg(cls, cfg: dict) -> KeybindConfig:
         k = cfg.get("keybinds", {}) or {}
         d = cls()
         allow = k.get("allowlist")

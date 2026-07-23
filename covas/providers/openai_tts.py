@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json as _json
 import threading
-from typing import Optional
 
 import requests
 
@@ -158,7 +157,7 @@ class OpenAITTS:
 
 # ---- module helper (the network lives here) -------------------------------
 def _collect_pcm(key: str, base_url: str, body: dict,
-                 cancel: Optional[threading.Event], *, timeout: float = 30.0) -> tuple[bytes, bool]:
+                 cancel: threading.Event | None, *, timeout: float = 30.0) -> tuple[bytes, bool]:
     """POST to `{base_url}/audio/speech` and stream the raw PCM back, returning (pcm, cancelled).
     Checks `cancel` between chunks so a barge-in stops the read promptly; a partial (cancelled)
     buffer is discarded by callers. Raises RuntimeError on a non-200 response."""

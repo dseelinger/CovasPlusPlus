@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import pytest
 
+from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
 from covas.ed.modes import MODE_MAINSHIP
 from covas.keybinds.binds import KeyBinding
 from covas.keybinds.registry import registered_macros
-from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
-
 
 # The macros this batch is contracted to ship: name -> (tool, ED action token).
 _EXPECTED = {

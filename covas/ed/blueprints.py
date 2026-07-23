@@ -142,7 +142,7 @@ class BlueprintLibrary:
                 grades=grades)
 
     @classmethod
-    def from_bundled(cls) -> "BlueprintLibrary":
+    def from_bundled(cls) -> BlueprintLibrary:
         return _bundled_library()
 
     # -- lookups ------------------------------------------------------------------------

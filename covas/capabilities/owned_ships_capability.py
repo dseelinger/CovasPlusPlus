@@ -14,7 +14,7 @@ never raised into the voice loop.
 """
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ..ed.owned_ships import display_name
 from .base import HelpMeta, Slot
@@ -85,7 +85,7 @@ class OwnedShipsCapability:
         self,
         *,
         get_owned: Callable[[], list[dict]],
-        add_ship: Callable[..., Optional[dict]],
+        add_ship: Callable[..., dict | None],
         remove_ship: Callable[[str], tuple[bool, list]],
         log: Callable[[str], None] | None = None,
     ) -> None:

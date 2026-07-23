@@ -14,7 +14,6 @@ from covas.app import App
 from covas.tts import build_tts_body
 from tests.fakes import FakeLLM, FakeSTT, FakeTTS
 
-
 _PRESETS = """# Title
 
 ## Base — applied to every persona (do not delete)

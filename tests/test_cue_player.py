@@ -14,10 +14,10 @@ import soundfile as sf
 from covas.audio import (
     CUE_TYPES,
     CuePlayer,
+    _scan_cue_dir,
     cue_roots,
     ensure_cue_skeleton,
     resolve_cue_files,
-    _scan_cue_dir,
 )
 
 
@@ -159,7 +159,7 @@ def test_cueplayer_silent_type_is_noop(tmp_path, monkeypatch):
 # ---- looping "thinking" bed (issue #5): start/stop lifecycle --------------------------------
 
 def test_thinking_is_a_cue_type_with_a_shipped_default():
-    from covas.audio import CUE_TYPES, _CUE_ALIASES
+    from covas.audio import _CUE_ALIASES, CUE_TYPES
     assert "thinking" in CUE_TYPES
     assert _CUE_ALIASES.get("working") == "thinking"     # intuitive synonym
 

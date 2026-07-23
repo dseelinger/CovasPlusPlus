@@ -15,8 +15,14 @@ import pytest
 from covas.ed.context import EDContext
 from covas.ed.journal import apply_journal_event
 from covas.ed.loadout import LoadoutSnapshot, parse_loadout
-from covas.ed.module_names import (blueprint_name, experimental_name, find_modules,
-                                   modifier_label, module_name, slot_name)
+from covas.ed.module_names import (
+    blueprint_name,
+    experimental_name,
+    find_modules,
+    modifier_label,
+    module_name,
+    slot_name,
+)
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "journal_loadout_corsair.json"
 

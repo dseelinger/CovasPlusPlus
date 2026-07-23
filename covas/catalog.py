@@ -18,8 +18,6 @@ monkeypatching the fetchers.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from . import settings_schema as schema
 
 # Known OpenAI-compatible endpoints (issue #92). One `openai`/`openai_tts` provider covers all four —
@@ -88,8 +86,8 @@ def _cfg(cfg: dict, *keys, default=""):
     return node if node is not None else default
 
 
-def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
-            ) -> tuple[Optional[list[dict]], Optional[str]]:
+def resolve(source: str, cfg: dict, *, base_url: str | None = None
+            ) -> tuple[list[dict] | None, str | None]:
     """Resolve ONE options_source to ``(options, None)`` or, fail-soft, ``(None, "reason")``.
 
     `base_url` overrides the config base_url for the OpenAI model list, so the page can refetch when
@@ -115,7 +113,7 @@ def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
 
         # --- LLM model catalogs ---
         if source == schema.OPT_OPENAI_MODELS:
-            from .providers.openai_llm import list_openai_models, _DEFAULT_BASE_URL
+            from .providers.openai_llm import _DEFAULT_BASE_URL, list_openai_models
             url = (base_url or _cfg(cfg, "openai", "base_url") or _DEFAULT_BASE_URL).rstrip("/")
             key = firstrun.openai_key(cfg)
             if not key:
@@ -123,7 +121,7 @@ def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
             return _ids(list_openai_models(url, key)), None
 
         if source == schema.OPT_GEMINI_MODELS:
-            from .providers.gemini_llm import list_gemini_models, _DEFAULT_BASE_URL
+            from .providers.gemini_llm import _DEFAULT_BASE_URL, list_gemini_models
             url = (_cfg(cfg, "gemini", "base_url") or _DEFAULT_BASE_URL).rstrip("/")
             key = firstrun.gemini_key(cfg)
             if not key:
@@ -159,7 +157,7 @@ def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
             return _voices(list_azure_voices(key, region, _reply_locale_prefix(cfg))), None
 
         if source == schema.OPT_CARTESIA_VOICES:
-            from .providers.cartesia_tts import list_cartesia_voices, _DEFAULT_BASE_URL
+            from .providers.cartesia_tts import _DEFAULT_BASE_URL, list_cartesia_voices
             key = firstrun.cartesia_key(cfg)
             if not key:
                 return None, "no Cartesia key"
@@ -184,7 +182,7 @@ def resolve(source: str, cfg: dict, *, base_url: Optional[str] = None
         return None, str(e)
 
 
-def option_pairs(source: str, cfg: dict) -> Optional[list[tuple[str, str]]]:
+def option_pairs(source: str, cfg: dict) -> list[tuple[str, str]] | None:
     """`(value, label)` pairs for the voice settings layer (`app._settings_option_pairs`), or None
     on any failure so the capability can say "couldn't reach it" instead of guessing."""
     opts, _err = resolve(source, cfg)

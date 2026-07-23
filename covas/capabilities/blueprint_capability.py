@@ -16,7 +16,7 @@ default `pytest` run stubs an inventory (DESIGN §9). Fail soft: any error is sp
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from ..ed.blueprints import Blueprint, BlueprintLibrary, LineItem, parse_grade
 from ..ed.materials import MaterialsSnapshot

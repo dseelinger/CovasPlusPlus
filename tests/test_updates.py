@@ -12,7 +12,6 @@ import pytest
 from covas import updates
 from covas.__version__ import __version__
 
-
 # ---- semver compare -----------------------------------------------------------------
 
 @pytest.mark.parametrize("latest,current", [

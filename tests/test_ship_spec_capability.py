@@ -14,7 +14,7 @@ from __future__ import annotations
 import covas.nav.ship_specs as ss
 from covas.capabilities.ship_spec_capability import ShipSpecCapability
 from covas.nav.ship_spec_data import SHIP_SPECS
-from covas.nav.ships import ROSTER, _BY_ID
+from covas.nav.ships import _BY_ID, ROSTER
 
 
 def _cap() -> ShipSpecCapability:

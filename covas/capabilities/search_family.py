@@ -27,20 +27,31 @@ spoken, never raised.
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Callable, Mapping
+from datetime import UTC, datetime
 
 from ..nav import copy as _default_copy
-from ..search import (NavError, RequestsHttp, category,
-                      parse_bodies, parse_stations, parse_systems)
-from ..search.bodies import (BIO_GENUS_NAMES, BODY_SUBTYPES, nearest_bio_signal, nearest_subtype,
-                             resolve_bio_signal, resolve_subtype)
-from ..search.factions import FACTION_STATES, nearest_state, resolve_state
+from ..search import NavError, RequestsHttp, category, parse_bodies, parse_stations, parse_systems
+from ..search.bodies import (
+    BIO_GENUS_NAMES,
+    BODY_SUBTYPES,
+    nearest_bio_signal,
+    nearest_subtype,
+    resolve_bio_signal,
+    resolve_subtype,
+)
 from ..search.faction_index import FactionIndex
+from ..search.factions import FACTION_STATES, nearest_state, resolve_state
 from ..search.spansh import Http, data_age_days, pad_filter_key
-from ..search.stations import (SERVICES, STATION_TYPES, nearest_service, nearest_type,
-                               resolve_service, resolve_type)
+from ..search.stations import (
+    SERVICES,
+    STATION_TYPES,
+    nearest_service,
+    nearest_type,
+    resolve_service,
+    resolve_type,
+)
 from ..search.systems import VOCAB, nearest_enum, resolve_enum
 from . import _search_support as sup
 from ._search_support import SearchConfig
@@ -66,7 +77,7 @@ class SearchDescriptor:
     error_label: str
     help_meta: HelpMeta
     help_vocabulary: Mapping[str, list] | None
-    run: Callable[["SpecSearchCapability", dict], str]
+    run: Callable[[SpecSearchCapability, dict], str]
 
 
 class SpecSearchCapability:
@@ -1179,4 +1190,4 @@ class BodySearchCapability(SpecSearchCapability):
     def __init__(self, config: SearchConfig, *,
                  now: Callable[[], datetime] | None = None, **kw) -> None:
         super().__init__(BODIES, config, **kw)
-        self._now = now if now is not None else (lambda: datetime.now(timezone.utc))
+        self._now = now if now is not None else (lambda: datetime.now(UTC))

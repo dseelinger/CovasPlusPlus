@@ -13,11 +13,9 @@ what these tests lock is every server guarantee:
 """
 from __future__ import annotations
 
-
 import pytest
 
-from covas import bootstrap
-from covas import config
+from covas import bootstrap, config
 from covas.app import App
 from covas.web import create_app
 from tests.fakes import FakeLLM, FakeSTT, FakeTTS

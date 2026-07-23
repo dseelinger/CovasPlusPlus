@@ -9,11 +9,10 @@ right mode — but are still refused out of mode / during combat.
 from __future__ import annotations
 
 import covas.keybinds.actions.panels  # noqa: F401 — ensure the batch is imported/registered
+from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
+from covas.ed.modes import MODE_FIGHTER, MODE_MAINSHIP
 from covas.keybinds.binds import KeyBinding
 from covas.keybinds.registry import registered_macros
-from covas.ed.modes import MODE_FIGHTER, MODE_MAINSHIP
-from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
-
 
 # Expected (macro name -> ED action token) for the whole batch.
 _EXPECTED_TOKENS = {

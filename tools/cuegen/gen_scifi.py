@@ -1,9 +1,10 @@
 """Re-voice the transcribed guitar phrase (E4 -> A3, descending 4th, E longer) as
 original sci-fi cue tones. Detuned partials + gentle vibrato = synthetic, not guitar.
 """
+import os
+
 import numpy as np
 import soundfile as sf
-import os
 
 SR = 48000
 OUT = os.path.dirname(os.path.abspath(__file__))

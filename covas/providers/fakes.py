@@ -11,7 +11,7 @@ the real providers, and take keyword args so tests can script their output.
 from __future__ import annotations
 
 import threading
-from typing import Iterator, Optional
+from collections.abc import Iterator
 
 
 class FakeSTT:
@@ -74,13 +74,13 @@ class FakeLLM:
         cfg: dict | None = None,
         *,
         text: str = "This is a mock reply.",
-        events: Optional[list[tuple[str, object]]] = None,
+        events: list[tuple[str, object]] | None = None,
     ) -> None:
         self._text = text
         self._events = list(events or [])
         # Records the router's per-turn choice (model, max_tokens) for test assertions.
-        self.model_seen: Optional[str] = None
-        self.max_tokens_seen: Optional[int] = None
+        self.model_seen: str | None = None
+        self.max_tokens_seen: int | None = None
 
     def stream_reply(
         self,

@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from .cues import Cue
 
@@ -38,7 +38,7 @@ class GovernorConfig:
     default_cooldown: float = DEFAULT_COOLDOWN
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "GovernorConfig":
+    def from_cfg(cls, cfg: dict) -> GovernorConfig:
         c = (cfg.get("audio", {}) or {}).get("cues", {}) or {}
         d = cls()
         return cls(
@@ -61,7 +61,7 @@ class CueGovernor:
         self._rotor: int = 0                  # advances each fire -> rotation, not repetition
 
     @classmethod
-    def from_cfg(cls, cfg: dict, *, clock: Callable[[], float] = time.monotonic) -> "CueGovernor":
+    def from_cfg(cls, cfg: dict, *, clock: Callable[[], float] = time.monotonic) -> CueGovernor:
         return cls(GovernorConfig.from_cfg(cfg), clock=clock)
 
     def _cooldown_for(self, cue: Cue) -> float:

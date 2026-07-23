@@ -21,7 +21,7 @@ spoken sentence, never a raise.
 """
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from .base import HelpMeta
 
@@ -110,10 +110,10 @@ class HudPlacementCapability:
 
     def __init__(self, *, get_hud: Callable[[], dict],
                  apply_patch: Callable[[dict], None],
-                 pin: Optional[Callable[[], object]] = None,
-                 recenter: Optional[Callable[[], object]] = None,
-                 vr_reason: Optional[Callable[[], Optional[str]]] = None,
-                 log: Optional[Callable[[str], None]] = None) -> None:
+                 pin: Callable[[], object] | None = None,
+                 recenter: Callable[[], object] | None = None,
+                 vr_reason: Callable[[], str | None] | None = None,
+                 log: Callable[[str], None] | None = None) -> None:
         self._get_hud = get_hud          # () -> the live [hud] config sub-dict
         self._apply = apply_patch        # (patch) -> None : persist + live-apply (update_settings)
         self._pin = pin                  # () -> VrPlacement | None : capture HMD gaze

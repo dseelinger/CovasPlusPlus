@@ -17,9 +17,9 @@ import os
 import re
 import sys
 import traceback
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
 
 from .__version__ import __version__
 
@@ -42,7 +42,7 @@ if _USER and "\0" not in _USER:
     _REDACTIONS.append((re.compile(_USER, re.I), "<user>"))
 
 
-def redact(text: str, cfg: Optional[dict] = None) -> str:
+def redact(text: str, cfg: dict | None = None) -> str:
     """Scrub secrets and PII (keys, DPAPI blobs, the username / home path) from `text`. Pure."""
     out = str(text)
     for pat, repl in _REDACTIONS:
@@ -51,7 +51,7 @@ def redact(text: str, cfg: Optional[dict] = None) -> str:
 
 
 def format_report(exc_type, exc, tb, cfg: dict, *, version: str = __version__,
-                  when: Optional[str] = None) -> str:
+                  when: str | None = None) -> str:
     """Build a redacted, shareable crash report from an exception. Pure (caller passes `when`)."""
     llm = str((cfg.get("llm", {}) or {}).get("provider", "?"))
     tts = str((cfg.get("tts", {}) or {}).get("provider", "?"))
@@ -68,8 +68,8 @@ def format_report(exc_type, exc, tb, cfg: dict, *, version: str = __version__,
     return redact("\n".join(header) + "\n" + tbtext, cfg)
 
 
-def write_report(cfg: dict, exc_type, exc, tb, *, now: Optional[datetime] = None,
-                 log: Optional[Callable[[str], None]] = None) -> Optional[Path]:
+def write_report(cfg: dict, exc_type, exc, tb, *, now: datetime | None = None,
+                 log: Callable[[str], None] | None = None) -> Path | None:
     """Write a redacted crash report to `<logs>/crash-<ts>.log`. Returns the path, or None if
     disabled / on any failure (fail-soft — capture must never crash the app)."""
     try:
@@ -88,7 +88,7 @@ def write_report(cfg: dict, exc_type, exc, tb, *, now: Optional[datetime] = None
         return None
 
 
-def install(cfg: dict, *, log: Optional[Callable[[str], None]] = None) -> bool:
+def install(cfg: dict, *, log: Callable[[str], None] | None = None) -> bool:
     """Install a `sys.excepthook` that captures an uncaught exception to a redacted crash file —
     but only actually *writes* when crash reporting is opted in. The hook checks the LIVE config
     each time (`cfg` is the app's mutated-in-place dict), so toggling the setting takes effect

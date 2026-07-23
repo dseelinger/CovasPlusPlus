@@ -10,8 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from covas.keybinds import (BindsError, KeyBinding, load_binds, parse_binds,
-                            resolve_binds_file)
+from covas.keybinds import BindsError, KeyBinding, load_binds, parse_binds, resolve_binds_file
 from covas.keybinds.binds import active_preset
 from covas.keybinds.executor import ExecutorError, KeyExecutor
 from covas.keybinds.scancodes import scancode_for

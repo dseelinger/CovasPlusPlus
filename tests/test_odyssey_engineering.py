@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from covas.ed import odyssey_engineering as ody
 
-
 # --- resolvers --------------------------------------------------------------------------
 
 def test_find_suit_by_name_keyword_and_alias():

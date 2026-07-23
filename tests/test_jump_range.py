@@ -11,8 +11,12 @@ import math
 
 from covas.ed.loadout import Engineering, LoadoutSnapshot, Modifier, ShipModule
 from covas.nav import fsd_data
-from covas.nav.jump_range import (compute_jump_range, dry_mass_from_max_range, resolve_fsd,
-                                  single_jump_range)
+from covas.nav.jump_range import (
+    compute_jump_range,
+    dry_mass_from_max_range,
+    resolve_fsd,
+    single_jump_range,
+)
 
 
 def _fsd(item: str = "int_hyperdrive_size6_class5", *, eng: Engineering | None = None) -> ShipModule:

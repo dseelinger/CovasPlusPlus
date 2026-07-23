@@ -9,13 +9,11 @@ Two things to prove, both offline:
 """
 from __future__ import annotations
 
-
+from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
 from covas.ed.modes import MODE_ON_FOOT
 from covas.keybinds import actions as _actions  # noqa: F401 — populates the registry
 from covas.keybinds.binds import KeyBinding
 from covas.keybinds.registry import registered_macros
-from covas.capabilities.keybind_capability import KeybindCapability, KeybindConfig
-
 
 # The macros this batch is expected to register: name -> ED action token.
 _EXPECTED = {

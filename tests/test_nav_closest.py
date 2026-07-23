@@ -13,8 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from covas.nav.closest import (ClosestResult, NavError, build_payload,
-                               find_closest_module, _pad_ok, _sells_mount)
+from covas.nav.closest import (
+    ClosestResult,
+    NavError,
+    _pad_ok,
+    _sells_mount,
+    build_payload,
+    find_closest_module,
+)
 from covas.nav.modules import resolve
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "spansh_stations_multicannon.json"

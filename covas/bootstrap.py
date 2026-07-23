@@ -21,8 +21,9 @@ from __future__ import annotations
 
 import datetime as _dt
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from .config import deep_merge, experimental
 from .router import Router
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
 
 
 # ---- Always-on capabilities (help/settings/clipboard/version/specs) ---------
-def build_help(app: "App") -> None:
+def build_help(app: App) -> None:
     """(moved from App.__init__ — help registration)
 
     Help is first-class and always on: it registers ITSELF so "what can you do" always has one
@@ -45,7 +46,7 @@ def build_help(app: "App") -> None:
     app.registry.register(app.help)
 
 
-def build_checklist(app: "App") -> None:
+def build_checklist(app: App) -> None:
     """(moved from App.__init__ — checklist-capability registration)
 
     Present only when a checklist file is configured, matching the prior tool-gating. on_change
@@ -56,7 +57,7 @@ def build_checklist(app: "App") -> None:
         ChecklistCapability(app.checklist, on_change=app.bus.publish))
 
 
-def build_settings(app: "App") -> None:
+def build_settings(app: App) -> None:
     """(moved from App.__init__ — settings-by-voice, Prompt N2)
 
     Change any setting spoken aloud, projected from the SAME schema the web page uses so the two
@@ -72,7 +73,7 @@ def build_settings(app: "App") -> None:
     app.registry.register(app.settings_cap)
 
 
-def build_clipboard(app: "App") -> None:
+def build_clipboard(app: App) -> None:
     """(moved from App.__init__ — "copy that to my clipboard", N11)
 
     One LLM-native tool — the model resolves what "that" refers to from the conversation and
@@ -82,7 +83,7 @@ def build_clipboard(app: "App") -> None:
     app.registry.register(app.clipboard_cap)
 
 
-def build_version(app: "App") -> None:
+def build_version(app: App) -> None:
     """(moved from App.__init__ — "what version are you?", I7)
 
     Report the running app version by voice, read from the single-source-of-truth
@@ -93,7 +94,7 @@ def build_version(app: "App") -> None:
     app.registry.register(app.version_cap)
 
 
-def build_ship_spec(app: "App") -> None:
+def build_ship_spec(app: App) -> None:
     """(moved from App.__init__ — grounded ship specifications, issue #83)
 
     Answer "what can a Type-8 carry / what pad does a Mandalay need" from a bundled, refreshable
@@ -105,7 +106,7 @@ def build_ship_spec(app: "App") -> None:
     app.registry.register(app.ship_spec)
 
 
-def build_game_data_status(app: "App") -> None:
+def build_game_data_status(app: App) -> None:
     """(moved from App.__init__ — game-data freshness, issue #101)
 
     "How current is your ship/game data?" answered from the bundled dataset manifest (sources +
@@ -118,7 +119,7 @@ def build_game_data_status(app: "App") -> None:
 
 
 # ---- Audio layer (C1-C8 composition, C9) ------------------------------------
-def build_audio_layer(app: "App") -> None:
+def build_audio_layer(app: App) -> None:
     """(moved from App._start_audio_layer)
 
     Build the AudioLayer over the shared mixer and register the voice-control capability
@@ -163,7 +164,7 @@ def build_audio_layer(app: "App") -> None:
                           "text": f"Audio layer failed to start: {e}"})
 
 
-def _register_edge_cast(app: "App", cast_synth) -> None:  # noqa: ANN001 — a CastSynth
+def _register_edge_cast(app: App, cast_synth) -> None:  # noqa: ANN001 — a CastSynth
     """(moved from App._register_edge_cast)
 
     Register the FREE Edge (edge-tts) provider as a cast-eligible backend (issue #15), so any
@@ -180,7 +181,7 @@ def _register_edge_cast(app: "App", cast_synth) -> None:  # noqa: ANN001 — a C
         app._log("audio", f"Edge cast provider unavailable: {e}")
 
 
-def _register_azure_cast(app: "App", cast_synth) -> None:  # noqa: ANN001 — a CastSynth
+def _register_azure_cast(app: App, cast_synth) -> None:  # noqa: ANN001 — a CastSynth
     """(moved from App._register_azure_cast)
 
     Register official Azure Neural TTS as a cast-eligible backend (issue #17) — the reliable,
@@ -201,7 +202,7 @@ def _register_azure_cast(app: "App", cast_synth) -> None:  # noqa: ANN001 — a 
         app._log("audio", f"Azure cast provider unavailable: {e}")
 
 
-def _register_openai_cast(app: "App", cast_synth) -> None:  # noqa: ANN001 — a CastSynth
+def _register_openai_cast(app: App, cast_synth) -> None:  # noqa: ANN001 — a CastSynth
     """(moved from App._register_openai_cast)
 
     Register an OpenAI-compatible TTS backend as cast-eligible (issue #16) — a cheap cloud
@@ -216,7 +217,7 @@ def _register_openai_cast(app: "App", cast_synth) -> None:  # noqa: ANN001 — a
         app._log("audio", f"OpenAI cast provider unavailable: {e}")
 
 
-def refresh_cast_exclusions(app: "App") -> None:
+def refresh_cast_exclusions(app: App) -> None:
     """(moved from App._refresh_cast_exclusions)
 
     Background: fetch the famous-filtered ElevenLabs voice list and rebuild the cast so a
@@ -232,7 +233,7 @@ def refresh_cast_exclusions(app: "App") -> None:
         app._log("audio", f"cast voice-exclusion refresh skipped: {e}")
 
 
-def build_cast_synth(app: "App"):
+def build_cast_synth(app: App):
     """(moved from App._build_cast_synth — the C10 cast synth router body)
 
     ElevenLabs for EL/persona voices, local Piper models (cached) for the cast pool. EL synth
@@ -262,23 +263,22 @@ def build_cast_synth(app: "App"):
 
 
 # ---- Elite Dangerous monitoring (DESIGN §5) ---------------------------------
-def build_ed_monitoring(app: "App") -> None:
+def build_ed_monitoring(app: App) -> None:
     """(moved from App._start_ed_monitoring)
 
     Build the shared context + ED-context capability and start the journal/status
     watchers. Fail soft: a missing directory or import problem must not stop the app
     from starting — ED monitoring just stays dark until the next run."""
     try:
-        from .ed import (EDContext, JournalWatcher, StatusWatcher,
-                         resolve_journal_dir, status_path)
-        from .capabilities.ed_context_capability import EDContextCapability
-        from .capabilities.on_foot_srv_capability import OnFootSrvCapability
-        from .capabilities.engineers_capability import EngineersCapability
-        from .capabilities.on_foot_engineering_capability import OnFootEngineeringCapability
-        from .capabilities.loadout_capability import LoadoutCapability
         from .capabilities.blueprint_capability import BlueprintCapability
+        from .capabilities.ed_context_capability import EDContextCapability
+        from .capabilities.engineers_capability import EngineersCapability
+        from .capabilities.loadout_capability import LoadoutCapability
         from .capabilities.materials_capability import MaterialsCapability
+        from .capabilities.on_foot_engineering_capability import OnFootEngineeringCapability
+        from .capabilities.on_foot_srv_capability import OnFootSrvCapability
         from .capabilities.stored_capability import StoredCapability
+        from .ed import EDContext, JournalWatcher, StatusWatcher, resolve_journal_dir, status_path
         from .nav import copy as _nav_copy
 
         el = app.cfg.get("elite", {})
@@ -294,8 +294,8 @@ def build_ed_monitoring(app: "App") -> None:
         # Owned-ships registry (issue #134): load the persisted fleet identity (path resolved under
         # the data dir by config) so the journal watcher can fold buy/sell/switch events and the
         # voice CRUD can correct it. Fail-soft: a missing file loads empty.
-        from .ed.owned_ships import OwnedShipsRegistry
         from .capabilities.owned_ships_capability import OwnedShipsCapability
+        from .ed.owned_ships import OwnedShipsRegistry
         _ships_reg_path = str((app.cfg.get("ships", {}) or {}).get("registry_file", "") or "").strip()
         if _ships_reg_path:
             app.ed_ctx.set_owned_ships_registry(OwnedShipsRegistry.load(_ships_reg_path))
@@ -303,8 +303,8 @@ def build_ed_monitoring(app: "App") -> None:
         # (path resolved under the data dir by config) so the journal watcher captures each Loadout
         # by ShipID and the engineering-planning capability can recall a ship's build. Fail-soft: a
         # missing file loads empty.
-        from .ed.ship_loadouts import ShipLoadoutStore
         from .capabilities.ship_engineering_plan_capability import ShipEngineeringPlanCapability
+        from .ed.ship_loadouts import ShipLoadoutStore
         _ships_loadouts_path = str((app.cfg.get("ships", {}) or {}).get("loadouts_file", "") or "").strip()
         if _ships_loadouts_path:
             app.ed_ctx.set_ship_loadout_store(ShipLoadoutStore.load(_ships_loadouts_path))
@@ -420,7 +420,7 @@ def build_ed_monitoring(app: "App") -> None:
 
 
 # ---- Location & carrier commands (N3) ---------------------------------------
-def build_carriers(app: "App", jdir) -> None:
+def build_carriers(app: App, jdir) -> None:
     """(moved from App._start_carriers)
 
     Register the location/carrier capability (copy current system, where's my fleet /
@@ -429,8 +429,8 @@ def build_carriers(app: "App", jdir) -> None:
     through Spansh by the configured callsign. Fail soft — never blocks startup."""
     try:
         from .capabilities.location_capability import LocationCarrierCapability
-        from .nav import (CarrierInfo, carrier_from_journals, copy as _nav_copy,
-                          squadron_name_from_journals)
+        from .nav import CarrierInfo, carrier_from_journals, squadron_name_from_journals
+        from .nav import copy as _nav_copy
 
         def _fleet_carrier():
             # Prefer the live watcher state; fall back to a journal scan for a carrier the
@@ -458,7 +458,7 @@ def build_carriers(app: "App", jdir) -> None:
 
 
 # ---- Community Goals (N6) ---------------------------------------------------
-def build_cg(app: "App", jdir) -> None:
+def build_cg(app: App, jdir) -> None:
     """(moved from App._start_cg)
 
     Register the Community-Goals capability. Journal-primary (works offline); an
@@ -501,7 +501,7 @@ def build_cg(app: "App", jdir) -> None:
 
 
 # ---- Proactive callouts (DESIGN §5) -----------------------------------------
-def build_proactive(app: "App") -> None:
+def build_proactive(app: App) -> None:
     """(moved from App._start_proactive)
 
     Build the proactive-callout capability and start the event pump that feeds bus
@@ -510,8 +510,7 @@ def build_proactive(app: "App") -> None:
     that's not on, since the two are independently toggled."""
     app.long_jump = None  # (#149) declared before the try so a mid-build failure leaves it defined
     try:
-        from .capabilities.proactive_capability import (ProactiveCapability,
-                                                        ProactivePolicy)
+        from .capabilities.proactive_capability import ProactiveCapability, ProactivePolicy
         policy = ProactivePolicy.from_cfg(app.cfg)
         app.proactive = ProactiveCapability(
             policy, app._speak_proactive,
@@ -545,7 +544,7 @@ def build_proactive(app: "App") -> None:
 
 
 # ---- Route callouts (DESIGN §5, N4) -----------------------------------------
-def build_route(app: "App") -> None:
+def build_route(app: App) -> None:
     """(moved from App._start_route)
 
     Build + register the route-callout capability and ensure the event pump is running.
@@ -584,7 +583,7 @@ def build_route(app: "App") -> None:
 
 
 # ---- Companion HUD (issue #47) ----------------------------------------------
-def build_hud(app: "App") -> None:
+def build_hud(app: App) -> None:
     """(moved from App._start_hud)
 
     Register the always-on HUD capability and ensure the event pump is running so it
@@ -600,8 +599,7 @@ def build_hud(app: "App") -> None:
     if not experimental(app.cfg, "hud"):
         return
     try:
-        from .capabilities.hud_capability import (
-            HudCapability, HudModel, WebHudView, checklist_line)
+        from .capabilities.hud_capability import HudCapability, HudModel, WebHudView, checklist_line
         from .capabilities.vr_hud import make_vr_view, probe_vr_reason
         from .ed import read_navroute, resolve_journal_dir
 
@@ -665,7 +663,7 @@ def build_hud(app: "App") -> None:
 
 
 # ---- Persistent memory capture (issue #60) ----------------------------------
-def build_memory(app: "App") -> None:
+def build_memory(app: App) -> None:
     """(moved from App._start_memory)
 
     Wire persistent memory (CAPTURE #60 + RECALL #61): register a capability that
@@ -705,7 +703,7 @@ def build_memory(app: "App") -> None:
 # The mutable handles live on `App` (app._binds_cache / _shared_executor / _shared_focuser); these
 # factories parse/build them ONCE and cache them there, so keybinds, reflex, honk, comms and macros
 # all share the SAME executor + abort + parsed binds — one hard abort releases every held key.
-def ed_binds(app: "App") -> dict:
+def ed_binds(app: App) -> dict:
     """(moved from App._ed_binds)
 
     Parse the active ED key bindings once, shared by keybinds + auto-honk. Returns {}
@@ -721,7 +719,7 @@ def ed_binds(app: "App") -> dict:
     return app._binds_cache
 
 
-def key_executor(app: "App"):
+def key_executor(app: App):
     """(moved from App._key_executor)
 
     Build (once) the shared scancode executor used by both keybind actions and auto-honk,
@@ -733,7 +731,7 @@ def key_executor(app: "App"):
     return app._shared_executor
 
 
-def window_focuser(app: "App"):
+def window_focuser(app: App):
     """(moved from App._window_focuser)
 
     Build (once) the shared window focuser used to bring ED to the foreground before
@@ -755,7 +753,7 @@ def window_focuser(app: "App"):
 
 
 # ---- Keybind automation (DESIGN §6) -----------------------------------------
-def build_keybinds(app: "App") -> None:
+def build_keybinds(app: App) -> None:
     """(moved from App._start_keybinds)
 
     Build the keybind capability: resolve + parse the active ED bindings, build the
@@ -764,7 +762,7 @@ def build_keybinds(app: "App") -> None:
     never block startup. The combat guard reads the live ED context snapshot (so keybinds
     needs [elite].enabled to positively confirm it's safe to act)."""
     try:
-        from .capabilities.keybind_capability import KeybindConfig, KeybindCapability
+        from .capabilities.keybind_capability import KeybindCapability, KeybindConfig
 
         kcfg = KeybindConfig.from_cfg(app.cfg)
         binds = ed_binds(app)
@@ -811,7 +809,7 @@ def build_keybinds(app: "App") -> None:
 
 
 # ---- Tier-2 combat reflexes (#36) -------------------------------------------
-def build_reflex(app: "App") -> None:
+def build_reflex(app: App) -> None:
     """(moved from App._start_reflex)
 
     Build the Tier-2 combat-reflex capability: parse the active ED bindings (shared),
@@ -821,8 +819,7 @@ def build_reflex(app: "App") -> None:
     snapshot (so it needs [elite].enabled to positively confirm you're IN danger before
     firing a reflex)."""
     try:
-        from .capabilities.reflex_capability import (
-            ReflexCapability, ReflexConfig)
+        from .capabilities.reflex_capability import ReflexCapability, ReflexConfig
 
         rcfg = ReflexConfig.from_cfg(app.cfg)
         binds = ed_binds(app)
@@ -864,7 +861,7 @@ def build_reflex(app: "App") -> None:
                           "text": f"Tier-2 reflexes failed to start: {e}"})
 
 
-def build_auto_reflex(app: "App", binds: dict, executor: object) -> None:
+def build_auto_reflex(app: App, binds: dict, executor: object) -> None:
     """(moved from App._start_auto_reflex)
 
     Build + register the ambient auto-reflex capability when opted in ([reflex.auto].
@@ -913,7 +910,7 @@ def build_auto_reflex(app: "App", binds: dict, executor: object) -> None:
 
 
 # ---- Send in-game comms (issue #49) -----------------------------------------
-def build_comms(app: "App") -> None:
+def build_comms(app: App) -> None:
     """(moved from App._start_comms)
 
     Build the comms-send capability: reuse the shared ED binds + scancode executor, wire
@@ -923,9 +920,8 @@ def build_comms(app: "App") -> None:
     the mandatory read-back confirmation, not a game-state guard."""
     try:
         from .capabilities.comms_capability import CommsSendCapability, CommsSendConfig
-        from .nav import clipboard
-
         from .capabilities.keybind_capability import KeybindConfig
+        from .nav import clipboard
 
         ccfg = CommsSendConfig.from_cfg(app.cfg)
         binds = ed_binds(app)
@@ -967,7 +963,7 @@ def build_comms(app: "App") -> None:
 
 
 # ---- Custom macros (#50) ----------------------------------------------------
-def build_macros(app: "App") -> None:
+def build_macros(app: App) -> None:
     """(moved from App._start_macros)
 
     Build + register the custom-macro capability: the persisted spec store, the shared
@@ -1017,7 +1013,7 @@ def build_macros(app: "App") -> None:
 
 
 # ---- Auto-honk (N5) ---------------------------------------------------------
-def build_honk(app: "App") -> None:
+def build_honk(app: App) -> None:
     """(moved from App._start_honk)
 
     Build + register the auto-honk capability and ensure the event pump is running. Fail
@@ -1062,7 +1058,7 @@ def build_honk(app: "App") -> None:
 
 
 # ---- Find-closest-module ----------------------------------------------------
-def build_nav(app: "App") -> None:
+def build_nav(app: App) -> None:
     """(moved from App._start_nav)
 
     Build + register the find-closest-module capability. Fail soft: a startup problem
@@ -1070,8 +1066,8 @@ def build_nav(app: "App") -> None:
     so tests never need it; current-system is read live from ED context with a journal
     fallback."""
     try:
-        from .nav import RequestsHttp, ModuleIndex
-        from .capabilities.find_closest_capability import NavConfig, FindClosestCapability
+        from .capabilities.find_closest_capability import FindClosestCapability, NavConfig
+        from .nav import ModuleIndex, RequestsHttp
 
         ncfg = NavConfig.from_cfg(app.cfg)
         # Live taxonomy so newly-released Frontier modules are findable without a CSV
@@ -1101,7 +1097,7 @@ def build_nav(app: "App") -> None:
                           "text": f"Find-closest-module failed to start: {e}"})
 
 
-def refresh_module_index(app: "App", module_index) -> None:
+def refresh_module_index(app: App, module_index) -> None:
     """(moved from App._refresh_module_index)
 
     Background startup task: fetch Spansh's current module list and log any modules newer
@@ -1118,18 +1114,18 @@ def refresh_module_index(app: "App", module_index) -> None:
 
 
 # ---- Find-closest-ship ------------------------------------------------------
-def build_ship_nav(app: "App") -> None:
+def build_ship_nav(app: App) -> None:
     """(moved from App._start_ship_nav)
 
     Build + register the find-closest-ship capability (shares [nav]). Fail soft: a
     startup problem just leaves the feature off. Same seams as find-closest-module —
     Spansh client built here, current-system read live with a journal fallback."""
     try:
-        from .nav import RequestsHttp, ShipIndex
-        from .nav.edsm_stock import EdsmStockLookup
         from .capabilities.find_closest_capability import FindClosestShipCapability, NavConfig
         from .ed.journal import resolve_journal_dir
         from .ed.shipyard import read_shipyard_snapshot
+        from .nav import RequestsHttp, ShipIndex
+        from .nav.edsm_stock import EdsmStockLookup
 
         ncfg = NavConfig.from_cfg(app.cfg)
         # Live roster so newly-released Frontier hulls are findable without a code change:
@@ -1163,7 +1159,7 @@ def build_ship_nav(app: "App") -> None:
                           "text": f"Find-closest-ship failed to start: {e}"})
 
 
-def refresh_ship_index(app: "App", ship_index) -> None:
+def refresh_ship_index(app: App, ship_index) -> None:
     """(moved from App._refresh_ship_index)
 
     Background startup task: fetch Spansh's current ship list and log any hulls newer
@@ -1180,7 +1176,7 @@ def refresh_ship_index(app: "App", ship_index) -> None:
 
 
 # ---- Star-system search -----------------------------------------------------
-def build_system_search(app: "App") -> None:
+def build_system_search(app: App) -> None:
     """(moved from App._start_system_search)
 
     Build + register the star-system search capability. Fail soft: a startup problem
@@ -1188,9 +1184,9 @@ def build_system_search(app: "App") -> None:
     so tests never need it; current-system is read live from ED context with a journal
     fallback (same seam as find-closest)."""
     try:
-        from .search import RequestsHttp
         from .capabilities._search_support import SearchConfig
         from .capabilities.search_family import SystemSearchCapability
+        from .search import RequestsHttp
         scfg = SearchConfig.from_cfg(app.cfg, "star_systems")
         app.system_search = SystemSearchCapability(
             scfg, http=RequestsHttp(),
@@ -1205,17 +1201,17 @@ def build_system_search(app: "App") -> None:
 
 
 # ---- Remaining Spansh search categories (stations/factions/signals/misc) ----
-def build_searches(app: "App") -> None:
+def build_searches(app: App) -> None:
     """(moved from App._start_searches)
 
     Build + register the four remaining LLM-native Spansh search capabilities. Fail
     soft: a startup problem just leaves them off. One [search] toggle enables the group;
     each shares the injected HTTP client + current-system seam."""
     try:
-        from .search import RequestsHttp
-        from .search.faction_index import FactionIndex
         from .capabilities._search_support import SearchConfig
         from .capabilities.search_family import SEARCH_GROUP, SpecSearchCapability
+        from .search import RequestsHttp
+        from .search.faction_index import FactionIndex
 
         scfg = SearchConfig.from_cfg(app.cfg, "search")
         http = RequestsHttp()
@@ -1245,7 +1241,7 @@ def build_searches(app: "App") -> None:
 
 
 # ---- Body / bio-geo signal finder (#68) -------------------------------------
-def build_bodies(app: "App") -> None:
+def build_bodies(app: App) -> None:
     """(moved from App._start_bodies)
 
     Build + register the body finder (#68) — nearest body by type / biological signal over
@@ -1253,9 +1249,9 @@ def build_bodies(app: "App") -> None:
     `[bodies]` toggle (defaults OFF); shares the injected HTTP client + current-system seam;
     the nearest match's system is copied to the clipboard for the galaxy map."""
     try:
-        from .search import RequestsHttp
         from .capabilities._search_support import SearchConfig
         from .capabilities.search_family import BodySearchCapability
+        from .search import RequestsHttp
 
         bcfg = SearchConfig.from_cfg(app.cfg, "bodies")
         app.body_search = BodySearchCapability(
@@ -1272,7 +1268,7 @@ def build_bodies(app: "App") -> None:
 
 
 # ---- Route planning (#41 foundation proof) ----------------------------------
-def build_route_plan(app: "App") -> None:
+def build_route_plan(app: App) -> None:
     """(moved from App._start_route_plan)
 
     Build + register the trade-route planner (#41), the foundation proof for the Spansh
@@ -1280,8 +1276,8 @@ def build_route_plan(app: "App") -> None:
     Shares the current-system/station seams; the plot handoff copies the next stop to the
     clipboard until the galaxy-map keybind automation (#32) lands."""
     try:
-        from .search import RequestsHttp
         from .capabilities.route_plan_capability import RoutePlanCapability, RoutePlanConfig
+        from .search import RequestsHttp
 
         rcfg = RoutePlanConfig.from_cfg(app.cfg)
         app.route_plan = RoutePlanCapability(
@@ -1298,7 +1294,7 @@ def build_route_plan(app: "App") -> None:
                           "text": f"Trade-route planner failed to start: {e}"})
 
 
-def build_neutron_plan(app: "App") -> None:
+def build_neutron_plan(app: App) -> None:
     """(moved from App._start_neutron_plan)
 
     Build + register the neutron / long-range galaxy planner (#43), the second capability on
@@ -1306,9 +1302,8 @@ def build_neutron_plan(app: "App") -> None:
     current-system seam for the default start; the plot handoff copies the first waypoint to the
     clipboard until the galaxy-map keybind automation (#32) lands."""
     try:
+        from .capabilities.route_plan_capability import NeutronPlanCapability, NeutronPlanConfig
         from .search import RequestsHttp
-        from .capabilities.route_plan_capability import (NeutronPlanCapability,
-                                                         NeutronPlanConfig)
 
         ncfg = NeutronPlanConfig.from_cfg(app.cfg)
         app.neutron_plan = NeutronPlanCapability(
@@ -1325,7 +1320,7 @@ def build_neutron_plan(app: "App") -> None:
 
 
 # ---- Road to Riches (#42, on the #41 foundation) ----------------------------
-def build_riches_plan(app: "App") -> None:
+def build_riches_plan(app: App) -> None:
     """(moved from App._start_riches_plan)
 
     Build + register the Road-to-Riches planner (#42) — nearby high-value UNSCANNED bodies
@@ -1334,8 +1329,8 @@ def build_riches_plan(app: "App") -> None:
     current SYSTEM (not a docked station); the plot handoff copies the first system to the
     clipboard until the galaxy-map keybind automation (#32) lands."""
     try:
-        from .search import RequestsHttp
         from .capabilities.route_plan_capability import RichesPlanCapability, RichesPlanConfig
+        from .search import RequestsHttp
 
         rcfg = RichesPlanConfig.from_cfg(app.cfg)
         app.riches_plan = RichesPlanCapability(
@@ -1352,7 +1347,7 @@ def build_riches_plan(app: "App") -> None:
 
 
 # ---- Mining helper (#45, on the Spansh search layer) ------------------------
-def build_mining_helper(app: "App") -> None:
+def build_mining_helper(app: App) -> None:
     """(moved from App._start_mining_helper)
 
     Build + register the mining helper (#45) — nearest ring hotspot for a material + the best
@@ -1362,9 +1357,11 @@ def build_mining_helper(app: "App") -> None:
     system to the galaxy map via the clipboard until the #32 keybind course-set lands. Fail
     soft — a startup problem just leaves it off."""
     try:
+        from .capabilities.mining_helper_capability import (
+            MiningHelperCapability,
+            MiningHelperConfig,
+        )
         from .search import RequestsHttp
-        from .capabilities.mining_helper_capability import (MiningHelperCapability,
-                                                            MiningHelperConfig)
 
         mcfg = MiningHelperConfig.from_cfg(app.cfg)
         app.mining_helper = MiningHelperCapability(
@@ -1382,7 +1379,7 @@ def build_mining_helper(app: "App") -> None:
 
 
 # ---- Auto persona->voice pairing (issue #96) --------------------------------
-def build_voice_pairing(app: "App") -> None:
+def build_voice_pairing(app: App) -> None:
     """(moved from App._start_voice_pairing)
 
     Kick off the background pairing thread (never blocks startup). Gated by
@@ -1396,7 +1393,7 @@ def build_voice_pairing(app: "App") -> None:
                      daemon=True).start()
 
 
-def load_piper_voice(app: "App", model_path: str):
+def load_piper_voice(app: App, model_path: str):
     """(moved from App._load_piper_voice)
 
     Load a Piper model as a cast voice (lazy, one per path). Returns an object with
@@ -1413,7 +1410,7 @@ def load_piper_voice(app: "App", model_path: str):
 # build_voice_pairing. The worker runs in the background at startup; reconcile_persona_voice runs
 # from App._after_settings_change on every live settings change (code moved; call sites and
 # behaviour unchanged).
-def pair_persona_voices(app: "App") -> None:
+def pair_persona_voices(app: App) -> None:
     """(moved from App._pair_persona_voices)
 
     Background worker: pair a default voice with each PRE-BUILT persona via one cheap-tier,
@@ -1450,7 +1447,7 @@ def pair_persona_voices(app: "App") -> None:
 
 
 # ---- Auto crew->voice pairing (issue #124) ----------------------------------
-def build_crew_voice_pairing(app: "App") -> None:
+def build_crew_voice_pairing(app: App) -> None:
     """Kick the crew's OWN background pairing thread — a sibling of `build_voice_pairing`, started
     from the same startup hook and gated by the SAME `_voice_pairing_allowed` switch. Split out (
     rather than folded into `build_voice_pairing`) so a roster save can re-kick JUST the crew
@@ -1462,7 +1459,7 @@ def build_crew_voice_pairing(app: "App") -> None:
                      daemon=True).start()
 
 
-def kick_crew_voice_pairing(app: "App") -> None:
+def kick_crew_voice_pairing(app: App) -> None:
     """Re-run the crew pairing in the BACKGROUND after the Commander saves the roster (issue #124):
     a save with no persona changes is a cache hit (the shared `pairing_key`), so this costs NO LLM
     call; only an actual persona edit/add/remove triggers one. Same gate + fail-soft as startup —
@@ -1470,7 +1467,7 @@ def kick_crew_voice_pairing(app: "App") -> None:
     build_crew_voice_pairing(app)
 
 
-def pair_crew_voices(app: "App") -> None:
+def pair_crew_voices(app: App) -> None:
     """Background worker (issue #124): pair a BEST-FIT voice with each crew member who has a
     written `persona` and is left on Auto (blank `voice_ref`), mirroring `pair_persona_voices` but
     keyed to the roster (`covas/crew.py`) instead of the shipped personas, and cached SEPARATELY
@@ -1514,7 +1511,7 @@ def pair_crew_voices(app: "App") -> None:
         app._log("voice", f"crew voice pairing skipped: {e}")
 
 
-def persona_explicit_voices(app: "App") -> dict:
+def persona_explicit_voices(app: App) -> dict:
     """(moved from App._persona_explicit_voices)
 
     The per-persona EXPLICIT voice choices ([personality].persona_voices) the user has made —
@@ -1522,7 +1519,7 @@ def persona_explicit_voices(app: "App") -> dict:
     return (app.cfg.get("personality", {}) or {}).get("persona_voices", {}) or {}
 
 
-def remember_persona_voice(app: "App", persona: str, voice_id: str, voice_name) -> None:  # noqa: ANN001
+def remember_persona_voice(app: App, persona: str, voice_id: str, voice_name) -> None:  # noqa: ANN001
     """(moved from App._remember_persona_voice)
 
     Record that the user EXPLICITLY chose `voice_id` for `persona` (a manual voice change while
@@ -1540,7 +1537,7 @@ def remember_persona_voice(app: "App", persona: str, voice_id: str, voice_name) 
     app._log("voice", f"remembered explicit voice for persona {persona!r}")
 
 
-def apply_persona_voice(app: "App", persona: str) -> None:
+def apply_persona_voice(app: App, persona: str) -> None:
     """(moved from App._apply_persona_voice)
 
     Apply the paired default voice for `persona` — UNLESS the user has set an explicit voice
@@ -1570,7 +1567,7 @@ def apply_persona_voice(app: "App", persona: str) -> None:
         app._applying_persona_voice = False
 
 
-def reconcile_persona_voice(app: "App", before: dict) -> None:
+def reconcile_persona_voice(app: App, before: dict) -> None:
     """(moved from App._reconcile_persona_voice)
 
     On a settings change (issue #96): if the user changed the VOICE while staying on a persona,
@@ -1619,7 +1616,7 @@ def _locale_voice_catalog(cfg: dict, provider: str) -> list[dict]:
     return []
 
 
-def steer_reply_voice_for_language(app: "App", before: dict) -> None:
+def steer_reply_voice_for_language(app: App, before: dict) -> None:
     """Locale-aware voice pairing (issue #182 layer 4, #198). When the reply language CHANGES (or
     'match voice to language' is switched on), point an Edge/Azure reply voice that can't pronounce
     the new language at one that can — the "would otherwise mispronounce" case. Runs only on that
@@ -1630,7 +1627,8 @@ def steer_reply_voice_for_language(app: "App", before: dict) -> None:
     if app._applying_persona_voice:
         return
     try:
-        from . import i18n, voice_pairing as vp
+        from . import i18n
+        from . import voice_pairing as vp
         if not (app.cfg.get("language", {}) or {}).get("match_voice", True):
             return
         code = i18n.language_code(i18n.reply_language(app.cfg))
@@ -1685,8 +1683,8 @@ class Wiring:
     fail-soft guard, always-on ones raise into startup exactly as their inline predecessors
     did."""
     attr: str | None
-    gate: Callable[["App"], bool] | None
-    build: Callable[["App"], None]
+    gate: Callable[[App], bool] | None
+    build: Callable[[App], None]
 
 
 # Construction order is list order. It preserves the two real constraints: ED monitoring runs
@@ -1728,7 +1726,7 @@ MANIFEST: tuple[Wiring, ...] = (
 )
 
 
-def wire(app: "App") -> None:
+def wire(app: App) -> None:
     """Wire every capability onto `app`. Two-phase so ordering can't clobber a shared attr:
     first derive the None-defaults for rows that declare an attr (replacing the old scattered
     `self.X = None` pre-declarations; attr-less rows deliberately keep theirs absent when

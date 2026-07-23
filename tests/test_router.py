@@ -10,7 +10,6 @@ import pytest
 
 from covas.router import Route, Router, RouterConfig
 
-
 # Model ids used across the tests — match the config defaults so a drift there is caught.
 HAIKU = "claude-haiku-4-5"
 SONNET = "claude-sonnet-5"

@@ -18,8 +18,8 @@ Action tokens are the Odyssey Humanoid* / *_Humanoid bindings verified against a
 """
 from __future__ import annotations
 
-from ..registry import Macro, register
 from ...ed.modes import MODE_ON_FOOT
+from ..registry import Macro, register
 
 # Every on-foot macro is valid in exactly this mode — the gate that hides them while flying.
 _ON_FOOT = frozenset({MODE_ON_FOOT})

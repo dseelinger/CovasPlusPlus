@@ -18,9 +18,13 @@ from __future__ import annotations
 
 import pytest
 
-from covas.capabilities.base import (CapabilityRegistry, HelpMeta, Slot,
-                                     help_meta_problems, validate_help_meta)
-
+from covas.capabilities.base import (
+    CapabilityRegistry,
+    HelpMeta,
+    Slot,
+    help_meta_problems,
+    validate_help_meta,
+)
 
 # --- fakes -----------------------------------------------------------------
 
@@ -131,9 +135,8 @@ def test_real_capabilities_satisfy_the_contract():
     # Build the actual help + outfitting capabilities the app registers (offline args) and
     # assert the registry carries no contract violations. A future category registered with
     # incomplete metadata breaks this (and register() would already have refused it).
+    from covas.capabilities.find_closest_capability import FindClosestCapability, NavConfig
     from covas.capabilities.help_capability import HelpCapability
-    from covas.capabilities.find_closest_capability import (FindClosestCapability,
-                                                            NavConfig)
     reg = CapabilityRegistry()
     reg.register(HelpCapability(reg))
     reg.register(FindClosestCapability(NavConfig(enabled=True),
@@ -279,8 +282,8 @@ def test_real_registry_groups_cover_every_capability():
     # Build the real app registry (offline) and assert every capability lands in a group and
     # every group resolves back — the guard that a new capability can't silently escape the
     # grouped "what can you do" overview.
+    from covas.capabilities.find_closest_capability import FindClosestCapability, NavConfig
     from covas.capabilities.help_capability import HelpCapability
-    from covas.capabilities.find_closest_capability import (FindClosestCapability, NavConfig)
     reg = CapabilityRegistry()
     help_cap = HelpCapability(reg)
     reg.register(help_cap)

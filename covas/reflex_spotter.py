@@ -93,7 +93,7 @@ class PhraseSpotter:
         object.__setattr__(self, "_phrases", phrases)
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "PhraseSpotter":
+    def from_cfg(cls, cfg: dict) -> PhraseSpotter:
         """Build from config. The vocabulary is FIXED today (a closed grammar is the point of a
         reflex), so this always uses the built-in map; the classmethod exists so the app builds the
         spotter the same way it builds the other pure detectors, and to give a single seam if a

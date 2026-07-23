@@ -13,7 +13,7 @@ its nearest results (Mars, Earth) sit in Sol at 0 ly, so it also exercises the a
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from covas.capabilities._search_support import SearchConfig
@@ -151,7 +151,7 @@ def test_body_result_copies_system_when_elsewhere():
 
 def test_body_bio_search_flags_stale_scan():
     # A biology record years old gets a gentle caveat (signal data is crowdsourced, so ageable).
-    now = datetime(2026, 7, 15, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 15, tzinfo=UTC)
     cap, _, _ = _mk(_bio_body(dist_ly=18.4, updated="2023-01-01 00:00:00+00"), now=now)
     out = cap.run_tool("search_bodies", {"biological_signal": "Bacterium Aurasus"})
     assert "old" in out.lower() and "re-surveyed" in out.lower()
@@ -159,7 +159,7 @@ def test_body_bio_search_flags_stale_scan():
 
 def test_body_structure_search_has_no_stale_caveat():
     # A subtype search never ages (a world doesn't stop being Earth-like), so: no caveat.
-    now = datetime(2026, 7, 15, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 15, tzinfo=UTC)
     body = {"results": [{"name": "Merlin", "system_name": "LHS 3006", "distance": 9.7,
                          "subtype": "Earth-like world", "distance_to_arrival": 300.0,
                          "updated_at": "2019-01-01 00:00:00+00"}]}

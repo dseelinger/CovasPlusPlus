@@ -30,8 +30,8 @@ sleeps, no journal.
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from ..keybinds.binds import KeyBinding
 from ..keybinds.executor import ExecutorError
@@ -149,7 +149,7 @@ class ReflexConfig:
     allowlist: tuple[str, ...] = ()
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "ReflexConfig":
+    def from_cfg(cls, cfg: dict) -> ReflexConfig:
         r = cfg.get("reflex", {}) or {}
         d = cls()
         allow = r.get("allowlist")
@@ -187,7 +187,7 @@ def fire_reflex_action(
     executor: object,
     snap: dict | None,
     combat_guard: bool = True,
-    log: Optional[Callable[[str], None]] = None,
+    log: Callable[[str], None] | None = None,
 ) -> tuple[bool, str]:
     """Fire a reflex end-to-end: bind check -> combat-permissive guard -> press/hold. Returns
     `(fired, message)` — `fired` is True only when a key was actually sent.
@@ -283,8 +283,8 @@ class ReflexCapability:
         executor: object,
         config: ReflexConfig,
         reflexes: dict[str, ReflexAction] | None = None,
-        status_snapshot: Optional[Callable[[], Optional[dict]]] = None,
-        log: Optional[Callable[[str], None]] = None,
+        status_snapshot: Callable[[], dict | None] | None = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._binds = binds or {}
         self._executor = executor

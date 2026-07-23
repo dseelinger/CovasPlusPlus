@@ -64,7 +64,7 @@ class WakeWordConfig:
     fuzzy: bool = True        # tolerate STT slips of the call sign (Kovas/Covis)
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "WakeWordConfig":
+    def from_cfg(cls, cfg: dict) -> WakeWordConfig:
         listen = (cfg or {}).get("listen", {}) or {}
         d = cls()
         return cls(
@@ -85,7 +85,7 @@ class WakeWordGate:
         self._phrase_words = [w.lower() for w in _WORD_RE.findall(cfg.phrase)]
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "WakeWordGate":
+    def from_cfg(cls, cfg: dict) -> WakeWordGate:
         return cls(WakeWordConfig.from_cfg(cfg))
 
     @property

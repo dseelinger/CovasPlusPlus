@@ -18,8 +18,8 @@ Everything opt-in and off by default; the LLM is not involved (curated pools + s
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from .buses import ALERT, AMBIENT, COMMS, COVAS
 from .cues import Cue
@@ -65,7 +65,7 @@ class InterdictionCue:
         self,
         emit: Callable[[Layer], bool],
         *,
-        governor: Optional[CueGovernor] = None,
+        governor: CueGovernor | None = None,
         enabled: bool = True,
         sting: str = DEFAULT_STING,
         sting_samples: tuple[str, ...] = (),
@@ -74,7 +74,7 @@ class InterdictionCue:
         pirate_voice: str = "male",
         cooldown_s: float = 45.0,
         clock: Callable[[], float] = time.monotonic,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._emit = emit
         self._governor = governor
@@ -94,8 +94,8 @@ class InterdictionCue:
 
     @classmethod
     def from_cfg(cls, cfg: dict, emit: Callable[[Layer], bool], *,
-                 governor: Optional[CueGovernor] = None,
-                 clock: Callable[[], float] = time.monotonic) -> "InterdictionCue":
+                 governor: CueGovernor | None = None,
+                 clock: Callable[[], float] = time.monotonic) -> InterdictionCue:
         i = (cfg.get("audio", {}) or {}).get("interdiction", {}) or {}
         return cls(emit, governor=governor, enabled=bool(i.get("enabled", False)),
                    sting=str(i.get("sting", "")), clock=clock)
@@ -108,7 +108,7 @@ class InterdictionCue:
         self._enabled = bool(on)
 
     def set_content(self, *, sting_samples: tuple[str, ...] = (),
-                    threat_lines: Optional[tuple[str, ...]] = None) -> None:
+                    threat_lines: tuple[str, ...] | None = None) -> None:
         """Swap the drop-in sting-sample set and threat pool WITHOUT resetting the rotation
         counters or the shared governor (live drop-in content reload, issue #110), so a live reload
         can't re-arm a just-fired interdiction or make it repeat a line. `threat_lines=None` leaves
@@ -178,7 +178,7 @@ class SfxPlayer:
         self,
         play_sample: Callable[[str, str], bool],
         *,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._play = play_sample
         self._log = log
@@ -205,7 +205,7 @@ _SFX_DEFS: dict[str, tuple[set[str], float]] = {
 }
 
 
-def sfx_cues(cfg: Optional[dict] = None) -> list[Cue]:
+def sfx_cues(cfg: dict | None = None) -> list[Cue]:
     """The shipped ambient SFX cues, on the ambient bus, eligibility-gated. Sample sets come from
     [audio.sfx].<name> (git-ignored local assets); an empty set is valid but silent."""
     sfx = ((cfg or {}).get("audio", {}) or {}).get("sfx", {}) or {}
@@ -216,6 +216,6 @@ def sfx_cues(cfg: Optional[dict] = None) -> list[Cue]:
     ]
 
 
-def register_sfx(registry, cfg: Optional[dict] = None) -> None:  # noqa: ANN001 — a CueRegistry
+def register_sfx(registry, cfg: dict | None = None) -> None:  # noqa: ANN001 — a CueRegistry
     for cue in sfx_cues(cfg):
         registry.register(cue)

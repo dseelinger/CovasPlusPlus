@@ -130,7 +130,7 @@ class RouterConfig:
     ])
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "RouterConfig":
+    def from_cfg(cls, cfg: dict) -> RouterConfig:
         r = cfg.get("router", {}) or {}
         # base_max_tokens is a reply-length policy (kept from [anthropic].max_tokens, which always
         # exists as the base cap); the tier->model map + router-off model come from the ACTIVE
@@ -180,7 +180,7 @@ class RouterConfig:
         return self.tiers.get(canon) if canon else None
 
 
-def _provider_tiers(cfg: dict, provider: str) -> "tuple[dict, str]":
+def _provider_tiers(cfg: dict, provider: str) -> tuple[dict, str]:
     """The tier→model map + the router-off `fixed` model for the ACTIVE llm provider (issue #11).
 
     Anthropic keeps reading `[router].{default,escalate,premium}_model` + `[anthropic].model`, so
@@ -216,7 +216,7 @@ class Router:
         self.cfg = cfg
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "Router":
+    def from_cfg(cls, cfg: dict) -> Router:
         return cls(RouterConfig.from_cfg(cfg))
 
     def cheap_route(self, max_tokens: int | None = None) -> Route:

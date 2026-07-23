@@ -12,8 +12,12 @@ from pathlib import Path
 
 from covas.ed.context import EDContext
 from covas.ed.journal import apply_journal_event
-from covas.ed.stored import (StoredModulesSnapshot, StoredShipsSnapshot,
-                             parse_stored_modules, parse_stored_ships)
+from covas.ed.stored import (
+    StoredModulesSnapshot,
+    StoredShipsSnapshot,
+    parse_stored_modules,
+    parse_stored_ships,
+)
 
 _FIX = Path(__file__).parent / "fixtures"
 

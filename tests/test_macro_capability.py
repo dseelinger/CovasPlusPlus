@@ -15,7 +15,6 @@ from covas.keybinds.registry import Macro
 from covas.keybinds.sequence import PRESS, Step
 from covas.macros.store import MacroStore
 
-
 # ---- fakes ----------------------------------------------------------------
 
 class RecordingExecutor:

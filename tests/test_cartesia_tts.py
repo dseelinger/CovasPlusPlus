@@ -12,9 +12,9 @@ import threading
 
 import pytest
 
-from covas.providers import cartesia_tts as cart
 from covas import firstrun
 from covas import settings_schema as ss
+from covas.providers import cartesia_tts as cart
 
 
 # ---- test doubles ----------------------------------------------------------
@@ -30,8 +30,7 @@ def _cartesia(monkeypatch=None, *, key="test-key", **cfg):
 def _chunks(*parts):
     """A fake _iter_pcm_chunks that yields the given byte parts (ignores its args)."""
     def _gen(key, base_url, body, *, timeout=30.0):
-        for p in parts:
-            yield p
+        yield from parts
     return _gen
 
 

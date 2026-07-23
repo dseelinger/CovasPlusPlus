@@ -17,7 +17,6 @@ or a service error the persona degrades to text and cast voices fall silent — 
 from __future__ import annotations
 
 import threading
-from typing import Optional
 from xml.sax.saxutils import escape as _xml_escape
 
 import requests
@@ -174,7 +173,7 @@ def _build_ssml(text: str, voice: str, style: str = "", rate: str | None = None)
 
 
 def _collect_pcm(key: str, region: str, ssml: str,
-                 cancel: Optional[threading.Event], *, timeout: float = 30.0) -> tuple[bytes, bool]:
+                 cancel: threading.Event | None, *, timeout: float = 30.0) -> tuple[bytes, bool]:
     """POST the SSML to the Speech endpoint and stream the raw PCM back, returning (pcm, cancelled).
     Checks `cancel` between chunks so a barge-in stops the read promptly; a partial (cancelled)
     buffer is discarded by callers. Raises RuntimeError on a non-200 response."""

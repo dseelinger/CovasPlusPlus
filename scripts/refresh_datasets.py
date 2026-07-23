@@ -28,7 +28,12 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from scripts import dataset_manifest, gen_module_taxonomy, gen_ship_roster, gen_ship_specs  # noqa: E402
+from scripts import (  # noqa: E402
+    dataset_manifest,
+    gen_module_taxonomy,
+    gen_ship_roster,
+    gen_ship_specs,
+)
 
 _NAV_DATA = _ROOT / "covas" / "nav" / "data"
 _ROSTER_JSON = _NAV_DATA / "ship_roster.json"

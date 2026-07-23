@@ -6,13 +6,10 @@ guardrail in the composed system prompt. No network, API, or ED — pure logic a
 """
 from __future__ import annotations
 
-
-from covas.ed import EDContext
-from covas.ed import currencies
-from covas.ed.currencies import (Currency, extract_balances, known_names, wallet_line)
+from covas.ed import EDContext, currencies
+from covas.ed.currencies import Currency, extract_balances, known_names, wallet_line
 from covas.ed.detector import ContextDetector, ContextDetectorConfig
 from covas.ed.journal import apply_journal_event
-
 
 # --- registry extraction ---------------------------------------------------
 
@@ -165,7 +162,7 @@ def test_fake_registry_drives_known_vs_unknown(monkeypatch):
 def test_currency_guardrail_in_build_system():
     # Mirror the ship-spec guardrail test in test_crew: the static currency guardrail must be in
     # build_system's output even with personality + crew OFF, and stay identical (cache-safe).
-    from covas.llm import build_system, _CURRENCY_GUARDRAIL
+    from covas.llm import _CURRENCY_GUARDRAIL, build_system
 
     bare = build_system({"personality": {"enabled": False}, "crew": {"enabled": False}})
     assert bare is not None and _CURRENCY_GUARDRAIL in bare

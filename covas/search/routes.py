@@ -25,9 +25,9 @@ field-name correction after on-hardware validation is a one-function change. See
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable
 from urllib.parse import urlencode
 
 from .spansh import _BASE, Http, NavError, data_age_days

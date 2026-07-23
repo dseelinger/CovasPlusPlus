@@ -29,8 +29,8 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Optional
 
 from ..comms.injector import ClipboardTextInjector, InjectorError
 from ..keybinds.binds import KeyBinding
@@ -85,7 +85,7 @@ class CommsSendConfig:
     channel_binds: dict[str, str] = field(default_factory=dict)  # channel -> ED action token
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "CommsSendConfig":
+    def from_cfg(cls, cfg: dict) -> CommsSendConfig:
         c = cfg.get("comms_send", {}) or {}
         d = cls()
         try:
@@ -185,11 +185,11 @@ class CommsSendCapability:
         executor: object,
         config: CommsSendConfig,
         injector: object | None = None,
-        copy: Optional[Callable[[str], None]] = None,
+        copy: Callable[[str], None] | None = None,
         focuser: object | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._binds = binds or {}
         self._executor = executor

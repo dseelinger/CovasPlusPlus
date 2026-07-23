@@ -14,7 +14,6 @@ import pytest
 from covas import config
 from covas import settings_schema as s
 
-
 # --- coverage + no-drift ---------------------------------------------------
 
 def _raw_config() -> dict:

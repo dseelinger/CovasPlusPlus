@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import difflib
 import re
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from .base import CapabilityRegistry, HelpMeta
 
@@ -144,7 +144,7 @@ class HelpCapability:
     )
 
     def __init__(self, registry: CapabilityRegistry,
-                 *, log: Optional[Callable[[str], None]] = None) -> None:
+                 *, log: Callable[[str], None] | None = None) -> None:
         self._registry = registry
         self._log = log
         self._rot = 0  # deterministic rotation counter (advanced once per response)
@@ -242,7 +242,7 @@ class HelpCapability:
         self._logline(f"recovery '{term}' -> no match")
         return _pick(_RECOVERY_MISS, idx).format(term=term, as_kind=as_kind)
 
-    def _recovery_pool(self, expected: str) -> tuple[list[str], Optional[str]]:
+    def _recovery_pool(self, expected: str) -> tuple[list[str], str | None]:
         """The validated candidate values an unresolved term is matched against. When the
         caller names an `expected` kind that the registry has a vocabulary for (e.g.
         'module'), match only within it; otherwise pool every canonical value plus the slot
@@ -275,7 +275,7 @@ def _norm(text: str) -> str:
     return _NON_ALNUM.sub("", str(text).lower())
 
 
-def _nearest(term: str, pool: list[str]) -> Optional[str]:
+def _nearest(term: str, pool: list[str]) -> str | None:
     """The closest VALID candidate in `pool` to `term`, or None. Returns the canonical pool
     value (not the normalized key), so the suggestion is always something the registry
     actually carries."""

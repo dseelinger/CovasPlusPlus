@@ -12,8 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from covas.nav.ships import (ROSTER, ResolvedShip, UnknownShip, _ALIASES, _build_roster,
-                             resolve_ship)
+from covas.nav.ships import _ALIASES, ROSTER, ResolvedShip, UnknownShip, _build_roster, resolve_ship
 from scripts import gen_ship_roster, gen_ship_specs
 
 _ROOT = Path(__file__).resolve().parent.parent

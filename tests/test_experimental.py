@@ -28,7 +28,6 @@ import pytest
 from covas import config
 from covas.config import experimental
 
-
 # --- 1. the accessor is public-safe by construction ------------------------
 
 def test_experimental_true_only_when_explicitly_enabled():

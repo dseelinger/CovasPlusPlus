@@ -29,15 +29,27 @@ injected so the default test run never hits the network (DESIGN §9).
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
-from typing import Callable, Iterator
+from collections.abc import Callable, Iterator
+from datetime import UTC, date, datetime
 
 # The reusable transport + pad/carrier logic live in the shared Spansh client; the result
 # shape is shared with the outfitting lookup. Import from one place so nothing is duplicated.
-from ..search.spansh import (Http, NavError, STATIONS_URL, STOCK_MAX_AGE_DAYS, _DEFAULT_UA,
-                             data_age_days, distance_sort, execute_search, freshness_filter,
-                             is_fleet_carrier, is_fresh, largest_pad as _largest_pad,
-                             pad_filter_key as _pad_filter_key, pad_ok as _pad_ok)
+from ..search.spansh import (
+    _DEFAULT_UA,
+    STATIONS_URL,
+    STOCK_MAX_AGE_DAYS,
+    Http,
+    NavError,
+    data_age_days,
+    distance_sort,
+    execute_search,
+    freshness_filter,
+    is_fleet_carrier,
+    is_fresh,
+)
+from ..search.spansh import largest_pad as _largest_pad
+from ..search.spansh import pad_filter_key as _pad_filter_key
+from ..search.spansh import pad_ok as _pad_ok
 from ..search.stations import STATION_TYPES
 from .closest import ClosestResult
 from .edsm_stock import norm_ship_name
@@ -252,9 +264,9 @@ def _memoized(stock_lookup: StockLookup | None) -> StockLookup | None:
     store) — but a raise ends verification for the pass anyway."""
     if stock_lookup is None:
         return None
-    cache: dict[tuple[str, str], "frozenset[str] | None"] = {}
+    cache: dict[tuple[str, str], frozenset[str] | None] = {}
 
-    def wrapped(system: str, station: str) -> "frozenset[str] | None":
+    def wrapped(system: str, station: str) -> frozenset[str] | None:
         key = (str(system or "").lower(), str(station or "").lower())
         if key not in cache:
             cache[key] = stock_lookup(system, station)
@@ -288,7 +300,7 @@ def find_closest_ship(resolved, current_system: str, http: Http, *,
         raise NavError("I don't know your current system yet — is Elite Dangerous running "
                        "with monitoring on? Jump somewhere and I'll have it.")
 
-    today = now.astimezone(timezone.utc).date() if now is not None else None
+    today = now.astimezone(UTC).date() if now is not None else None
     vetoed: list[str] = []
     stock_vetoed: list[str] = []
     lookup = _memoized(stock_lookup)

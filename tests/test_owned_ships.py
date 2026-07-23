@@ -14,10 +14,14 @@ from covas.capabilities.owned_ships_capability import OwnedShipsCapability
 from covas.ed.context import EDContext
 from covas.ed.journal import apply_journal_event
 from covas.ed.loadout import LoadoutSnapshot
-from covas.ed.owned_ships import (OwnedShipsRegistry, fold, match_ships,
-                                  reconcile_loadout, reconcile_stored)
+from covas.ed.owned_ships import (
+    OwnedShipsRegistry,
+    fold,
+    match_ships,
+    reconcile_loadout,
+    reconcile_stored,
+)
 from covas.ed.stored import StoredShip, StoredShipsSnapshot
-
 
 # --- pure fold over each Shipyard event -------------------------------------------------
 

@@ -6,12 +6,22 @@ human-readable error mapping run without any network, key, or audio hardware (DE
 from __future__ import annotations
 
 import covas.health as health
-from covas.health import (HealthReport, run_health, friendly_provider_error,
-                          check_anthropic, check_audio, check_keys_and_files,
-                          check_datasets, check_updates, check_system, OK, WARN, FAIL)
+from covas.health import (
+    FAIL,
+    OK,
+    WARN,
+    HealthReport,
+    check_anthropic,
+    check_audio,
+    check_datasets,
+    check_keys_and_files,
+    check_system,
+    check_updates,
+    friendly_provider_error,
+    run_health,
+)
 from covas.nav.datasets import DatasetInfo
 from covas.providers._retry import ProviderError
-
 
 # --- report aggregation ----------------------------------------------------
 

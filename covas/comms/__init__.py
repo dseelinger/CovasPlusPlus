@@ -12,8 +12,7 @@ read-back-before-send gate so a garbled message never reaches strangers.
 """
 from __future__ import annotations
 
-from .injector import (PASTE_BINDING, SEND_BINDING, ClipboardTextInjector,
-                       InjectorError)
+from .injector import PASTE_BINDING, SEND_BINDING, ClipboardTextInjector, InjectorError
 
 __all__ = [
     "ClipboardTextInjector",

@@ -10,10 +10,9 @@ from __future__ import annotations
 
 import pytest
 
-from covas import tiering
 from covas import settings_schema as schema
+from covas import tiering
 from covas.capabilities import CapabilityRegistry
-
 
 # --- fakes -----------------------------------------------------------------------------------
 

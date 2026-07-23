@@ -10,9 +10,19 @@ from pathlib import Path
 
 from covas.ed import EDContext, StatusWatcher
 from covas.ed.modes import MODE_FIGHTER, MODE_MAINSHIP, MODE_ON_FOOT, MODE_SRV
-from covas.ed.status import (FLAGS, FLAGS2, HEALTH_LOW, OXYGEN_LOW, apply_status, decode_flags,
-                            describe_transition, flag_transitions, game_mode_from_flags,
-                            low_vital_transitions, status_path)
+from covas.ed.status import (
+    FLAGS,
+    FLAGS2,
+    HEALTH_LOW,
+    OXYGEN_LOW,
+    apply_status,
+    decode_flags,
+    describe_transition,
+    flag_transitions,
+    game_mode_from_flags,
+    low_vital_transitions,
+    status_path,
+)
 from covas.events import EventBus
 
 FIXTURES = Path(__file__).parent / "fixtures" / "ed"

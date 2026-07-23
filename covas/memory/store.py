@@ -23,13 +23,13 @@ import sys
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
 def _now_iso() -> str:
     """UTC timestamp, second precision — enough to order facts, no locale surprises."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _norm_tags(tags: object) -> tuple[str, ...]:
@@ -61,7 +61,7 @@ class MemoryRecord:
                 "tags": list(self.tags), "when": self.when}
 
     @classmethod
-    def from_dict(cls, d: dict) -> "MemoryRecord":
+    def from_dict(cls, d: dict) -> MemoryRecord:
         """Build from a parsed line. Missing/odd fields fall back to defaults (fail soft);
         raises ValueError only if there is no usable `text` — an empty fact is meaningless."""
         text = str(d.get("text", "")).strip()

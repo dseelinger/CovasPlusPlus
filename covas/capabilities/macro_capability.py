@@ -35,8 +35,8 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from ..keybinds import actions as _actions  # noqa: F401 — import populates the macro registry
 from ..keybinds.abort import AbortController
@@ -46,11 +46,18 @@ from ..keybinds.registry import Macro, registered_macros
 from ..keybinds.sequence import run_sequence
 from ..macros.compile import MacroValidationError, compile_macro
 from ..macros.registry import STATUS_CONDITIONS, TRIGGERS, triggers_for_event
-from ..macros.spec import (ACTION, AWAIT_STATUS, REQUIRE_STATUS, WAIT, MacroSpec, MacroStepSpec,
-                           _as_bool)
+from ..macros.spec import (
+    ACTION,
+    AWAIT_STATUS,
+    REQUIRE_STATUS,
+    WAIT,
+    MacroSpec,
+    MacroStepSpec,
+    _as_bool,
+)
 from ..macros.store import MacroStore
 from .base import HelpMeta
-from .keybind_capability import SAFE, _GUARD_MESSAGES, combat_state
+from .keybind_capability import _GUARD_MESSAGES, SAFE, combat_state
 
 # How long to ignore a re-fire of the SAME macro's trigger, so the journal's `Docked` and the
 # Status watcher's `Docked` transition (which arrive within a second of each other) can't run a
@@ -72,7 +79,7 @@ class MacroConfig:
     confirm_window: float = 60.0
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "MacroConfig":
+    def from_cfg(cls, cfg: dict) -> MacroConfig:
         m = cfg.get("macros", {}) or {}
         d = cls()
         return cls(
@@ -150,14 +157,14 @@ class MacroCapability:
         binds: dict[str, KeyBinding],
         executor: object,
         allowlist: Callable[[], frozenset[str]],
-        status_snapshot: Optional[Callable[[], Optional[dict]]] = None,
-        actions: Optional[dict[str, Macro]] = None,
-        abort_controller: Optional[AbortController] = None,
-        speak: Optional[Callable[[str], object]] = None,
-        spawn: Optional[Callable[[Callable[[], None]], None]] = None,
+        status_snapshot: Callable[[], dict | None] | None = None,
+        actions: dict[str, Macro] | None = None,
+        abort_controller: AbortController | None = None,
+        speak: Callable[[str], object] | None = None,
+        spawn: Callable[[Callable[[], None]], None] | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
-        log: Optional[Callable[[str], None]] = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._store = store
         self._cfg = config

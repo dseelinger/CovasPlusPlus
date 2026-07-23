@@ -26,18 +26,29 @@ a field-name correction there.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
+from ..i18n import fmt_int  # locale-aware number formatting for spoken callouts (#199)
 from ..nav import copy as _default_copy
 from ..search import NavError, RequestsHttp
-from ..search.routes import (RICHES_ROUTE_URL, ROUTE_URL, TRADE_ROUTE_URL, RoutePlotter,
-                             RouteWaypoint, build_galaxy_request, build_riches_request,
-                             build_trade_request, hop_age_days, parse_galaxy_route,
-                             parse_riches_route, parse_trade_route, stale_age_caveat,
-                             submit_and_poll)
-from ..search.spansh import Http, _DEFAULT_UA
-from ..i18n import fmt_int   # locale-aware number formatting for spoken callouts (#199)
+from ..search.routes import (
+    RICHES_ROUTE_URL,
+    ROUTE_URL,
+    TRADE_ROUTE_URL,
+    RoutePlotter,
+    RouteWaypoint,
+    build_galaxy_request,
+    build_riches_request,
+    build_trade_request,
+    hop_age_days,
+    parse_galaxy_route,
+    parse_riches_route,
+    parse_trade_route,
+    stale_age_caveat,
+    submit_and_poll,
+)
+from ..search.spansh import _DEFAULT_UA, Http
 from .base import HelpMeta, Slot
 
 
@@ -121,7 +132,7 @@ class RoutePlanConfig:
     max_price_age_days: int = 2
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "RoutePlanConfig":
+    def from_cfg(cls, cfg: dict) -> RoutePlanConfig:
         r = cfg.get("route_plan", {}) or {}
         d = cls()
         return cls(
@@ -338,7 +349,7 @@ class NeutronPlanConfig:
     default_efficiency: int = 60
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "NeutronPlanConfig":
+    def from_cfg(cls, cfg: dict) -> NeutronPlanConfig:
         n = cfg.get("neutron_plan", {}) or {}
         d = cls()
         eff = int(n.get("default_efficiency", d.default_efficiency) or d.default_efficiency)
@@ -493,7 +504,7 @@ class RichesPlanConfig:
     use_mapping_value: bool = True
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "RichesPlanConfig":
+    def from_cfg(cls, cfg: dict) -> RichesPlanConfig:
         r = cfg.get("riches_plan", {}) or {}
         d = cls()
         return cls(

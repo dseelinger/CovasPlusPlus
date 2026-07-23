@@ -13,8 +13,7 @@ from __future__ import annotations
 import time
 
 from covas.config import load_config
-from covas.ed import (EDContext, JournalWatcher, StatusWatcher, resolve_journal_dir,
-                     status_path)
+from covas.ed import EDContext, JournalWatcher, StatusWatcher, resolve_journal_dir, status_path
 from covas.events import EventBus
 
 

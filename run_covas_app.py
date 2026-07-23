@@ -26,8 +26,7 @@ import sys
 import threading
 import time
 
-from covas import firstrun
-from covas import setup_web
+from covas import firstrun, setup_web
 from covas.__version__ import __version__
 from covas.app import App
 from covas.config import load_config

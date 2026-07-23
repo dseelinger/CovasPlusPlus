@@ -13,16 +13,21 @@ Covers the three Prompt-6 tasks at the unit level:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from covas.capabilities._search_support import SearchConfig, recovery
 from covas.capabilities.base import CapabilityRegistry
-from covas.capabilities.help_capability import HelpCapability
 from covas.capabilities.find_closest_capability import FindClosestCapability, NavConfig
-from covas.capabilities.search_family import (FACTION_STATES_CATEGORY, MINOR_FACTIONS, SIGNALS,
-                                              STATIONS, SpecSearchCapability,
-                                              SystemSearchCapability)
+from covas.capabilities.help_capability import HelpCapability
+from covas.capabilities.search_family import (
+    FACTION_STATES_CATEGORY,
+    MINOR_FACTIONS,
+    SIGNALS,
+    STATIONS,
+    SpecSearchCapability,
+    SystemSearchCapability,
+)
 from covas.search.factions import FACTION_STATES
 from covas.search.stations import STATION_TYPES
 
@@ -32,7 +37,7 @@ _SYSTEMS = json.loads((Path(__file__).parent / "fixtures" /
 # issues a second (stale-fallback) query — which would inflate the expected call count as the
 # fixture's fixed dates age out. Stamp the rows fresh relative to now so the freshness path holds
 # and each refinement stays a single query.
-_NOW_STAMP = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00")
+_NOW_STAMP = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S+00")
 for _r in _SYSTEMS.get("results", []):
     if "updated_at" in _r:
         _r["updated_at"] = _NOW_STAMP

@@ -13,9 +13,9 @@ tools. Local journal data only — no CAPI, no network.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Mapping
 
 # The journal's three material buckets, as they appear in the `Materials` event.
 _BUCKETS = ("Raw", "Manufactured", "Encoded")
@@ -33,7 +33,7 @@ class MaterialsSnapshot:
         """How many of `symbol` (journal name) are held — 0 if none/unknown."""
         return int(self.counts.get(str(symbol).strip().lower(), 0))
 
-    def with_delta(self, symbol: str, delta: int) -> "MaterialsSnapshot":
+    def with_delta(self, symbol: str, delta: int) -> MaterialsSnapshot:
         """A new snapshot with `symbol`'s count adjusted by `delta` (clamped at 0). Used to keep
         the inventory fresh from MaterialCollected (+) / MaterialDiscarded (-) between full
         `Materials` events, without waiting for the next wholesale snapshot."""

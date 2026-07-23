@@ -14,7 +14,7 @@ the app; a fake in tests) so the default `pytest` run never touches the real cli
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from ..nav import copy as _default_copy
 from .base import HelpMeta, Slot

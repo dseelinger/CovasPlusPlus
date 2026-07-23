@@ -7,11 +7,15 @@ callout only when idle — never over an in-progress user turn.
 from __future__ import annotations
 
 from covas.app import App
-from covas.capabilities.proactive_capability import (DEFAULT_EVENTS, ProactiveCapability,
-                                                     ProactiveConfig, ProactivePolicy,
-                                                     build_prompt, event_phrase)
+from covas.capabilities.proactive_capability import (
+    DEFAULT_EVENTS,
+    ProactiveCapability,
+    ProactiveConfig,
+    ProactivePolicy,
+    build_prompt,
+    event_phrase,
+)
 from tests.fakes import FakeLLM, FakeSTT, FakeTTS
-
 
 # --- ProactiveConfig.from_cfg ---------------------------------------------------------
 

@@ -24,8 +24,8 @@ opts each one in by name, same as the ship batch.
 """
 from __future__ import annotations
 
-from ..registry import Macro, register
 from ...ed.modes import MODE_SRV
+from ..registry import Macro, register
 
 _SRV = frozenset({MODE_SRV})   # every SRV macro is valid ONLY while driving the buggy
 

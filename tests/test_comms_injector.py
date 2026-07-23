@@ -8,8 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from covas.comms.injector import (ClipboardTextInjector, InjectorError,
-                                  PASTE_BINDING, SEND_BINDING)
+from covas.comms.injector import PASTE_BINDING, SEND_BINDING, ClipboardTextInjector, InjectorError
 from covas.keybinds.executor import ExecutorError
 
 

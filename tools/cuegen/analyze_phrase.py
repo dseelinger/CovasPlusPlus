@@ -2,8 +2,9 @@
 Monophonic autocorrelation pitch detection. Reports what was played so we can re-voice it.
 """
 import sys
-import numpy as np
+
 import av
+import numpy as np
 
 PATH = sys.argv[1]
 SR = 44100

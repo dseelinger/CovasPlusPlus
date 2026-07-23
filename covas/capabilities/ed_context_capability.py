@@ -135,7 +135,7 @@ class EDContextCapability:
         # Grounded wallet (#101): the login-only balances, hedged. The ONLY source for a currency
         # amount — an unknown currency simply isn't here, so the model must degrade honestly.
         wallet = self.ctx.wallet_snapshot()
-        from ..i18n import fmt_int   # locale grouping for spoken/on-screen amounts (#199)
+        from ..i18n import fmt_int  # locale grouping for spoken/on-screen amounts (#199)
         if wallet.get("credits") is not None:
             parts.append(f"Credits: {fmt_int(wallet['credits'])} (as of login)")
         if wallet.get("carrier_balance") is not None:

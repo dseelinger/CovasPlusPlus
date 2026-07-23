@@ -21,7 +21,6 @@ from covas.keybinds.registry import Macro
 from covas.keybinds.sequence import PRESS, Step
 from covas.macros.store import MacroStore
 
-
 # ---- AbortController semantics (the primitive the fix rests on) -------------
 
 def test_abort_marks_every_in_flight_run():

@@ -24,9 +24,9 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
 
 # Where the generated cache lives by default (git-ignored; per-account, never committed).
 DEFAULT_CACHE = "personalities/voice_pairings.json"
@@ -101,7 +101,7 @@ def build_pairing_prompt(personas: list[dict], voices: list[dict]) -> str:
 
 
 def make_pairing_generator(
-    llm, *, model: Optional[str] = None, max_tokens: int = 900  # noqa: ANN001 — LLMProvider
+    llm, *, model: str | None = None, max_tokens: int = 900  # noqa: ANN001 — LLMProvider
 ) -> Callable[[str], str]:
     """Adapt an LLMProvider into a `generate(prompt) -> text` callable by accumulating its streamed
     reply. Thin by design (matches the chatter/comms adapters); the app injects the cheap tier."""
@@ -118,7 +118,7 @@ def make_pairing_generator(
     return generate
 
 
-def _extract_json(text: str) -> Optional[dict]:
+def _extract_json(text: str) -> dict | None:
     """Best-effort: pull the first {...} object out of a reply (models sometimes wrap it in prose
     or a ```json fence). Returns the parsed dict, or None if nothing parses."""
     t = (text or "").strip()
@@ -165,7 +165,7 @@ class Pairing:
     from_cache: bool = False
 
 
-def load_cache(path: Path) -> tuple[Optional[str], dict[str, str]]:
+def load_cache(path: Path) -> tuple[str | None, dict[str, str]]:
     """(key, mapping) from the cache file, or (None, {}) when missing/unreadable/malformed."""
     try:
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -194,11 +194,11 @@ def save_cache(path: Path, key: str, mapping: dict[str, str]) -> None:
 def pair_voices(
     personas: list[dict],
     voices: list[dict],
-    generate: Optional[Callable[[str], str]],
+    generate: Callable[[str], str] | None,
     *,
     cache_path: Path,
-    log: Optional[Callable[[str], None]] = None,
-) -> Optional[Pairing]:
+    log: Callable[[str], None] | None = None,
+) -> Pairing | None:
     """Resolve the persona→voice mapping, using the cache when it's still valid (recompute ONLY when
     the persona set or the voice list changed — the whole point of the key). On a miss it calls the
     injected generator ONCE, validates the result against the real ids/personas, and saves it.
@@ -237,7 +237,7 @@ def pair_voices(
     return Pairing(mapping=mapping, key=key, from_cache=False)
 
 
-def _lookup_ci(mapping: Optional[dict], name: str) -> Optional[str]:
+def _lookup_ci(mapping: dict | None, name: str) -> str | None:
     """Case-insensitive name lookup returning a non-empty value, else None."""
     want = str(name or "").strip().lower()
     for k, v in (mapping or {}).items():
@@ -246,8 +246,8 @@ def _lookup_ci(mapping: Optional[dict], name: str) -> Optional[str]:
     return None
 
 
-def voice_for_persona(explicit_map: Optional[dict], pairings: Optional[dict],
-                     persona_name: str) -> Optional[str]:
+def voice_for_persona(explicit_map: dict | None, pairings: dict | None,
+                     persona_name: str) -> str | None:
     """The voice to use for `persona_name`: an EXPLICIT user choice ALWAYS wins over an auto
     pairing; with neither, None (keep the current default). Case-insensitive name match. Pure."""
     if not str(persona_name or "").strip():
@@ -289,12 +289,12 @@ class LanguageVoice:
     it; `mismatch` is True when the result can't actually speak the language — either because an
     explicit user voice was respected, or because the catalog has no voice for that language — so
     the caller can warn instead of silently mispronouncing."""
-    voice_id: Optional[str]
+    voice_id: str | None
     steered: bool = False
     mismatch: bool = False
 
 
-def _best_speaker(speakers: list[dict], prefer_gender: Optional[str]) -> Optional[dict]:
+def _best_speaker(speakers: list[dict], prefer_gender: str | None) -> dict | None:
     """Pick a locale-appropriate voice: prefer one matching `prefer_gender` (keep the persona's
     feel), else the first (the catalog is already sorted deterministically). None if empty."""
     if not speakers:
@@ -309,11 +309,11 @@ def _best_speaker(speakers: list[dict], prefer_gender: Optional[str]) -> Optiona
 
 def pick_language_voice(
     voices: list[dict],
-    code: Optional[str],
+    code: str | None,
     *,
-    current: Optional[str] = None,
+    current: str | None = None,
     explicit: bool = False,
-    prefer_gender: Optional[str] = None,
+    prefer_gender: str | None = None,
 ) -> LanguageVoice:
     """Resolve which voice should read a reply in ISO 639-1 language `code`, given the provider's
     `voices` catalog (normalized `{ref/voice_id, name, gender, locale}` dicts) and the `current`
@@ -358,7 +358,7 @@ def pick_language_voice(
     return LanguageVoice(current, steered=False, mismatch=True)
 
 
-def voice_speaks_strict(v: dict, code: Optional[str]) -> bool:
+def voice_speaks_strict(v: dict, code: str | None) -> bool:
     """Like `i18n.voice_speaks`, but for PICKING a replacement: an untagged voice does NOT qualify
     (we only steer TO a voice we can positively confirm speaks the language)."""
     from .i18n import voice_speaks
@@ -373,7 +373,7 @@ def reply_voice_patch(
     voices: list[dict],
     *,
     explicit: bool = False,
-) -> tuple[Optional[dict], LanguageVoice]:
+) -> tuple[dict | None, LanguageVoice]:
     """Given the live `cfg` and the active provider's `voices` catalog, return `(patch, outcome)`
     where `patch` is a config patch that steers the reply voice to the active language — or None
     when nothing should change. `outcome` (a `LanguageVoice`) carries the mismatch flag so the

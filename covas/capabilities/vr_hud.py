@@ -35,8 +35,8 @@ from __future__ import annotations
 import ctypes
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Callable, List, Optional
 
 import numpy as np
 
@@ -136,7 +136,7 @@ def _fold_ascii(text: str) -> str:
     return text.upper()
 
 
-def _draw_char(buf: "np.ndarray", ch: str, x: int, y: int, color, scale: int) -> None:
+def _draw_char(buf: np.ndarray, ch: str, x: int, y: int, color, scale: int) -> None:
     """Blit one glyph at pixel (x, y) into ``buf`` (HxWx4), scaled by ``scale``. Off-canvas
     pixels are clipped. Unknown characters draw nothing (a blank cell)."""
     rows = _FONT.get(ch)
@@ -154,7 +154,7 @@ def _draw_char(buf: "np.ndarray", ch: str, x: int, y: int, color, scale: int) ->
             buf[max(0, py0):py1, max(0, px0):px1] = color
 
 
-def _draw_text(buf: "np.ndarray", text: str, x: int, y: int, color, scale: int,
+def _draw_text(buf: np.ndarray, text: str, x: int, y: int, color, scale: int,
                max_chars: int) -> None:
     """Draw a single (already ASCII-folded) line, truncating with a trailing '..' when it
     would exceed ``max_chars`` cells so a long line can't overrun the panel."""
@@ -179,7 +179,7 @@ _ACCENT_PX = 6      # top accent-bar height
 _ROW_GAP_PX = 10    # gap between rows
 
 _font_cache: dict = {}
-_pil_ok: Optional[bool] = None  # tri-state: None untried, then True/False (avoid re-probing)
+_pil_ok: bool | None = None  # tri-state: None untried, then True/False (avoid re-probing)
 
 
 def _load_font(size: int, bold: bool):
@@ -210,11 +210,11 @@ def _load_font(size: int, bold: bool):
     return None
 
 
-def _snapshot_rows(snap: HudSnapshot) -> List[tuple]:
+def _snapshot_rows(snap: HudSnapshot) -> list[tuple]:
     """The rows to paint as ``(text, rgba, size_px, bold)``, in order — the SINGLE source shared
     by both renderers so they can't drift. State is always the headline; checklist / route /
     callout appear only when populated. Mixed-case human text (the bitmap path folds to caps)."""
-    rows: List[tuple] = [(f"COVAS  {snap.voice_state}", _C_STATE, _HEAD_SIZE, True)]
+    rows: list[tuple] = [(f"COVAS  {snap.voice_state}", _C_STATE, _HEAD_SIZE, True)]
     if snap.checklist:
         rows.append((f"STEP   {snap.checklist}", _C_CHECK, _DETAIL_SIZE, False))
     if snap.route:
@@ -275,7 +275,7 @@ def _render_pillow(snap: HudSnapshot, width: int, height: int):
     return np.array(img, dtype=np.uint8)
 
 
-def _render_bitmap(snap: HudSnapshot, width: int, height: int, scale: int) -> "np.ndarray":
+def _render_bitmap(snap: HudSnapshot, width: int, height: int, scale: int) -> np.ndarray:
     """Fail-soft fallback: the original 5x7 bitmap renderer, used only when Pillow / Segoe UI is
     absent. Uppercase, fixed-width, chunky — but zero-dependency, so the overlay still draws."""
     buf = np.zeros((height, width, 4), dtype=np.uint8)
@@ -298,7 +298,7 @@ def _render_bitmap(snap: HudSnapshot, width: int, height: int, scale: int) -> "n
 
 
 def render_snapshot_rgba(snap: HudSnapshot, *, width: int = 768, height: int = 384,
-                         scale: int = 3) -> "np.ndarray":
+                         scale: int = 3) -> np.ndarray:
     """Rasterize a ``HudSnapshot`` to an HxWx4 uint8 **RGBA** buffer — the exact surface
     ``IVROverlay.setOverlayRaw`` uploads (RGBA from system memory, no DirectX context).
 
@@ -313,7 +313,7 @@ def render_snapshot_rgba(snap: HudSnapshot, *, width: int = 768, height: int = 3
     return _render_bitmap(snap, width, height, scale)
 
 
-def as_overlay_buffer(buf: "np.ndarray") -> "ctypes.Array":
+def as_overlay_buffer(buf: np.ndarray) -> ctypes.Array:
     """Wrap the RGBA buffer as the ctypes object ``IVROverlay.setOverlayRaw`` needs.
 
     pyopenvr's binding does ``fn(handle, byref(buffer), w, h, bpp)`` — it calls ``byref()`` on
@@ -362,7 +362,7 @@ class VrPlacement:
     @staticmethod
     def normalize(mode: object, width_m: object = 0.55, *, forward_m: object = 1.30,
                   up_m: object = -0.12, offset_x_m: object = 0.0, pitch_deg: object = 0.0,
-                  curvature: object = 0.0, yaw_deg: object = 0.0) -> "VrPlacement":
+                  curvature: object = 0.0, yaw_deg: object = 0.0) -> VrPlacement:
         """Build a placement from raw config values, clamping each to a sane, comfortable range
         so a bad setting can never place the panel somewhere unusable (or raise)."""
         m = str(mode or "world").strip().lower()
@@ -393,7 +393,7 @@ class VrPlacement:
         )
 
 
-def _mul_3x4(a: List[List[float]], b: List[List[float]]) -> List[List[float]]:
+def _mul_3x4(a: list[list[float]], b: list[list[float]]) -> list[list[float]]:
     """Compose two 3x4 rigid transforms (each an ``[R | t]`` with an implicit ``[0 0 0 1]``
     bottom row): returns ``a ∘ b``. Pure, so the placement math is unit-tested offline."""
     out = [[0.0, 0.0, 0.0, 0.0] for _ in range(3)]
@@ -404,7 +404,7 @@ def _mul_3x4(a: List[List[float]], b: List[List[float]]) -> List[List[float]]:
     return out
 
 
-def hmd_yaw_deg(matrix: List[List[float]]) -> float:
+def hmd_yaw_deg(matrix: list[list[float]]) -> float:
     """The heading (degrees) to give ``VrPlacement.yaw_deg`` so a panel placed by look-to-place
     sits along the HMD's horizontal gaze and faces back at the viewer. ``matrix`` is the HMD's
     3x4 device-to-absolute pose. Pure — unit-tested against known rotations."""
@@ -412,7 +412,7 @@ def hmd_yaw_deg(matrix: List[List[float]]) -> float:
     return math.degrees(math.atan2(matrix[0][2], matrix[2][2]))
 
 
-def hmd_pitch_deg(matrix: List[List[float]]) -> float:
+def hmd_pitch_deg(matrix: list[list[float]]) -> float:
     """The elevation (degrees) of the HMD's gaze, for placing a pinned panel on the full gaze
     ray (not just its heading). ``matrix`` is the HMD's 3x4 device-to-absolute pose; the forward
     vector is the negated Z column, so ``elevation = degrees(asin(-matrix[1][2]))`` — looking up
@@ -423,7 +423,7 @@ def hmd_pitch_deg(matrix: List[List[float]]) -> float:
     return math.degrees(math.asin(max(-1.0, min(1.0, -matrix[1][2]))))
 
 
-def resolve_transform(p: VrPlacement) -> List[List[float]]:
+def resolve_transform(p: VrPlacement) -> list[list[float]]:
     """The overlay's 3x4 row-major transform: a heading rotation ``Ry(yaw)`` composed with the
     panel's local pose — an X-axis ``pitch`` tilt plus a translation to ``(offset_x, up,
     −forward)`` (lateral, vertical, and ``forward`` in front; −Z is forward in OpenVR). So the
@@ -469,7 +469,7 @@ VR_REASON_NO_POSE = "no-hmd-pose"            # TRANSIENT: overlay up but HMD pos
 VR_TRANSIENT_REASONS = frozenset({VR_REASON_STEAMVR, VR_REASON_ATTACH, VR_REASON_NO_POSE})
 
 
-def probe_vr_reason() -> Optional[str]:
+def probe_vr_reason() -> str | None:
     """Why the VR overlay can't attach *right now* — a cheap, synchronous check — or ``None``
     when it should attach (``openvr`` importable AND SteamVR up). No persistent view and no
     ``openvr.init``: it only separates the PERMANENT ``openvr-missing`` from the TRANSIENT
@@ -531,8 +531,8 @@ class VrHudView:
     NAME = "COVAS++ HUD"
 
     def __init__(self, snapshot_provider: Callable[[], HudSnapshot],
-                 placement: Optional[VrPlacement] = None,
-                 *, log: Optional[Callable[[str], None]] = None) -> None:
+                 placement: VrPlacement | None = None,
+                 *, log: Callable[[str], None] | None = None) -> None:
         self._provider = snapshot_provider
         self._placement = placement or VrPlacement()
         self._log = log
@@ -541,24 +541,24 @@ class VrHudView:
         self._closing = False
         self._ready = threading.Event()
         self._ok = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         # Keep the uploaded pixels alive for OpenVR: `_raw` aliases `_buf`'s memory (see
         # `as_overlay_buffer`), so both must outlive the setOverlayRaw call.
-        self._buf: Optional["np.ndarray"] = None
-        self._raw: Optional["ctypes.Array"] = None
+        self._buf: np.ndarray | None = None
+        self._raw: ctypes.Array | None = None
         # A new placement pushed from outside (voice/Settings) — the OpenVR thread picks it up on
         # its next poll and re-applies live, so repositioning never needs a re-toggle.
-        self._pending_placement: Optional[VrPlacement] = None
+        self._pending_placement: VrPlacement | None = None
         # "Pin the HUD here" (look-to-place): the request is served on the OpenVR thread (HMD
         # pose reads must stay there), which computes the new placement and signals the waiter.
         self._pin_request = False
-        self._pin_event: Optional[threading.Event] = None
-        self._pin_result: Optional[VrPlacement] = None
+        self._pin_event: threading.Event | None = None
+        self._pin_result: VrPlacement | None = None
         # "Recentre the HUD on me" (issue #144): same OpenVR-thread pose read, but snaps only the
         # heading (yaw) to the current gaze, keeping distance/height/tilt/size/curvature.
         self._recenter_request = False
-        self._recenter_event: Optional[threading.Event] = None
-        self._recenter_result: Optional[VrPlacement] = None
+        self._recenter_event: threading.Event | None = None
+        self._recenter_result: VrPlacement | None = None
 
     # -- lifecycle ---------------------------------------------------------------------
     def start(self, timeout: float = 8.0) -> bool:
@@ -588,7 +588,7 @@ class VrHudView:
         with self._lock:
             self._pending_placement = placement
 
-    def pin_here(self, timeout: float = 1.5) -> Optional[VrPlacement]:
+    def pin_here(self, timeout: float = 1.5) -> VrPlacement | None:
         """Look-to-place: place the panel on the direction you're currently facing — both HMD
         heading AND elevation — so a downward look drops it and an upward look raises it, tilting
         the face to match so it reads head-on. Keeps distance/width/curvature. Returns the full
@@ -603,7 +603,7 @@ class VrHudView:
         with self._lock:
             return self._pin_result
 
-    def recenter_here(self, timeout: float = 1.5) -> Optional[VrPlacement]:
+    def recenter_here(self, timeout: float = 1.5) -> VrPlacement | None:
         """Horizontal recentre (issue #144): snap the panel's HEADING (yaw) to the direction the
         HMD faces NOW, keeping distance, height, tilt, size, and curvature. The fix for a
         world-locked panel that drifted off to the side as you turned your head — distinct from
@@ -658,7 +658,7 @@ class VrHudView:
             except Exception:  # noqa: BLE001
                 pass
 
-    def _apply_placement(self, openvr, overlay, handle, p: "VrPlacement") -> None:
+    def _apply_placement(self, openvr, overlay, handle, p: VrPlacement) -> None:
         """Apply an entire placement to the live overlay: physical width, the pose transform
         (position + pitch), and curvature. Used both at setup and for live re-apply, so a
         Settings/voice change repositions without recreating the overlay. Curvature is
@@ -686,7 +686,7 @@ class VrHudView:
                       f"x={p.offset_x_m:.2f} y={p.up_m:.2f} pitch={p.pitch_deg:.0f} "
                       f"curve={p.curvature:.2f} mode={p.mode}")
 
-    def _pin_to_gaze(self, openvr, overlay, handle) -> Optional["VrPlacement"]:
+    def _pin_to_gaze(self, openvr, overlay, handle) -> VrPlacement | None:
         """Read the HMD pose and place the panel on the full gaze ray — heading AND elevation —
         then tilt its face square to the look direction. Returns the new placement (also applied
         to the live overlay) or ``None`` if the HMD pose isn't valid yet. Runs on the OpenVR
@@ -722,7 +722,7 @@ class VrHudView:
         self._apply_placement(openvr, overlay, handle, pinned)
         return pinned
 
-    def _recenter_to_heading(self, openvr, overlay, handle) -> Optional["VrPlacement"]:
+    def _recenter_to_heading(self, openvr, overlay, handle) -> VrPlacement | None:
         """Read the HMD pose and snap only the panel's HEADING (yaw) to the current gaze, keeping
         every other field (distance, height, tilt, size, curvature, lateral offset). The recentre
         primitive for a drifted world-locked panel (issue #144). Returns the new placement (also
@@ -742,7 +742,7 @@ class VrHudView:
     def _loop(self, openvr, overlay, handle) -> None:
         """Show/hide + repaint from the latest snapshot until closed. Re-uploads the RGBA
         buffer only when the snapshot changes, so a static HUD costs almost nothing."""
-        last: Optional[HudSnapshot] = None
+        last: HudSnapshot | None = None
         shown = False
         while True:
             with self._lock:
@@ -815,8 +815,8 @@ class VrHudView:
 
 
 def make_vr_view(snapshot_provider: Callable[[], HudSnapshot],
-                 placement: Optional[VrPlacement] = None,
-                 *, log: Optional[Callable[[str], None]] = None) -> Optional[VrHudView]:
+                 placement: VrPlacement | None = None,
+                 *, log: Callable[[str], None] | None = None) -> VrHudView | None:
     """Build and start a ``VrHudView``, or return ``None`` when ``openvr`` isn't installed or
     SteamVR isn't running (a non-VR box, CI). This is the single guarded entry point for the
     VR surface — the capability calls it only when the VR HUD is enabled, so the default test

@@ -18,7 +18,8 @@ dynamic options), so the default `pytest` run exercises the whole dialog offline
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from .. import settings_schema as schema
 from ..settings_schema import Setting
@@ -98,8 +99,8 @@ class SettingsCapability:
         *,
         get_value: Callable[[Setting], Any],
         apply_patch: Callable[[dict], None],
-        options_for: Optional[Callable[[Setting], Optional[list]]] = None,
-        log: Optional[Callable[[str], None]] = None,
+        options_for: Callable[[Setting], list | None] | None = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self._get_value = get_value
         self._apply = apply_patch
@@ -204,7 +205,7 @@ class SettingsCapability:
         return self._confirm(s, display)
 
     # -- value coercion ---------------------------------------------------------------
-    def _coerce(self, s: Setting, raw: Any) -> tuple[Any, str, Optional[str]]:
+    def _coerce(self, s: Setting, raw: Any) -> tuple[Any, str, str | None]:
         """Resolve a spoken value to a canonical, validated value.
 
         Returns ``(value, display, None)`` on success or ``(None, "", error)`` on failure,
@@ -254,7 +255,7 @@ class SettingsCapability:
             return "not set"
         return str(value)
 
-    def _option_pairs(self, s: Setting) -> Optional[list]:
+    def _option_pairs(self, s: Setting) -> list | None:
         """`(value, label)` options for an enum: static ones straight from the schema, dynamic
         ones (models, voices) via the injected resolver (None if it can't fetch them)."""
         if s.options is not None:
@@ -357,7 +358,7 @@ def find_settings(spoken: str, *, include_protected: bool = False) -> list[Setti
     return _dedupe_settings(weak)
 
 
-def _resolve_option(pairs: list, spoken: str) -> tuple[Optional[str], Optional[list]]:
+def _resolve_option(pairs: list, spoken: str) -> tuple[str | None, list | None]:
     """Match a spoken value against `(value, label)` option pairs. Returns
     ``(value, None)`` on a unique match, ``(None, candidates)`` when several partials match
     (ambiguous), or ``(None, None)`` when nothing matches. Exact value/label wins over a

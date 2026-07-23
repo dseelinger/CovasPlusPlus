@@ -6,9 +6,13 @@ allowlist, explicit (turn-gated) confirmation, combat/interdiction guard, and ha
 """
 from __future__ import annotations
 
+from covas.capabilities.keybind_capability import (
+    KeybindCapability,
+    KeybindConfig,
+    Macro,
+    combat_state,
+)
 from covas.keybinds.binds import KeyBinding
-from covas.capabilities.keybind_capability import (KeybindCapability, KeybindConfig,
-                                                   Macro, combat_state)
 
 
 class _FakeExecutor:

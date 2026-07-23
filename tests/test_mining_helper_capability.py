@@ -8,11 +8,14 @@ message, a soft sell-lookup failure that still yields the hotspot, and the opt-o
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from covas.capabilities.mining_helper_capability import (MiningHelperCapability, MiningHelperConfig,
-                                                         resolve_material)
+from covas.capabilities.mining_helper_capability import (
+    MiningHelperCapability,
+    MiningHelperConfig,
+    resolve_material,
+)
 from covas.search.routes import RoutePlotter
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -28,7 +31,7 @@ def _fresh_sell(results: list[dict]) -> list[dict]:
     their real 2020 dates (they're dropped as transient anyway); pinning fixed dates on the real
     stations would silently re-stale as the calendar advances past them (that drift is exactly
     what this guards against)."""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S+00")
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S+00")
     for r in results:
         if r.get("type") != "Drake-Class Carrier":
             r["market_updated_at"] = now

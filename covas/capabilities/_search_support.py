@@ -14,14 +14,13 @@ changing a spoken byte.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Callable
+from datetime import UTC, datetime
 
 from ..search import NavError, build_query, execute_search
 from ..search.categories import CategorySpec
-from ..search.spansh import (BGS_MAX_AGE_DAYS, _DEFAULT_UA, data_age_days, freshness_filter,
-                             is_fresh)
+from ..search.spansh import _DEFAULT_UA, BGS_MAX_AGE_DAYS, data_age_days, freshness_filter, is_fresh
 
 
 @dataclass(frozen=True)
@@ -34,7 +33,7 @@ class SearchConfig:
     search_size: int = 50
 
     @classmethod
-    def from_cfg(cls, cfg: dict, section: str = "search") -> "SearchConfig":
+    def from_cfg(cls, cfg: dict, section: str = "search") -> SearchConfig:
         s = cfg.get(section, {}) or {}
         d = cls()
         return cls(
@@ -83,7 +82,7 @@ def run_query_fresh(spec: CategorySpec, slots: dict, http, reference: str, *,
     nothing fresh matches, ONE retry without the window answers from stale data. Returns
     `(results, stale_age_days)` — the age is the nearest stale result's, None on the fresh
     path, so the capability knows whether to speak the caveat. `now` is injectable for tests."""
-    today = now.astimezone(timezone.utc).date() if now is not None else None
+    today = now.astimezone(UTC).date() if now is not None else None
     payload = build_query(spec, slots, reference, size=size)
     payload["filters"].update(freshness_filter(fresh_field, fresh_within_days, today=today))
     results = execute_search(spec.endpoint, payload, http, user_agent=user_agent,

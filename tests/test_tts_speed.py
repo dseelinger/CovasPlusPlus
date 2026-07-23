@@ -14,7 +14,6 @@ import pytest
 
 from covas import tts_speed as ts
 
-
 # --- normalized_speed: read, fallback, clamp, garbage --------------------------------------
 
 def test_reads_tts_speed():

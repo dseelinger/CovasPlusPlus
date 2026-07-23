@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from covas.mixer import (
-    Cue,
     ContentBundle,
+    Cue,
     content_status,
     ensure_skeleton,
     load_content,

@@ -22,10 +22,10 @@ Fail soft throughout — any error is spoken, never raised into the voice loop.
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
-from ..nav import (AmbiguousShip, ResolvedShip, UnknownShip, SHIP_NAMES,
-                   get_spec, resolve_ship as _default_resolve, ship_spec_summary)
+from ..nav import SHIP_NAMES, AmbiguousShip, ResolvedShip, UnknownShip, get_spec, ship_spec_summary
+from ..nav import resolve_ship as _default_resolve
 from . import _search_support as sup
 from .base import HelpMeta, Slot
 

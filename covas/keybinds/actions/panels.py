@@ -29,8 +29,8 @@ block in place); see the report / issue #41 for the seam.
 """
 from __future__ import annotations
 
-from ..registry import Macro, register
 from ...ed.modes import MODE_FIGHTER, MODE_MAINSHIP
+from ..registry import Macro, register
 
 # Panels + maps + UI navigation + head-look are meaningful only while flying the main ship.
 _MAINSHIP = frozenset({MODE_MAINSHIP})

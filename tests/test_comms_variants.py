@@ -195,9 +195,8 @@ def test_play_gets_the_record_so_the_sticky_cast_assigns_by_identity():
 
 
 def test_make_variant_generator_with_fake_llm():
-    from covas.providers.fakes import FakeLLM
-
     from covas.mixer import make_variant_generator
+    from covas.providers.fakes import FakeLLM
     gen = make_variant_generator(FakeLLM(text="reworded line"), model="claude-haiku-4-5")
     assert gen("Docking granted.", TIER_PARAPHRASE) == "reworded line"
 

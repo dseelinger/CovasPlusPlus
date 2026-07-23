@@ -8,8 +8,8 @@ No network, API, or model calls — pure inspection of the composed system promp
 from __future__ import annotations
 
 from covas import settings_schema as schema
-from covas.llm import build_system, _language_instruction
 from covas.capabilities.settings_capability import find_settings
+from covas.llm import _language_instruction, build_system
 
 
 def _cfg(reply=None):

@@ -18,8 +18,11 @@ import threading
 from pathlib import Path
 
 from covas.app import App
-from covas.capabilities.find_closest_capability import (FindClosestCapability, NavConfig,
-                                                         _pad_constraint)
+from covas.capabilities.find_closest_capability import (
+    FindClosestCapability,
+    NavConfig,
+    _pad_constraint,
+)
 from tests.fakes import FakeSTT, FakeTTS
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "spansh_stations_multicannon.json"

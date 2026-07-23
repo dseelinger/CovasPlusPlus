@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import threading
 from collections import deque
-from typing import Optional
 
 import numpy as np
 
@@ -95,7 +94,7 @@ class SpeechStream:
         self._src_sr = int(src_sr)
         self._mix_sr = int(mix_sr)
         self._q: deque[np.ndarray] = deque()
-        self._cur: Optional[np.ndarray] = None
+        self._cur: np.ndarray | None = None
         self._pos = 0
         self._lock = threading.Lock()
         self._finished = False
@@ -133,7 +132,7 @@ class SpeechStream:
             self._cur = None
             self._done.set()
 
-    def wait(self, timeout: Optional[float] = None) -> bool:
+    def wait(self, timeout: float | None = None) -> bool:
         return self._done.wait(timeout)
 
     @property
@@ -173,7 +172,7 @@ class BusMixer:
 
     The device is opened only by start(); construct + submit()/open_speech() are device-free."""
 
-    def __init__(self, cfg: dict, *, sample_rate: Optional[int] = None, device=None) -> None:  # noqa: ANN001
+    def __init__(self, cfg: dict, *, sample_rate: int | None = None, device=None) -> None:  # noqa: ANN001
         self.cfg = cfg
         self._configs = buses.load_bus_configs(cfg)
         self._gains = bus_gains(self._configs)

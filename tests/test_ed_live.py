@@ -15,8 +15,7 @@ import time
 
 import pytest
 
-from covas.ed import (EDContext, JournalWatcher, StatusWatcher, resolve_journal_dir,
-                     status_path)
+from covas.ed import EDContext, JournalWatcher, StatusWatcher, resolve_journal_dir, status_path
 from covas.events import EventBus
 
 pytestmark = [pytest.mark.integration, pytest.mark.local]

@@ -17,8 +17,8 @@ default behaviour is unchanged. A Commander opts a macro in by adding its NAME t
 """
 from __future__ import annotations
 
-from ..registry import Macro, register
 from ...ed.modes import MODE_MAINSHIP
+from ..registry import Macro, register
 
 # Every macro here is a benign, repeatable main-ship toggle/tap — fire-immediately (no arm),
 # main-ship mode only. `name` is the allowlist key; `action` is the ED .binds token.

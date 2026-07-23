@@ -14,6 +14,7 @@ This replaces the old ``[sound_cues]`` explicit-path lists in config.toml. The s
 are originals we own (see ``tools/cuegen/``); ``sounds/`` stays git-ignored (user assets).
 """
 from __future__ import annotations
+
 import random
 import threading
 import time

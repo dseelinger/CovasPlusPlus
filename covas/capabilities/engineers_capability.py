@@ -18,10 +18,16 @@ runtime. Fail soft: any error is spoken, never raised into the voice loop.
 """
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
-from ..ed.engineers import (ENGINEERS, Engineer, EngineerStatus, find_by_specialty,
-                            find_engineer, status_for)
+from ..ed.engineers import (
+    ENGINEERS,
+    Engineer,
+    EngineerStatus,
+    find_by_specialty,
+    find_engineer,
+    status_for,
+)
 from .base import HelpMeta, Slot
 
 _FIND_TOOL = "find_engineer"
@@ -82,7 +88,7 @@ class EngineersCapability:
         self,
         *,
         get_progress: Callable[[], dict],
-        get_current_system: Callable[[], Optional[str]] | None = None,
+        get_current_system: Callable[[], str | None] | None = None,
         clipboard: Callable[[str], None] | None = None,
         log: Callable[[str], None] | None = None,
     ) -> None:
@@ -204,7 +210,7 @@ class EngineersCapability:
         return " ".join(parts)
 
     # -- status prose -----------------------------------------------------------------
-    def _status_sentence(self, eng: Engineer, status: Optional[EngineerStatus],
+    def _status_sentence(self, eng: Engineer, status: EngineerStatus | None,
                          progress: dict) -> str:
         """The grounded 'where you stand + what's left' sentence for one engineer."""
         if not progress:
@@ -225,7 +231,7 @@ class EngineersCapability:
         return (f"You've DISCOVERED them but not yet earned the invitation. Next: {eng.access} "
                 f"Then {self._lower_first(eng.unlock)}")
 
-    def _short_status(self, eng: Engineer, status: Optional[EngineerStatus],
+    def _short_status(self, eng: Engineer, status: EngineerStatus | None,
                       progress: dict) -> str:
         """A terse per-engineer tag for the by-module list."""
         if not progress:
@@ -258,7 +264,7 @@ class EngineersCapability:
             return f"I've copied {eng.system} to your clipboard to plot a route."
         return ""
 
-    def _current(self) -> Optional[str]:
+    def _current(self) -> str | None:
         """The Commander's current system, guarded like `_progress` — a raising getter must not
         turn a good answer (location, status, what's left) into a generic error."""
         if self._current_system is None:

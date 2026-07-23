@@ -16,7 +16,6 @@ from covas.cg.feed import CGConfig, CGFeedError, fetch_inara_goals
 from covas.cg.journal import _safe_mtime, cg_from_journals, parse_cg_event
 from covas.cg.models import CommunityGoal, match_goal, merge, standing_phrase, summarize
 
-
 _JOURNAL_EVENT = {
     "event": "CommunityGoal",
     "CurrentGoals": [

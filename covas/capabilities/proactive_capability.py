@@ -21,8 +21,8 @@ cap — a callout is one sentence. Everything here is opt-in and off by default.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 # Events worth announcing by default. Keys are the semantic event names the watchers
 # publish (journal event names + status transitions); values are on/off toggles. The
@@ -94,7 +94,7 @@ class ProactiveConfig:
     events: dict[str, bool] = field(default_factory=lambda: dict(DEFAULT_EVENTS))
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "ProactiveConfig":
+    def from_cfg(cls, cfg: dict) -> ProactiveConfig:
         p = cfg.get("proactive", {}) or {}
         d = cls()
         events = p.get("events")
@@ -140,7 +140,7 @@ class ProactivePolicy:
         self._last_long_jump: float = float("-inf")
 
     @classmethod
-    def from_cfg(cls, cfg: dict) -> "ProactivePolicy":
+    def from_cfg(cls, cfg: dict) -> ProactivePolicy:
         return cls(ProactiveConfig.from_cfg(cfg))
 
     # -- runtime mute (the global quiet switch) ---------------------------------------

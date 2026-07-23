@@ -29,13 +29,20 @@ from __future__ import annotations
 
 import json
 import threading
-from typing import Iterator, Optional
+from collections.abc import Iterator
 
 import requests
 
 from ..llm import build_system, estimate_cost
-from ._retry import (ProviderError, RetryPolicy, TransientError, is_retryable_status,
-                     parse_retry_after, retry_event, run_with_retry)
+from ._retry import (
+    ProviderError,
+    RetryPolicy,
+    TransientError,
+    is_retryable_status,
+    parse_retry_after,
+    retry_event,
+    run_with_retry,
+)
 from .base import OnEvent, ToolHandler
 
 _DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
@@ -112,10 +119,10 @@ class GeminiLLM:
         messages: list[dict],
         cancel: threading.Event,
         on_event: OnEvent,
-        tool_handler: Optional[ToolHandler] = None,
-        tools: Optional[list[dict]] = None,
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
+        tool_handler: ToolHandler | None = None,
+        tools: list[dict] | None = None,
+        model: str | None = None,
+        max_tokens: int | None = None,
     ) -> Iterator[tuple[str, str]]:
         key = self._key()
         contents = self._contents(messages)
@@ -140,7 +147,7 @@ class GeminiLLM:
 
             text_parts: list[str] = []
             fn_calls: list[dict] = []
-            usage: Optional[dict] = None
+            usage: dict | None = None
 
             for chunk in _stream_generate(self.base_url, mdl, key, body, cancel, policy=policy,
                                           on_retry=_on_retry):
@@ -228,7 +235,7 @@ def _close(r) -> None:  # noqa: ANN001 — a requests.Response (or a test double
         pass
 
 
-def _build_tools(tools: Optional[list[dict]], grounding: bool) -> list[dict]:
+def _build_tools(tools: list[dict] | None, grounding: bool) -> list[dict]:
     """Translate shared tool schemas ({name, description, input_schema}) into a Gemini
     `functionDeclarations` tool, and (when grounding is on) add the `googleSearch` tool so the model
     can ground answers on live Google Search."""
@@ -264,7 +271,7 @@ def _usage_event(cfg: dict, model: str, usage: dict) -> dict:
 
 
 def _stream_generate(base_url: str, model: str, key: str, body: dict, cancel: threading.Event,
-                     *, policy: Optional[RetryPolicy] = None, on_retry=None,
+                     *, policy: RetryPolicy | None = None, on_retry=None,
                      timeout=(10, 600)) -> Iterator[dict]:  # noqa: ANN001
     """POST `models/{model}:streamGenerateContent?alt=sse` and yield each parsed SSE `data:` chunk.
     The key rides the `x-goog-api-key` header (never the URL).
@@ -278,7 +285,7 @@ def _stream_generate(base_url: str, model: str, key: str, body: dict, cancel: th
     headers = {"x-goog-api-key": key, "Content-Type": "application/json", "User-Agent": _USER_AGENT}
     policy = policy or RetryPolicy()
 
-    def _connect() -> "requests.Response":
+    def _connect() -> requests.Response:
         r = requests.post(url, data=json.dumps(body), headers=headers, stream=True, timeout=timeout)
         if r.status_code != 200:
             detail = f"Gemini LLM {r.status_code}: {r.text[:200]}"

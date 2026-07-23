@@ -3,9 +3,10 @@
 All synthesized from scratch (sine partials + envelopes) — nothing sampled, nothing
 copyrighted. numpy + soundfile are already project deps.
 """
+import os
+
 import numpy as np
 import soundfile as sf
-import os
 
 SR = 48000
 OUT = os.path.dirname(os.path.abspath(__file__))

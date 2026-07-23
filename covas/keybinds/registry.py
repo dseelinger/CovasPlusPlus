@@ -37,7 +37,7 @@ class Macro:
     # A status-checked timed sequence (issue #33). Empty = a single-key macro (above). Typed as
     # a string annotation (`from __future__ import annotations`) so registry stays decoupled
     # from the sequence module — no runtime import needed for the default empty tuple.
-    steps: "tuple[Step, ...]" = ()  # noqa: F821 — forward ref (see note above), resolved lazily
+    steps: tuple[Step, ...] = ()  # noqa: F821 — forward ref (see note above), resolved lazily
     # Game modes this action is valid in (ed/modes vocabulary). EMPTY = valid in any mode
     # (e.g. a global control). Mode-gating hides an action when the Commander isn't in one of
     # these modes — so on-foot actions aren't offered while flying, and vice-versa.

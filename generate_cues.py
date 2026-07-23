@@ -4,8 +4,10 @@ Re-runnable: overwrites sounds/listening.wav, processing.wav, done.wav.
 Swap in your own files anytime — just point config.toml's [sound_cues] at them.
 """
 from __future__ import annotations
+
 import tomllib
 from pathlib import Path
+
 import numpy as np
 import soundfile as sf
 

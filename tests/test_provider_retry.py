@@ -11,10 +11,20 @@ import threading
 
 import pytest
 
-from covas.providers._retry import (CONFIG_STATUS, ProviderError, RetryPolicy, TransientError,
-                                    config_hint, degraded_reason, is_config_error,
-                                    is_degraded_error, is_retryable_status, parse_retry_after,
-                                    run_with_retry, sleep_cancellable)
+from covas.providers._retry import (
+    CONFIG_STATUS,
+    ProviderError,
+    RetryPolicy,
+    TransientError,
+    config_hint,
+    degraded_reason,
+    is_config_error,
+    is_degraded_error,
+    is_retryable_status,
+    parse_retry_after,
+    run_with_retry,
+    sleep_cancellable,
+)
 
 
 # ---- classifier -----------------------------------------------------------

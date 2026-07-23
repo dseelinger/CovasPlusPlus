@@ -17,7 +17,7 @@ read your materials yet" rather than a fabricated zero.
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from ..ed.blueprints import BlueprintLibrary, MaterialInfo, cap_for_grade
 from ..ed.materials import MaterialsSnapshot
