@@ -1,5 +1,15 @@
-"""Manual check for MANUAL_TESTS.md 4.3 transient-outage cases (issue #97): a configurable
+"""OPTIONAL live smoke aid for the transient-outage behaviour (issue #97): a configurable
 OpenAI-compatible LLM endpoint that can FAIL a couple of times and/or respond SLOWLY, then succeed.
+
+NOTE (issue #217): the LOGIC of all four cases below is now covered by automated tests that run in
+CI — no key, no socket, no cost — so none of this needs hand-walking to prove correctness:
+  * retry-then-recover   -> tests/test_openai_llm.py::test_transient_503_then_success…  (+ Gemini parity)
+  * exhausted -> degraded -> tests/test_{openai,gemini}_llm.py::test_transient_503_exhausts…
+                             and tests/test_app_turn.py::test_exhausted_retries_speak_named_degraded_line
+  * slow heads-up        -> tests/test_app_turn.py::test_latency_watchdog_speaks_interim_when_slow
+  * fail-fast (404/401)  -> tests/test_{openai,gemini}_llm.py non-200 tests + test_app_turn config-error tests
+This script survives only as a way to hear it end-to-end on real hardware (actual backoff pauses,
+the spoken "still slow" line over TTS) — not as a required MANUAL_TESTS step.
 
     .venv\\Scripts\\python.exe scripts\\flaky_llm_stub.py                       # retry-then-recover
     $env:STUB_FAIL_TIMES=0; $env:STUB_DELAY=8; .venv\\Scripts\\python.exe scripts\\flaky_llm_stub.py  # slow

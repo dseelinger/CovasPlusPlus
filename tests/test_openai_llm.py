@@ -15,7 +15,7 @@ import pytest
 
 from covas import firstrun
 from covas.providers import openai_llm as oai
-from covas.providers._retry import ProviderError, is_config_error
+from covas.providers._retry import ProviderError, is_config_error, is_degraded_error
 
 
 # ---- helpers ---------------------------------------------------------------
@@ -286,6 +286,40 @@ def test_transient_503_then_success_emits_retry_and_recovers(monkeypatch):
     assert len(retries) == 1                                # the single 503 surfaced one backoff
     assert retries[0]["provider"] == "OpenAI" and retries[0]["reason"] == "HTTP 503"
     assert retries[0]["attempt"] == 1 and retries[0]["attempts"] >= 1
+
+
+def test_transient_503_exhausts_and_gives_up_degraded(monkeypatch):
+    """Repeated 503s that never recover exhaust the retry budget and surface a RETRYABLE
+    ProviderError — the exact signal the app turns into the in-character 'service is overloaded'
+    degraded line (see test_app_turn.test_exhausted_retries_speak_named_degraded_line). Automated
+    equivalent of flaky_llm_stub.py's exhausted case (STUB_FAIL_TIMES=999, MANUAL_TESTS §4.3),
+    exercised through the REAL provider connect path — not the run_with_retry unit."""
+    monkeypatch.setattr(firstrun, "openai_key", lambda cfg: "k")
+
+    class _Resp503:
+        status_code = 503
+        text = "overloaded (stub)"
+        headers: dict = {}                       # no Retry-After -> uses the tiny backoff below
+        def close(self):
+            pass
+
+    monkeypatch.setattr(oai.requests, "post", lambda *a, **k: _Resp503())
+    llm = oai.OpenAILLM({
+        "openai": {"model": "gpt-4o-mini", "base_url": "http://stub/v1"},
+        "personality": {"enabled": False},
+        # 3 tries, microscopic backoff so the test never actually waits one out
+        "llm": {"retry": {"base_delay": 0.001, "max_delay": 0.001, "factor": 1.0,
+                          "jitter": 0.0, "attempts": 3}},
+    })
+    events: list[tuple] = []
+    with pytest.raises(ProviderError) as ei:
+        for _ in llm.stream_reply([{"role": "user", "content": "hi"}],
+                                  threading.Event(), lambda k, d: events.append((k, d))):
+            pass
+    assert ei.value.retryable is True and is_degraded_error(ei.value)  # degraded, NOT fail-fast
+    assert ei.value.status == 503 and ei.value.provider == "OpenAI"
+    assert ei.value.attempts == 3                              # 1 initial + 2 retries, then gave up
+    assert len([d for k, d in events if k == "retry"]) == 2    # a backoff surfaced before each retry
 
 
 # ---- no key -----------------------------------------------------------------

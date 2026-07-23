@@ -15,7 +15,7 @@ import pytest
 
 from covas import firstrun
 from covas.providers import gemini_llm as gem
-from covas.providers._retry import ProviderError, is_config_error
+from covas.providers._retry import ProviderError, is_config_error, is_degraded_error
 
 
 # ---- helpers ---------------------------------------------------------------
@@ -311,6 +311,78 @@ def test_stream_generate_404_message_names_model_and_config(monkeypatch):
     msg = str(ei.value)
     assert "gemini-bogus" in msg and "[gemini].model" in msg and "/models" in msg
     assert ei.value.status == 404 and is_config_error(ei.value)
+
+
+# ---- transient retry (issue #97) -------------------------------------------
+# The retry POLICY is unit-tested in test_provider_retry.py; these drive Gemini's REAL
+# _stream_generate connect path (parity with test_openai_llm), so the provider's own wiring —
+# 503 -> TransientError -> run_with_retry -> recover or degrade — is covered, not just the policy.
+def _RetryResp(status, *, lines=()):
+    """A fake requests.Response covering both branches _stream_generate touches: a non-200 read
+    (status/text/headers/close) and a 200 SSE stream (context-manager + iter_lines)."""
+    class _R:
+        def __init__(self):
+            self.status_code = status
+            self.text = "" if status == 200 else "overloaded (stub)"
+            self.headers = {}                    # no Retry-After -> uses the tiny backoff below
+            self._lines = list(lines)
+        def iter_lines(self):
+            yield from self._lines
+        def close(self):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+    return _R()
+
+
+def _retry_llm():
+    return gem.GeminiLLM({
+        "gemini": {"model": "gemini-flash-lite-latest", "base_url": "http://stub/v1beta"},
+        "web_search": {"enabled": False},
+        "personality": {"enabled": False},
+        "pricing": {"gemini-flash-lite-latest": {"input": 0.1, "output": 0.4}},
+        # microscopic backoff so the test never actually waits a retry out
+        "llm": {"retry": {"base_delay": 0.001, "max_delay": 0.001, "factor": 1.0,
+                          "jitter": 0.0, "attempts": 3}},
+    })
+
+
+def test_transient_503_then_success_emits_retry_and_recovers(monkeypatch):
+    """A 503 then a 200 SSE reply: the turn recovers AND surfaces a 'retry' event so the log shows
+    the backoff (flaky_llm_stub.py retry-recover case, MANUAL_TESTS §4.3)."""
+    monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: "k")
+    ok = [b'data: {"candidates":[{"content":{"parts":[{"text":"hello"}]}}]}', b'']
+    seq = iter([_RetryResp(503), _RetryResp(200, lines=ok)])
+    monkeypatch.setattr(gem.requests, "post", lambda *a, **k: next(seq))
+
+    events: list[tuple] = []
+    text = "".join(piece for kind, piece in _retry_llm().stream_reply(
+        [{"role": "user", "content": "hi"}], threading.Event(),
+        lambda k, d: events.append((k, d))) if kind == "text")
+
+    assert text == "hello"                                       # recovered on the retry
+    retries = [d for k, d in events if k == "retry"]
+    assert len(retries) == 1                                     # the single 503 surfaced one backoff
+    assert retries[0]["provider"] == "Gemini" and retries[0]["reason"] == "HTTP 503"
+
+
+def test_transient_503_exhausts_and_gives_up_degraded(monkeypatch):
+    """Repeated 503s exhaust the budget and surface a RETRYABLE ProviderError — the app's degraded
+    'service is overloaded' signal (flaky_llm_stub.py STUB_FAIL_TIMES=999 case, MANUAL_TESTS §4.3)."""
+    monkeypatch.setattr(firstrun, "gemini_key", lambda cfg: "k")
+    monkeypatch.setattr(gem.requests, "post", lambda *a, **k: _RetryResp(503))
+
+    events: list[tuple] = []
+    with pytest.raises(ProviderError) as ei:
+        for _ in _retry_llm().stream_reply([{"role": "user", "content": "hi"}],
+                                           threading.Event(), lambda k, d: events.append((k, d))):
+            pass
+    assert ei.value.retryable is True and is_degraded_error(ei.value)  # degraded, NOT fail-fast
+    assert ei.value.status == 503 and ei.value.provider == "Gemini"
+    assert ei.value.attempts == 3                              # 1 initial + 2 retries, then gave up
+    assert len([d for k, d in events if k == "retry"]) == 2    # a backoff surfaced before each retry
 
 
 # ---- model-list parsing + fail-soft guard (issue #91) ----------------------
