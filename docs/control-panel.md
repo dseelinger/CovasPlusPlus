@@ -87,12 +87,14 @@ model** (speech-to-text) and a **Personality** toggle.
   (there's a `change ⚙` link on each block). The quick card then re-renders to match.
 - **Anthropic (Claude)** — a **model** dropdown plus a **Thinking depth** control. Thinking is
   Anthropic-only for now; other LLM providers simply don't show it.
-- **OpenAI-compatible / Gemini** — an editable **model** combobox: pick from the endpoint's
-  live catalog, or type any model id (free text is always accepted). If the catalog can't be
-  fetched (no key, offline), it quietly degrades to a plain text box with your current value kept.
-- **ElevenLabs** — **model**, a searchable **voice** picker (with the type-to-filter box and 🔍
-  search palette), and a **voice speed** slider. The voice/model lists are fetched from ElevenLabs
-  **only when ElevenLabs is the active TTS provider**.
+- **OpenAI-compatible / Gemini** — a **model** picker: one button shows the current model and opens
+  a searchable **command palette** on click or keyboard — pick from the endpoint's live catalog, or
+  type any model id (free text is always accepted). If the catalog can't be fetched (no key, offline),
+  your current value is kept and you can still type one in the palette.
+- **ElevenLabs** — **model**, a **voice** picker, and a **voice speed** slider. The voice and model
+  pickers are each a single button that opens the same command palette (fuzzy search, keyboard nav,
+  your current pick marked ✓). The voice/model lists are fetched from ElevenLabs **only when
+  ElevenLabs is the active TTS provider**.
 - **Edge / Azure / OpenAI / Cartesia / Piper** — each shows its voice through the **same searchable
   voice picker** (issue #120): every provider voice, the local **Piper** `.onnx` voice (picked from
   the voices found next to your current one, or typed), the **Player-DM voice**, and the crew page's
@@ -169,7 +171,9 @@ and persists to `overrides.json`, so it's remembered across restarts and shown o
 You can also switch by **voice** — *"switch to the light theme"*, *"use the Elite Dangerous theme"* —
 since the theme is an ordinary [setting](using/settings.md). Because the theme is baked into each
 page as it's served, opening or navigating to any page shows the right palette **immediately**, with
-no flash of the wrong colours. Set it in `config.toml` too:
+no flash of the wrong colours. The interface icons (search, refresh, copy, send, …) are drawn from an
+inline SVG set that inherits the theme colours, so they recolour cleanly across all three themes
+rather than sitting as fixed full-colour emoji. Set it in `config.toml` too:
 
 ```toml
 [ui]

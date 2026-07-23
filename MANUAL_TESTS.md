@@ -1301,41 +1301,38 @@ Notes:
 ### 14.1 Live status & log
 - [ ] The status light tracks state as you talk; the log scrolls with prompts, replies, router/usage, status/search lines (timestamped).
 
-### 14.1a Voice-list filter (issue #26 / #100)  🌐 PANEL 🌍 NET
-> `requires:` **both voice dropdowns must be POPULATED via a valid ElevenLabs key** (set it on the
+### 14.1a Voice-list filter — main panel (issue #26 / #100 / #214)  🌐 PANEL 🌍 NET
+> `requires:` the **ElevenLabs voice list POPULATED via a valid ElevenLabs key** (set it on the
 > Settings *API keys* card and restart; `tts.provider` doesn't need to be elevenlabs, but the list only
-> loads with a key) — an empty list has nothing to filter and the test reads as "not implemented".
-> Verify in the control panel — both a normal browser tab and the packaged native window.
+> loads with a key) — an empty list has nothing to filter. Verify in the control panel (browser tab +
+> packaged native window).
 >
-> **#100 resolution (do NOT re-mark NYI on an empty list):** the filter code IS wired on both surfaces —
-> `index.html` `#el_voice_filter` → `filterOptions(#el_voice)` and `settings.html` `voiceFilter(sel)` on
-> the `@elevenlabs_voices` picker. The earlier `panel-voice-list-filter` NYI failure was a **populate
-> artifact** (the voice dropdowns never loaded — no valid key / non-EL TTS active — so there was nothing
-> to filter), not a code regression. If it fails again, first confirm the list actually populated. The
-> inline box coexists with the richer command palette (§14.1d).
-- [ ] The **ElevenLabs voice** picker on the **main panel** (below the dropdown) and the schema-driven
-      picker on the **Settings** page (beside the dropdown) both show a filter box once the list loads.
-- [ ] **Main panel:** type **3+ characters** in the filter box under **ElevenLabs voice** → the dropdown
-      narrows to voices whose **name or category** contains the text (case-insensitive; try a category
-      word like *"cloned"* or *"premium"*). Typing **1–2 chars** filters nothing; **clearing** the box
-      restores the full list. The **currently-selected** voice stays visible even when it doesn't match.
-- [ ] **Settings page:** same behavior in the filter box **next to** the schema `@elevenlabs_voices`
-      picker — 3+ chars filters by substring, <3 clears. Picking a filtered voice still saves normally.
+> **Scope (#214):** the inline type-to-filter box was **removed from the Settings page** — its voice
+> fields are now the trigger + command palette (§14.1e), where search lives. This section now covers
+> only the **main panel's** ElevenLabs voice picker (`index.html` `#el_voice_filter` →
+> `filterOptions(#el_voice)`), which keeps its inline filter beside the dropdown.
+- [ ] **Main panel filter:** once the **ElevenLabs voice** list loads, type **3+ characters** in the
+      filter box under it → the dropdown narrows to voices whose **name or category** contains the text
+      (case-insensitive; try *"cloned"* / *"premium"*). Typing **1–2 chars** filters nothing;
+      **clearing** restores the full list. The **currently-selected** voice stays visible even when it
+      doesn't match.
 
-### 14.1d Command-palette voice/model search (issue #94)  🌐 PANEL 🌍 NET
-> A reusable searchable palette (magnifier 🔍 button) beside the long voice/model pickers on BOTH the
-> **main panel** (ElevenLabs voice) and the **Settings** page (ElevenLabs voice/model + the #92 model/
-> voice comboboxes). `requires:` a populated list (valid ElevenLabs key for the voice palettes; the
-> relevant provider key for a model palette). Verify in the browser AND the packaged native window.
-- [ ] **Open + search:** click 🔍 beside **ElevenLabs voice** → a palette opens with a search box and the
-      full list below. Type a few letters → results **filter live** and the matched substring is **bold**;
-      each row shows the voice **category** as secondary text. Empty query lists **alphabetically**.
+### 14.1d Command-palette voice/model search (issue #94 / #214)  🌐 PANEL 🌍 NET
+> The reusable searchable palette. On the **Settings** page it's opened by each field's **trigger
+> button** (#214 — voices, models, the #92 comboboxes); on the **main panel** it's still the search
+> icon beside the ElevenLabs voice dropdown. `requires:` a populated list (valid ElevenLabs key for the
+> voice palettes; the relevant provider key for a model palette). Verify in the browser AND the
+> packaged native window.
+- [ ] **Open + search:** open the **ElevenLabs voice** picker (its trigger on Settings, or the search
+      icon on the main panel) → a palette opens with a search box and the full list below. Type a few
+      letters → results **filter live** and the matched substring is **bold**; each row shows the voice
+      **category** as secondary text. Empty query lists **alphabetically**.
 - [ ] **Keyboard-first:** **↑/↓** move the highlighted row, **Enter** selects it (applies + saves), **Esc**
       closes without changing. A mouse **click** also selects. The list **scrolls** for the long tail.
 - [ ] **Current pick reachable (fail-soft, #26/#100):** the currently-selected voice is marked (✓). With
-      the ElevenLabs key cleared/offline, 🔍 still opens the palette showing *"list unavailable — type a
-      value and press Enter"* so the current pick is kept and a value can still be entered — never blocks.
-- [ ] **Reused for model lists:** on the Settings page, the 🔍 beside a fetched **model** combobox
+      the ElevenLabs key cleared/offline, the picker still opens the palette showing *"list unavailable —
+      type a value and press Enter"* so the current pick is kept and a value can still be entered.
+- [ ] **Reused for model lists:** on the Settings page, a fetched **model** field's trigger
       (e.g. OpenAI/OpenRouter with a key) opens the same palette over the hundreds of model ids.
 
 ### 14.1b Voice/model dropdowns sorted alphabetically (issue #93)  🌐 PANEL 🌍 NET
@@ -1349,48 +1346,55 @@ Notes:
       (e.g. starts with *"Z"* or *"™"*), reload the Settings page → it's still the selected value
       (sorting is presentational only, never drops or changes the current selection).
 
-### 14.1c Fetched-catalog dropdowns — editable comboboxes (issues #92 + #88)  🌐 PANEL 🌍 NET 📋 FILE
-> On the **Settings** page the model-id and endpoint fields are editable comboboxes: a dropdown fed
-> from the provider's LIVE catalog plus free-text for anything custom. `requires:` the relevant
-> provider key/endpoint for the list to actually populate (OpenAI/Groq key for `openai.model`, Gemini
-> key for `gemini.model`, Azure key+region for `azure.voice`,
-> Cartesia key for `cartesia.voice`; Edge needs no key). Verify in the control panel — both a normal
-> browser tab and the packaged native window.
-- [ ] **Base-URL presets:** the **OpenAI LLM base URL** field offers the four presets
-      (OpenAI/Groq/DeepSeek/OpenRouter) in its dropdown; picking one fills the box. Typing a custom URL
-      shows a **"custom (unsupported)"** flag but is accepted.
+### 14.1c Fetched-catalog choosers — trigger + palette (issues #92 + #88 + #214)  🌐 PANEL 🌍 NET 📋 FILE
+> On the **Settings** page the model-id and endpoint fields are each **one trigger button** (current
+> value + chevron) that opens the command palette (§14.1d) fed from the provider's LIVE catalog, plus
+> free-text for anything custom — with an adjacent **⟳ refresh**. `requires:` the relevant provider
+> key/endpoint for the list to populate (OpenAI/Groq key for `openai.model`, Gemini key for
+> `gemini.model`, Azure key+region for `azure.voice`, Cartesia key for `cartesia.voice`; Edge needs no
+> key). Verify in the control panel — both a normal browser tab and the packaged native window.
+- [ ] **Base-URL presets:** open the **OpenAI LLM base URL** trigger → the palette offers the four
+      presets (OpenAI/Groq/DeepSeek/OpenRouter); pick one → it's set. Typing a custom URL shows a
+      **"custom (unsupported)"** flag but is accepted.
 - [ ] **Model list populates:** with an OpenAI (or Groq/OpenRouter) key set, open **OpenAI LLM model**
-      → the datalist lists that endpoint's models; the row footer shows a count. Change the **base URL**
-      to another preset → the model list **refetches** for the new endpoint.
+      → the palette lists that endpoint's models; the row footer shows a count. Change the **base URL**
+      → the model list **refetches** (or hit **⟳**) for the new endpoint.
 - [ ] **Gemini:** with a Gemini key, **Gemini model** lists Google's live models.
-- [ ] **Edge/Azure/Cartesia voices:** **Edge voice** populates with no key; **Azure voice** populates
-      once the Azure key + region are set; **Cartesia voice** once the Cartesia key is set.
-- [ ] **Custom value accepted + flagged:** type a model/voice id NOT in the list → it's kept (flagged
-      "custom (unsupported)"), saves to `overrides.json`, and is still the value on reload.
-- [ ] **Fail-soft (no key / offline):** with the relevant key cleared or offline, the field still shows
-      the **current value** and lets you type — the footer reads *"catalog unavailable (…) — type a
-      value"*; never an empty or blocking dropdown, and the existing value is never lost.
+- [ ] **Edge/Azure/Cartesia voices:** **Edge voice** populates with no key; **Azure voice** once the
+      Azure key + region are set; **Cartesia voice** once the Cartesia key is set.
+- [ ] **Custom value accepted + flagged:** in the palette, type a model/voice id NOT in the list → it's
+      kept (flagged "custom (unsupported)"), saves to `overrides.json`, still the value on reload.
+- [ ] **Fail-soft (no key / offline):** with the relevant key cleared or offline, the trigger still
+      shows the **current value**; opening it, the footer reads *"catalog unavailable (…) — open the
+      picker to type a value"* and you can keep or type a value — never an empty/blocking control, and
+      the existing value is never lost.
 
-### 14.1e One reusable voice picker everywhere (issue #120)  🌐 PANEL 🌍 NET
-> Every voice field — provider voices, the Player-DM voice, the Piper voice, the crew per-character
-> voice — renders through the SAME searchable control: a `<select>` (current value always visible) +
-> the 🔍 command palette + the type-to-filter box. Verify in BOTH the browser and the native window.
-- [ ] **Player-DM voice is searchable:** Settings → Ambient audio → **Player-DM voice** is a dropdown,
-      not a bare text box. With an ElevenLabs key, the 🔍 palette lists your library voices; type to
-      filter, pick one → saves. It sits **beside** a leading **"(random session voice)"** = blank.
-- [ ] **Custom path / id accepted (allowCustom):** open its 🔍 palette, type a Piper `.onnx` path (or
-      any unlisted id) → the **"custom"** entry appears at the top; pick it → it's saved and stays the
-      selected value on reload. Clear it back to blank → random-per-session behavior returns.
-- [ ] **Piper voice is searchable too:** set `[tts].provider = piper`, point **Piper voice** at a voice
-      in a folder of `.onnx` files → the picker lists the **other `.onnx` voices in that folder**
-      (each with its sibling `.onnx.json`); typing a custom path still works; an empty/missing folder
-      degrades to type-a-path (no error).
-- [ ] **Identical to a provider voice field:** compare the Player-DM voice side-by-side with the
-      **ElevenLabs voice** field — same look and behavior (the ElevenLabs one just doesn't allow a
-      custom id).
+### 14.1e One reusable voice picker everywhere (issue #120 / #214)  🌐 PANEL 🌍 NET
+> Every voice field on the **Settings** and **Crew** pages — provider voices, the Player-DM voice, the
+> Piper voice, the crew per-character voice — renders through the SAME control: **one trigger button**
+> that shows the full current voice and opens the command palette (§14.1d) on click or keyboard (the
+> redundant native `<select>` + 🔍 + "Filter…" box were collapsed into it, #214). Verify in the control
+> panel — both a normal browser tab and the packaged native window.
+- [ ] **One trigger, no cluster:** Settings → Ambient audio → **Player-DM voice** is a single button
+      showing the current voice (its full name, not truncated) with a chevron — **no** separate
+      dropdown or filter box beside it. Click it (or Tab to it and press **Enter/Space**) → the command
+      palette opens. A leading **"(random session voice)"** = blank is offered inside the palette.
+- [ ] **Custom path / id accepted (allowCustom):** in its palette, type a Piper `.onnx` path (or any
+      unlisted id) → a **"custom"** entry appears at the top; pick it → saved, still selected on reload.
+      Clear back to blank → random-per-session returns.
+- [ ] **Piper voice too:** set TTS provider = Piper, point **Piper voice** at a voice in a folder of
+      `.onnx` files → the trigger's palette lists the **other `.onnx` voices in that folder**; typing a
+      custom path still works; an empty/missing folder degrades to type-a-path (no error).
+- [ ] **Keyboard + screen reader (#184):** the trigger is a real button — it takes focus with a visible
+      **focus ring**, Enter/Space opens the palette, and a screen reader announces it as
+      "<field>: <current voice>".
 - [ ] **Crew page reuses the SAME control:** the **🎙 crew** page's per-character **Voice** is the same
-      searchable picker (🔍 + filter), with **"Auto (deterministic)"** = blank; pick/search/type a
-      custom voice, **SAVE ROSTER**, reload → the choice persists.
+      trigger + palette, with **"Auto (deterministic)"** = blank; pick/type a custom voice,
+      **SAVE ROSTER**, reload → the choice persists.
+- [ ] **Themable icons recolour (#214):** switch the theme (Settings → Appearance → Dark / Light /
+      Elite, or say *"switch to the light theme"*) → the interface glyphs (the trigger chevron, the
+      palette's search + clear icons, ⟳ refresh, per-row reset, the copy/send icons on the main panel)
+      **recolour to match** the theme — none stay as fixed full-colour emoji.
 
 ### 14.2 Settings page (N1) — http://127.0.0.1:8765/settings
 - [ ] The page renders **grouped sections** with the **right control per type** (toggles, dropdowns, number/sliders, text/path) and inline help.
@@ -1419,10 +1423,10 @@ Notes:
 ### 14.2b Microphone picker on the Settings page (issue #89)  🔊 HW 🌐 PANEL
 > Previously the mic could only be chosen in the first-run wizard; #89 adds it to the Settings page,
 > riding the live mic-reconcile path from #90.
-- [ ] **Picker present:** under *Voice input* on the Settings page there's a **Microphone** combobox listing your capture devices. It's **de-duplicated** — the truncated short-name copy of a device (often a **silent** MME clone, e.g. `Microphone (Logi 4K Stream Edit`) is dropped in favour of the **full-name** entry (`…Edition)`). Blank = the Windows default.
+- [ ] **Picker present:** under *Voice input* on the Settings page there's a **Microphone** picker (one trigger button → command palette) listing your capture devices, each shown in **full** (no truncation). It's **de-duplicated** — the truncated short-name copy of a device (often a **silent** MME clone, e.g. `Microphone (Logi 4K Stream Edit`) is dropped in favour of the **full-name** entry (`…Edition)`). Blank = the Windows default.
 - [ ] **Pick + apply live:** choose a **different** mic and **SAVE CHANGES** → the log notes the recorder was rebuilt (no restart). Hold PTT and speak → the turn transcribes from the **newly selected** mic. Pick the full-name entry that used to be silent → capture now has audio.
 - [ ] **Continuous mode too:** with `[listen].mode = continuous`, changing the mic restarts the VAD listener on the new device (a subsequent hands-free utterance is captured from it).
-- [ ] **Survives a saved-but-absent device:** the combobox keeps a saved mic name even if that device isn't currently connected (it's an editable combobox — the value is never silently wiped); blank falls back to the default.
+- [ ] **Survives a saved-but-absent device:** the picker keeps a saved mic name even if that device isn't currently connected (the current value is never silently wiped — it shows on the trigger and stays reachable in the palette); blank falls back to the default.
 
 ### 14.2c Settings search highlights the match (issue #95)  🌐 PANEL
 > Rides the §14.2 filter box (#7): matched text in the filtered rows gets a **yellow background** so you can see *why* each row matched.

@@ -124,6 +124,7 @@
 </style>
 </head>
 <body>
+{% include "_icons.html" %}
 <a href="#log" class="skip-link">{{ t('Skip to the conversation log') }}</a>
 <header role="banner">
   <h1>COVAS++</h1>
@@ -146,7 +147,7 @@
 <div class="banner" id="updateBanner">
   <span id="updateText"></span>
   <button id="updateBtn">{{ t('Update & restart') }}</button>
-  <button class="dismiss" id="updateDismiss" title="{{ t('Dismiss') }}">✕</button>
+  <button class="dismiss" id="updateDismiss" title="{{ t('Dismiss') }}" aria-label="{{ t('Dismiss') }}"><svg class="ic" aria-hidden="true"><use href="#ic-clear"/></svg></button>
 </div>
 
 <main class="wrap" id="main">
@@ -187,7 +188,7 @@
     <div class="promptrow">
       <input type="text" id="promptInput" placeholder="{{ t('Type a message to COVAS…') }}"
              aria-label="{{ t('Type a message to COVAS') }}" autocomplete="off" spellcheck="false">
-      <button id="promptSend" title="{{ t('Send (Enter)') }}" aria-label="{{ t('Send prompt') }}">&#9992;</button>
+      <button id="promptSend" title="{{ t('Send (Enter)') }}" aria-label="{{ t('Send prompt') }}"><svg class="ic" aria-hidden="true"><use href="#ic-send"/></svg></button>
     </div>
     <div class="logwrap">
       <div class="log" id="log" role="log" aria-live="polite"
@@ -325,12 +326,14 @@ async function copyLog(){
 // A small per-line copy button, revealed on hover (see .linecopy). Copies just that line's text.
 function addLineCopy(div, plain){
   const b = document.createElement("button");
-  b.className = "linecopy"; b.type = "button"; b.title = "Copy this line"; b.textContent = "⎘";
+  const COPY_ICON = '<svg class="ic" aria-hidden="true"><use href="#ic-copy"/></svg>';
+  b.className = "linecopy"; b.type = "button"; b.title = "Copy this line";
+  b.setAttribute("aria-label", "Copy this line"); b.innerHTML = COPY_ICON;
   b.onclick = async (e) => {
     e.stopPropagation();
     const ok = await copyText(plain);
-    b.textContent = ok ? "✓" : "✗";
-    clearTimeout(b._t); b._t = setTimeout(() => b.textContent = "⎘", 1200);
+    b.textContent = ok ? "✓" : "✗";            // transient text feedback (monochrome, themes via color)
+    clearTimeout(b._t); b._t = setTimeout(() => b.innerHTML = COPY_ICON, 1200);
   };
   div.appendChild(b);
 }
@@ -592,7 +595,8 @@ function elevenVoiceRow(field, voices){
   const lab = document.createElement("label"); lab.textContent = field.label;
   const sel = document.createElement("select");
   const search = document.createElement("button"); search.type="button"; search.className="voicesearch";
-  search.title="Search voices"; search.textContent="🔍";
+  search.title="Search voices"; search.setAttribute("aria-label","Search voices");
+  search.innerHTML='<svg class="ic" aria-hidden="true"><use href="#ic-search"/></svg>';
   head.appendChild(lab); head.appendChild(sel); head.appendChild(search);
   const filter = document.createElement("input"); filter.type="text"; filter.className="voicefilter";
   filter.placeholder="Filter voices (3+ chars)…"; filter.autocomplete="off";

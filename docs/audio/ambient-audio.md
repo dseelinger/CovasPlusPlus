@@ -82,8 +82,8 @@ speaking:
 
 Each role has its **own voice and display name**. Set them right on the **Settings page** under the
 **"Carrier voices"** group — name the **Captain** and **Tower Control**, and pick each one's voice
-from the same **searchable voice dropdown** (🔍 command palette + type-to-filter) the other voice
-fields use: choose a voice from your ElevenLabs library, or type a Piper `.onnx` path / any voice id
+from the same **voice picker** the other voice fields use — a button that opens the searchable
+command palette: choose a voice from your ElevenLabs library, or type a Piper `.onnx` path / any voice id
 (with the matching **voice provider**). Changes **persist and apply live** — the very next carrier
 line uses the new name and voice. It's still fully editable in `config.toml` under
 `[audio.carrier].<role>` (`captain`, `tower`, `chatter`) if you prefer. Leave a role's voice blank
@@ -126,8 +126,8 @@ play session**:
   the next system sounds different.
 - **Players** keep their voice for the whole session (the last 25 commanders are remembered), so a
   wing or an operation keeps stable per-person voices. To **pin** a fixed voice for direct player
-  DMs, set the **Player-DM voice** on the Settings page: it's the same **searchable voice dropdown**
-  (🔍 command palette + type-to-filter) the provider voice fields use — pick a voice from your
+  DMs, set the **Player-DM voice** on the Settings page: it's the same **voice picker** the provider
+  voice fields use — a button that opens the searchable command palette — pick a voice from your
   ElevenLabs library, or type a Piper `.onnx` path / any voice id. Blank keeps the random-per-session
   behavior above.
 - **Chatter** picks a fresh random voice per line, so the background radio sounds like many people.

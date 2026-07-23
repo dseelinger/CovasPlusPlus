@@ -53,6 +53,7 @@
 </style>
 </head>
 <body>
+{% include "_icons.html" %}
 <header>
   <h1>COVAS++</h1>
   <span class="sub">{{ t('CUSTOM MACROS') }}</span>
@@ -127,7 +128,7 @@ function addStep(){
       <input class="sSeconds fld" type="number" step="0.1" min="0" placeholder="seconds" style="width:110px">
       <select class="sStatus fld">${stats}</select>
       <select class="sExpect fld">${opt("true","must be TRUE")}${opt("false","must be FALSE")}</select>
-      <button class="small danger delStep" style="margin-left:auto">✕</button>
+      <button class="small danger delStep" style="margin-left:auto" title="Remove step" aria-label="Remove step"><svg class="ic" aria-hidden="true"><use href="#ic-clear"/></svg></button>
     </div>`;
   const type = div.querySelector(".sType");
   const refresh = () => {

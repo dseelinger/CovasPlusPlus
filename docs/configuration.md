@@ -636,18 +636,20 @@ See [Companion HUD](using/hud.md). **Off by default.**
 | `cartesia.model` / `.voice` / `.language` | `sonic-2` / *(blank)* / `en` | Cartesia Sonic model, voice id, and language when `tts.provider = "cartesia"` (persona-only) |
 | `dev.mock` | `false` | **Dev/test only** — swap LLM/TTS/STT for fakes to exercise the loop with zero API calls. Set it here or via `COVAS_MOCK=1` before launch; it is **not** on the Settings page or voice-settable (issue #130) |
 
-> **Pick, don't type — fetched dropdowns (issue #92 / #88).** On the Settings page most model-id and
-> endpoint fields are **editable comboboxes**: a dropdown populated from the provider's *live* catalog
-> plus free-text for anything custom. `openai.model` / `openai_tts` follow `GET {base_url}/models` for
+> **Pick, don't type — fetched catalogs (issues #92 / #88 / #214).** On the Settings page most
+> model-id and endpoint fields are a **single picker button** that shows the current value and opens a
+> searchable **command palette** (fuzzy search, keyboard nav, your current pick marked). Inside the
+> palette you pick from the provider's *live* catalog or type any custom value. `openai.model` /
+> `openai_tts` follow `GET {base_url}/models` for
 > the active endpoint (OpenAI/Groq/DeepSeek/OpenRouter — the model list refetches when you change the
 > base URL); `gemini.model` uses Google's `GET /v1beta/models`;
 > `edge.voice` / `azure.voice` / `cartesia.voice` fetch each provider's voice catalog (Edge needs no
 > key; Azure needs the key + region; Cartesia needs the key). The base-URL fields offer the four known
 > presets + a custom entry. A value **outside** the fetched list is still accepted — flagged *"custom
 > (unsupported)"*, never blocked — and the **current value is always kept**: offline, no key, or an
-> unreachable endpoint simply degrades the control to free-text with your existing value intact (never
-> an empty/blocking dropdown). `openai_tts.voice` / `openai_tts.model` / `cartesia.model` are small
-> fixed sets shown as strict dropdowns.
+> unreachable endpoint just means the palette opens with an empty catalog and you keep or type your
+> value there (never an empty/blocking control). `openai_tts.voice` / `openai_tts.model` /
+> `cartesia.model` are small fixed sets shown as plain dropdowns.
 >
 > **Command-palette search (issue #94).** For the long lists — 100+ ElevenLabs voices, hundreds of
 > OpenRouter model ids — a 🔍 button beside the picker opens a **search palette**: type to filter with

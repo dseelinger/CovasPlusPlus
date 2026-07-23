@@ -1,0 +1,46 @@
+{# Themable icon sprite (issue #214). ONE inline SVG of <symbol> defs, {% include %}'d once per page
+   near the top of <body>; icons are referenced anywhere on that page via
+       <svg class="ic" aria-hidden="true"><use href="#ic-search"/></svg>
+   Icon-only buttons keep a title/aria-label for #184.
+
+   Glyphs are Lucide (https://lucide.dev, ISC-licensed) paths, embedded inline — no font, no runtime
+   dependency, no network (matters for the packaged offline app + the stdlib-first rule). They draw
+   with `stroke:currentColor`, so every icon inherits the theme tokens (--text/--accent/--muted) and
+   recolours across the dark / light / elite themes for free — unlike the full-colour emoji they
+   replace. `ic-reset` (rotate-ccw) is deliberately distinct from `ic-refresh` (refresh-cw). #}
+<style>
+  .ic{width:1em;height:1em;vertical-align:-0.125em;flex:0 0 auto;
+      fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+</style>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="ic-search" viewBox="0 0 24 24">
+    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+  </symbol>
+  <symbol id="ic-refresh" viewBox="0 0 24 24">
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
+  </symbol>
+  <symbol id="ic-reset" viewBox="0 0 24 24">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+  </symbol>
+  <symbol id="ic-clear" viewBox="0 0 24 24">
+    <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+  </symbol>
+  <symbol id="ic-check" viewBox="0 0 24 24">
+    <path d="M20 6 9 17l-5-5"/>
+  </symbol>
+  <symbol id="ic-expand" viewBox="0 0 24 24">
+    <path d="m6 9 6 6 6-6"/>
+  </symbol>
+  <symbol id="ic-send" viewBox="0 0 24 24">
+    <path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4Z"/>
+  </symbol>
+  <symbol id="ic-copy" viewBox="0 0 24 24">
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+  </symbol>
+  <symbol id="ic-mic" viewBox="0 0 24 24">
+    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>
+  </symbol>
+</svg>

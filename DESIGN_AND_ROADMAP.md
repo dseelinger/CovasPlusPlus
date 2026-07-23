@@ -2185,6 +2185,24 @@ The original seven-phase plan is done and tested:
     the browser-level cross-origin behavior is `MANUAL_TESTS.md` §19.10. **Advisory
     GHSA-3mxj-5926-rqmr — affected `<= 0.17.0`, patched in `v0.17.1` (the release cutting this fix).**
 
+73. **Settings choosers collapsed to one trigger + themable Lucide icon sprite** (issue #214,
+    Foundation; `covas/templates/_icons.html` (new), `_voice_picker.html`, `_command_palette.html`,
+    `settings.html`, + an emoji sweep across the page templates) — the fetched-catalog and voice
+    `enum` fields each rendered THREE competing controls (a native `<select>`/`datalist` + the 🔍
+    command palette + a "Filter…" box) with no signal which was primary, and the native control
+    truncated long device/voice names. This collapses each to **ONE trigger button** that shows the
+    full current value (ellipsis + tooltip on overflow) and opens the existing command palette (the
+    good fuzzy/keyboard picker) on click or keyboard — a real `<button>` with `aria-label` + focus
+    ring (#184). `buildVoicePicker`'s public contract (the `.value` getter + opts) is **unchanged**, so
+    the Crew page keeps working; short STATIC enums (theme, activation mode) keep a native `<select>`
+    (no redundant cluster, and the theme applies live). Separately, ~2 dozen literal emoji
+    (🔍 ⟳ ✕ ✈ ⎘ …) are replaced by an inline **Lucide** (ISC) SVG `<symbol>` sprite (`_icons.html`,
+    `{% include %}`'d once per page) drawn with `stroke:currentColor`, so every icon inherits the
+    theme tokens and recolours across dark/light/elite — no font, no runtime dep, no network
+    (packaged-offline + stdlib-first). Decorative emoji embedded in `t('…')` nav labels are left for
+    the #212 i18n pass. **Improvement thesis (Foundation): one obvious, keyboard-first, non-truncating
+    chooser per field, and icons that belong to the theme instead of clashing with it.**
+
 ### Backlog
 **Multi-provider support (issue #10) — COMPLETE.** TTS track: #14 registry → #15 Edge → #16 OpenAI TTS → #17 Azure Neural → #18 Cartesia (all done). LLM track: #11 provider-agnostic router → #12 OpenAI-compatible → #13 Gemini (all done). The provider seam now spans free/local, free-tier, cheap-cloud, and premium across both LLM and TTS, all on the router/registry foundations. Otherwise every prompt in `CLAUDE_CODE_PROMPTS.md` (Prompts 1–7, Search 1–6, N1–N11, C1–C11, I1–I9) is built and merged. **The prompt pack / GitHub issues carry the live worklist; this doc carries the architecture.**
 

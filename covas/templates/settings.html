@@ -52,9 +52,8 @@
   select,input[type=text],input[type=number],input[type=password]{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);
     border-radius:5px;padding:7px 9px;font-family:inherit;font-size:13px;min-width:200px}
   input[type=number]{min-width:120px;text-align:right}
-  /* Compact type-to-filter box that sits beside a voice <select> (issue #26). */
-  input.voicefilter{min-width:120px;max-width:150px;font-size:12px}
   input.invalid,select.invalid{border-color:var(--err)}
+  .reset .ic{width:14px;height:14px}   /* the per-row reset glyph reads a touch larger than 11px text */
   /* Editable combobox (issue #92): a fetched dropdown you can also type into. A value outside the
      fetched catalog is the "custom / at your own risk" escape hatch — flagged, never blocked. */
   .combo{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:1}
@@ -99,6 +98,7 @@
 </style>
 </head>
 <body>
+{% include "_icons.html" %}
 <a href="#main" class="skip-link">{{ t('Skip to settings') }}</a>
 <header role="banner">
   <h1>COVAS++</h1>
@@ -276,8 +276,12 @@ function row(s, group){
   const label = document.createElement("div"); label.className="label"; label.textContent=s.label;
   const control = document.createElement("div"); control.className="control";
   buildControl(control, s);
-  const reset = document.createElement("span"); reset.className="reset"; reset.textContent="RESET";
-  reset.title="Reset to default"; reset.onclick=()=>resetOne(s.key);
+  const reset = document.createElement("span"); reset.className="reset";
+  reset.innerHTML='<svg class="ic" aria-hidden="true"><use href="#ic-reset"/></svg>';
+  reset.title="Reset to default"; reset.setAttribute("role","button"); reset.tabIndex=0;
+  reset.setAttribute("aria-label","Reset to default");
+  reset.onclick=()=>resetOne(s.key);
+  reset.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); resetOne(s.key); } });
 
   top.appendChild(label); top.appendChild(control); top.appendChild(reset);
   wrap.appendChild(top);
@@ -317,35 +321,28 @@ function buildControl(control, s){
     // Editable combobox for fetched-catalog sources (issue #92): pick from the live list OR type a
     // custom value. Everything else stays a strict <select>.
     if(s.combobox){ control.appendChild(buildCombo(s)); return; }
+    // Fetched, non-voice catalog (e.g. ElevenLabs models): ONE trigger + palette (issue #214) — the
+    // redundant native <select> + 🔍 + Filter cluster is gone; the palette does search + keyboard nav.
+    // ElevenLabs ids must be real (no free-text), so allowCustom is false.
+    if(s.options_source){
+      let current = String(s.value);
+      const labelFor=(v)=>{ const it=optionsFor(s).find(o=>o.value===v); return it?it.label:(v===""?"(none)":v); };
+      control.appendChild(makePickTrigger({
+        label:s.label, allowCustom:false, labelFor,
+        getItems:()=> optionsFor(s).map(o=>({value:o.value, label:o.label, meta:o.meta||""})),
+        getCurrent:()=> current,
+        onPick:(val)=>{ current=val; edit(s.key, val); },
+      }));
+      return;
+    }
+    // Short STATIC enum (theme, activation mode, …): a native <select> is fine — no redundant cluster,
+    // and the theme (issue #104) applies LIVE on change so the page recolours immediately (SAVE
+    // persists it; REVERT/RESET restores the saved theme via applyThemeFromGroups()).
     const sel = document.createElement("select");
     const selOpts = optionsFor(s);
     for(const o of selOpts) sel.appendChild(new Option(o.label,o.value));
-    sel.value = s.value; if(sel.value!==String(s.value)) sel.appendChild(new Option(s.value,s.value)), sel.value=s.value;
-    sel.onchange=()=>{
-      edit(s.key, sel.value);
-      // The theme (issue #104) applies LIVE on selection: stamp data-theme so the whole page
-      // recolours immediately (a preview). SAVE persists it via /api/settings/update; REVERT/RESET
-      // restores the saved theme through applyThemeFromGroups().
-      if(s.key==="ui.theme") document.documentElement.dataset.theme = sel.value;
-    };
-    // Long fetched lists (ElevenLabs voices/models) get the command palette (#94) — a searchable,
-    // keyboard-driven, highlighted picker for the long case. The #26 inline type-to-filter box stays
-    // too (for voices), so both paths work; the <select> is the current-value display.
-    if(s.options_source){
-      const search=document.createElement("button"); search.type="button"; search.className="pickbtn";
-      search.textContent="🔍"; search.title="Search "+s.label;
-      search.onclick=()=> openPalette({
-        title:"Search "+s.label,
-        items: selOpts.map(o=>({value:o.value, label:o.label, meta:""})),
-        current: sel.value,
-        allowCustom:false,   // ElevenLabs voice/model must be a real account id — no free-text
-        onPick:(val)=>{ sel.value=val; if(sel.value!==val){ sel.appendChild(new Option(val,val)); sel.value=val; } edit(s.key, val); },
-      });
-      control.appendChild(search);
-    }
-    // Voice lists can be long — keep the #26 type-to-filter box beside any *_voices picker (the
-    // currently-selected voice always stays visible so the current pick can't vanish behind it).
-    if(s.options_source && s.options_source.indexOf("voices")>=0) control.appendChild(voiceFilter(sel));
+    sel.value = s.value; if(sel.value!==String(s.value)){ sel.appendChild(new Option(s.value,s.value)); sel.value=s.value; }
+    sel.onchange=()=>{ edit(s.key, sel.value); if(s.key==="ui.theme") document.documentElement.dataset.theme = sel.value; };
     control.appendChild(sel); return;
   }
   if(s.type==="int"||s.type==="float"){
@@ -402,20 +399,23 @@ function makeVoicePicker(s){
   });
 }
 
-// A compact text box that filters a native <select>'s options by case-insensitive substring of the
-// visible label. 3+ chars filters; fewer (or empty) restores the full list (issue #26). Reusable for
-// any voice picker (@elevenlabs_voices today; persona/voice-cast later). The selected option stays
-// visible so the current pick can't disappear behind the filter.
-function voiceFilter(sel){
-  const f=document.createElement("input");
-  f.type="text"; f.className="voicefilter"; f.autocomplete="off"; f.spellcheck=false;
-  f.placeholder="Filter…";
-  f.oninput=()=>{
-    const q=f.value.trim().toLowerCase();
-    const active=q.length>=3;
-    for(const o of sel.options) o.hidden = active && !o.selected && !o.textContent.toLowerCase().includes(q);
-  };
-  return f;
+// Shared chooser trigger (issue #214): ONE button that shows the full current value (ellipsis + title
+// on overflow) and opens the command palette on click / Enter / Space (a real <button>, so keyboard
+// + SR work for free — #184). Replaces the old <select>/datalist + 🔍 + "Filter…" cluster. `labelFor(v)`
+// maps a value to display text; `getItems()` returns the palette items lazily (so a refreshed or
+// late-loaded catalog is picked up); `onPick` applies the choice, then the trigger re-paints.
+function makePickTrigger({label, allowCustom, labelFor, getItems, getCurrent, onPick}){
+  const btn=document.createElement("button");
+  btn.type="button"; btn.className="picktrigger"; btn.setAttribute("aria-haspopup","dialog");
+  const val=document.createElement("span"); val.className="pt-val"; btn.appendChild(val);
+  btn.insertAdjacentHTML("beforeend",'<svg class="ic" aria-hidden="true"><use href="#ic-expand"/></svg>');
+  btn.refresh=()=>{ const t=labelFor(getCurrent()); val.textContent=t; btn.title=t; btn.setAttribute("aria-label",label+": "+t); };
+  btn.refresh();
+  btn.onclick=()=> openPalette({
+    title:"Search "+label, items:getItems(), current:getCurrent(), allowCustom:!!allowCustom,
+    onPick:(v,l)=>{ onPick(v,l); btn.refresh(); },
+  });
+  return btn;
 }
 
 // ---- editable combobox + catalog fetch (issue #92) --------------------------------
@@ -440,33 +440,39 @@ function currentValueOf(key){
   return (key in EDITS) ? EDITS[key] : (s ? s.value : "");
 }
 
-// Build one editable combobox. Fail-soft (issue #92 + #26): the input shows the CURRENT value
-// immediately (never lost), the catalog loads in the background to fill the datalist, and a typed
-// value outside the fetched set is accepted but flagged "custom (unsupported)". Static-option enums
-// marked combobox (none today) would pass s.options straight through.
+// Build one catalog chooser: a trigger + palette (issue #214) over a live catalog. Fail-soft
+// (issue #92 + #26): the trigger shows the CURRENT value immediately (never lost), the catalog loads
+// in the background to fill the palette, and a value outside the fetched set is accepted via the
+// palette's custom escape hatch but flagged "custom (unsupported)".
 function buildCombo(s){
   const wrap=document.createElement("div"); wrap.className="combo"; wrap.dataset.combo=s.key;
   const row=document.createElement("div"); row.className="pickrow";
-  const inp=document.createElement("input"); inp.type="text"; inp.value=(s.value==null?"":s.value);
-  inp.autocomplete="off"; inp.spellcheck=false;
-  const list=document.createElement("datalist"); list.id="dl-"+s.key.replace(/[^a-z0-9]/gi,"-");
-  inp.setAttribute("list", list.id);
-  const btn=document.createElement("button"); btn.className="pickbtn"; btn.type="button"; btn.textContent="⟳";
-  btn.title="Refresh list";
-  const search=document.createElement("button"); search.className="pickbtn"; search.type="button";
-  search.textContent="🔍"; search.title="Search (command palette)";
-  row.appendChild(inp); row.appendChild(list); row.appendChild(search); row.appendChild(btn);
+
+  let current=(s.value==null?"":String(s.value));
+  let known=new Set();
+  let opts=[];   // last-fetched catalog options, fed to the command palette (#94)
+  function labelFor(v){
+    const it=opts.find(o=>o.value===v);
+    if(it) return it.meta ? (it.label+" — "+it.meta) : (it.label||it.value);
+    return v==="" ? "(default)" : v;   // an unlisted/custom id, or a not-yet-fetched value
+  }
+  function reflectCustom(){ custom.classList.toggle("hidden", current==="" || known.has(current)); }
+
+  // ONE trigger + palette (issue #214) replaces the old [input][datalist][🔍]. allowCustom stays true
+  // so a Piper path / unlisted model id is typeable in the palette; the current pick is never lost.
+  const trigger = makePickTrigger({
+    label:s.label, allowCustom:true, labelFor,
+    getItems:()=> opts, getCurrent:()=> current,
+    onPick:(val)=>{ current=val; edit(s.key, val); reflectCustom(); },
+  });
+  // Adjacent ⟳ refetch for the live catalog (issue #92) — the one control we keep beside the trigger.
+  const btn=document.createElement("button"); btn.className="pickbtn"; btn.type="button";
+  btn.innerHTML='<svg class="ic" aria-hidden="true"><use href="#ic-refresh"/></svg>';
+  btn.title="Refresh list"; btn.setAttribute("aria-label","Refresh list");
+  row.appendChild(trigger); row.appendChild(btn);
   const custom=document.createElement("div"); custom.className="custom hidden"; custom.textContent="custom (unsupported)";
   const msg=document.createElement("div"); msg.className="catmsg";
   wrap.appendChild(row); wrap.appendChild(custom); wrap.appendChild(msg);
-
-  let known=new Set();
-  let opts=[];   // last-fetched catalog options, fed to the command palette (#94)
-  function reflectCustom(){
-    const v=inp.value.trim();
-    custom.classList.toggle("hidden", v==="" || known.has(v));
-  }
-  inp.oninput=()=>{ edit(s.key, inp.value); reflectCustom(); };
 
   async function fill(force){
     // openai.model / openai_tts.model follow their sibling base_url (refetch on change, #92).
@@ -477,28 +483,14 @@ function buildCombo(s){
     if(force) delete CATALOG[ck];
     msg.textContent="loading…";
     const {options,error}=await fetchCatalog(s.options_source, baseUrl);
-    opts=options||[];
-    list.innerHTML="";
-    known=new Set();
-    for(const o of opts){
-      const opt=document.createElement("option"); opt.value=o.value;
-      opt.label=o.meta ? (o.label+" — "+o.meta) : o.label;
-      list.appendChild(opt); known.add(o.value);
-    }
-    // Fail-soft: on offline/no-key/error keep the current value valid + typeable, just say why.
-    msg.textContent = error ? ("catalog unavailable ("+error+") — type a value")
+    opts=options||[]; known=new Set(opts.map(o=>o.value));
+    // Fail-soft: on offline/no-key/error keep the current value valid + typeable (open the palette),
+    // just say why.
+    msg.textContent = error ? ("catalog unavailable ("+error+") — open the picker to type a value")
                             : (opts.length+" available");
-    reflectCustom();
+    trigger.refresh(); reflectCustom();
   }
   btn.onclick=()=>fill(true);
-  // Command palette (#94): search the (possibly long) catalog with keyboard nav + highlight; a
-  // custom/unlisted value is still selectable so the current pick is never lost (fail-soft).
-  search.onclick=()=> openPalette({
-    title: "Search "+s.label,
-    items: opts,
-    current: (inp.value||"").trim(),
-    onPick: (val)=>{ inp.value=val; edit(s.key, val); reflectCustom(); },
-  });
   fill(false);
   wrap._refill=fill;   // so a base_url change can trigger a dependent refetch
   return wrap;

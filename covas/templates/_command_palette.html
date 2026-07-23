@@ -45,9 +45,9 @@
 <div class="cmdp-overlay" id="cmdpOverlay" role="dialog" aria-modal="true">
   <div class="cmdp">
     <div class="cmdp-searchrow">
-      <span class="cmdp-mag">🔍</span>
+      <span class="cmdp-mag"><svg class="ic" aria-hidden="true"><use href="#ic-search"/></svg></span>
       <input class="cmdp-input" id="cmdpInput" type="text" placeholder="{{ t('Search…') }}" autocomplete="off" spellcheck="false">
-      <button class="cmdp-clear" id="cmdpClear" title="{{ t('Clear') }}">✕</button>
+      <button class="cmdp-clear" id="cmdpClear" title="{{ t('Clear') }}" aria-label="{{ t('Clear') }}"><svg class="ic" aria-hidden="true"><use href="#ic-clear"/></svg></button>
     </div>
     <div class="cmdp-list" id="cmdpList"></div>
     <div class="cmdp-foot"><span>{{ t('↑↓ navigate') }}</span><span>{{ t('⏎ select') }}</span><span>{{ t('esc close') }}</span></div>
