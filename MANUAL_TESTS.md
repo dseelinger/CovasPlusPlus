@@ -1,16 +1,37 @@
 # COVAS++ — Manual Test Suite (MANUAL_TESTS.md)
 
-A single human-run checklist to walk through **in-game** and confirm every user-facing
-feature works reasonably well. Not exhaustive — happy-path plus a few key edge cases per
-feature. This is separate from, and complementary to, the offline `pytest` suite (which
-covers pure logic for free; this file covers the parts that need a mic, speakers, the web
-panel, and — for several sections — Elite Dangerous actually running).
+A single human-run checklist of **user-acceptance tests**: things only a person with a mic,
+speakers, a screen, and (for several sections) Elite Dangerous running can confirm. Happy-path
+plus a few key edge cases per feature — not exhaustive.
+
+## Scope — what this suite is (and is not)
+**Test the app as a user meets it: the _installed_ build.** Launch it from the installer's
+Start-menu shortcut / desktop icon, change settings through the **Settings panel**, and expect
+per-user data under `%APPDATA%\COVAS++\`. The value of a manual test is that it exercises the
+artifact we ship — a source run can pass while the packaged app is broken (data dir, bundled
+assets, DPAPI key files, installer shortcuts, missing runtime DLLs, auto-update all differ, and
+those gaps are exactly where user-facing regressions hide).
+
+**Out of scope here — do not add these:**
+- **Anything that needs the repo, a `.venv`, or a dev script** (`python run_covas.py`,
+  `check_setup.py`, hand-editing `config.toml`). The in-app equivalents are the **Settings
+  panel** and the panel's **Test my setup** health report — use those instead.
+- **Unit and integration tests** — those live in `pytest` (offline unit by default; opt-in
+  `integration`) and are enforced by CI, not hand-walked here.
+- **Fault-injection / simulation** (transient-outage retry, bad-journal-line resilience, stub
+  scripts like `flaky_llm_stub.py`, pointing a provider at `httpstat.us`). These are
+  integration tests; they are being moved to automated CI — see #215.
+
+> **Migration in progress (#215).** Some sections below still carry source/venv steps and
+> fault-injection scaffolding from before this scope was set. They are being converted to
+> installed-app acceptance steps or moved to automated CI. **New sections must follow the scope
+> above from the start** (e.g. the chooser/icon work, #214).
 
 ## How to use it
 Work top to bottom. Tick each `- [ ]` as it passes; jot anything odd in the **Notes:** line
 under each section. Most steps are done by **voice** with the app running; some check the web
-panel or a file on disk. If a feature is disabled in config, its section says so up front —
-enable it first (see **§0.3**).
+panel or a file on disk. If a feature is disabled, its section says so up front — enable it
+first via the **Settings panel** (see **§0.3**).
 
 **Keys** — hold **`[`** to talk · **tap `[`** briefly (under 400 ms) to cancel/stop · **Ctrl+Alt+Q** to quit.
 (You can bind a joystick button to `[` via JoyToKey. There's no separate cancel key by default; the panel's **CANCEL** button always works too.)
@@ -39,25 +60,30 @@ your own dropped into `<data dir>/sounds/<type>/` — see §2):
 ## 0. Prerequisites & setup
 
 ### 0.1 Environment health
-- [ ] 🔊 Run **`check_setup.bat`** (or `.venv\Scripts\python.exe check_setup.py`) → every line reads `[ OK ]`, ending in "All systems go."
-- [ ] Confirm `personality.txt` (or `campaign.txt`) exists and `ElevenLabsAPIKey.txt` holds your key — both git-ignored.
+- [ ] 🔊🌐 Open the control panel → **Settings → Test my setup** (§14.2, issue #181) → the report ends
+      in a green *"✓ All systems go"* with every section (Config, Keys & files, Anthropic, ElevenLabs,
+      Game data, Audio) marked `✓ [OK]`. This is the installed-app equivalent of the old `check_setup` CLI.
+- [ ] On the Settings **API keys** card, confirm your ElevenLabs (or chosen TTS) key is present; the
+      panel stores it encrypted under `%APPDATA%\COVAS++\` — no hand-dropped key files.
 
 Notes:
 
 ### 0.2 Launch
-- [ ] **Headless:** `run_covas.bat` (or `python run_covas.py`) → console banner shows your model, voice, Whisper size, and the capability on/off lines (Router, ED monitor, Proactive, Keybinds, **Reflexes** — shows `(fast-PTT […])` / `(auto ON)` when those are set, **Auto-honk**, Find module, Personality). No browser.
-- [ ] **With panel:** `run_covas_ui.bat` (or `python run_covas_ui.py`) → same banner **plus** the browser opens http://127.0.0.1:8765 and the status light reads **IDLE**.
-- [ ] Console prints the PTT scan codes line, and `QUIT: Ctrl+Alt+Q`.
+- [ ] Launch COVAS++ from its **Start-menu shortcut** (or desktop icon) → the native window opens on the
+      control panel and the status light reads **IDLE**. (The banner details — active model, voice, Whisper
+      size, and capability on/off lines — are visible in the panel's live log.)
+- [ ] The panel is reachable in a normal browser at http://127.0.0.1:8765 while the app runs.
+- [ ] Quit with **Ctrl+Alt+Q** (or by closing the native window).
 
 Notes:
 
 ### 0.3 Capability toggles — enable what you want to test FIRST
-Capabilities are gated in **`config.toml`** (edit freely) or **`overrides.json`** (what the panel
-writes). The Settings page (§14.2) can also flip these; **most settings now apply live** (issue #90
-— providers, keys, mic, Whisper, volumes, toggles) with only a tiny `RESTART_REQUIRED` set needing a
-relaunch (`audio.enabled`, `audio.mix_sample_rate`, `ui.host`/`ui.port` — see §14.3).
-Confirm each before running its section (as shipped,
-**everything defaults ON** so the app shows full functionality out of the box):
+Capabilities are toggled on the **Settings page** (§14.2, reached from the control panel); **most apply
+live** (issue #90 — providers, keys, mic, Whisper, volumes, toggles) with only a tiny `RESTART_REQUIRED`
+set needing a relaunch (Audio engine, audio sample rate, panel host/port — see §14.3). The bracketed
+`[section].key` names below are just identifiers for the underlying setting so you know which Settings
+row to look for. Confirm each before running its section (as shipped, **everything defaults ON** so the
+app shows full functionality out of the box):
 - [ ] `[elite].enabled = true` — ED journal/Status monitoring. **Required by** proactive/route callouts, the keybind + honk combat guard, carriers, community goals, and the live "current system" used by every search. (§5, §6, §7, §8, §9, §10)
 - [ ] `[proactive].enabled = true` — proactive callouts. (§5.2)
 - [ ] `[route].enabled = true` — Route callouts while flying a plotted route. (§5.3)
@@ -198,8 +224,8 @@ Notes:
 
 ## 3a. Hands-free / continuous listening (issue #63 — `[listen].mode = "continuous"`)  🔊 HW 🎧 headset
 > Off by default. Switch to continuous by voice (*"switch to continuous listening"*), on the Settings
-> page (**Activation mode** under *Voice input*), or in `config.toml` (`[listen].mode`). Best tested
-> with a **headset** so COVAS doesn't hear its own voice. PTT must keep working the whole time.
+> page (**Activation mode** under *Voice input*). Best tested with a **headset** so COVAS doesn't hear
+> its own voice. PTT must keep working the whole time.
 - [ ] **Switch on live by voice:** in PTT mode, hold `[` and say *"switch to continuous listening."*
       The log shows **Hands-free continuous listening ON**; no restart needed.
 - [ ] **Hands-free turn:** with your hands off the keyboard, just say *"COVAS, what time is it? Keep it
@@ -223,8 +249,8 @@ Notes:
 
 ## 3b. Wake word — hands-free gating (issue #64 — `[listen].wake_word`)  🔊 HW 🎧 headset 🌐 PANEL
 > Off by default (blank). Only affects **continuous** mode; PTT is never gated. Set a wake word by
-> voice (*"set the wake word to COVAS"*), on the Settings page (**Wake word** under *Voice input*), or
-> in `config.toml` (`[listen].wake_word`). Turn on continuous mode first (section 3a).
+> voice (*"set the wake word to COVAS"*) or on the Settings page (**Wake word** under *Voice input*).
+> Turn on continuous mode first (section 3a).
 - [ ] **Set it by voice:** in continuous mode, hold `[` and say *"set the wake word to COVAS."* The
       log/Settings show the wake word is now `COVAS`.
 - [ ] **Armed turn:** hands off the keyboard, say *"COVAS, what time is it? Keep it short."* → the turn
@@ -304,7 +330,7 @@ Notes:
 > (`gemini-flash-lite-latest` default, `gemini-flash-latest` standard, `gemini-pro-latest` premium),
 > which always resolve to Google's current GA model per class — pinning a concrete id kept breaking
 > (the guessed `gemini-3.1-flash-lite` 404'd; GA `gemini-2.5-*` is now "superseded"). You can still set
-> a concrete id from <https://ai.google.dev/gemini-api/docs/models>. `check_setup.py` warns only if a
+> a concrete id from <https://ai.google.dev/gemini-api/docs/models>. **Settings → Test my setup** warns only if a
 > **concrete** configured id isn't in the live list; `-latest` aliases are always accepted (they don't
 > appear verbatim in `GET /models`).
 >
@@ -312,8 +338,8 @@ Notes:
 > comfortably fits COVAS's per-turn tool load — unlike Groq's free tier (§4.1) — so it's the
 > zero-cost path that actually works. Google trims free quotas without notice, so treat exact
 > numbers as best-effort.
-- [ ] **Model-id guard:** run `.venv\Scripts\python.exe check_setup.py` with `[llm].provider = "gemini"` and a
-  key set → the **Gemini API** section reports the live model count and confirms `[gemini].model` / tiers are
+- [ ] **Model-id guard:** with the provider set to **Gemini** and a key entered, run **Settings → Test my
+  setup** → the **Gemini API** section reports the live model count and confirms `[gemini].model` / tiers are
   all in the live list (or WARNs which id is stale). No crash without a key.
 - [ ] **Conversation:** set `[llm].provider = "gemini"`, add your Gemini key in Settings, restart, speak a turn
   → COVAS answers via Gemini (no 404 on the first word); `[router]` line shows the Gemini model
@@ -330,42 +356,16 @@ Notes:
 
 Notes:
 
-### 4.3 Transient provider outage — retry, slow heads-up, degraded line (issue #97)  🔊 HW 🌐 PANEL
-> Cloud LLMs have bad minutes (Anthropic **529 Overloaded**, 429s, 503s). COVAS should **retry** with
-> backoff, speak a **"still slow"** heads-up if a turn drags, and — if it can't recover — say the
-> provider is **overloaded** (named) instead of dying. Simulate an outage without waiting for a real
-> one by pointing a provider at a URL that returns errors, or by using a throwaway/over-quota key.
-> **How to force a 529/5xx or timeout (pick one):**
-> - **Fail-then-succeed** (for "Retry then recover"): run `python scripts\flaky_llm_stub.py` — a local
->   OpenAI-compatible endpoint that returns 503 twice **then** streams a real reply, re-arming each turn.
->   Set `[llm].provider = "openai"` and `[openai].base_url = "http://127.0.0.1:8799/v1"` (any throwaway
->   key/model — a hand-dropped plaintext `OpenAIAPIKey.txt` is accepted), restart, and speak/type a turn.
-> - **Always-fail** (for "Exhausted → degraded"): point `[openai].base_url` at an endpoint that returns
->   5xx/429 (e.g. `https://httpstat.us/529`), or at an unroutable host/port to force a **connection timeout**.
-> - Or temporarily lower `[llm.retry].max_total_wait` / raise `attempts` to watch the backoff.
-> - **Note:** retry logging is wired for the raw providers (**openai / gemini**). The default
->   **Anthropic** provider retries *inside its own SDK*, which is silent to the COVAS log — so use the
->   OpenAI stub above to see the retry lines.
-- [ ] **Retry then recover:** with the flaky stub (fails twice then succeeds), one turn **still answers** —
-      the log shows `OpenAI HTTP 503 — retry N/4, backing off …s` lines (backoff) before the reply. No
-      user-visible error.
-- [ ] **Slow heads-up (watchdog):** set `[llm].slow_warning_seconds` low (e.g. `5`) against a slow/hung
-      endpoint → after ~5 s COVAS **speaks** *"the AI service is being slow… I'm still trying"* in the
-      **current voice**, and still delivers the real reply (or the degraded line) afterward.
-- [ ] **Exhausted → degraded line:** with an endpoint that always returns 529/5xx, a turn ends with a
-      short spoken, **provider-named** *"…is overloaded right now, Commander…"* line — not a raw error —
-      and 🌐 the log shows a precise reason (e.g. `provider degraded: … 529 … — retried 4×, giving up`).
-- [ ] **Fail-fast (no pointless retry):** point at a **404** model or a **bad key (401)** → the turn
-      fails **immediately** (no long backoff) and returns to Idle — and now (issue #108) **speaks** a
-      "check your settings" heads-up instead of failing silently; see **§4.3a** for the full check.
-- [ ] **Cancel during backoff:** while a turn is retrying/slow, **tap `[`** (or panel **CANCEL**) →
-      it aborts **instantly**, no waiting out the backoff, back to IDLE.
-- [ ] **Text-only fail-soft:** in text-only mode (no TTS key), the slow/degraded messages appear as
-      **log lines** (not spoken) and the loop never crashes.
-- [ ] **History intact:** after a degraded/failed turn, the **next** turn answers its own question
-      (the failed turn left no orphaned prompt behind).
-
-Notes:
+### 4.3 Transient provider outage — retry, slow heads-up, degraded line (issue #97)
+> **Migrated to automated CI (issue #217).** This section used to force a 529/5xx/timeout with the
+> `scripts/flaky_llm_stub.py` fault-injection stub — repo/venv scaffolding that has no place in an
+> installed-app checklist. All of its behaviour is now covered by offline tests that run in the #215 gate:
+> retry-then-recover and exhausted→degraded (`test_openai_llm.py` / `test_gemini_llm.py`
+> `test_transient_503_*`), the slow-heads-up watchdog and text-only fail-soft and history-intact
+> (`test_app_turn.py::test_latency_watchdog_*`, `test_exhausted_retries_speak_named_degraded_line_no_orphan`),
+> and cancel-during-backoff (`test_provider_retry.py::test_cancel_aborts_backoff`). The one part a human
+> still hears — the spoken misconfiguration heads-up via a natural Settings change — lives on in §4.3a.
+> `flaky_llm_stub.py` survives only as an optional way to *hear* it end-to-end on real hardware.
 
 ### 4.3a LLM misconfiguration — spoken "check your settings" heads-up (issue #108)  🔊 HW 🌐 PANEL
 > A bad model id, a wrong/missing key, or a bad endpoint is NOT a transient blip (§4.3 above) — it
@@ -386,11 +386,13 @@ Notes:
 - [ ] **Off switch:** set `[llm].speak_config_errors = false` on the Settings page, repeat the
       bad-model case → the **failure cue** still plays and the log still records the precise reason,
       but nothing is spoken. Set it back to `true` afterward.
-- [ ] **Doesn't cross with §4.3:** a genuine transient outage (e.g. `https://httpstat.us/529`) still
-      says *"…is overloaded right now, Commander…"* — never the settings line — and a bad-model/key
-      case never says "overloaded".
 - [ ] **History intact:** after a misconfigured turn, history stays empty (no orphaned prompt) and
       fixing the setting lets the very next turn answer cleanly.
+
+> The misconfig-vs-overload distinction (a bad key/model never says "overloaded", and a transient
+> outage never says the settings line) is enforced by automated tests — `test_provider_retry.py`
+> `test_is_config_error_*` and `test_app_turn.py::test_config_error_does_not_speak_degraded_overloaded_line`
+> — so it needs no fault-injection here; this section only confirms you can *hear* the spoken heads-up.
 
 Notes:
 
@@ -444,11 +446,14 @@ Notes:
 
 Notes:
 
-### 5.1b Journal monitoring survives a bad line (#152)  🎮 ED 📋 FILE
-> Requires `[elite].enabled = true`. The journal watcher must fail **soft**: one malformed/unexpected event, or a journal file vanishing during a rollover, may not silently stop all further monitoring for the session.
-- [ ] **Bad line is skipped, tailing continues:** with COVAS++ running and ED live, append a garbage line to the current journal (e.g. `echo '{"event":"__notreal__","x":{}}' >> Journal.<latest>.log`), then do a real in-game action (FSD-jump / dock). The action is still reflected — *"where am I?"* / *"what did I just do?"* stays current. At most a single warning is logged for the bad line; monitoring does **not** go dark.
-- [ ] **Rollover race is harmless:** let ED roll to a new journal (long session, or relog) while COVAS++ runs → it picks up the new file and keeps narrating; no watcher-dead silence, no traceback in the log.
-- [ ] **Event straddling startup is not lost (#161):** start COVAS++ **while a jump/dock is landing** in the journal (relog COVAS++ mid-action, or start it the instant you jump), so its *final* journal line is half-written at startup. Once ED finishes writing that line, the action still lands — *"where am I?"* reflects the new system/station within a poll or two; the straddling event is **not** silently dropped.
+### 5.1b Journal monitoring survives a bad line (#152)
+> **Migrated to automated CI (issue #217).** This section used to inject a garbage line into a live
+> `Journal.*.log` — fault-injection scaffolding that doesn't belong in an installed-app checklist. Its
+> behaviour is covered by offline tests in the #215 gate: a malformed/half-written/non-object line is
+> skipped, not crashed (`test_ed_journal.py::test_parse_half_written_line_is_none`,
+> `test_parse_non_object_json_is_none`, `test_watcher_buffers_half_written_line_across_prime_boundary`);
+> a raising event doesn't stop the tail (`test_drain_skips_raising_event_and_keeps_tailing`); and a file
+> rollover is picked up cleanly (`test_watcher_rolls_over_to_newer_file`).
 
 ### 5.1c Registry persistence never stalls the voice loop (#161)  🎮 ED 📋 FILE
 > Requires `[elite].enabled = true`. The journal thread now persists its disk-backed registries (visit ledger #138, owned-ships #134, per-ship loadouts #135, NPC-crew #125) **outside** the EDContext lock, so a slow/locked disk can't stall a `snapshot()`/`summary()` read.
@@ -580,10 +585,9 @@ Notes:
 - [ ] 🖐 **#144 recentre & offset (visual, SteamVR mode):** with a **world-locked** panel, turn your head so it sits off to the side (offset still reads `0.0`) → *"recentre the HUD on me"* snaps it **back in front**, keeping distance/height/tilt/size. Separately, change **`vr_offset_x_m` 0 → 1.0** on the Settings page → the shown overlay **slides** (view-relative), confirming live-apply; the `hud` log shows a `placement -> …` line each apply.
 
 ## 5c. Web HUD via OpenKneeboard (issue #103 — `[hud].web_enabled`)  🥽 VR 🎮 ED
-> The **same** four-row HUD as §5a/§5b served as a **transparent web page** at `/hud` for OpenKneeboard's Web Dashboard tab, so it composites in-headset on **OpenComposite / VDXR / Virtual Desktop** where the SteamVR overlay structurally can't. **Off by default**, **independent** of the 2D/VR HUDs, and **requires the control panel** (`run_covas_ui.py`). Beats the community EDCoPilot route (OpenKneeboard *window-capturing* an opaque app) on one axis: a **natively transparent** page — no black box. The in-headset checks need Doug's Quest 3 + OpenComposite/VDXR rig and cannot run in CI.
-- [ ] **Headless is fail-soft (no headset):** with `run_covas.py` (headless, no control panel) and `[hud].web_enabled = true`, enabling the web HUD **logs that the control panel is required** and continues — no crash, no `/hud` served.
-- [ ] **Page renders offline (no headset):** with `run_covas_ui.py` running, open `http://127.0.0.1:8765/hud` in a normal browser → with the web HUD **on**, the four rows show live data (transparent background); with it **off**, the page is **empty**. View source: it references **no external URL** (self-contained).
-- [ ] **In-headset composite (Doug's rig):** ED in OpenComposite mode (`Toggle-VR-2D-Steam.ps1 status` → `vr`); OpenKneeboard installed with a **Web Dashboard** tab → `http://127.0.0.1:8765/hud`; `run_covas_ui.py`; say *"turn the web HUD on"*; launch ED via Virtual Desktop (VDXR). Confirm the panel composites over the cockpit with a **transparent background** (no opaque rectangle — the EDCoPilot-beating claim) and legible text.
+> The **same** four-row HUD as §5a/§5b served as a **transparent web page** at `/hud` for OpenKneeboard's Web Dashboard tab, so it composites in-headset on **OpenComposite / VDXR / Virtual Desktop** where the SteamVR overlay structurally can't. **Off by default**, **independent** of the 2D/VR HUDs, and **requires the control panel**. Beats the community EDCoPilot route (OpenKneeboard *window-capturing* an opaque app) on one axis: a **natively transparent** page — no black box. The in-headset checks need Doug's Quest 3 + OpenComposite/VDXR rig and cannot run in CI.
+- [ ] **Page renders offline (no headset):** with the control panel running, open `http://127.0.0.1:8765/hud` in a normal browser → with the web HUD **on**, the four rows show live data (transparent background); with it **off**, the page is **empty**. View source: it references **no external URL** (self-contained).
+- [ ] **In-headset composite (Doug's rig):** ED in OpenComposite mode (`Toggle-VR-2D-Steam.ps1 status` → `vr`); OpenKneeboard installed with a **Web Dashboard** tab → `http://127.0.0.1:8765/hud`; the control panel running; say *"turn the web HUD on"*; launch ED via Virtual Desktop (VDXR). Confirm the panel composites over the cockpit with a **transparent background** (no opaque rectangle — the EDCoPilot-beating claim) and legible text.
 - [ ] **Live data + toggle (in-headset):** voice state tracks Listening/Thinking/Speaking; plot a route → jumps-remaining updates each jump. Say *"turn the web HUD off"* → the panel **blanks** (no OpenKneeboard interaction); *"on"* → it returns.
 - [ ] **Streaming-perf check (only this rig can answer):** compare frametimes/encode with the OpenKneeboard tab **present vs. absent** over Virtual Desktop. If the overhead is meaningful, note it — it reshapes the recommendation.
 
@@ -867,15 +871,15 @@ Notes:
 
 Notes:
 
-### 7.3 Game-data freshness & new-content refresh (#101)  🔊 HW 🌍 NET (dev tool)
-> **Always on** — no config. The honest companion to 7.2: reports how current the bundled
-> ship/module/engineering data is, and how a new FDev hull enters the app as a **data update, not
-> a code edit**. The refresh commands need network; the voice question does not.
+### 7.3 Game-data freshness — the voice answer (#101)  🔊 HW
+> **Always on** — no config. The honest companion to 7.2: COVAS reports how current the bundled
+> ship/module/engineering data is, so it web-searches rather than guessing for anything newer.
 - [ ] **"How up to date is your ship data?"** → COVAS++ names its datasets (ship specs, modules, engineering, roster), each with a source and a *generation date*, and says it'll web-search rather than guess for anything newer. It does **not** invent a version or claim to be perfectly current.
-- [ ] **Startup freshness:** run `.venv\Scripts\python.exe check_setup.py` → a **Game data freshness** section lists each dataset's age; datasets older than ~6 months are flagged `[warn]` with a hint to run `scripts\refresh_datasets.py`.
-- [ ] **Refresh diff (dev):** run `.venv\Scripts\python.exe scripts\refresh_datasets.py` → it fetches, regenerates, and prints a **diff summary** (new hulls / modules / blueprints, orphaned overlay rows, hulls with no bundled spec) plus a *last refreshed* nag for the hand-curated engineer tables. Re-running with no game change shows "no change" everywhere. Then `pytest` is green.
-- [ ] **New-hull detection is loud (dev):** the mechanism to verify when Frontier ships a hull — after a refresh that pulls a coriolis ship file with no roster id yet, `scripts\gen_ship_specs.py` **fails loudly naming the ship** ("new FDev hull?") instead of silently dropping it; running `scripts\gen_ship_roster.py --fetch` first harvests its name/symbol so the next spec regen matches it with no hand edits.
-- [ ] **Offline determinism:** `.venv\Scripts\python.exe scripts\refresh_datasets.py --no-fetch` regenerates from the committed snapshots with **no network** and leaves the generated files byte-identical (`git status` clean apart from the manifest date).
+
+> The **freshness report** itself is in the panel's **Settings → Test my setup → Game data** section
+> (§0.1) — no CLI needed. The **dev/release** refresh pipeline (`refresh_datasets.py`, `gen_ship_specs.py`)
+> that used to be hand-walked here — offline-determinism, refresh-diff, and the loud new-hull guard — is
+> automatable and tracked for CI coverage in #219; it is not an installed-app acceptance step.
 
 Notes:
 
@@ -1039,7 +1043,7 @@ Notes:
       resume. *"silence all the background audio"* also mutes them. Your own replies are unaffected.
 
 ### 9.1a Carrier Captain — Settings-UI name/voice + arrival/departure responses (issue #137)  🎮 ED 🔊 HW 🌐 PANEL
-> Needs the control panel (`run_covas_ui.py`) + `[audio].enabled` + `[elite].enabled`, and you must
+> Needs the control panel + `[audio].enabled` + `[elite].enabled`, and you must
 > own a fleet carrier. The Captain's arrival/departure lines are **guaranteed** at the transition.
 - [ ] **Set name + voice in the UI:** open the control panel → **Settings → "Carrier voices"** group.
       Type a **Captain name** (e.g. "Reynolds"), pick a **Captain voice** from the 🔍 searchable
@@ -1265,7 +1269,7 @@ Notes:
 ## 14. Web control panel  🌐 PANEL 🔊 HW 📋 FILE
 
 ### 14.0 Version label (issue #78)
-- [ ] A small, muted **`vX.Y.Z`** tag sits in the bottom-right corner of the panel (matches `__version__` / `check_setup.py`'s reported version) — visible but out of the way of every control. 🖥️ **Native window:** its title bar also reads **"COVAS++ vX.Y.Z"** in the packaged app (not the plain browser build).
+- [ ] A small, muted **`vX.Y.Z`** tag sits in the bottom-right corner of the panel (matches the app's `__version__`) — visible but out of the way of every control. 🖥️ **Native window:** its title bar also reads **"COVAS++ vX.Y.Z"** in the packaged app (not the plain browser build).
 
 ### 14.0a Quick panel reflects the active LLM/TTS provider (issue #86)  🌐 PANEL 🌍 NET 📋 FILE
 > The left **Configuration** card's **LLM** and **Speech** blocks must MIRROR `[llm].provider` /
@@ -1301,7 +1305,7 @@ Notes:
 > `requires:` **both voice dropdowns must be POPULATED via a valid ElevenLabs key** (set it on the
 > Settings *API keys* card and restart; `tts.provider` doesn't need to be elevenlabs, but the list only
 > loads with a key) — an empty list has nothing to filter and the test reads as "not implemented".
-> Verify in BOTH the browser (`run_covas_ui.py`) AND the packaged native window.
+> Verify in the control panel — both a normal browser tab and the packaged native window.
 >
 > **#100 resolution (do NOT re-mark NYI on an empty list):** the filter code IS wired on both surfaces —
 > `index.html` `#el_voice_filter` → `filterOptions(#el_voice)` and `settings.html` `voiceFilter(sel)` on
@@ -1350,8 +1354,8 @@ Notes:
 > from the provider's LIVE catalog plus free-text for anything custom. `requires:` the relevant
 > provider key/endpoint for the list to actually populate (OpenAI/Groq key for `openai.model`, Gemini
 > key for `gemini.model`, Azure key+region for `azure.voice`,
-> Cartesia key for `cartesia.voice`; Edge needs no key). Verify in BOTH the browser (`run_covas_ui.py`)
-> and the packaged native window.
+> Cartesia key for `cartesia.voice`; Edge needs no key). Verify in the control panel — both a normal
+> browser tab and the packaged native window.
 - [ ] **Base-URL presets:** the **OpenAI LLM base URL** field offers the four presets
       (OpenAI/Groq/DeepSeek/OpenRouter) in its dropdown; picking one fills the box. Typing a custom URL
       shows a **"custom (unsupported)"** flag but is accepted.
@@ -1541,7 +1545,7 @@ applies to *whichever* TTS provider is active; each provider maps + clamps it to
 
 ### 14.5c Right-click Copy on a selection (issue #75)
 - [ ] **Browser:** select some log text, right-click it → a small dark **Copy** menu appears at the cursor (not the browser's native menu); click it → the selection is on the clipboard. Right-clicking with **no selection** leaves the browser's normal menu alone.
-- [ ] 🖥️ **Native window (the real point of #75):** in the **packaged app** (`run_covas_app.py` / installed `COVAS++.exe`, not `run_covas_ui.py`'s browser tab) the native right-click menu is suppressed entirely — select log text and right-click → the same custom **Copy** menu appears there and copies correctly. Right-clicking a **per-line ⎘ button** does not bring up this menu.
+- [ ] 🖥️ **Native window (the real point of #75):** in the **packaged app** (the installed `COVAS++.exe` native window, not a browser tab) the native right-click menu is suppressed entirely — select log text and right-click → the same custom **Copy** menu appears there and copies correctly. Right-clicking a **per-line ⎘ button** does not bring up this menu.
 - [ ] Click elsewhere (or scroll, or Alt-Tab away) while the menu is open → it dismisses without side effects.
 
 ### 14.6 Checklist editor (N10) — http://127.0.0.1:8765/checklist 🌍 NET (CDN)
@@ -1633,10 +1637,12 @@ on in config (or the Settings page) before testing.
   through the mixer's **clean COVAS bus** (no change in character), and a **tap-`[` barge-in still
   cuts speech instantly**.
 
-### 18.1 Bus mixer + comms radio treatment (device-level demos, app NOT running)
-- [ ] 🔊 `.venv\Scripts\python.exe scripts\demo_comms_bus.py` → a tone CLEAN (COVAS bus) then
-  RADIO-FILTERED (Comms bus). `demo_comms_variants.py` → NPC riff / tampered→verbatim / player DM.
-  `demo_interdiction.py` → the three interdiction layers.
+### 18.1 Bus mixer + comms radio treatment
+> The old **device-level demo scripts** (`demo_comms_bus.py`, `demo_comms_variants.py`,
+> `demo_interdiction.py`, run with the app *not* running) were repo/venv dev tools, not installed-app
+> steps. The **audible** result — clean COVAS bus vs radio-treated comms bus, NPC-vs-verbatim-vs-DM
+> variants, the interdiction layers — is exercised in-game by §18.2 below; the underlying DSP/mix logic
+> is automatable and tracked in #219.
 
 ### 18.2 Comms voices in-game (C4/C5)
 - [ ] 🎮 Receive an **NPC/station** comms-panel line (e.g. request docking) → it's read on the
@@ -1754,7 +1760,7 @@ on in config (or the Settings page) before testing.
   — a single voice, no attribution, and any literal `[bracketed]` text is just read as text.
 
 ### 18.5c Crew editor (issue #70 — control-panel Crew tab)  🖥️
-> Run `run_covas_ui.py` and open the panel; click **🎙 crew**. This edits `crew.json` (`[crew].file`),
+> Open the control panel; click **🎙 crew**. This edits `crew.json` (`[crew].file`),
 > git-ignored. Personas fold into the system prompt; a chosen voice overrides the auto-assignment.
 - [ ] 🖥️ **Add a character:** click **+ ADD CHARACTER**, enter a name (e.g. *Nyx*), a personality
   line, pick a **Voice** from the dropdown (or leave **Auto**), **SAVE ROSTER** → a green *Saved*
@@ -1916,7 +1922,8 @@ Notes:
 - [ ] **Default unchanged:** with no `[audio.voices.providers]` set, the cast sounds exactly as
   before (comms/chatter/player cast from `cast_provider`); COVAS's own voice is still your ElevenLabs
   persona.
-- [ ] **Per-role override:** add to `config.toml` →
+- [ ] **Per-role override:** this advanced role→provider map has no Settings-panel row yet, so add it
+  to your data-dir config at `%APPDATA%\COVAS++\config.toml` →
   ```toml
   [audio.voices.providers]
   chatter = "piper"
@@ -1935,7 +1942,7 @@ Notes:
 > **Free** neural TTS via `edge-tts` (Edge "Read Aloud" Azure voices) — hundreds of voices, **no
 > key**, so ambient chatter never burns ElevenLabs credits. ⚠ It rides an **undocumented, no-SLA**
 > endpoint that periodically breaks — it's **optional and never load-bearing**; **Piper** stays the
-> guaranteed free floor. Install it first: `pip install -r requirements.txt`.
+> guaranteed free floor. `edge-tts` ships bundled in the installed app — nothing to install.
 - [ ] **Persona voice:** set `[tts].provider = "edge"` (optionally `[edge].voice = "en-US-GuyNeural"`),
   restart, speak a turn → COVAS replies in the Edge voice with **zero** ElevenLabs usage.
 - [ ] **Cast-eligible:** set `[audio.voices].cast_provider = "edge"` (or a per-role
@@ -1945,8 +1952,8 @@ Notes:
   disconnect the network (or block the endpoint) and speak → the persona voice **falls back to local
   Piper**; reconnect → Edge resumes. With **no** Piper model, a dead endpoint degrades to **text** and
   the loop returns to IDLE. Cast Edge voices fall **silent** on failure (never crash).
-- [ ] **Catalog:** `.venv\Scripts\python.exe -m edge_tts --list-voices` lists the voices; a ShortName
-  works as `[edge].voice` or a `[[audio.voices.pool]]` `ref`.
+- [ ] **Catalog:** the panel's **voice picker** (Settings, §14.1a) lists the Edge voices; a ShortName
+  chosen there works as the Edge voice or a cast-pool `ref`.
 
 Notes:
 
@@ -2038,14 +2045,6 @@ Notes:
 > available on Win11 Home) so "no Python/keys/model preinstalled" is actually proven. Revert the
 > snapshot between passes. A partial dev-machine shortcut: delete `%APPDATA%\COVAS++` + the HF
 > model cache to re-exercise the wizard (does **not** prove the no-runtimes case).
-
-### 19.0a Release prep — refresh bundled game data (issue #101)  🌍 NET
-> Before cutting a release, bring the bundled FDev-content datasets up to date so a downloaded
-> build ships current ship/module/engineering data (the app is offline at runtime, so this is the
-> only moment it converges on live community data). Do this **before** the version bump / build.
-- [ ] Run `.venv\Scripts\python.exe scripts\refresh_datasets.py` → review the printed **diff summary** (new hulls / modules / blueprints / orphaned overlay rows) and the *last refreshed* nag for the hand-curated engineer tables (refresh those by hand if they've drifted).
-- [ ] `.venv\Scripts\python.exe check_setup.py` → the **Game data freshness** section shows no `[warn]` (nothing older than ~6 months).
-- [ ] `pytest` is green, then commit the regenerated data + manifest as part of release prep.
 
 ### 19.0b Release automation — CI builds & attaches the installer (PR #213)  🌍 NET
 > Cutting a release must leave a **downloadable installer on the Releases page**, not a source-only
@@ -2167,7 +2166,7 @@ Notes:
 - [ ] Set zoom to **130%**, **close and relaunch** the app → panel reopens at 130% with **no flash** of 100% before it snaps to 130%.
 - [ ] Navigate between pages (panel ↔ settings ↔ checklist ↔ crew ↔ macros ↔ memory) → zoom stays applied on every page.
 - [ ] Trackpad/touch **pinch-zoom** also works in the packaged window (`zoomable=True`).
-- [ ] Sanity: `run_covas_ui.py` in a real browser still zooms natively (Ctrl+±/scroll), and the in-page `− % +` control also works there.
+- [ ] Sanity: the control panel in a real browser tab still zooms natively (Ctrl+±/scroll), and the in-page `− % +` control also works there.
 
 Notes:
 
