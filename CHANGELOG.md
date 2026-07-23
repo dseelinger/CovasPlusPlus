@@ -13,6 +13,26 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.26.0] — 2026-07-23
+
+A **Foundation** release that tidies the control-panel choosers.
+
+### Changed
+- **One picker per field, not three.** Each fetched-catalog and voice chooser on the Settings and Crew
+  pages (provider voices, the Player-DM voice, the Piper voice, model ids, the microphone) is now a
+  **single button** that shows the full current value and opens the searchable command palette — the
+  redundant native dropdown, the extra 🔍 button, and the separate "Filter…" box are gone. Long device
+  and voice names are shown in full instead of being truncated by the old dropdown. Search, keyboard
+  navigation (↑/↓/Enter/Esc), your current pick, and custom/offline values all work exactly as before
+  — the palette already did all of that. ([#214])
+- **Themable interface icons.** The panel's icons (search, refresh, copy, send, reset, …) are drawn
+  from an inline SVG set that inherits the theme colours, so they **recolour cleanly across the Dark /
+  Light / Elite themes** instead of sitting as fixed full-colour emoji that clashed. No font, no
+  download — the packaged offline app is unaffected. ([#214])
+
+### Migration
+- Nothing to do — same settings, same behaviour, just one cleaner control per field.
+
 ## [0.25.3] — 2026-07-23
 
 A **Foundation** patch — **test-only; the shipped app is byte-for-byte unchanged from 0.25.2.**
@@ -341,3 +361,4 @@ Releases before 0.15.0 are listed on the
 [#213]: https://github.com/dseelinger/CovasPlusPlus/issues/213
 [#215]: https://github.com/dseelinger/CovasPlusPlus/issues/215
 [#217]: https://github.com/dseelinger/CovasPlusPlus/issues/217
+[#214]: https://github.com/dseelinger/CovasPlusPlus/issues/214
