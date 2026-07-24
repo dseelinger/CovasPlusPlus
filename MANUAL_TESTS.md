@@ -33,7 +33,7 @@ under each section. Most steps are done by **voice** with the app running; some 
 panel or a file on disk. If a feature is disabled, its section says so up front — enable it
 first via the **Settings panel** (see **§0.3**).
 
-**Keys** — hold **`[`** to talk · **tap `[`** briefly (under 400 ms) to cancel/stop · **Ctrl+Alt+Q** to quit.
+**Keys** — hold **`[`** to talk · **tap `[`** briefly (under 400 ms) to cancel/stop · **close the window** to quit (Ctrl+Alt+Q also works).
 (You can bind a joystick button to `[` via JoyToKey. There's no separate cancel key by default; the panel's **CANCEL** button always works too.)
 
 **Web panel** — http://127.0.0.1:8765 (opens automatically when you launch the UI build). The

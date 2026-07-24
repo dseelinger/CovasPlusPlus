@@ -79,7 +79,7 @@ class SingleInstance:
 _ALREADY_RUNNING_MSG = (
     "COVAS++ is already running. Only one instance can run at a time — a second one would "
     "share your microphone and speakers and talk over the first. Close the other window "
-    "first (quit it with Ctrl+Alt+Q)."
+    "first."
 )
 
 

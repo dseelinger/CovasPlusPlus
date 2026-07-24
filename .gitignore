@@ -53,6 +53,9 @@ custom_macros.jsonl
 # visit ledger (issue #138) — per-location arrival log powering place/history callouts. The
 # Commander's own travel history; journal-derived per-user data — never committed.
 visit_ledger.json
+# native-window geometry (packaged app) — last position/size/maximized for run_covas_app.py's
+# PyWebView window. Per-machine display layout; regenerated on close, never committed.
+window_state.json
 
 # --- Transient / local working files (scratchpad, not for the repo) ---
 # scratchpad for in-progress / one-off bug-fix prompts

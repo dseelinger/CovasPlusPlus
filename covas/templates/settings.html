@@ -46,26 +46,41 @@
   mark.hl{background:var(--highlight-bg);color:inherit;border-radius:2px;padding:0 1px}
   .setting .err{color:var(--err);font-size:12px;margin-top:6px;display:none}
   .setting.invalid .err{display:block}
-  .reset{color:var(--faint);font-size:11px;letter-spacing:1px;cursor:pointer;visibility:hidden;white-space:nowrap}
-  .reset:hover{color:var(--accent2)}
-  .setting.overridden .reset{visibility:visible}
-  select,input[type=text],input[type=number],input[type=password]{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);
-    border-radius:5px;padding:7px 9px;font-family:inherit;font-size:13px;min-width:200px}
-  input[type=number]{min-width:120px;text-align:right}
+  /* --- Uniform control sizing (F13): every editable field is ONE width so they line up down the
+     right edge of a list; every action (save/reset/refresh/clear) is the SAME boxed .iconbtn; the
+     per-row reset reserves its slot (visibility, not display) so the icon column stays straight on
+     non-overridden rows. Toggles are the deliberate size exception but still right-align. */
+  :root{--field-w:264px}
+  .setting .control select,.setting .control input[type=text],.setting .control input[type=number],
+  .setting .control input[type=password],.setting .control .picktrigger,.setting .combo input[type=text]{
+    width:var(--field-w);min-width:0;max-width:var(--field-w);flex:0 0 auto;
+    background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);
+    border-radius:5px;padding:7px 9px;font-family:inherit;font-size:13px}
+  .setting .control input[type=number]{text-align:right}
+  .setting .control select{text-overflow:ellipsis}   /* clip long values; JS sets title=value for hover */
   input.invalid,select.invalid{border-color:var(--err)}
-  .reset .ic{width:14px;height:14px}   /* the per-row reset glyph reads a touch larger than 11px text */
-  /* Editable combobox (issue #92): a fetched dropdown you can also type into. A value outside the
-     fetched catalog is the "custom / at your own risk" escape hatch — flagged, never blocked. */
+  /* Shared icon button — save / reset / refresh / clear share one look + footprint, in a right column. */
+  .iconbtn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;flex:0 0 34px;
+    background:transparent;color:var(--muted);border:1px solid var(--edge);border-radius:5px;cursor:pointer;padding:0}
+  .iconbtn:hover{color:var(--text);border-color:var(--accent2)}
+  .iconbtn .ic{width:15px;height:15px}
+  .iconbtn:disabled{opacity:.3;cursor:default}
+  .iconbtn:disabled:hover{color:var(--muted);border-color:var(--edge)}
+  .iconbtn.primary{color:var(--on-accent);background:var(--accent);border-color:var(--accent)}
+  .iconbtn.primary:hover{filter:brightness(1.1);color:var(--on-accent)}
+  /* Trailing action column present on EVERY row: [refresh slot][reset]. Fixed so fields line up. */
+  .setting .actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+  .setting .refresh-slot{width:34px;height:34px;flex:0 0 34px;display:inline-flex;align-items:center;justify-content:center}
+  /* Per-row reset-to-default: a boxed icon in the trailing column; hidden (not removed) until dirty. */
+  .reset{visibility:hidden}
+  .setting.overridden .reset{visibility:visible}
+  .reset .ic{width:15px;height:15px}
+  /* Editable combobox (issue #92): a fetched dropdown you can also type into. */
   .combo{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:1}
   .combo .pickrow{display:flex;align-items:center;gap:8px;width:100%;justify-content:flex-end}
-  .combo input[type=text]{min-width:220px}
   .combo .custom{color:var(--accent);font-size:11px;letter-spacing:.3px}
   .combo .custom.hidden{display:none}
   .combo .catmsg{color:var(--muted);font-size:11px}
-  .pickbtn{background:transparent;color:var(--muted);border:1px solid var(--edge);border-radius:5px;
-    padding:6px 10px;font-family:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
-  .pickbtn:hover{color:var(--text);border-color:var(--accent2)}
-  .unit{color:var(--muted);font-size:12px;min-width:52px}
   .toggle{position:relative;width:50px;height:26px;background:var(--toggle-off);border-radius:20px;cursor:pointer;
     border:1px solid var(--edge);transition:.15s;flex:0 0 auto}
   .toggle.on{background:var(--accent)}
@@ -277,17 +292,28 @@ function row(s, group){
   wrap.dataset.search = ((group||"")+" "+s.label+" "+s.help).toLowerCase();
 
   const top = document.createElement("div"); top.className="top";
-  const label = document.createElement("div"); label.className="label"; label.textContent=s.label;
+  const label = document.createElement("div"); label.className="label";
+  label.textContent = s.label + (s.unit ? " ("+s.unit+")" : "");   // F13: unit in the title, not after the box
   const control = document.createElement("div"); control.className="control";
   buildControl(control, s);
-  const reset = document.createElement("span"); reset.className="reset";
+  // F13: hover context help on the control itself (selects / pick-triggers keep their value tooltip).
+  control.querySelectorAll("input,.toggle").forEach(el=>{ if(!el.title) el.title=s.help; });
+  const reset = document.createElement("span"); reset.className="reset iconbtn";
   reset.innerHTML='<svg class="ic" aria-hidden="true"><use href="#ic-reset"/></svg>';
   reset.title="Reset to default"; reset.setAttribute("role","button"); reset.tabIndex=0;
   reset.setAttribute("aria-label","Reset to default");
   reset.onclick=()=>resetOne(s.key);
   reset.addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); resetOne(s.key); } });
 
-  top.appendChild(label); top.appendChild(control); top.appendChild(reset);
+  // F13: a FIXED trailing action column [refresh?][reset] on EVERY row, so all fields end at the same
+  // right edge and the icons form straight columns. A catalog's ⟳ refresh (built inside the control) is
+  // relocated into its reserved slot; non-catalog rows keep the slot empty (reserved) so nothing shifts.
+  const actions = document.createElement("div"); actions.className="actions";
+  const refreshSlot = document.createElement("span"); refreshSlot.className="refresh-slot";
+  const rb = control.querySelector('.iconbtn[aria-label="Refresh list"]');
+  if(rb) refreshSlot.appendChild(rb);
+  actions.appendChild(refreshSlot); actions.appendChild(reset);
+  top.appendChild(label); top.appendChild(control); top.appendChild(actions);
   wrap.appendChild(top);
 
   const help = document.createElement("div"); help.className="help";
@@ -346,7 +372,10 @@ function buildControl(control, s){
     const selOpts = optionsFor(s);
     for(const o of selOpts) sel.appendChild(new Option(o.label,o.value));
     sel.value = s.value; if(sel.value!==String(s.value)){ sel.appendChild(new Option(s.value,s.value)); sel.value=s.value; }
-    sel.onchange=()=>{ edit(s.key, sel.value); if(s.key==="ui.theme") document.documentElement.dataset.theme = sel.value; };
+    // F13: fixed-width selects clip long values; a title = the selected label shows the full text on hover.
+    const setSelTitle=()=>{ const o=sel.options[sel.selectedIndex]; sel.title = o ? o.text : sel.value; };
+    setSelTitle();
+    sel.onchange=()=>{ edit(s.key, sel.value); setSelTitle(); if(s.key==="ui.theme") document.documentElement.dataset.theme = sel.value; };
     control.appendChild(sel); return;
   }
   if(s.type==="int"||s.type==="float"){
@@ -355,8 +384,7 @@ function buildControl(control, s){
     if(s.type==="int") inp.step=1; else inp.step="any";
     inp.value = s.value;
     inp.oninput=()=>edit(s.key, inp.value);
-    control.appendChild(inp);
-    if(s.unit){ const u=document.createElement("span"); u.className="unit"; u.textContent=s.unit; control.appendChild(u); }
+    control.appendChild(inp);   // F13: unit moved to the label (parens); no trailing unit span
     return;
   }
   // string / path
@@ -470,7 +498,7 @@ function buildCombo(s){
     onPick:(val)=>{ current=val; edit(s.key, val); reflectCustom(); },
   });
   // Adjacent ⟳ refetch for the live catalog (issue #92) — the one control we keep beside the trigger.
-  const btn=document.createElement("button"); btn.className="pickbtn"; btn.type="button";
+  const btn=document.createElement("button"); btn.className="iconbtn"; btn.type="button";
   btn.innerHTML='<svg class="ic" aria-hidden="true"><use href="#ic-refresh"/></svg>';
   btn.title="Refresh list"; btn.setAttribute("aria-label","Refresh list");
   row.appendChild(trigger); row.appendChild(btn);
@@ -701,8 +729,14 @@ function keyRow(p){
   const badge=document.createElement("span"); badge.className="kbadge";
   const inp=document.createElement("input"); inp.type="password"; inp.autocomplete="off";
   inp.spellcheck=false; inp.placeholder=p.placeholder;
-  const saveB=document.createElement("button"); saveB.className="kbtn set ksave";
-  const clrB=document.createElement("button"); clrB.className="kbtn kclear"; clrB.textContent="Clear";
+  inp.title="Stored encrypted on this PC — paste a key to set or rotate it (takes effect on restart).";
+  // F13: save + clear are ICONS (not text), always present so the column lines up; clear is disabled
+  // when there's no key to clear. Save shows the accent (primary) treatment; both carry a tooltip.
+  const saveB=document.createElement("button"); saveB.className="iconbtn primary ksave"; saveB.type="button";
+  saveB.innerHTML='<svg class="ic" aria-hidden="true"><use href="#ic-save"/></svg>';
+  const clrB=document.createElement("button"); clrB.className="iconbtn kclear"; clrB.type="button";
+  clrB.innerHTML='<svg class="ic" aria-hidden="true"><use href="#ic-clear"/></svg>';
+  clrB.title="Clear key"; clrB.setAttribute("aria-label","Clear key");
   control.appendChild(badge); control.appendChild(inp); control.appendChild(saveB); control.appendChild(clrB);
   top.appendChild(label); top.appendChild(control);
   wrap.appendChild(top);
@@ -724,8 +758,10 @@ function applyRowState(row){
   const set=!!KEYS[row.dataset.section];
   const badge=row.querySelector(".kbadge");
   badge.className="kbadge"+(set?" on":""); badge.textContent=set?"set":"not set";
-  row.querySelector(".ksave").textContent=set?"Rotate":"Save";
-  row.querySelector(".kclear").style.display=set?"":"none";
+  const sv=row.querySelector(".ksave"); sv.title=set?"Rotate key":"Save key";
+  sv.setAttribute("aria-label",set?"Rotate key":"Save key");
+  // F13: clear is always visible (keeps the column aligned) but disabled when there's no key to clear.
+  row.querySelector(".kclear").disabled=!set;
 }
 
 function kmsg(el, text, ok){ el.textContent=text; el.className="kmsg"+(ok===true?" ok":ok===false?" bad":""); }

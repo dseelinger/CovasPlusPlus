@@ -26,7 +26,7 @@ import sys
 import threading
 import time
 
-from covas import firstrun, setup_web
+from covas import firstrun, setup_web, window_state
 from covas.__version__ import __version__
 from covas.app import App
 from covas.config import load_config
@@ -152,6 +152,61 @@ def _start_panel(cfg: dict, host: str, port: int) -> App | None:
     return core
 
 
+def _screens_as_tuples(webview) -> list:
+    """PyWebView Screen objects -> the (x, y, w, h) tuples window_state.sanitize_geometry wants.
+    Defensive: some platforms omit a Screen's x/y (only width/height), so getattr with a 0/…
+    fallback and treat a missing origin as (0, 0). NEEDS ON-HARDWARE VERIFICATION — the pure
+    sanitizer that consumes these tuples is unit-tested; this adapter runs only in the frozen app."""
+    out = []
+    for s in getattr(webview, "screens", []) or []:
+        out.append((
+            int(getattr(s, "x", 0) or 0),
+            int(getattr(s, "y", 0) or 0),
+            int(getattr(s, "width", 0) or 0),
+            int(getattr(s, "height", 0) or 0),
+        ))
+    return out
+
+
+def _restore_geometry(cfg: dict, webview) -> dict:
+    """Best-effort restore kwargs for create_window: load the saved geometry, sanitize it against
+    the connected displays, and shape it into create_window kwargs (x/y only when known). On ANY
+    error, fall back to the app's fixed 1200x820 default so a broken/absent state file can never
+    stop the window opening. The screen/window plumbing NEEDS ON-HARDWARE VERIFICATION; the
+    sanitize logic it feeds is unit-tested in tests/test_window_state.py."""
+    try:
+        geom = window_state.sanitize_geometry(
+            window_state.load(cfg), _screens_as_tuples(webview))
+        kwargs = {"width": geom["width"], "height": geom["height"],
+                  "maximized": bool(geom["maximized"])}
+        if geom.get("x") is not None and geom.get("y") is not None:
+            kwargs["x"], kwargs["y"] = geom["x"], geom["y"]
+        return kwargs
+    except Exception:  # noqa: BLE001 — geometry is a nicety; degrade to the fixed default
+        return {"width": 1200, "height": 820}
+
+
+def _save_geometry(cfg: dict, window, maximized: bool) -> None:
+    """Persist the window's geometry on the way out, fully fail-soft (never blocks shutdown). When
+    the window is maximized, WebView2 reports the maximized OUTER bounds for x/y/width/height — we
+    must NOT save those as the restore position or they'd fight the maximized flag on reopen. There
+    is no reliable "normal size while maximized" from PyWebView, so we persist maximized=True with
+    the fixed default size (x/y None -> the sanitizer will center it). Not maximized -> save the
+    real x/y/width/height. NEEDS ON-HARDWARE VERIFICATION; the sanitize path it feeds is unit-tested."""
+    try:
+        if maximized:
+            geom = {"x": None, "y": None,
+                    "width": window_state.DEFAULT["width"], "height": window_state.DEFAULT["height"],
+                    "maximized": True}
+        else:
+            geom = {"x": int(window.x), "y": int(window.y),
+                    "width": int(window.width), "height": int(window.height),
+                    "maximized": False}
+        window_state.save(cfg, geom)
+    except Exception:  # noqa: BLE001 — geometry is a nicety, never worth disrupting exit
+        pass
+
+
 def main() -> None:
     # pywebview is a packaging-only dep; import here so the base runtime never requires it.
     import webview
@@ -174,7 +229,9 @@ def main() -> None:
     # Shared state across the GUI thread and the background boot thread. `core` is filled once the
     # panel App is built; `closing` guards the wizard→panel handoff against a mid-wizard window
     # close so we don't build an App nobody will see.
-    state: dict = {"core": None, "closing": False}
+    # `maximized` tracks the window's live maximized state (kept current by the maximized/restored
+    # events below) so the shutdown path can persist it without querying PyWebView for it.
+    state: dict = {"core": None, "closing": False, "maximized": False}
 
     # I9 single-window handoff: whatever serves the FIRST page must be up BEFORE the window loads
     # it. Configured install → bring the panel up now. Fresh install → start only the lightweight
@@ -197,8 +254,26 @@ def main() -> None:
     # install opens straight on the panel.
     # zoomable=True (issue #116): native trackpad/touch pinch-zoom in the packaged WebView2
     # window, alongside the in-page Ctrl+/-/0 and Ctrl+scroll zoom (_zoom.html).
+    # Geometry persistence (issue: window-state): reopen where/how we last closed, but sanitized so
+    # a since-changed display setup can't strand the window off-screen. _restore_geometry is
+    # fully fail-soft — on any hiccup it returns the fixed 1200x820 default, exactly the old call.
+    geom_kwargs = _restore_geometry(cfg, webview)
     window = webview.create_window(f"COVAS++ v{__version__}", url=(panel_url if configured else wizard_url),
-                                   width=1200, height=820, min_size=(900, 640), zoomable=True)
+                                   min_size=(900, 640), zoomable=True, **geom_kwargs)
+
+    # Track live maximized state so the shutdown save reflects how the window is right now. These
+    # events NEED ON-HARDWARE VERIFICATION in the frozen app (fired by WebView2); a platform that
+    # never fires them simply leaves the flag False and we persist the normal size — fail-soft.
+    def _on_maximized() -> None:
+        state["maximized"] = True
+
+    def _on_restored() -> None:
+        state["maximized"] = False
+    try:
+        window.events.maximized += _on_maximized
+        window.events.restored += _on_restored
+    except Exception:  # noqa: BLE001 — older/odd PyWebView may lack these events; skip tracking
+        pass
 
     if configured:
         _install_quit_watch(state["core"], window)
@@ -239,6 +314,11 @@ def main() -> None:
     # Blocks on the main thread until the window is closed (user close OR quit-watch destroy).
     # On a fresh install, `_boot` drives the wizard→panel handoff on a pywebview-managed thread.
     webview.start(_boot) if setup_handle is not None else webview.start()
+
+    # Window closed -> save its last geometry so next launch reopens where/how we left it, then
+    # quit. The save reads window.x/.y/.width/.height while the window object is still around
+    # (start() has just returned) and is fail-soft, so it can't hold up the shutdown below.
+    _save_geometry(cfg, window, state["maximized"])
 
     # Window closed -> quit. request_quit() covers the user-close case (unblocks the watcher);
     # shutdown() stops watchers/mixer and closes the log. os._exit is the pragmatic stop for a

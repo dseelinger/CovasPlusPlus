@@ -13,6 +13,31 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.27.5] — 2026-07-23
+
+A **Foundation** patch: the app window remembers where it was, and the Settings page is tidier and more consistent.
+
+### Added
+- **The app window reopens where you left it.** Position, size, and maximized state are remembered
+  across launches (packaged app). If that spot is no longer visible — a monitor was unplugged, the
+  resolution shrank, a smaller screen is now primary — it opens **fully visible at a sensible size**
+  instead of off-screen. Fails soft to the standard 1200×820 if anything's off.
+
+### Changed
+- **Settings-page controls are consistent and aligned.** Every field is one width and lines up down
+  the right; units now read in the label — *"Category search size (results)"* — instead of floating
+  after the box; long dropdown/field values truncate with a hover-tooltip showing the full text; and
+  the row actions (refresh / reset-to-default / save / clear) are now one uniform icon style in
+  straight columns. Hovering a control shows its help. On the **API keys** card, Save and Clear are
+  now icons, and Clear is always shown (disabled until there's a key to clear) so the column stays even.
+- **"Web HUD (OpenKneeboard)" moved to the bottom of the Companion HUD settings** so it no longer
+  splits the VR HUD controls.
+- **Closing the window is the documented way to quit.** The panel/prompts no longer foreground the
+  Ctrl+Alt+Q shortcut (it still works); the title-bar **✕** (or Alt+F4) is the obvious close.
+
+### Migration
+- Nothing to do. (Window position is remembered from this version on; the first launch is unchanged.)
+
 ## [0.27.4] — 2026-07-23
 
 A **Foundation** patch. **The shipped app is unchanged** — this only rewrites the manual test suite.

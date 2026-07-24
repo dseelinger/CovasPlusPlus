@@ -361,7 +361,7 @@ async function init(){
   $("whisper").value = st.settings.whisper;
   setToggle("personality", st.settings.personality);
   $("keys").innerHTML = "Hold <kbd>"+st.keys.push_to_talk+"</kbd> to talk &nbsp;·&nbsp; " +
-                        "tap it briefly to cancel &nbsp;·&nbsp; Quit <kbd>Ctrl+Alt+Q</kbd>";
+                        "tap it briefly to cancel";
   setStatus(st.status, "");
 
   $("whisper").onchange = e => postKey("whisper.model", e.target.value);

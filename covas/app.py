@@ -1983,7 +1983,7 @@ def _banner(cfg: dict) -> str:
         f"  Dev mock   : {'ON' if mock else 'OFF'}\n"
         f"  TALK        : hold  [{k['push_to_talk']}]\n"
         f"  CANCEL      : tap   [{k['push_to_talk']}] briefly\n"
-        f"  QUIT        : Ctrl+Alt+Q (or close this window)\n"
+        f"  QUIT        : close the window (Ctrl+Alt+Q also works)\n"
         "==================================================\n"
         "Hold the PTT key and speak, Commander.\n"
     )

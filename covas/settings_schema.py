@@ -1109,18 +1109,6 @@ SCHEMA: list[Setting] = [
             default=False, phrasings=("vr hud", "the vr hud", "vr overlay", "headset hud"),
             example="turn the VR HUD on",
             doc_url="https://dseelinger.github.io/CovasPlusPlus/using/hud/#in-vr-the-in-headset-overlay"),
-    Setting("hud.web_enabled", ("hud", "web_enabled"), "bool",
-            "Web HUD (OpenKneeboard)", "Companion HUD",
-            "Serve the same HUD as a transparent web page at /hud for OpenKneeboard's Web "
-            "Dashboard tab, so it composites in-headset on ANY OpenXR runtime "
-            "(OpenComposite / VDXR / Virtual Desktop), not just SteamVR. Off by default; needs the "
-            "control panel running (run_covas_ui.py) and a one-time OpenKneeboard tab setup. "
-            "Independent of the desktop and SteamVR HUDs.",
-            default=False,
-            phrasings=("web hud", "the web hud", "kneeboard hud", "openkneeboard hud"),
-            example="turn the web HUD on",
-            doc_url="https://dseelinger.github.io/CovasPlusPlus/using/hud/"
-                    "#in-headset-without-steamvr-the-web-hud-openkneeboard"),
     Setting("hud.vr_placement", ("hud", "vr_placement"), "enum",
             "VR HUD placement", "Companion HUD",
             "Where the VR panel sits: 'world' (cockpit-fixed, parked in front — the comfortable "
@@ -1165,6 +1153,20 @@ SCHEMA: list[Setting] = [
             "~0.1. Applies live.",
             default=0.1, min=0.0, max=1.0,
             phrasings=("vr hud curve", "vr overlay curvature")),
+    # Web HUD sits at the BOTTOM of the section (issue: it's a distinct in-headset path, not a VR-HUD
+    # tuning knob — keeping it here stops it splitting the VR HUD cluster above).
+    Setting("hud.web_enabled", ("hud", "web_enabled"), "bool",
+            "Web HUD (OpenKneeboard)", "Companion HUD",
+            "Serve the same HUD as a transparent web page at /hud for OpenKneeboard's Web "
+            "Dashboard tab, so it composites in-headset on ANY OpenXR runtime "
+            "(OpenComposite / VDXR / Virtual Desktop), not just SteamVR. Off by default; needs the "
+            "control panel running and a one-time OpenKneeboard tab setup. "
+            "Independent of the desktop and SteamVR HUDs.",
+            default=False,
+            phrasings=("web hud", "the web hud", "kneeboard hud", "openkneeboard hud"),
+            example="turn the web HUD on",
+            doc_url="https://dseelinger.github.io/CovasPlusPlus/using/hud/"
+                    "#in-headset-without-steamvr-the-web-hud-openkneeboard"),
 
     # --- Appearance --------------------------------------------------------
     Setting("ui.theme", ("ui", "theme"), "enum",
