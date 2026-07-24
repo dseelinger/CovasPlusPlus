@@ -13,6 +13,22 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.27.4] — 2026-07-23
+
+A **Foundation** patch. **The shipped app is unchanged** — this only rewrites the manual test suite.
+
+### Changed
+- **`MANUAL_TESTS.md` is now purely in-app acceptance testing.** Every step that used to say "edit
+  `[section].key` in a config file" is reworded to do it on the **Settings page** (against the real
+  control), and any test that could *only* be set up by hand-editing config or key files was removed
+  — combat reflexes, the keybind allowlist sections (SRV/on-foot/flight/UI/launch), the
+  memory-cap and nav stock-check kill-switches, per-role audio overrides, the experimental-flags
+  self-enable, and the key-file/`crew.json` fault-injection steps. Custom-macro testing now goes
+  through the in-app **Macros tab**. Net ~137 lines lighter; no feature or behaviour change.
+
+### Migration
+- Nothing to do.
+
 ## [0.27.3] — 2026-07-23
 
 A **Foundation** patch fixing a Settings-page scrollspy regression from 0.27.1.

@@ -93,14 +93,11 @@ app shows full functionality out of the box):
 - [ ] `[hud].enabled = true` — Companion HUD overlay (**off** by default; applies **live**, no restart). (§5a)
 - [ ] `[hud].vr_enabled = true` — in-headset VR HUD overlay (**off** by default; needs SteamVR running, nothing to install). (§5b)
 - [ ] `[keybinds].enabled = true` — Landing-gear automation. Keep `require_confirmation`/`combat_guard = true`. (§6.1)
-- [ ] `[reflex].enabled = true` — Tier-2 combat reflexes (fire chaff / heat sink). **Off** by default, allowlist ships empty — set `[reflex].allowlist = ["chaff", "heat_sink"]` to opt in the spoken/hotword path. Keep `combat_guard = true`. (§6.3)
-- [ ] `[reflex.auto].enabled = true` — Tier-2 **ambient** auto-reflexes (no voice). **Off** by default; needs `[reflex].enabled` too, plus a per-reflex enable (`[reflex.auto.heat_sink].enabled` / `[reflex.auto.chaff].enabled`). (§6.3.2)
 - [ ] `[honk].enabled = true` — Auto-honk on arrival (**on** by default). No fire-group setup — it probes and backs out of a Surface-Scanner misfire. Set `[honk].trigger` only if your scanner is on secondary fire. (§6.2)
 - [ ] `[comms_send].enabled = true` — send in-game chat by voice (**off** by default). Bind **Quick Comms Panel** to a key; outward-facing, so it always reads back and sends only on a separate confirm. (§6.4)
 - [ ] `[macros].enabled = true` — Voice/UI-authored **custom macros** (#50). **Off** by default. Needs `[keybinds]` set up (macros only use allowlisted actions) + `[elite].enabled` (combat guard + triggers). (§6.5)
 - [ ] `[nav].enabled = true` — outfitting "find the closest module". (§7)
 - [ ] `[star_systems].enabled = true` / `[search].enabled = true` — voice search categories. (§8)
-- [ ] `[cg].enabled` is implicit (`[cg].source`); add an **Inara API key** on the Settings API keys card to also see CGs you haven't visited. (§10)
 - [ ] `[router].enabled = true` — cost router (cheap tier by default). (§4)
 - [ ] `[web_search].enabled = true` — automatic web search. (§16)
 - [ ] `[personality].enabled = true` — "Commander" address + campaign context.
@@ -298,26 +295,24 @@ Notes:
 > supported** — it returns HTTP 413/429; no app-side tuning changes that (the daily-token ceiling is
 > the wall). For a paid/high-limit endpoint (paid Groq, DeepSeek, OpenRouter-with-credits, OpenAI) it
 > works fine. For a **free** option that actually fits the load, use the **Gemini** provider (§4.2).
-- [ ] **Conversation:** set `[llm].provider = "openai"` (default `base_url`/`model` = OpenAI
-  `gpt-4o-mini`), restart, speak a turn → COVAS answers via OpenAI; the `[router]` line shows the
-  OpenAI model (e.g. `[cheap] gpt-4o-mini`) and `[usage]` shows token counts (+ a cost if priced).
+- [ ] **Conversation:** on the Settings page (Providers → LLM provider), choose **openai** (default
+  `base_url`/`model` = OpenAI `gpt-4o-mini`), restart, speak a turn → COVAS answers via OpenAI; the
+  `[router]` line shows the OpenAI model (e.g. `[cheap] gpt-4o-mini`) and `[usage]` shows token counts
+  (+ a cost if priced).
 - [ ] **Tool calling works:** *"What's my next objective?"* / *"Mark fuel scooping complete."* → the
   checklist tool fires (log shows the tool call) and COVAS confirms — proving delta-assembled
   `tool_calls` are handled.
-- [ ] **Escalation tiers:** first set distinct `[openai.tiers]` ids (they're unset by default, so every
-  tier reuses `[openai].model` — the router line would otherwise show the same model for all tiers).
-  Then *"Think hard…"* → the router line shows `[standard]` with the `[openai.tiers].standard` model;
-  *"use opus/the big model"* wake phrase → `[premium]`.
-- [ ] **Alt endpoint (the "one provider" claim):** point `[openai].base_url` + `model` at a viable
-  OpenAI-compatible service — **DeepSeek** (`https://api.deepseek.com/v1`, `deepseek-chat`),
-  **OpenRouter**, or **paid Groq** — with that service's key, restart → conversation still works
-  through the same provider. Leave `[openai.tiers]` unset (the default) so the router uses your
-  `[openai].model`; with the router ON the log line reads e.g. `[cheap] deepseek-chat`, **not**
-  `gpt-4o-mini`. (Do **not** use Groq's *free* tier here — see the limits note above: it 413/429s.)
-- [ ] **Fail-soft:** clear the key (or set a bad `base_url`) → the turn degrades to text and the loop
-  returns to IDLE; restore → it works again. No crash.
-- [ ] **o-series reasoning model (issue #153):** set `[openai].model = "o3-mini"` (or another o-series
-  id) against OpenAI with a key, restart, speak a turn → COVAS answers (the request sends
+- [ ] **Alt endpoint (the "one provider" claim):** on the Settings page (Providers → OpenAI LLM base URL
+  and OpenAI LLM model), point them at a viable OpenAI-compatible service — **DeepSeek**
+  (`https://api.deepseek.com/v1`, `deepseek-chat`), **OpenRouter**, or **paid Groq** — with that
+  service's key, restart → conversation still works through the same provider; with the router ON the
+  log line reads e.g. `[cheap] deepseek-chat`, **not** `gpt-4o-mini`. (Do **not** use Groq's *free* tier
+  here — see the limits note above: it 413/429s.)
+- [ ] **Fail-soft:** clear the key (or set a bad OpenAI LLM base URL on the Settings page) → the turn
+  degrades to text and the loop returns to IDLE; restore → it works again. No crash.
+- [ ] **o-series reasoning model (issue #153):** on the Settings page (Providers → OpenAI LLM model) set
+  `o3-mini` (or another o-series id) against OpenAI with a key, restart, speak a turn → COVAS answers
+  (the request sends
   `max_completion_tokens`, **not** `max_tokens`). Before the fix every o-series turn 400'd and spoke
   the misconfig heads-up. A regular `gpt-4o-mini` turn still works unchanged.
 
@@ -344,7 +339,8 @@ Notes:
 - [ ] **Model-id guard:** with the provider set to **Gemini** and a key entered, run **Settings → Test my
   setup** → the **Gemini API** section reports the live model count and confirms `[gemini].model` / tiers are
   all in the live list (or WARNs which id is stale). No crash without a key.
-- [ ] **Conversation:** set `[llm].provider = "gemini"`, add your Gemini key in Settings, restart, speak a turn
+- [ ] **Conversation:** on the Settings page (Providers → LLM provider), choose **gemini**, add your Gemini
+  key in Settings, restart, speak a turn
   → COVAS answers via Gemini (no 404 on the first word); `[router]` line shows the Gemini model
   (e.g. `[cheap] gemini-flash-lite-latest`) and `[usage]` shows token counts.
 - [ ] **Tool calling works:** *"What's my next objective?"* / *"Mark fuel scooping complete."* → the
@@ -374,8 +370,8 @@ Notes:
 > A bad model id, a wrong/missing key, or a bad endpoint is NOT a transient blip (§4.3 above) — it
 > won't fix itself on retry, and only you can fix it. Unlike an overload, this line is deliberately
 > **not** silenced after the first turn: it speaks on every failed turn until you fix the setting.
-- [ ] **Bad model (404):** set `[gemini].model` (or the active provider's model field) to a nonsense
-      id, e.g. `gemini-does-not-exist`, on the Settings page. PTT and speak → COVAS **speaks**
+- [ ] **Bad model (404):** on the Settings page set the **Gemini model** (Providers → Gemini model), or
+      the active provider's model field, to a nonsense id, e.g. `gemini-does-not-exist`. PTT and speak → COVAS **speaks**
       *"I can't reach Gemini, Commander — the model name looks wrong. Check the AI settings."* and
       🌐 the log shows the precise `404` reason (`provider misconfigured: Gemini …`).
 - [ ] **Bad/missing key (401/403):** clear or scramble the active provider's API key. PTT → COVAS
@@ -408,18 +404,20 @@ Notes:
 - [ ] **Auto default (Anthropic):** with the stock config, the startup log reports **`Full (auto)`**
       with all tool groups listed and all three background flags **on**. Tool-using turns (checklist,
       "where am I", a Spansh search) all still work.
-- [ ] **Manual `Minimal`:** set `[llm].optimization_level = "Minimal"`, restart → the log shows
+- [ ] **Manual `Minimal`:** on the Settings page (Language model → Optimization level), choose **Minimal**, restart → the log shows
       **`Minimal (manual)`** with **`tools: core, checklist`** and **all background off**. Checklist
       voice commands still work; a **Spansh/engineering** request is politely declined / not tool-driven
       (those tools aren't advertised), and **proactive callouts stay silent** even with
       `[proactive].enabled = true`.
-- [ ] **Manual `Bare`:** set `Bare`, restart → **`tools: no tools`**; COVAS still converses but drives
+- [ ] **Manual `Bare`:** on the Settings page (Language model → Optimization level), choose **Bare**, restart → **`tools: no tools`**; COVAS still converses but drives
       no tools at all (e.g. it won't tick the checklist).
-- [ ] **Groq-free auto → Minimal:** set `[llm].provider = "openai"` and `[openai].base_url =
-      "https://api.groq.com/openai/v1"`, keep `optimization_level = "auto"`, restart → the log reports
-      **`Minimal (auto)`**. (A **paid** Groq user would set `Full` manually.) 🌍 NET
-- [ ] **Custom TPM:** with an unknown `[openai].base_url` and `auto`, set `[llm].custom_tpm = 20000`,
-      restart → the log reports **`Lean (auto)`** (the TPM mapped it), not `Full`.
+- [ ] **Groq-free auto → Minimal:** on the Settings page, set **LLM provider** to openai (Providers → LLM
+      provider) and **OpenAI LLM base URL** to `https://api.groq.com/openai/v1` (Providers → OpenAI LLM
+      base URL), keep the Optimization level on **auto**, restart → the log reports **`Minimal (auto)`**.
+      (A **paid** Groq user would set `Full` manually.) 🌍 NET
+- [ ] **Custom TPM:** with an unknown **OpenAI LLM base URL** and Optimization level **auto**, set the
+      **Custom endpoint tokens/min** to `20000` on the Settings page (Language model → Custom endpoint
+      tokens/min), restart → the log reports **`Lean (auto)`** (the TPM mapped it), not `Full`.
 - [ ] **Background suppressed vs. Full:** at `Full`, an ambient chatter line (with `[audio.cues].flavor
       = true`) can be **LLM-flavored**; at `Standard`/`Lean`/etc. the same line is **canned/pooled only**
       — and comms lines are read **verbatim** — with **no extra LLM cost** in the usage log.
@@ -513,7 +511,7 @@ Notes:
 - [ ] **Varied, not canned:** do **several** long jumps → the remarks **differ** each time (no fixed pool).
 - [ ] **Short jump → silence:** a normal short jump (below the threshold) produces **no** flavor remark.
 - [ ] **Cooldown:** back-to-back long jumps within `[proactive].long_jump_cooldown` don't each get a line.
-- [ ] **Mute / disable:** with the proactive mute on ("stop the callouts"), or `[proactive].long_jump_enabled = false`, long jumps stay silent.
+- [ ] **Mute / disable:** with the proactive mute on ("stop the callouts"), or with the **Long-jump flavor remark** turned off on the Settings page (Proactive callouts → Long-jump flavor remark), long jumps stay silent.
 - [ ] **No false facts:** the line never claims a Thargoid *is* present or names a real place/number — it's speculative flavor only.
 
 Notes:
@@ -526,7 +524,7 @@ Notes:
 - [ ] **No false "next star" while headed to a scoopable star:** confirm you never hear "isn't scoopable" while mid-hyperspace toward a star that **is** scoopable (the old off-by-one bug, #148) — speaking during hyperspace itself is fine/expected, just correct about which star.
 - [ ] **Hazard warning — neutron star (#147):** plot a route with a **neutron star** as the immediate next hop → on locking the target, hear "Heads up, Commander — next jump's a neutron star. Mind the exclusion zone, and no fuel there." **and no separate** "isn't scoopable" line right before/after it (supersede, not double up).
 - [ ] **Hazard warning — white dwarf (#147):** same with a **white dwarf** next hop → "Careful — a white dwarf next. Watch the jets; you can't scoop it." (also superseding the plain "not scoopable" line).
-- [ ] **Hazard toggle:** set `[route].callout_hazard = false` → flying toward a neutron star/white dwarf gets **no hazard warning**, but you still hear the plain "isn't scoopable" line (it's still non-scoopable) and normal scoopable callouts for other stars are unaffected.
+- [ ] **Hazard toggle:** on the Settings page (Route callouts → Announce hazard star), turn it **off** → flying toward a neutron star/white dwarf gets **no hazard warning**, but you still hear the plain "isn't scoopable" line (it's still non-scoopable) and normal scoopable callouts for other stars are unaffected.
 - [ ] **Jumps remaining:** every **Nth** jump (`[route].every_n`, default 5) it announces jumps remaining to the destination (singular "1 jump remaining" near the end).
 - [ ] **Arrival:** on reaching the final system it says "Arrived at <system>. Route complete." and stops.
 - [ ] **Replot:** plot a new route mid-flight → callouts follow the new route (counts reset).
@@ -568,9 +566,9 @@ Notes:
 - [ ] **Pinned pitch/height survive a settings change (#107):** after a down-pin, say *"move it left"* (or toggle the HUD off/on) → the panel **stays at the pinned height and tilt**, it doesn't snap back to eye level — proving pin persists the full placement, not just heading.
 - [ ] **Tilt:** place it low (`vr_offset_y_m = -0.3`), then *"set the VR HUD tilt to 25"* → the panel's **top leans toward you**, angling up to face you; `0` is dead vertical.
 - [ ] **Curvature:** *"set the VR HUD curvature to 0.0"* (flat) → *"…to 0.1"* → the panel **wraps gently** like ED's/Virtual Desktop's screens; `1.0` would be a full cylinder (too much). Pick a comfortable curve.
-- [ ] **Size:** adjust `[hud].vr_width_m` (e.g. `0.4` vs `0.8`) → the panel's physical width changes **live**; pick a comfortable, legible size.
-- [ ] **Placement — world vs head:** with `[hud].vr_placement = "world"` the panel stays **cockpit-fixed** as you turn your head; switch to `"head"` and it **follows your view**. (Mode change may re-create the overlay; the position/tilt/curve settings above do not.)
-- [ ] **Both surfaces at once:** enable **both** `[hud].enabled` and `[hud].vr_enabled` → the desktop window and the headset overlay show simultaneously and independently.
+- [ ] **Size:** adjust the **VR HUD width** on the Settings page (Companion HUD → VR HUD width; e.g. `0.4` vs `0.8`) → the panel's physical width changes **live**; pick a comfortable, legible size.
+- [ ] **Placement — world vs head:** with the **VR HUD placement** set to `world` (Settings → Companion HUD → VR HUD placement) the panel stays **cockpit-fixed** as you turn your head; switch it to `head` and it **follows your view**. (Mode change may re-create the overlay; the position/tilt/curve settings above do not.)
+- [ ] **Both surfaces at once:** turn on **both** the Companion HUD overlay and the VR HUD overlay on the Settings page (Companion HUD) → the desktop window and the headset overlay show simultaneously and independently.
 - [ ] **Quest boundary (if applicable):** confirm the overlay shows on **Quest via SteamVR** (Link/Air Link/Virtual Desktop-SteamVR), and does **not** on **OpenComposite / VDXR / Virtual Desktop** (expected — no SteamVR compositor there; use the **web HUD** in §5c for those, *not* OVR Toolkit, which is itself SteamVR-only).
 
 ### 5b.1 VR-HUD placement-model fixes (#140–#144)  🥽 VR 🎮 ED
@@ -677,73 +675,8 @@ Notes:
 - [ ] **Off-allowlist refusal:** ask for a different control (*"deploy hardpoints"*) → won't do it.
 - [ ] **Mode gating — on foot (#29):** **disembark** (on foot) and ask to toggle landing gear → it **refuses** with an "only works in your ship" style message, and doesn't offer the action. Back **in the ship**, the same request arms normally.
 - [ ] **Mode gating — disembark after arming (#29):** in the ship, **arm** the toggle; before confirming, **disembark**; then *"confirm"* → **refused** (mode re-checked at confirm), nothing fires.
-- [ ] **Binding preference (#29):** with a keyboard bind on **Primary** (the normal case), it presses it. If you set `[keybinds].binding_preference = "secondary"` and your keyboard key is on the Secondary slot, it uses that instead (falls back to the other slot if only one is bound). Startup log shows `landing_gear -> <Key>`.
 
 Notes:
-
-### 6.1.1 Tier-1 ship-systems toggles (#31 — opt-in via allowlist)
-> Benign, repeatable **main-ship** toggles that **fire immediately** (no arm/confirm). Off until you add each macro NAME to `[keybinds].allowlist`; bind the matching control to a **key** in ED. Do these **parked/docked**. Names: `cargo_scoop`, `night_vision`, `ship_lights`, `hud_mode`, `pips_engines`, `pips_weapons`, `pips_systems`, `pips_balance`.
-- [ ] **Opt-in fires immediately:** add `cargo_scoop` to the allowlist, then *"toggle my cargo scoop"* → the scoop deploys/retracts **right away** (no "armed, confirm separately" step). Startup log lists `cargo_scoop -> <Key>`.
-- [ ] **Not allowlisted → refused:** with `ship_lights` **not** in the allowlist, *"turn on my ship lights"* → won't do it (off-allowlist), nothing presses.
-- [ ] **Pips:** allowlist `pips_engines`, say *"pips to engines"* three times → three pips move into ENG. Then allowlist + say *"balance the pips"* (`pips_balance`) → distribution resets to 2/2/2.
-- [ ] **HUD mode:** allowlist `hud_mode`, *"switch HUD to analysis mode"* → the HUD flips combat↔analysis.
-- [ ] **Combat guard still applies:** with a benign toggle allowlisted, get **interdicted / into danger** and ask for it → **refuses** (benign toggles aren't exempt from the combat guard).
-- [ ] **Mode gating:** **disembark** (on foot) and ask for cargo scoop → **refuses** ("only works in your ship") and isn't offered. Back in the ship it fires.
-- [ ] **Unbound control:** if the matching ED control is on a HOTAS/mouse only (no keyboard bind), asking for it → "bind it to a key" message; nothing fires.
-### 6.1a Flight / nav actions (#30 — opt in via `[keybinds].allowlist`)
-> Off by default. For each action you want, add its name to `allowlist` **and** bind the matching control to a **key** in ED. Do these **parked/docked** first, then in open space with a clear area. Combat guard + mode gate still apply to every one.
-- [ ] **Benign fires immediately:** allowlist `throttle_zero`; *"COVAS, cut the throttle."* → throttle drops to zero **at once** (no separate confirm), reply "Throttle at zero". Same for `throttle_50` / `throttle_100`.
-- [ ] **Targeting (benign):** allowlist `cycle_next_target` + `select_target_ahead`; *"target the ship ahead"* then *"cycle to the next target"* → target reticle changes immediately each time.
-- [ ] **Route target (benign):** with a route plotted, allowlist `target_next_route_system`; *"target the next system in my route"* → the next route system is selected immediately.
-- [ ] **Consequential arms-and-confirms:** allowlist `supercruise`; *"engage supercruise"* → **armed but not done**; on a separate *"confirm"* it fires. Same shape for `frame_shift_drive`, `hyperspace`, and `flight_assist`.
-- [ ] **Combat guard:** in danger/interdiction, any flight action **refuses**; with `[elite]` OFF it refuses too.
-- [ ] **Mode gate — fighter:** deploy a **ship-launched fighter**; `throttle_*` and target cycling are still offered, but `supercruise` / `hyperspace` / `frame_shift_drive` / `target_next_route_system` / `nav_lock` are **not** (main-ship only) and refuse if asked.
-- [ ] **Unbound token:** allowlist `nav_lock` but leave **WingNavLock** unbound in ED → asking to toggle nav lock says to **bind it in-game**; nothing fires.
-- [ ] **Off-allowlist still refused:** an action you did **not** add (e.g. `hyperspace` when only `throttle_zero` is allowlisted) → won't do it.
-### 6.1b Odyssey on-foot actions (#34 — `[keybinds].enabled = true`)
-> **Disembark first** (be on foot in Odyssey). Add the macros under test to `[keybinds].allowlist`, e.g. `["landing_gear", "on_foot_flashlight", "on_foot_night_vision"]`. Bind the matching **On Foot** controls to keys in ED. These are benign, so they fire **immediately** (no separate confirm).
-- [ ] **Mode gating — offered only on foot:** **in your ship**, ask to *"toggle my flashlight"* → **refused** ("only works on foot"), and the action isn't offered. **Disembark**, ask again → it fires immediately (flashlight toggles in-game). This is the core check: on-foot actions are hidden while flying.
-- [ ] **Flashlight / night vision:** on foot, *"flashlight"* and *"night vision"* each toggle the suit light / night vision.
-- [ ] **Weapon select + holster:** on foot, *"draw your primary weapon"* / *"secondary"* / *"utility"* selects that weapon; *"holster your weapon"* puts it away. It never **fires** — only draws/holsters.
-- [ ] **Suit tools:** on foot, *"switch to your energy link"* / *"profile analyser"* / *"suit tool"* selects that gadget.
-- [ ] **Crouch / galaxy map:** on foot, *"crouch"* and *"open the galaxy map"* work.
-- [ ] **Combat guard on foot:** get into **danger** on foot, ask to toggle flashlight → **refused** (benign still guarded). With `[elite]` OFF it also refuses.
-- [ ] **Off-allowlist refusal:** ask for an on-foot macro you did **not** add to the allowlist → won't do it.
-- [ ] **Ship control hidden on foot (regression):** while on foot, *"toggle landing gear"* → **refused** and not offered (proves the gate both ways).
-### 6.1a SRV / buggy controls (#35 — `[keybinds].enabled = true`, allowlist the SRV macros)
-> New SRV batch. Add the ones you want to `[keybinds].allowlist`, e.g. `["landing_gear", "drive_assist", "srv_headlights", "srv_night_vision", "srv_cargo_scoop", "srv_auto_brake", "recall_ship"]`. Bind the matching **Buggy** controls to keys in ED. **Deploy the SRV first** (drive the buggy) — these are offered ONLY while driving.
-- [ ] **Benign toggle fires immediately (in SRV):** while **driving the SRV**, say *"COVAS, turn on the headlights."* → headlights toggle **right away** (no separate confirm needed); same for *"toggle drive assist"*, *"night vision"*, *"cargo scoop"*, *"auto-brake"*. Log shows e.g. `executed srv_headlights -> <Key>`.
-- [ ] **Recall ship arms-and-confirms:** in the SRV, *"recall my ship."* → says it's **armed but not done**; confirm on a **separate** turn (*"confirm"*) → the ship recall/dismiss fires. Same-turn confirm is refused.
-- [ ] **Mode gating — not in the SRV:** back **in the main ship** (or on foot), ask for any SRV control (*"headlights"*, *"recall my ship"*) → **refused** with an "only works in the SRV" style message, and the SRV actions aren't offered.
-- [ ] **Mode gating — exit SRV after arming recall:** in the SRV, **arm** `recall_ship`; before confirming, **board your ship** (leave the SRV); then *"confirm"* → **refused** (mode re-checked at confirm), nothing fires.
-- [ ] **Combat guard:** in the SRV, get **into danger**, then ask for any SRV toggle → **refuses**. With `[elite]` OFF it also refuses.
-- [ ] **Off-allowlist refusal:** ask for an SRV control you did **not** allowlist → won't do it. Weapons/turret are never offered.
-- [ ] **Unbound control:** if a Buggy control (e.g. Night Vision) is HOTAS/mouse-only → COVAS says to bind it to a key; nothing fires.
-### 6.1a Tier-1 UI actions — panels / maps / fire groups (#32)
-> Benign, **fire-immediately** actions (no confirm step). Opt in by NAME: add to `[keybinds].allowlist`, e.g. `allowlist = ["landing_gear", "open_galaxy_map", "cycle_fire_group_next"]`. Each ED control must be **bound to a key** in-game; `[keybinds].enabled` and `[elite].enabled` on (combat guard). Do first tests **parked and docked**.
-- [ ] **Fires immediately (no confirm):** with `open_galaxy_map` allowlisted, *"open the galaxy map"* → the map opens on the spoken command — no separate confirm turn. Say it again to close.
-- [ ] **Panels:** allowlist a panel (e.g. `focus_left_panel`) → *"open the navigation panel"* focuses the correct HUD panel. Spot-check `focus_right_panel`, `focus_comms_panel`, `focus_role_panel`, `quick_comms`, `open_system_map`.
-- [ ] **Fire groups:** with `cycle_fire_group_next` / `cycle_fire_group_previous` allowlisted, *"next fire group"* / *"previous fire group"* steps the active fire group (top-right HUD).
-- [ ] **UI / head-look:** allowlist `ui_back`, `ui_focus`, `toggle_headlook` → each presses the matching control.
-- [ ] **Not allowlisted = refused:** with a macro NOT in the allowlist, asking for it → won't do it (even though the action exists).
-- [ ] **Combat guard still applies:** while **interdicted / in danger**, ask to open the galaxy map → **refused** (benign actions are still gated).
-- [ ] **Mode gating:** **on foot**, ask to open the galaxy map / focus a panel → **refused** ("only works in your ship"); fire-group cycling also works **in a deployed fighter**.
-- [ ] **Unbound control:** if the ED control is HOTAS/mouse-only (no keyboard bind), the action reports "bind it in-game" and nothing fires. Startup log shows each allowlisted macro `-> <Key>`.
-
-Notes:
-
-### 6.1c Status-checked timed sequence — `launch` (#33 — `[keybinds].enabled = true`, allowlist `launch`)
-> The first **multi-step** macro: a scripted sequence that mixes press/hold/wait with **Status.json checks between steps**. Add `launch` to `[keybinds].allowlist` (e.g. `["landing_gear", "launch"]`) and bind, to **keys** in ED, the controls it uses: *Flight Throttle* → Set Speed 50%, *Flight Rotation/Thrusters* → **Thrust Up** (`UpThrustButton`), *Flight Miscellaneous* → **Engine Boost** (`UseBoostJuice`), and *Landing Gear*. `[elite].enabled` on (combat guard + the status checks). **Do this docked at a station**, ready to undock — expect the ship to actually fly off the pad.
-- [ ] **Startup readiness:** launch reports `Keybind macro: launch (sequence) READY` (or `UNUSABLE (bind: <token>)` naming the control you still need to bind to a key).
-- [ ] **Arm-and-confirm:** *"COVAS, launch."* → says it's **armed but not done**; nothing moves. Same-turn confirm is refused (must be a separate command).
-- [ ] **Happy path:** press **undock** in the station menu (ED hovers you over the pad, gear down); then *"confirm"* → COVAS throttles up, **holds** thrust to rise off the pad, **boosts** clear, retracts the gear, and only reports success once Status.json shows the gear **up**. Log: `executed sequence launch`.
-- [ ] **Precondition refuses (gear up):** while flying with the **gear up** (not on a pad), arm+confirm `launch` → it **refuses** ("your landing gear isn't down…") and presses **nothing**.
-- [ ] **Verify step catches a miss:** if the gear never retracts (e.g. unbind Landing Gear from a key after arming) → after ~4 s it reports it **couldn't confirm the gear retracted** rather than claiming success.
-- [ ] **Hard abort mid-sequence:** during the confirmed run, say *"abort"* → the sequence **stops**, the held thrust key **releases immediately**, and remaining steps don't fire.
-- [ ] **Abort interrupts a hold promptly (#159):** during the pad-clearing **hold** step, say *"abort"* → the held thrust key releases **the moment you abort** and the sequence ends — it does **not** keep holding for the rest of the hold duration before reacting.
-- [ ] **Mode gating:** **on foot** or **in the SRV**, `launch` isn't offered and is refused ("only works in your ship").
-- [ ] **Combat guard:** in **danger/interdiction** (or with `[elite]` off) arming/confirming `launch` is **refused**.
-- [ ] **Off by default:** with the default allowlist (`landing_gear` only), *"launch"* is **not** offered and is refused — the sequence ships opt-in.
 
 ### 6.1d Focus the Elite window (#105 — `[keybinds].enabled = true`)  🎮 ED ⌨️ INJECT 🔊 HW
 > Makes injection deterministic by bringing ED to the foreground. The explicit *"focus Elite"* command is always available (no allowlist/mode/combat gate). Auto-focus (`[keybinds].focus_before_inject`, **on by default**) pulls ED forward right before a keybind macro or a comms send.
@@ -751,7 +684,7 @@ Notes:
 - [ ] **Auto-focus before a keybind:** with `focus_before_inject = true`, alt-tab to a browser, then arm+confirm *"toggle landing gear"* → ED is **foregrounded first** and the gear toggles **in the game** (the key does not land in the browser).
 - [ ] **Restores when minimised:** **minimise** ED, then *"focus the game"* → ED **restores** and comes to the front.
 - [ ] **Not running → fail soft:** with ED **closed**, *"focus Elite"* → COVAS says it **can't find the Elite window — is the game running?** No crash, and it doesn't claim success.
-- [ ] **Auto-focus off:** set `[keybinds].focus_before_inject = false`, alt-tab away, arm+confirm landing gear → focus is **not** changed (the keypress goes to whatever window has focus, the old behaviour). The explicit *"focus Elite"* command still works.
+- [ ] **Auto-focus off:** on the Settings page (Keybinds → Focus Elite before injecting), turn it **off**, alt-tab away, arm+confirm landing gear → focus is **not** changed (the keypress goes to whatever window has focus, the old behaviour). The explicit *"focus Elite"* command still works.
 - [ ] **Comms send focuses too:** with comms on (§6.4) and `focus_before_inject = true`, alt-tab away, compose+confirm a local message → ED is **foregrounded before the paste** so the message lands in ED chat, not the other window.
 - [ ] **VR rig (VDXR) 🥽:** with ED running in-headset via Virtual Desktop/OpenComposite, repeat the *explicit focus* and *auto-focus before a keybind* checks and confirm **desktop foreground** behaves — i.e. VD streaming doesn't defeat `SetForegroundWindow`. This is the one path only the real rig can settle.
 
@@ -765,45 +698,10 @@ Notes:
 - [ ] **Guards:** jump in **combat mode** (not analysis) → skips (`in combat mode`); in **danger/interdiction** → `blocked`; in **normal space** → `not in supercruise`.
 - [ ] **Unbound fire:** if the fire button is HOTAS/mouse-only (no keyboard bind) → it **skips** with a "no keyboard binding" note; nothing fires.
 - [ ] **Hard abort:** with `[keybinds]` also on, jump and during the hold say *"abort"* → the held fire key releases immediately.
-- [ ] **Disabled:** set `[honk].enabled = false` → no honk on arrival.
-
-### 6.3 Tier-2 combat reflex — fire chaff (#36 — `[reflex].enabled = true`, allowlist `chaff`)
-> The **inverse** of §6.1: reflexes fire ONLY while you're in danger. Chaff is purely **defensive**, so firing it is always safe — you never shoot at anyone. Set `[reflex].enabled = true` and `[reflex].allowlist = ["chaff"]`, keep `[reflex].combat_guard = true`, and bind your **chaff launcher** to a **key** in ED (a HOTAS/mouse-only bind can't be pressed). Requires `[elite].enabled`.
-- [ ] **Startup readiness:** launch reports `Reflex: chaff -> <key>` (or `chaff UNUSABLE (no keyboard bind for FireChaffLauncher)` if it's not bound to a key), and a `Tier-2 combat reflexes ON …` line. (Add `heat_sink` to the allowlist to also see `Reflex: heat_sink -> <key>` and say *"heat sink!"* to deploy one under fire — same guard as chaff.)
-- [ ] **Refused when safe (fully combat-SAFE test — do this parked/docked):** say *"chaff"* while NOT in danger → COVAS **refuses** ("you're not in combat…") and **nothing is pressed**. This is the safe way to prove the guard without a fight.
-- [ ] **Refused with monitoring off:** set `[elite].enabled = false`, say *"chaff"* → refused ("can't confirm you're in danger — … status isn't available"); nothing fires.
-- [ ] **Fires under fire (defensive — safe):** let a **weak NPC interdict** you (or take fire from a low-threat hostile), say *"chaff"* → it presses your chaff key **once**, log `fired chaff -> <key>`, and chaff deploys. Because chaff is defensive, this is safe even mid-combat.
-- [ ] **Not offered unless allowlisted:** remove `chaff` from `[reflex].allowlist` (leave enabled), ask for chaff → it's neither advertised nor run.
-- [ ] **Hard abort:** say *"abort"* → releases every held key (shared with keybinds/honk). Log: `aborted — released all keys`.
-- [ ] **Tier-1 unaffected:** with reflexes on, confirm §6.1 landing gear still behaves exactly as before — it still **refuses in combat** (the two policies are independent).
-- [ ] **Disabled:** set `[reflex].enabled = false` → no chaff tool offered; asking for chaff does nothing.
-
-### 6.3.1 Tier-2 reflex FAST PATH — second push-to-talk phrase-spotter (#38 — `[reflex].ptt`)
-> A **local** hotword path for snap combat calls: a capture on the second PTT is matched against a fixed vocabulary and, on a hit, fires the reflex **without the LLM** (latency ≈ speech-to-text only), through the **same** guard/allowlist/abort as §6.3. Set `[reflex].enabled = true`, `[reflex].allowlist = ["chaff"]`, and bind `[reflex].ptt` to a **DIFFERENT** key than `[keys].push_to_talk` (e.g. `"]"` or a spare HOTAS button via JoyToKey). Requires `[elite].enabled`.
-- [ ] **Startup readiness:** launch reports the reflex scancodes on the `(PTT scan codes … reflex …)` line, and the banner's `Reflexes` line shows `(fast-PTT [<key>])`.
-- [ ] **Instant fire under fire (defensive — safe):** while a **weak NPC** is interdicting/shooting you, tap the **reflex** key and say *"chaff!"* → chaff deploys **noticeably faster than the assistant path** (no "thinking"), log `phrase-spot fired chaff …`. Because chaff is defensive this is safe mid-combat.
-- [ ] **Same guard when safe:** parked/docked (not in danger), tap the reflex key and say *"chaff"* → **refused** ("you're not in combat…"), nothing pressed — the fast path is faster, not looser.
-- [ ] **Synonyms:** on the reflex key, *"flares"* / *"break lock"* also map to chaff (fire under fire to confirm; refused when safe).
-- [ ] **Snap abort:** on the reflex key, say *"abort"* (or *"stop"*/*"release"*) → releases every held key immediately (shared abort). Log: `aborted — released all keys`.
-- [ ] **Falls through to a normal turn:** on the reflex key, say a **non-combat** request (*"what's my fuel level?"*) → it is **not** treated as a reflex; it runs as an ordinary conversation turn and COVAS answers.
-- [ ] **Main PTT untouched:** the normal `[keys].push_to_talk` key still opens a normal conversation turn exactly as before; the two keys don't interfere.
-- [ ] **Disabled by default:** clear `[reflex].ptt` (blank) → no second hook; only the main PTT works.
-
-### 6.3.2 Tier-2 ambient auto-reflexes (#37 — `[reflex.auto].enabled = true`, per-reflex enable)
-> The **automatic** (no-voice, no-key) version of §6.3: the SAME reflexes fire the instant your ED status crosses a threshold — no command. Same combat-permissive guard, same shared abort. Set `[reflex].enabled = true` and `[reflex.auto].enabled = true`, then opt a reflex in: `[reflex.auto.heat_sink].enabled = true` and/or `[reflex.auto.chaff].enabled = true`. Keep `[reflex].combat_guard = true`. Bind **DeployHeatSink** and/or **FireChaffLauncher** to **keys** in ED. Requires `[elite].enabled`. **These fire real keypresses with no prompt — test the "fires" cases against weak NPCs only.**
-- [ ] **Startup readiness:** launch reports the banner line `Reflexes : ON (auto ON)` and, per enabled reflex, `Auto-reflex: heat_sink -> <key>` / `chaff -> <key>` (or `… UNUSABLE (no keyboard bind for DeployHeatSink/FireChaffLauncher)`).
-- [ ] **Auto chaff under fire (defensive — safe):** with auto-chaff on, let a **weak NPC interdict** you → chaff fires **automatically once** shortly after the danger/interdiction begins. Log: `auto-chaff on EnteredDanger|Interdicted: Chaff away …`.
-- [ ] **Cooldown holds the repeat:** stay in the fight past the danger onset → it does **not** re-fire until the `[reflex.auto.chaff].cooldown` (default 20s) elapses. Log shows `chaff suppressed: chaff cooldown (20s)` for held attempts.
-- [ ] **Auto heat sink on overheat (in combat):** while in danger, push your ship over **100% heat** (e.g. hard boosting/weapons in a fight) → a heat sink deploys automatically. Log: `auto-heat_sink on Overheating: Heat sink deployed …`.
-- [ ] **Guard blocks when safe:** overheat while **NOT** in danger (e.g. flying too close to a star, parked) with `combat_guard = true` → it **refuses** and nothing fires (log `auto-heat_sink … refused: you're not in combat …`). Then set `[reflex].combat_guard = false`, repeat → it **does** deploy on overheat regardless of danger (the escape hatch).
-- [ ] **Disabled reflex stays quiet:** turn `[reflex.auto.chaff].enabled = false` (leave heat_sink on) → interdiction fires **no** chaff; overheat still deploys a heat sink.
-- [ ] **Hard abort:** say *"abort"* mid-reaction → releases every held key (shared with keybinds/honk/verbal reflexes).
-- [ ] **Master off:** set `[reflex.auto].enabled = false` → nothing auto-fires (verbal §6.3 still works if allowlisted).
-
-Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_DETECT_WINDOW`, the Exit-Mode bind):
+- [ ] **Disabled:** turn **Auto-honk** off on the Settings page (Auto-honk → Auto-honk) → no honk on arrival.
 
 ### 6.4 Send in-game messages by voice (#49 — `[comms_send].enabled = true`)  ⌨️ INJECT
-> **Outward-facing — other Commanders SEE the message.** COVAS composes ED chat from what you say, **reads it back**, and sends only on a **separate** confirm. Set `[comms_send].enabled = true` and bind **Quick Comms Panel** to a **key** in ED (a HOTAS/mouse-only bind can't be pressed). No ED monitoring needed — the read-back is the safety, not a combat guard. Do your first tests **in a quiet/solo instance** so a slip doesn't spam a populated one. Per-channel switching is optional: leave `channel_*` blank to send on your currently-selected channel, or set the ED tokens if you've bound channel-switch keys.
+> **Outward-facing — other Commanders SEE the message.** COVAS composes ED chat from what you say, **reads it back**, and sends only on a **separate** confirm. Turn on **Send in-game messages** on the Settings page (Comms → Send in-game messages) and bind **Quick Comms Panel** to a **key** in ED (a HOTAS/mouse-only bind can't be pressed). No ED monitoring needed — the read-back is the safety, not a combat guard. Do your first tests **in a quiet/solo instance** so a slip doesn't spam a populated one. Per-channel switching is optional: leave `channel_*` blank to send on your currently-selected channel, or set the ED tokens if you've bound channel-switch keys.
 - [ ] **Startup readiness:** launch reports `Comms: open box QuickCommsPanel -> <key>` (or `Comms UNUSABLE (bind QuickCommsPanel …)`), and a `Comms send ON (read-back-before-send confirmation required).` line.
 - [ ] **Compose reads back, does NOT send:** *"Tell local o7."* → COVAS says it's *ready to send to local/system chat: "o7"* and asks you to confirm. **Nothing is typed into ED yet.**
 - [ ] **Send on a separate turn:** then say *"Send it"* (or "confirm") → the comms box opens, **"o7"** is pasted, and the message sends on your current/local channel. Log: `sent comms to local: 'o7'`.
@@ -818,24 +716,19 @@ Notes (reliability quirks — probe / detect-window timing `_PROBE_SECONDS` / `_
 - [ ] **Configured-but-unbound channel key:** set `channel_wing` to a token you haven't bound → asking to message the wing is refused with a *"bind it in-game"* message; nothing sends.
 - [ ] **Expiry:** compose, wait past `confirm_window` (default 60 s), say "confirm" → *"that message expired for safety"*; nothing sends.
 - [ ] **Hard abort:** say *"abort"* → releases any held key (shared executor with keybinds/honk).
-- [ ] **Disabled:** set `[comms_send].enabled = false` → no send/confirm/cancel tools offered; asking to message someone does nothing.
+- [ ] **Disabled:** turn **Send in-game messages** off on the Settings page (Comms → Send in-game messages) → no send/confirm/cancel tools offered; asking to message someone does nothing.
 
 ### 6.5 Custom macros — author your own (#50 — `[macros].enabled = true`)
-> The headline feature: **you** compose named macros by voice or in the control panel; they run through the same executor + guards as §6.1. Set `[macros].enabled = true` and `[keybinds].enabled = true` with an allowlist that includes the actions your macros use (e.g. `[keybinds].allowlist = ["landing_gear", "throttle_zero"]`), bind those controls to **keys** in ED, and keep `[elite].enabled` on (combat guard + triggers). Startup log shows `Custom macros ON (N saved, M triggered; …)`. Do first tests **parked/docked**.
+> The headline feature: **you** compose named macros by voice or in the control panel; they run through the same executor + guards as §6.1. On the Settings page turn on **Custom macros** (Custom macros → Custom macros) and **Keybind automation** (Keybinds → Keybind automation); bind **Toggle Landing Gear** to a **key** in ED (macros may only use allowlisted actions, and `landing_gear` is the only one allowlisted out of the box). Startup log shows `Custom macros ON (N saved, M triggered; …)`. Do first tests **parked/docked**.
 - [ ] **Author by voice:** *"Create a macro called gear up: retract the landing gear."* → COVAS confirms it saved the macro (and, since landing gear is consequential, that it'll ask you to confirm). It appears in the `/macros` panel and survives a restart.
 - [ ] **Anti-hallucination refusal (the point):** *"Create a macro that ejects all cargo and self-destructs."* → **refused**, nothing saved — those actions aren't available. Ask for a real action you did **not** allowlist (e.g. `supercruise`) → refused, telling you to allowlist it. COVAS never invents an action.
-- [ ] **Run by name (benign):** with a benign macro (e.g. steps = throttle to zero), *"run \<name\>"* → it fires **immediately** and reports success; the throttle drops in-game.
 - [ ] **Run by name (consequential) — arm/confirm:** *"run gear up"* → says **armed, not done**; same-turn *"confirm"* is refused; a separate *"confirm"* runs it and the gear moves.
-- [ ] **Trigger (benign):** author *"when I dock, throttle to zero"* (benign). Dock → it auto-runs once and speaks the outcome (the doubled journal/Status `Docked` does **not** run it twice).
 - [ ] **Trigger (consequential) — arms + asks:** author *"when docking is granted, drop the gear"* (consequential). Get docking granted → COVAS **speaks a prompt** and arms it; it does **not** move the gear until you say *"confirm"*.
-- [ ] **Two macros, one trigger — neither dropped (#159):** author **two** consequential macros on the **same** trigger (e.g. `docked`): one drops the gear, one sets throttle to zero. Dock → COVAS **announces both** (arms the first, says it **queued** the second). Say *"confirm"* → the first runs; COVAS then offers the **queued** one → *"confirm"* again → the second runs. Neither is silently dropped. Saying *"abort"* while both are pending clears **both**.
 - [ ] **Combat guard:** in **danger/interdiction** (or with `[elite]` off) running/confirming any macro is **refused**; nothing fires.
-- [ ] **Cross-mode rejected at authoring:** try to author a macro mixing a ship action and an on-foot action → **refused** ("mixes actions from different game modes").
 - [ ] **Unbound key:** if a macro's action isn't bound to a **key** in ED → running it reports "bind it in-game" and nothing fires.
-- [ ] **Hard abort:** with a macro armed (or mid-run), say *"abort"* → clears the pending macro and releases every held key (shared with §6.1/§6.3).
-- [ ] **Concurrent abort isn't defeated (#154):** start a **multi-step keybind sequence** (e.g. `launch`) and, while it's mid-run, say *"abort"* at the same moment a **triggered custom macro** fires (e.g. a benign `on-dock` macro, or manually *"run \<benign macro\>"* in the same breath). The sequence must **stop and stay stopped** — its remaining steps do **not** fire after `release_all`, and the concurrently-starting macro does **not** wipe the abort. (Before the #154 fix, the macro's start could clear the sequence's just-set abort and let it re-press its remaining keys.)
+- [ ] **Hard abort:** with a macro armed (or mid-run), say *"abort"* → clears the pending macro and releases every held key (shared with §6.1).
 - [ ] **Panel authoring + delete:** open **🎛 macros**, build a macro with the step editor (dropdowns only offer allowlisted actions / known triggers), SAVE → it appears in voice too; DELETE removes it. An out-of-allowlist action can't be picked, and the server rejects a hand-crafted bad request.
-- [ ] **Disabled:** set `[macros].enabled = false` → no macro tools offered; *"run \<name\>"* does nothing.
+- [ ] **Disabled:** turn **Custom macros** off on the Settings page (Custom macros → Custom macros) → no macro tools offered; *"run \<name\>"* does nothing.
 
 Notes:
 
@@ -857,7 +750,6 @@ Notes:
 - [ ] **Catalog-vs-stock (THE Type-10 bug):** ask for a ship your **current station catalogs but doesn't stock** (the in-game shipyard shows it "unavailable") → the answer is a **different** station that really stocks it, optionally noting the nearer listing was skipped ("current stock data says it isn't actually available there"). Verify the named station really sells it on Inara.
 - [ ] **Family disambiguation:** *"Find the closest Krait."* → asks **MkII or Phantom**, doesn't guess; answer → searches once.
 - [ ] **Unverified caveat:** rare in populated space — if the reply ends with *"I couldn't verify live stock…"*, the named station had no recent EDSM data; spot-check it on Inara.
-- [ ] **Kill switch:** set `[nav].verify_stock = false`, restart → searches still work (startup line says `stock check off`), no EDSM calls, no caveats.
 
 Notes:
 
@@ -1040,8 +932,9 @@ Notes:
       voices at all.
 - [ ] **Not a squadron carrier:** dock at a **squadron** or someone else's carrier → the carrier
       voices stay **silent** (identity mismatch), while normal station/NPC comms still work.
-- [ ] **Configured voice + name:** set `[audio.carrier.captain].voice_ref` and `name` (e.g.
-      "Reynolds"), restart → the Captain now uses **that** voice and the name is woven into the lines.
+- [ ] **Configured voice + name:** on the Settings page (Carrier voices → Captain voice / Captain name),
+      set a Captain voice and a name (e.g. "Reynolds") → the Captain now uses **that** voice and the name
+      is woven into the lines.
 - [ ] **Voice control:** *"mute the carrier"* → carrier voices stop; *"carrier voices on"* → they
       resume. *"silence all the background audio"* also mutes them. Your own replies are unaffected.
 
@@ -1179,7 +1072,7 @@ Notes:
 - [ ] **English-only model warning (issue #197):** with reply = German but an `.en` model selected (e.g. `small.en`), launch → the log shows a warning that the model is English-only and to switch to a multilingual model (e.g. `small`); COVAS does **not** auto-swap the model.
 - [ ] **Voice follows the reply language (issue #198):** with `[tts].provider = "edge"` (or `azure`) and `[language].match_voice` at its default **on**, start on an English voice (e.g. `en-US-GuyNeural`), then say *"reply in German."* → the log shows a steer (`reply language de -> voice de-DE-…`) and 📋 `overrides.json` gets the new `edge.voice`; the next reply is **read by a German voice**, not the English one mangling German. Say *"reply in English"* → it steers back to an English voice.
 - [ ] **Explicit voice is respected, not overridden (issue #198):** hand-pick a German voice (Settings → Text-to-speech) while on reply = German → it is **kept** (no steer). Pick an English voice by hand while on German → COVAS logs a **mismatch warning** rather than silently swapping it (an explicit pick wins).
-- [ ] **Opt-out & untagged providers (issue #198):** set `[language].match_voice = false` → switching to German leaves the Edge voice **unchanged**. Separately, on `[tts].provider = "elevenlabs"` (multilingual), switching language does **not** change the voice (ElevenLabs/OpenAI aren't locale-tagged — nothing to steer). 📋 Also confirm the Settings **Edge/Azure voice dropdown** lists German (`de-DE-…`) voices while reply = German.
+- [ ] **Opt-out & untagged providers (issue #198):** on the Settings page (Language → Match voice to language), turn it **off** → switching to German leaves the Edge voice **unchanged**. Separately, on `[tts].provider = "elevenlabs"` (multilingual), switching language does **not** change the voice (ElevenLabs/OpenAI aren't locale-tagged — nothing to steer). 📋 Also confirm the Settings **Edge/Azure voice dropdown** lists German (`de-DE-…`) voices while reply = German.
 - [ ] **Locale number/date formatting (issue #199):** with reply = German, ask *"how many credits do I have?"* → the spoken **and** on-screen amount groups with dots, e.g. **`2.000.000` credits** (French → `2 000 000` with a thin space), not `2,000,000`. Ask for a route/trade loop or "closest …" → profit/light-second numbers group the same way. A Community Goal deadline reads **`15. Juli`** (de) instead of `Jul 15`. Switch reply back to **English** → every number/date returns to `2,000,000` / `Jul 15` (byte-identical to before this feature).
 - [ ] **Control-panel UI strings extracted, English unchanged (issue #196):** with **reply = English**, open the control panel, **Settings**, and each sub-page (**checklist, memory, crew, engineers, macros**) plus the **first-run wizard** — all headings, buttons, nav, placeholders and hints read **exactly as before**. No raw `{{ t(... }}` text appears anywhere.
 - [ ] **Control panel renders fully in German — no English fallthrough (issue #196):** set **reply = German** and reload. The control panel, **Settings**, every sub-page (**checklist, memory, crew, engineers, macros**) **and the first-run wizard** render in **German** — headings, buttons (e.g. `SPEICHERN`, `VON DER FESTPLATTE NEU LADEN`), nav (`⚙ Einstellungen`, `☑ Checkliste`), placeholders, hints and the long help paragraphs. Scan for **any English word left over** (a fallthrough) — there should be none. Check that longer German strings don't **break the layout** (buttons/labels wrap rather than overflow). Spot-check **French, Russian, Spanish, Portuguese** the same way (each is a complete catalog). These five are **machine-translated, native review pending** — note any awkward wording rather than treating it as a bug. Switch back to **English** → the panel returns to English exactly.
@@ -1195,7 +1088,7 @@ Notes:
 - [ ] *"Actually reopen it."* → back to `- [ ]`.
 - [ ] **Disambiguation:** ask to mark something matching several lines → it **asks which one**.
 - [ ] **Add / Modify / Delete** a throwaway line → inserted after current with matching nesting / text updated (checkbox preserved) / removed; real objectives intact.
-- [ ] **External edit:** hand-edit the file, save, then *"What's next?"* → reflects your edit (reads fresh).
+- [ ] **External edit:** change a throwaway line in the **Checklist** tab (§14.6) and **SAVE**, then *"What's next?"* → reflects your edit (reads fresh).
 
 Notes:
 
@@ -1228,9 +1121,6 @@ Notes:
       is added to the file. Confirm the router logged **one** turn, not two (no extra model call).
 - [ ] 📋 **Dedup:** repeat the exact same "remember that…" — it is **not** added a second time
       (log: `Already knew that…`), and the file still has one copy.
-- [ ] 📋 **Cap:** set `[memory].cap` low (e.g. `3`), add a couple of `remember that…` facts, then
-      generate several milestones. The file stays at the cap; the oldest **milestones** drop first
-      while your explicitly-remembered facts survive.
 - [ ] 📋 Relaunch COVAS++ with the same journal present — old milestones are **not** re-captured
       (capture only sees live events; startup priming doesn't republish).
 - [ ] Ask **"what can you do"** → the **memory** capability is listed; drilling in mentions
@@ -1277,7 +1167,7 @@ Notes:
 ### 14.0a Quick panel reflects the active LLM/TTS provider (issue #86)  🌐 PANEL 🌍 NET 📋 FILE
 > The left **Configuration** card's **LLM** and **Speech** blocks must MIRROR `[llm].provider` /
 > `[tts].provider`, rendered generically from the schema — not a hardcoded Anthropic/ElevenLabs panel.
-> Change providers by editing `overrides.json` / the Settings page and **restart** between checks.
+> Change providers on the Settings page and **restart** between checks.
 - [ ] **Anthropic + ElevenLabs** (`[llm].provider = "anthropic"`, `[tts].provider = "elevenlabs"`, EL key set):
       the **LLM** block header reads *"Anthropic (Claude)"* and shows a **Claude model** dropdown **and a
       Thinking depth** control; the **Speech** block reads *"ElevenLabs"* and shows **model + a searchable
@@ -1410,7 +1300,7 @@ Notes:
 - [ ] **No Dev-mock setting in the UI (issue #130):** the Settings page has **no "Dev mock mode" row** and **no "Developer" group**; voice *"turn mock mode on"* does nothing. The mechanism still works out of band: launch with `[dev] mock = true` in `config.toml` (or `$env:COVAS_MOCK=1`) → the startup log prints `Dev mock ON …` and a turn runs with fakes (no API calls).
 - [ ] **Test my setup (issue #181):** near the top of Settings, the **API keys** card is followed by a **Test my setup** card. Click **Test my setup** → a spinner, then a readable report: a green summary line (*"✓ All systems go"*) or a red *"✗ N issue(s)…"*, then sections (Config, Python packages, Keys & files, Anthropic, ElevenLabs, Game data, Audio) each line marked `✓ [OK]` / `! [warn]` / `✗ [FAIL]` with a plain-language hint under any problem. It matches the CLI `check_setup.py` output. Nothing is written to `overrides.json`. **Human-readable errors:** temporarily set a **bad Anthropic key** and re-run → the Anthropic line reads a sentence like *"COVAS couldn't sign in to Anthropic — the API key looks wrong or expired…"*, **not** a stack trace. **Screenshot-able:** the whole report is plain on-page text you can capture for a support request.
 - [ ] **Test my setup — keyboard + colorblind (a11y):** the **Test my setup** button is reachable and activatable by keyboard (Tab to it, Enter/Space runs it); each result line carries a **text mark (✓/!/✗) and a word ([OK]/[warn]/[FAIL])**, so status is legible without relying on colour.
-- [ ] **Test my setup — System + Updates (issue #186):** the report includes a **System** section listing your **RAM** and Whisper model, and warns if the model is heavy for your RAM (e.g. set `[whisper].model = large-v3` on an 8 GB PC → a `! [warn]` line suggests a smaller model). It also includes an **Updates** line: `✓ [OK] Up to date (version X)` when current, or `! [warn] An update is available: vY` when behind (matches the update banner on the main page).
+- [ ] **Test my setup — System + Updates (issue #186):** the report includes a **System** section listing your **RAM** and Whisper model, and warns if the model is heavy for your RAM (e.g. set the Whisper model to large-v3 on the Settings page (Speech-to-text → Whisper model) on an 8 GB PC → a `! [warn]` line suggests a smaller model). It also includes an **Updates** line: `✓ [OK] Up to date (version X)` when current, or `! [warn] An update is available: vY` when behind (matches the update banner on the main page).
 - [ ] **Crash reports opt-in (issue #186):** on Settings → **Diagnostics**, **Save crash reports** is **OFF** by default. With it off, an induced crash writes **no** `crash-*.log` in `%APPDATA%\COVAS++\logs`. Turn it **on** (applies live, no restart), induce a crash → a `crash-<time>.log` appears; open it and confirm it contains the traceback but **no API key, no `DPAPI:` blob, and your Windows username/home path are scrubbed** to `<user>`. Nothing is sent anywhere (offline is fine). Turn it back off → no new crash files.
 
 ### 14.2a Settings apply LIVE — hot-swap providers & keys (issue #90)  🔊 HW 🌐 PANEL 🌍 NET
@@ -1636,10 +1526,10 @@ The atmospheric audio layer is now **wired into the live app** (C9). It's OFF by
 on in config (or the Settings page) before testing.
 
 ### 18.0 Enable it
-- [ ] 🌐 Set `[audio].enabled = true` (master — reopens the audio device through the bus mixer),
-  then enable the parts you want: `[audio.cues].enabled` (chatter/SFX), `[audio.comms].enabled`
-  (on by default), `[music].enabled` (needs track files), `[audio.interdiction].enabled`. Requires
-  `[elite].enabled` so game events drive it. Restart after flipping the master switch.
+- [ ] 🌐 On the Settings page (Ambient audio → Audio layer), turn on the master (reopens the audio
+  device through the bus mixer), then enable the parts you want: **Space chatter & SFX**,
+  **Comms voices** (on by default), **Ambient music** (needs track files), **Interdiction cue**.
+  Requires **ED game-state monitoring** on so game events drive it. Restart after flipping the master switch.
 - [ ] 🔊 With the layer ON, confirm a normal spoken reply still sounds right — COVAS now streams
   through the mixer's **clean COVAS bus** (no change in character), and a **tap-`[` barge-in still
   cuts speech instantly**.
@@ -1665,9 +1555,9 @@ on in config (or the Settings page) before testing.
   (rate-limited, never over-talking). Jump to an **unpopulated / deep-space** system → chatter goes
   **silent** (populated-only). 🎮 Trigger an **interdiction** → the layered sting + threat + pirate line.
 - [ ] 🎮 Compare a **dense** system (population in the billions) with a **sparse** one (a few
-  thousand) → chatter is noticeably **more frequent** in the dense one. Then lower
-  `[audio.chatter].min_seconds` (or `full_population`) → chatter speeds up. Confirm each chatter line
-  uses a **different random voice**.
+  thousand) → chatter is noticeably **more frequent** in the dense one. Then lower the **Chatter min gap**
+  (Settings → Ambient audio → Chatter min gap) or **Chatter full-population** → chatter speeds up. Confirm
+  each chatter line uses a **different random voice**.
 
 ### 18.3.1 Context-grounded chatter (issue #85 — `[audio.cues].flavor`, `Full` level)
 - [ ] 🎮 With `[audio.cues].enabled` **and** `[audio.cues].flavor = true`, optimization level `Full`,
@@ -1701,9 +1591,9 @@ on in config (or the Settings page) before testing.
   fresh random voice. Confirm the cast voices are **distinct from your COVAS persona voice**.
 - [ ] 🎮 In a **wing / multicrew / operation**, confirm each **player** keeps a **stable, distinct**
   voice — including **across system jumps** (the last 25 players are remembered).
-- [ ] 🔊 Set `[audio.voices].cast_provider = "piper"` with a few `[[audio.voices.pool]]` `.onnx`
-  entries → the cast reverts to **free local Piper** voices (no ElevenLabs credits). A voice you
-  can't use (an ElevenLabs ™/famous voice) is never selected.
+- [ ] 🔊 On the Settings page (Ambient audio → Cast provider), choose **piper** (with a few Piper `.onnx`
+  voices in your cast pool) → the cast reverts to **free local Piper** voices (no ElevenLabs credits). A
+  voice you can't use (an ElevenLabs ™/famous voice) is never selected.
 
 ### 18.5a Context-aware voice quality — variety + perspective (issue #57)
 - [ ] 🔊 **Variety (anti-repeat):** in a **busy populated** system with `[audio.cues].enabled` and
@@ -1779,9 +1669,6 @@ on in config (or the Settings page) before testing.
 - [ ] 🔊 **Assigned voice wins:** pin a character to a **specific** voice, save, then invoke them a
   few times → they use **that** voice every time (not the deterministic auto pick). Switch back to
   **Auto** and save → they revert to the deterministic voice.
-- [ ] 🖥️ **Stale-write guard:** open the Crew tab, hand-edit `crew.json` in a text editor and save,
-  then click **SAVE ROSTER** in the tab → it warns the file changed and offers **reload** or
-  **overwrite** (no silent clobber).
 - [ ] 🖥️ **Disabled banner:** with `[crew].enabled = false`, the Crew tab shows a banner noting crew
   won't speak until enabled, but the roster still saves/loads.
 
@@ -1851,9 +1738,10 @@ on in config (or the Settings page) before testing.
   *"all hands, sound off"* → each crew member gives a brief line in turn.
 - [ ] 🔊 **Barge-in mid-crew-line:** while a crew chatter (or addressed) line is speaking, tap cancel
   (`[`) → it stops promptly and returns to Idle.
-- [ ] 🔊 **Silent when flavor off / crew off:** set `[audio.cues].flavor = false` → no crew chatter
-  at all (it's generated-or-nothing, no canned pool). With `[crew].enabled = false`, neither crew
-  chatter nor in-voice addressing occurs — replies are a single voice as before.
+- [ ] 🔊 **Silent when crew off:** with crew turned **off** (Crew tab, or say *"turn crew off"*), neither
+  crew chatter nor in-voice addressing occurs — replies are a single voice as before. (Ambient flavor
+  is off by default, so crew chatter is generated-or-nothing and simply stays silent until you enable
+  ambient flavor generation.)
 
 ### 18.5g Per-ship crew rosters (issue #127 — Crew tab)  🖥️ 🎮 🔊 HW
 > The Crew tab grows an **Editing roster** selector (Default + each fleet ship) and a **Copy crew
@@ -1929,19 +1817,6 @@ Notes:
 - [ ] **Default unchanged:** with no `[audio.voices.providers]` set, the cast sounds exactly as
   before (comms/chatter/player cast from `cast_provider`); COVAS's own voice is still your ElevenLabs
   persona.
-- [ ] **Per-role override:** this advanced role→provider map has no Settings-panel row yet, so add it
-  to your data-dir config at `%APPDATA%\COVAS++\config.toml` →
-  ```toml
-  [audio.voices.providers]
-  chatter = "piper"
-  comms   = "elevenlabs"
-  ```
-  (add Piper `.onnx` entries to `[audio.voices].pool` so chatter has local voices), restart → ambient
-  **chatter** is spoken by **local Piper** voices (no ElevenLabs credits) while **station/NPC comms**
-  stay on **ElevenLabs**. COVAS's persona voice is unaffected either way.
-- [ ] **Fail-soft:** point a role at a provider with no working backend (e.g. `comms = "piper"` with
-  an empty pool / no model) → those lines fall silent rather than crashing the audio layer; the rest
-  keeps working.
 
 Notes:
 
@@ -1950,11 +1825,12 @@ Notes:
 > key**, so ambient chatter never burns ElevenLabs credits. ⚠ It rides an **undocumented, no-SLA**
 > endpoint that periodically breaks — it's **optional and never load-bearing**; **Piper** stays the
 > guaranteed free floor. `edge-tts` ships bundled in the installed app — nothing to install.
-- [ ] **Persona voice:** set `[tts].provider = "edge"` (optionally `[edge].voice = "en-US-GuyNeural"`),
-  restart, speak a turn → COVAS replies in the Edge voice with **zero** ElevenLabs usage.
-- [ ] **Cast-eligible:** set `[audio.voices].cast_provider = "edge"` (or a per-role
-  `[audio.voices.providers].chatter = "edge"`), restart, fly/dock in a populated system → ambient
-  chatter/comms speak in distinct free Edge voices; COVAS's persona voice is unaffected.
+- [ ] **Persona voice:** on the Settings page (Providers → TTS provider), choose **edge** (optionally set
+  the Edge voice, e.g. `en-US-GuyNeural`, under Providers → Edge voice), restart, speak a turn → COVAS
+  replies in the Edge voice with **zero** ElevenLabs usage.
+- [ ] **Cast-eligible:** on the Settings page (Ambient audio → Cast provider), choose **edge**, restart,
+  fly/dock in a populated system → ambient chatter/comms speak in distinct free Edge voices; COVAS's
+  persona voice is unaffected.
 - [ ] **Fail-soft to Piper:** with `[tts].provider = "edge"` **and** a valid `[piper].model`,
   disconnect the network (or block the endpoint) and speak → the persona voice **falls back to local
   Piper**; reconnect → Edge resumes. With **no** Piper model, a dead endpoint degrades to **text** and
@@ -1968,13 +1844,15 @@ Notes:
 > **Official Azure Neural TTS** — the *same* voices as Edge, but with a real API, an **SLA**, and a
 > **free monthly tier (~0.5M chars)**. No ToS/reliability asterisk. Needs a Speech resource: create one
 > in the Azure portal, then add its key on the Settings **API keys** card (stored DPAPI-encrypted in
-> `AzureSpeechKey.txt`; env vars are no longer read, #22) and set `[azure].region` to match it.
-- [ ] **Persona voice:** set `[tts].provider = "azure"` (and `[azure].voice`, e.g. `en-US-GuyNeural`),
-  restart, speak a turn → COVAS replies in the chosen Azure voice.
-- [ ] **Speaking style:** set `[azure].style = "cheerful"` (on a voice that supports it), restart, speak
-  → the delivery changes; an unsupported style is ignored (still speaks).
-- [ ] **Cast-eligible:** set `[audio.voices].cast_provider = "azure"` (or `[audio.voices.providers].chatter
-  = "azure"`), restart, fly/dock in a populated system → ambient chatter/comms use distinct Azure voices.
+> `AzureSpeechKey.txt`; env vars are no longer read, #22) and set the **Azure region** (Settings →
+> Providers → Azure region) to match it.
+- [ ] **Persona voice:** on the Settings page (Providers → TTS provider), choose **azure** (and set the
+  Azure voice, e.g. `en-US-GuyNeural`, under Providers → Azure voice), restart, speak a turn → COVAS
+  replies in the chosen Azure voice.
+- [ ] **Speaking style:** on the Settings page (Providers → Azure speaking style), set `cheerful` (on a
+  voice that supports it), restart, speak → the delivery changes; an unsupported style is ignored (still speaks).
+- [ ] **Cast-eligible:** on the Settings page (Ambient audio → Cast provider), choose **azure**, restart,
+  fly/dock in a populated system → ambient chatter/comms use distinct Azure voices.
 - [ ] **Fail-soft:** with `[tts].provider = "azure"` and a **wrong region or missing key**, speak → the
   reply degrades to **text** and the loop returns to IDLE (cast Azure voices fall silent); fix the
   key/region → voices return. No crash either way.
@@ -1986,17 +1864,19 @@ Notes:
 > best as a persona or supplemental cast voice). Needs an OpenAI key (add it on the Settings **API keys**
 > card — stored DPAPI-encrypted in `OpenAIAPIKey.txt`; env vars are no longer read, #22);
 > `[openai_tts].base_url` is configurable for compatible endpoints.
-- [ ] **Persona voice:** set `[tts].provider = "openai"` (and `[openai_tts].voice`, e.g. `nova`), add the
-  OpenAI key on the Settings **API keys** card, restart, speak a turn → COVAS replies in the chosen OpenAI voice.
-- [ ] **Model + tone:** try `[openai_tts].model = "tts-1"` (works) and `gpt-4o-mini-tts` with
-  `[openai_tts].instructions = "Calm, professional ship-computer tone"` → the newer model reflects the
-  instruction; `tts-1` ignores it (still speaks).
-- [ ] **Cast-eligible:** set `[audio.voices].cast_provider = "openai"` (or a per-role override), restart,
+- [ ] **Persona voice:** on the Settings page (Providers → TTS provider), choose **openai** (and set the
+  OpenAI TTS voice, e.g. `nova`, under Providers → OpenAI TTS voice), add the OpenAI key on the Settings
+  **API keys** card, restart, speak a turn → COVAS replies in the chosen OpenAI voice.
+- [ ] **Model + tone:** on the Settings page (Providers → OpenAI TTS model), try `tts-1` (works) and
+  `gpt-4o-mini-tts` with the OpenAI TTS instructions set to `Calm, professional ship-computer tone`
+  (Providers → OpenAI TTS instructions) → the newer model reflects the instruction; `tts-1` ignores it
+  (still speaks).
+- [ ] **Cast-eligible:** on the Settings page (Ambient audio → Cast provider), choose **openai**, restart,
   fly/dock in a populated system → ambient chatter/comms use OpenAI voices (a small set, so speakers
   repeat sooner than Edge/Azure).
-- [ ] **Fail-soft:** clear the OpenAI key on the Settings **API keys** card (or set a bad `base_url`) and
-  speak → the reply degrades to **text** and the loop returns to IDLE (cast OpenAI voices fall silent);
-  restore the key → voices return.
+- [ ] **Fail-soft:** clear the OpenAI key on the Settings **API keys** card (or set a bad OpenAI TTS base
+  URL on the Settings page) and speak → the reply degrades to **text** and the loop returns to IDLE (cast
+  OpenAI voices fall silent); restore the key → voices return.
 
 Notes:
 
@@ -2005,16 +1885,18 @@ Notes:
 > COVAS's own voice; it **streams** so the first audio starts fast. **Persona-only** (not a cast
 > provider). Needs a Cartesia key (add it on the Settings **API keys** card — stored DPAPI-encrypted in
 > `CartesiaAPIKey.txt`; env vars are no longer read, #22) and a voice id.
-- [ ] **Persona voice:** set `[tts].provider = "cartesia"`, a valid `[cartesia].voice` id (from
-  play.cartesia.ai), add the Cartesia key on the Settings **API keys** card, restart, speak a turn →
-  COVAS replies in the Cartesia voice, and audio starts **noticeably fast** (low time-to-first-audio).
+- [ ] **Persona voice:** on the Settings page (Providers → TTS provider), choose **cartesia**, set a valid
+  Cartesia voice id (from play.cartesia.ai, under Providers → Cartesia voice id), add the Cartesia key on
+  the Settings **API keys** card, restart, speak a turn → COVAS replies in the Cartesia voice, and audio
+  starts **noticeably fast** (low time-to-first-audio).
 - [ ] **Barge-in:** while COVAS is speaking a long Cartesia reply, tap push-to-talk → speech stops
   promptly (streaming cancel), loop returns to LISTENING/IDLE.
-- [ ] **Persona-only:** set `[audio.voices].cast_provider = "cartesia"` → it has **no effect** on the
-  cast (Cartesia isn't a cast backend); the cast keeps using its own provider. COVAS's own voice is
-  unaffected.
-- [ ] **Fail-soft:** clear the Cartesia key on the Settings **API keys** card (or blank `[cartesia].voice`)
-  and speak → the reply degrades to **text** and the loop returns to IDLE; restore → the voice returns. No crash.
+- [ ] **Persona-only:** on the Settings page (Ambient audio → Cast provider), choose **cartesia** → it has
+  **no effect** on the cast (Cartesia isn't a cast backend); the cast keeps using its own provider. COVAS's
+  own voice is unaffected.
+- [ ] **Fail-soft:** clear the Cartesia key on the Settings **API keys** card (or blank the Cartesia voice
+  id on the Settings page) and speak → the reply degrades to **text** and the loop returns to IDLE; restore
+  → the voice returns. No crash.
 
 Notes:
 
@@ -2031,10 +1913,6 @@ Notes:
 - [ ] **Not on the public Settings surface:** open the control panel → the **Voice provider** dropdown
   does **not** list Azure or Cartesia, the **Activation mode** control does **not** offer *continuous*, and
   there is **no** `[experimental]` group anywhere on the page.
-- [ ] **Self-enable via `overrides.json`:** add `{ "experimental": { "trade_route": { "enabled": true } } }`
-  to `overrides.json` (with `route_plan.enabled = true`), restart, ask *"what can you do?"* → the
-  trade-route planner now appears and *"plan a trade route from here"* runs. Repeat for one more (e.g.
-  `experimental.hud` + `hud.enabled` → *"turn the HUD on"* shows the overlay).
 - [ ] **First-run wizard:** on a clean install the wizard's **Voice provider** list offers edge/elevenlabs/
   openai/piper only — **no** Azure or Cartesia.
 - [ ] **Docs badges:** each gated feature's docs page (HUD, crew, hands-free, trade-routes, custom-macros,
@@ -2111,10 +1989,10 @@ Notes:
 - [ ] **Default Edge voice actually plays (not just imports):** launch the packaged `COVAS++.exe`
   with the **default** `[tts].provider = "edge"`, speak a turn → COVAS replies in the **Edge neural
   voice** (audible speech, not the text-only fallback), with **zero** ElevenLabs usage.
-- [ ] **Other cloud providers construct in the frozen app:** in turn, set `[tts].provider` to
-  `azure` / `openai` / `cartesia` and `[llm].provider` to `openai` / `gemini` (each with a valid
-  key), relaunch, speak a turn → each **constructs and speaks without an `ImportError`** (they ride
-  `requests`, already bundled — low risk, but confirm).
+- [ ] **Other cloud providers construct in the frozen app:** in turn, on the Settings page choose each
+  **TTS provider** (azure / openai / cartesia) and **LLM provider** (openai / gemini) (Providers → TTS
+  provider / LLM provider, each with a valid key), relaunch, speak a turn → each **constructs and speaks
+  without an `ImportError`** (they ride `requests`, already bundled — low risk, but confirm).
 
 Notes:
 
@@ -2224,23 +2102,8 @@ Notes:
 - [ ] 📋 **Encrypted on disk:** after entering keys (wizard or Settings), open `AnthropicAPIKey.txt`
   (and any other `*APIKey.txt`) → the content begins with **`DPAPI:`** and your raw key is **not**
   visible anywhere in the file.
-- [ ] 📋 **Transparent migration:** drop a **plaintext** key into a fresh `AnthropicAPIKey.txt` (just
-  the raw `sk-ant-…`, no `DPAPI:`), launch → the app works normally, and re-opening the file shows it
-  has been **rewritten to `DPAPI:<blob>`** (migrated on first read). Your key still works.
-- [ ] **Env var is ignored:** set `ANTHROPIC_API_KEY` in your environment but **remove** the key file
-  → launch a source run → the app is **unconfigured** and the **setup wizard shows** (the env var is
-  NOT used). Add the key via the wizard/Settings to proceed.
-- [ ] **Wrong-machine blob = clear re-enter, not a crash:** copy a `DPAPI:` key file from another PC
-  (or hand-edit the base64 to corrupt it) → launch → the app treats it as **no key** and logs a clear
-  *"re-enter the key on this machine"* message (console/stderr); it does **not** crash. Re-enter the
-  key and it works.
 - [ ] 🔊 **check_setup:** `check_setup.bat` reports the **Anthropic key file** present (no
   `ANTHROPIC_API_KEY` env line anymore) and the Anthropic API call succeeds using the file key.
-- [ ] 📋 **Inara key folded in (issue #24):** put a **plaintext** Inara key in `[cg].inara_api_key`
-  (in `overrides.json`), launch → community goals still authenticate (unvisited CGs surface), a new
-  **`InaraAPIKey.txt`** appears holding a **`DPAPI:`** blob, and the inline `inara_api_key` in
-  `overrides.json` is **blanked**. A fresh key entered on the Settings **API keys** card also works
-  (takes effect on restart).
 
 ### 19.9 Masked "API keys" Settings card — rotate any key (issue #23)  🌐 PANEL 📋 FILE
 > The Settings page (`/settings`) has a write-only **API keys** card covering every provider
