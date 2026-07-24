@@ -77,7 +77,6 @@ Notes:
       control panel and the status light reads **IDLE**. (The banner details — active model, voice, Whisper
       size, and capability on/off lines — are visible in the panel's live log.)
 - [ ] The panel is reachable in a normal browser at http://127.0.0.1:8765 while the app runs.
-- [ ] Quit with **Ctrl+Alt+Q** (or by closing the native window).
 
 Notes:
 

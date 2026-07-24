@@ -217,10 +217,14 @@ function setActiveNav(link){
 }
 
 // The active section is the LAST visible card whose top has scrolled up past the "active line" just
-// below the sticky header — i.e. the section currently filling the top of the content area. The
-// IntersectionObserver is the cheap TRIGGER (fires only when a card crosses the band, never per
-// scroll frame); this reads live geometry so it's correct on the very first paint too, before the
-// observer's async callback. A click's smooth-scroll suppresses it briefly. Filter-hidden cards are skipped.
+// below the sticky header — i.e. the section currently filling the top of the content area. Two
+// triggers call this: a persistent rAF-throttled scroll listener (the CONTINUOUS driver — see
+// initSpyScroll) and the IntersectionObserver (a cheap extra nudge on card-boundary crossings, and
+// it fires on the very first async callback). The scroll listener is what makes a card TALLER than
+// the viewport (e.g. Providers) stay correctly highlighted while it fills the screen — the observer
+// alone never re-fires across that stretch, which stranded the highlight on the prior card. This
+// reads live geometry so it's correct on the very first paint too. A click's smooth-scroll
+// suppresses it briefly. Filter-hidden cards are skipped.
 const _SPY_LINE = 88;                     // px below the viewport top (under the ~78px sticky header)
 function spyApply(){
   if(performance.now() < _spySuppressUntil) return;
@@ -250,6 +254,19 @@ function setupScrollspy(){
     });
   }
   spyApply();   // initial paint (once layout settles the observer also fires)
+}
+
+// Persistent scroll driver (attached ONCE; window survives re-renders). The IntersectionObserver
+// only fires when a card crosses the top band, which misses long scroll stretches INSIDE a card
+// taller than the viewport — leaving the highlight stale on the previous section (issue #119
+// regression). A passive, rAF-throttled scroll recompute keeps the nav tracking what's actually on
+// screen every frame-batch, cheaply.
+let _spyRaf = 0;
+function initSpyScroll(){
+  window.addEventListener("scroll", () => {
+    if(_spyRaf) return;                       // coalesce a burst of scroll events into one recompute
+    _spyRaf = requestAnimationFrame(() => { _spyRaf = 0; spyApply(); });
+  }, {passive:true});
 }
 
 function row(s, group){
@@ -807,6 +824,7 @@ async function clearKey(row, msg){
 $("saveBtn").onclick=save;
 $("revertBtn").onclick=()=>{ for(const k of Object.keys(EDITS)) delete EDITS[k]; render(); filter(); applyThemeFromGroups(); };
 $("search").oninput=filter;
+initSpyScroll();   // scrollspy continuous scroll driver (issue #119) — attach once
 load();
 </script>
 {% include "_command_palette.html" %}

@@ -13,6 +13,22 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.27.3] — 2026-07-23
+
+A **Foundation** patch fixing a Settings-page scrollspy regression from 0.27.1.
+
+### Fixed
+- **The Settings left-nav highlight tracks a tall section again.** After 0.27.1 made the highlight
+  purely scroll-driven, its only trigger was the IntersectionObserver, which fires just when a
+  section *crosses* the top band. A section **taller than the window** (e.g. **Providers**) filling
+  the screen produced no such crossing, so the highlight got stranded on the section above it (you'd
+  see everything under "Providers" but "Test my setup" stayed lit). Added a continuous,
+  rAF-throttled scroll listener so the highlight follows the actual scroll position every frame —
+  which is the "follow what's on screen" behaviour 0.27.1 intended.
+
+### Migration
+- Nothing to do.
+
 ## [0.27.2] — 2026-07-23
 
 A **Foundation** patch fixing the update banner during the minutes right after a release publishes.
