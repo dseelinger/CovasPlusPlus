@@ -193,11 +193,11 @@ function render(){
 }
 
 // ---- Left-nav scrollspy (issue #119) --------------------------------------
-// Highlight the nav entry for the section in view (IntersectionObserver), and — while you're
-// editing — for the section of the focused control (focus wins over scroll until the next scroll).
-// A click highlights immediately and the observer resumes once the smooth-scroll settles.
+// Highlight the nav entry for the section IN VIEW — driven purely by what's visible in the window
+// (IntersectionObserver + live geometry), NOT by which control has focus. Tabbing through fields
+// never moves the highlight; only scrolling does. A click highlights immediately and the observer
+// resumes once the smooth-scroll settles.
 let _spyObserver = null;                 // current IntersectionObserver (rebuilt each render)
-let _spyFocusActive = false;             // focus owns the highlight until the next scroll
 let _spySuppressUntil = 0;               // ignore observer churn during a click's smooth-scroll
 
 function navLinks(){ return [...document.querySelectorAll("nav.groups a")]; }
@@ -220,10 +220,10 @@ function setActiveNav(link){
 // below the sticky header — i.e. the section currently filling the top of the content area. The
 // IntersectionObserver is the cheap TRIGGER (fires only when a card crosses the band, never per
 // scroll frame); this reads live geometry so it's correct on the very first paint too, before the
-// observer's async callback. Focus/click ownership short-circuits it. Filter-hidden cards are skipped.
+// observer's async callback. A click's smooth-scroll suppresses it briefly. Filter-hidden cards are skipped.
 const _SPY_LINE = 88;                     // px below the viewport top (under the ~78px sticky header)
 function spyApply(){
-  if(_spyFocusActive || performance.now() < _spySuppressUntil) return;
+  if(performance.now() < _spySuppressUntil) return;
   const cards=[...document.querySelectorAll("#main .card")].filter(cardVisible);
   if(!cards.length) return;
   let current=cards[0];
@@ -245,24 +245,11 @@ function setupScrollspy(){
   // Click a nav entry -> highlight now; let the observer take back over once the scroll settles.
   for(const a of navLinks()){
     a.addEventListener("click", ()=>{
-      _spyFocusActive=false;
       setActiveNav(a);
       _spySuppressUntil = performance.now()+450;   // ride out the smooth-scroll without flicker
     });
   }
   spyApply();   // initial paint (once layout settles the observer also fires)
-}
-
-// Persistent listeners (attached ONCE; #main and window survive re-renders):
-//  * focusin — tabbing into a control marks its section active and OWNS the highlight till a scroll.
-//  * scroll  — hands ownership back to the observer.
-function initSpyListeners(){
-  const main=$("main");
-  if(main) main.addEventListener("focusin", (e)=>{
-    const card = e.target.closest ? e.target.closest(".card") : null;
-    if(cardVisible(card)){ _spyFocusActive=true; setActiveNav(linkForCard(card)); }
-  });
-  window.addEventListener("scroll", ()=>{ _spyFocusActive=false; }, {passive:true});
 }
 
 function row(s, group){
@@ -616,9 +603,9 @@ function filter(){
     const link=linkForCard(card);
     if(link) link.classList.toggle("navhidden", !any);
   }
-  // Filtering is an explicit action that changes what's visible: hand the highlight back from any
-  // focus/click owner and recompute, so it can never stay stuck on a now-hidden section (issue #119).
-  _spyFocusActive=false; _spySuppressUntil=0;
+  // Filtering is an explicit action that changes what's visible: clear any click suppression and
+  // recompute, so the highlight can never stay stuck on a now-hidden section (issue #119).
+  _spySuppressUntil=0;
   spyApply();
 }
 
@@ -820,7 +807,6 @@ async function clearKey(row, msg){
 $("saveBtn").onclick=save;
 $("revertBtn").onclick=()=>{ for(const k of Object.keys(EDITS)) delete EDITS[k]; render(); filter(); applyThemeFromGroups(); };
 $("search").oninput=filter;
-initSpyListeners();   // scrollspy focus/scroll listeners (issue #119) — attach once
 load();
 </script>
 {% include "_command_palette.html" %}

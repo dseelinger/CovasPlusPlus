@@ -13,6 +13,19 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.27.1] — 2026-07-23
+
+A **Foundation** patch refining the Settings page's left-nav "you are here" highlight.
+
+### Changed
+- **The Settings "you are here" highlight now follows what's on screen, not the focused control.**
+  The left-nav section highlight (issue #119) is driven purely by what's scrolled into view; tabbing
+  or clicking into a field no longer yanks the highlight over to that field's section and hold it
+  there. Scrolling moves it exactly as before. Removes the focus-ownership path entirely.
+
+### Migration
+- Nothing to do.
+
 ## [0.27.0] — 2026-07-23
 
 A **Foundation** release correcting the **Test my setup** health report after the persona rework.
