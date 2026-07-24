@@ -21,12 +21,6 @@
   /* Voice list + its type-to-filter box, stacked so the filter spans the row (issue #26). */
   .voicerow{flex-direction:column;align-items:stretch;gap:6px}
   .voicerow .voicehead{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .voicerow .voicehead select{flex:1;min-width:0}
-  .voicesearch{background:transparent;color:var(--muted);border:1px solid var(--edge);border-radius:5px;
-       padding:5px 9px;font-family:inherit;font-size:13px;cursor:pointer;flex:0 0 auto}
-  .voicesearch:hover{color:var(--text);border-color:var(--accent2)}
-  input.voicefilter{background:var(--panel-inset);color:var(--text);border:1px solid var(--edge);border-radius:5px;
-       padding:6px 8px;font-family:inherit;font-size:12px;width:100%}
   /* #86: provider quick-block header — names the ACTIVE provider the block reflects. */
   .pblock .phead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
        margin:6px 0 2px;color:var(--muted);font-size:11px;letter-spacing:1px;text-transform:uppercase}
@@ -340,16 +334,6 @@ function addLineCopy(div, plain){
 
 function opt(v,t){const o=document.createElement("option");o.value=v;o.textContent=t||v;return o;}
 
-// Type-to-filter a native <select>'s options by case-insensitive substring of the visible label
-// (name + category, so "any word" matches). 3+ chars filters; fewer (or empty) restores the full
-// list (issue #26). The selected option always stays visible so the current pick can't vanish.
-function filterOptions(sel, raw){
-  const q = (raw||"").trim().toLowerCase();
-  const active = q.length >= 3;
-  for(const o of sel.options)
-    o.hidden = active && !o.selected && !o.textContent.toLowerCase().includes(q);
-}
-
 // Schema-key writes go straight to the validated schema endpoint (issue #86): the quick panel is
 // provider-generic now, so it posts canonical dotted keys instead of the old friendly aliases.
 function postKey(key, value){
@@ -586,41 +570,26 @@ function fieldRow(field, opts){
   return row;
 }
 
-// The ElevenLabs voice row keeps its type-to-filter (#26) + search palette (#94), since its catalog
-// is 100+ voices; it also pairs voice_name with the id. Rendered here (still driven by the payload)
-// rather than as a plain combobox. `voices` is the normalized fetched list ([] on failure).
+// The ElevenLabs voice row uses the ONE shared voice picker (issue #120 / #214) — the same trigger +
+// command palette the Settings and Crew pages use — so the whole app has a single voice UI. It pairs
+// voice_name with the id on change. `voices` is the normalized fetched list ([] on failure); the
+// current value stays reachable even when the fetch fails (buildVoicePicker keeps it).
 function elevenVoiceRow(field, voices){
   const row = document.createElement("div"); row.className = "row voicerow";
   const head = document.createElement("div"); head.className = "voicehead";
   const lab = document.createElement("label"); lab.textContent = field.label;
-  const sel = document.createElement("select");
-  const search = document.createElement("button"); search.type="button"; search.className="voicesearch";
-  search.title="Search voices"; search.setAttribute("aria-label","Search voices");
-  search.innerHTML='<svg class="ic" aria-hidden="true"><use href="#ic-search"/></svg>';
-  head.appendChild(lab); head.appendChild(sel); head.appendChild(search);
-  const filter = document.createElement("input"); filter.type="text"; filter.className="voicefilter";
-  filter.placeholder="Filter voices (3+ chars)…"; filter.autocomplete="off";
-  row.appendChild(head); row.appendChild(filter);
-
-  voices.forEach(v => sel.appendChild(opt(v.value, v.label + (v.meta?" ["+v.meta+"]":""))));
-  if(field.value != null && ![...sel.options].some(o=>o.value===field.value))
-    sel.appendChild(opt(field.value, field.value + " (current)"));
-  if(!voices.length && field.value == null) sel.appendChild(opt("", "(fetch failed)"));
-  sel.value = field.value;
-
-  const setVoice = (id, name) => {
-    if(sel.value !== id){ if(![...sel.options].some(o=>o.value===id)) sel.appendChild(opt(id, name||id)); sel.value = id; }
-    postUpdates({ "elevenlabs.voice_id": id, "elevenlabs.voice_name": (name||"").split(" [")[0] });
-  };
-  sel.onchange = e => setVoice(e.target.value, e.target.selectedOptions[0].textContent);
-  filter.oninput = e => filterOptions(sel, e.target.value);
-  search.onclick = () => openPalette({
-    title:"Search ElevenLabs voices",
-    items: voices.map(v=>({value:v.value, label:v.label, meta:v.meta||""})),
-    current: sel.value, allowCustom:false,
-    onPick:(id,label)=>setVoice(id,label),
+  const options = voices.map(v => ({value: v.value, label: v.label, meta: v.meta || ""}));
+  const nameFor = id => { const o = options.find(o => o.value === id); return o ? o.label : (id || ""); };
+  const picker = buildVoicePicker({
+    value: field.value,
+    label: field.label,
+    allowCustom: false,          // an ElevenLabs voice must be a real account id
+    options: options,
+    onChange: id => postUpdates({ "elevenlabs.voice_id": id, "elevenlabs.voice_name": nameFor(id) }),
   });
-  FIELD_SETTERS[field.key] = v => { if(v!=null && sel.value!==v) sel.value = v; };
+  head.appendChild(lab); head.appendChild(picker);
+  row.appendChild(head);
+  FIELD_SETTERS[field.key] = v => { if(v != null) picker._set(v); };
   return row;
 }
 
@@ -832,5 +801,6 @@ function syncSettings(s){
 init();
 </script>
 {% include "_command_palette.html" %}
+{% include "_voice_picker.html" %}
 </body>
 </html>

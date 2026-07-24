@@ -84,6 +84,9 @@
     }
 
     Object.defineProperty(wrap, "value", { get: ()=> current });
+    // Set the value from OUTSIDE (e.g. a live cross-client settings sync) without firing onChange —
+    // the trigger repaints to the new value. Used by index.html's FIELD_SETTERS.
+    wrap._set = (v)=>{ current = (v == null) ? "" : String(v); paint(); };
     return wrap;
   };
 })();
