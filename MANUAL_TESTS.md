@@ -2188,6 +2188,7 @@ Notes:
 ### 19.5 Update banner → download → relaunch  📦 🖥️ 🌍 NET
 > Best on a VM: install an **older** version, then publish/point at a **newer** GitHub Release.
 - [ ] With a newer release available, an **"Update available → vX.Y"** banner appears in the panel on launch. (Already-current → **no** banner.)
+- [ ] **Published-but-still-building shows nothing:** right after `gh release create` (before CI attaches `COVAS++ Setup.exe`, ~3 min), the banner does **NOT** appear and **Test my setup** still shows *"Up to date"* — an update is only surfaced once its installer asset exists, so the button is always a real one-click download, never a GitHub link. The banner appears on its own once the asset lands (relaunch / next check).
 - [ ] Click update → COVAS++ **downloads the new installer**, **exits**, and the installer launches (same SmartScreen step).
 - [ ] After install, relaunch → *"What version are you?"* now reports the **bumped** version.
 

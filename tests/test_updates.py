@@ -137,6 +137,31 @@ def test_check_newer_release_available(monkeypatch):
     assert out["asset_url"] == "https://x/s.exe"
 
 
+def test_check_newer_release_without_asset_not_yet_available(monkeypatch):
+    # A newer tag whose installer isn't attached yet (the ~3 min post-publish CI build window):
+    # NOT one-click installable, so not "available" — but we still learn the latest tag/url so a
+    # caller could report it if it wanted. This is the fix for the "View release took me to GitHub"
+    # regression: the app stays quiet until the download actually exists.
+    _patch_get(monkeypatch, resp=_FakeResp({
+        "tag_name": "v2.0.0", "html_url": "https://example/2.0.0", "assets": [],
+    }))
+    out = updates.check_for_update(current="1.0.0")
+    assert out["available"] is False
+    assert out["latest"] == "v2.0.0"
+    assert out["asset_url"] is None
+
+
+def test_check_newer_release_with_non_exe_asset_not_available(monkeypatch):
+    # Assets present but no installer .exe among them -> still not one-click installable.
+    _patch_get(monkeypatch, resp=_FakeResp({
+        "tag_name": "v2.0.0",
+        "assets": [{"name": "notes.txt", "browser_download_url": "https://x/notes.txt"}],
+    }))
+    out = updates.check_for_update(current="1.0.0")
+    assert out["available"] is False
+    assert out["asset_url"] is None
+
+
 def test_check_same_version_not_available(monkeypatch):
     _patch_get(monkeypatch, resp=_FakeResp({"tag_name": "1.0.0", "assets": []}))
     out = updates.check_for_update(current="1.0.0")

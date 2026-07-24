@@ -13,6 +13,23 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.27.2] — 2026-07-23
+
+A **Foundation** patch fixing the update banner during the minutes right after a release publishes.
+
+### Fixed
+- **The update banner only appears once the new version is actually downloadable.** `gh release
+  create` publishes a release instantly, but CI attaches the Windows installer (`COVAS++ Setup.exe`)
+  a few minutes later. In that window the banner used to show a **"View release"** button that opened
+  a GitHub page instead of downloading — looking like the one-click updater had broken. Now an update
+  is only surfaced when its installer asset exists, so the banner is **always** a real
+  **"Update & restart"** download and never a GitHub link. If the release isn't built yet, the app
+  simply shows nothing (and **Test my setup** likewise stays *"Up to date"*) until the installer
+  lands — it self-heals on the next check with no user action.
+
+### Migration
+- Nothing to do.
+
 ## [0.27.1] — 2026-07-23
 
 A **Foundation** patch refining the Settings page's left-nav "you are here" highlight.

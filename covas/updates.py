@@ -134,7 +134,14 @@ def check_for_update(current: str = __version__, url: str = GITHUB_LATEST,
     info["latest"] = rel["tag"]
     info["url"] = rel["url"]
     info["asset_url"] = rel["asset_url"]
-    info["available"] = is_newer(rel["tag"], current)
+    # "Available" means one-click INSTALLABLE, not merely "a newer tag exists". `gh release create`
+    # publishes the release instantly, but CI attaches `COVAS++ Setup.exe` ~3 min later; advertising
+    # an update in that window sent the user to a GitHub page instead of downloading (no asset to
+    # apply). Gate on the installer asset so the banner (and the health "Updates" line, which points
+    # at that banner) only surface an update you can actually install from the app. Self-heals the
+    # moment the asset lands. COVAS ships an installer with every release, so a release with no asset
+    # is by definition "not ready yet", never a deliberate source-only drop.
+    info["available"] = is_newer(rel["tag"], current) and bool(rel["asset_url"])
     return info
 
 

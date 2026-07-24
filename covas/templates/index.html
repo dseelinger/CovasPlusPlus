@@ -663,30 +663,26 @@ async function initUpdateCheck(){
   let info;
   try{ info = await (await fetch("/api/update")).json(); }
   catch(e){ return; }                        // offline / error: no banner, fail-soft
+  // `available` is gated server-side on the installer asset being attached (see updates.py), so an
+  // update we surface is always one-click installable — no "release published but still building"
+  // half-state, no GitHub-link fallback. If the release isn't built yet we simply show nothing.
   if(!info || !info.available) return;
-  const asset = info.asset_url;
   $("updateText").innerHTML = "A new version is available — <b>" + escapeHtml(info.latest) +
     "</b> (you're on " + escapeHtml(info.current || "?") + ").";
   const btn = $("updateBtn");
-  if(!asset){
-    // Release exists but has no installer asset yet: link to it instead of the apply flow.
-    btn.textContent = "View release";
-    btn.onclick = () => { if(info.url) window.open(info.url, "_blank"); };
-  } else {
-    btn.onclick = async () => {
-      btn.disabled = true; btn.textContent = "Downloading…";
-      try{
-        const r = await fetch("/api/update/apply",{method:"POST",
-          headers:{"content-type":"application/json"},body:JSON.stringify({asset_url:asset})});
-        const data = await r.json();
-        if(!r.ok || !data.ok) throw new Error((data && data.error) || "update failed");
-        btn.textContent = "Restarting…";       // app is quitting; installer takes over
-      }catch(err){
-        btn.disabled = false; btn.textContent = "Update & restart";
-        $("updateText").innerHTML = "Update failed: " + escapeHtml(err.message);
-      }
-    };
-  }
+  btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = "Downloading…";
+    try{
+      const r = await fetch("/api/update/apply",{method:"POST",
+        headers:{"content-type":"application/json"},body:JSON.stringify({asset_url:info.asset_url})});
+      const data = await r.json();
+      if(!r.ok || !data.ok) throw new Error((data && data.error) || "update failed");
+      btn.textContent = "Restarting…";       // app is quitting; installer takes over
+    }catch(err){
+      btn.disabled = false; btn.textContent = "Update & restart";
+      $("updateText").innerHTML = "Update failed: " + escapeHtml(err.message);
+    }
+  };
   $("updateDismiss").onclick = () => $("updateBanner").classList.remove("show");
   $("updateBanner").classList.add("show");
 }
