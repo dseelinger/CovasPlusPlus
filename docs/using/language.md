@@ -47,7 +47,9 @@ English-only one, so the list grows only as the rest of the pipeline catches up.
     speech poorly. The **control panel is now translated** into all five curated languages —
     German, French, Russian, Spanish and Portuguese — so setting the reply language also switches
     the web panel and first-run wizard to that language. Those translations are
-    **machine-generated (LLM), pending native-speaker review**, so wording may still be refined;
+    **machine-generated (LLM)**; they have passed a mechanical QA pass (format/placeholder integrity,
+    no missed keys) and an LLM review pass that fixed a handful of clear defects (issue #212), but
+    **native-speaker review of natural register is still pending**, so wording may still be refined.
     English is unaffected. See [translating the UI](translating-the-ui.md) to review or improve a
     catalog.
 
