@@ -13,6 +13,22 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.26.1] — 2026-07-23
+
+An **Immerse** patch: a QA + review pass over the translated control-panel catalogs.
+
+### Fixed
+- **A few clear translation defects** in the German / French / Spanish / Portuguese / Russian UI
+  catalogs (issue #212): the *"editing roster"* status header read as past-tense ("edited roster")
+  in German and French; the *"reload their version"* button used the *load* verb instead of *reload*
+  in Spanish/French/Portuguese; and two Russian strings were corrected (a "consequential" →
+  "responsible" mistranslation and a "shares" → "splits" false friend). The catalogs also passed a
+  mechanical QA check (format/placeholder integrity, no missing keys). English is unaffected.
+  Native-speaker review of natural register is still pending. ([#212])
+
+### Migration
+- Nothing to do.
+
 ## [0.26.0] — 2026-07-23
 
 A **Foundation** release that tidies the control-panel choosers.
@@ -362,3 +378,4 @@ Releases before 0.15.0 are listed on the
 [#215]: https://github.com/dseelinger/CovasPlusPlus/issues/215
 [#217]: https://github.com/dseelinger/CovasPlusPlus/issues/217
 [#214]: https://github.com/dseelinger/CovasPlusPlus/issues/214
+[#212]: https://github.com/dseelinger/CovasPlusPlus/issues/212
