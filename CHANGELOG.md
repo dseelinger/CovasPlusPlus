@@ -13,6 +13,25 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.27.0] — 2026-07-23
+
+A **Foundation** release correcting the **Test my setup** health report after the persona rework.
+
+### Fixed
+- **"Test my setup" no longer nags about a legacy `personality.txt`.** The health report still probed
+  the old monolithic personality file that the persona system (Base + Persona + Campaign) replaced,
+  and wrongly claimed COVAS *"speaks with a neutral default"* even when a persona was active. It now
+  reports the real state: personality **off** → `✓ [OK]` (neutral by choice); **on** → the selected
+  persona (e.g. *"Classic"*), warning only when the shipped presets are missing or the chosen persona
+  can't be found. The Campaign is personal and optional, so it's no longer nagged.
+
+### Changed
+- **Plainer "Test my setup" description.** The card no longer names an internal script; it simply says
+  it checks that everything is set up and running right.
+
+### Migration
+- Nothing to do.
+
 ## [0.26.2] — 2026-07-23
 
 A **Foundation** patch finishing the control-panel chooser consolidation from 0.26.0.

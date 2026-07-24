@@ -741,9 +741,9 @@ function healthCard(){
   card.className="card"; card.id="g-health";
   card.innerHTML='<h2>Test my setup</h2>';
   const note=document.createElement("div"); note.className="help"; note.style.margin="4px 0 8px";
-  note.textContent="Runs the same checks as check_setup.py — keys, providers, game data, and audio "+
-    "devices — and shows the result here. Nothing is changed, and the provider calls are free. "+
-    "Handy to screenshot if you're asking for help.";
+  note.textContent="Checks that everything's set up and running right — keys, providers, game data, "+
+    "and audio devices — and shows the result here. Nothing is changed, and the provider calls are "+
+    "free. Handy to screenshot if you're asking for help.";
   card.appendChild(note);
   const btn=document.createElement("button"); btn.className="kbtn set"; btn.id="healthRun";
   btn.type="button"; btn.textContent="Test my setup";

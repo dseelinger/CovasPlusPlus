@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
 
 # Check statuses. Only FAIL blocks "all systems go"; WARN is informational (optional key, stale data).
 OK = "ok"
@@ -151,13 +150,31 @@ def check_keys_and_files(report: HealthReport, cfg: dict) -> tuple[str | None, s
         s.add(WARN, "No ElevenLabs key (optional)",
               "The app still runs - it uses the free Edge voice, or falls back to on-screen text.")
 
-    p_path = Path(str((cfg.get("personality", {}) or {}).get("file", "personality.txt")))
-    if p_path.exists():
-        s.add(OK, "personality.txt found")
-    else:
-        s.add(WARN, "personality.txt not found",
-              "COVAS speaks with a neutral default until you add one (copy personality.example.txt).")
+    _check_personality(s, cfg)
     return anth_key, el_key
+
+
+def _check_personality(s: Section, cfg: dict) -> None:
+    """Personality is Base + a selected Persona (shipped `presets.md`) + an optional, personal
+    Campaign (N7) — the old monolithic `personality.txt` is retired (kept only as a back-compat
+    campaign fallback). So the only thing worth a health line is: when personality is ON, does the
+    selected persona actually resolve? Campaign is personal/optional and never nagged."""
+    from . import personality
+    pcfg = cfg.get("personality", {}) or {}
+    if not pcfg.get("enabled"):
+        s.add(OK, "Personality off (neutral replies by choice)")
+        return
+    want = str(pcfg.get("persona", "") or "").strip()
+    persona = personality.find_persona(cfg, want)
+    if persona is None:
+        s.add(WARN, "No personas available",
+              "The shipped presets file is missing or unreadable, so COVAS falls back to a neutral "
+              "default. Reinstall or restore personalities/presets.md.")
+    elif want and persona["name"].strip().lower() != want.lower():
+        s.add(WARN, f'Persona "{want}" not found - using "{persona["name"]}"',
+              "Pick an available persona on the Personality tab.")
+    else:
+        s.add(OK, f'Personality on - persona "{persona["name"]}"')
 
 
 def check_anthropic(report: HealthReport, anth_key: str | None,

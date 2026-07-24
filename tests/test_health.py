@@ -109,7 +109,7 @@ def test_missing_anthropic_key_fails_and_missing_elevenlabs_only_warns(monkeypat
     monkeypatch.setattr("covas.firstrun.anthropic_key", lambda cfg: None)
     monkeypatch.setattr("covas.firstrun.elevenlabs_key", lambda cfg: None)
     r = HealthReport()
-    check_keys_and_files(r, {"personality": {"file": "nonexistent.txt"}})
+    check_keys_and_files(r, {})
     checks = r.sections[-1].checks
     anth = next(c for c in checks if "Anthropic" in c.label)
     el = next(c for c in checks if "ElevenLabs" in c.label)
@@ -121,9 +121,44 @@ def test_present_keys_pass(monkeypatch):
     monkeypatch.setattr("covas.firstrun.anthropic_key", lambda cfg: "sk-abc")
     monkeypatch.setattr("covas.firstrun.elevenlabs_key", lambda cfg: "el-abc")
     r = HealthReport()
-    a, e = check_keys_and_files(r, {"personality": {"file": "nonexistent.txt"}})
+    a, e = check_keys_and_files(r, {})
     assert a == "sk-abc" and e == "el-abc"
     assert next(c for c in r.sections[-1].checks if "Anthropic" in c.label).status == OK
+
+
+# --- personality (N7: Base + Persona + Campaign; no legacy personality.txt) -----
+
+def _personality_check(cfg: dict):
+    """Run the checks and return the personality line (the key lines are independent of it)."""
+    r = HealthReport()
+    check_keys_and_files(r, cfg)
+    return next(c for c in r.sections[-1].checks if "ersona" in c.label)
+
+
+def test_personality_off_is_ok_not_a_warning():
+    c = _personality_check({"personality": {"enabled": False}})
+    assert c.status == OK and "off" in c.label.lower()
+
+
+def test_personality_on_with_resolvable_persona_is_ok(monkeypatch):
+    monkeypatch.setattr("covas.personality.find_persona",
+                        lambda cfg, name: {"name": "Classic", "body": "x"})
+    c = _personality_check({"personality": {"enabled": True, "persona": "Classic"}})
+    assert c.status == OK and "Classic" in c.label
+
+
+def test_personality_on_with_missing_presets_warns(monkeypatch):
+    monkeypatch.setattr("covas.personality.find_persona", lambda cfg, name: None)
+    c = _personality_check({"personality": {"enabled": True, "persona": "Classic"}})
+    assert c.status == WARN and "no personas" in c.label.lower()
+
+
+def test_personality_on_with_unknown_persona_warns(monkeypatch):
+    # Requested "Bogus" but find_persona falls back to Classic -> the requested one wasn't found.
+    monkeypatch.setattr("covas.personality.find_persona",
+                        lambda cfg, name: {"name": "Classic", "body": "x"})
+    c = _personality_check({"personality": {"enabled": True, "persona": "Bogus"}})
+    assert c.status == WARN and "Bogus" in c.label
 
 
 # --- update notifier + system requirements (issue #186) --------------------
@@ -177,7 +212,7 @@ def test_run_health_offline_produces_a_report(monkeypatch):
     # Deterministic audio (no real device query in the offline run).
     monkeypatch.setattr(health, "_probe_audio",
                         lambda: {"inputs": 1, "outputs": 1, "default_in": "M", "default_out": "S"})
-    report = run_health({"personality": {"file": "x"}, "llm": {"provider": "anthropic"}}, network=False)
+    report = run_health({"personality": {"enabled": False}, "llm": {"provider": "anthropic"}}, network=False)
     titles = [s.title for s in report.sections]
     assert "Python packages" in titles and "Keys & files" in titles and "Audio devices" in titles
     # No network sections when network=False.

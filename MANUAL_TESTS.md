@@ -60,6 +60,10 @@ your own dropped into `<data dir>/sounds/<type>/` — see §2):
 ## 0. Prerequisites & setup
 
 ### 0.1 Environment health
+- [ ] 🌐 **Configure your Anthropic key first** — it's the one **required** key. On first launch the
+      setup wizard prompts for it; on an already-configured install, add/confirm it on **Settings →
+      API keys**. Without it, the health check below correctly reports `✗ [FAIL] No Anthropic key
+      (required)` and the app can't reach the LLM. (ElevenLabs/TTS keys are optional — see the next step.)
 - [ ] 🔊🌐 Open the control panel → **Settings → Test my setup** (§14.2, issue #181) → the report ends
       in a green *"✓ All systems go"* with every section (Config, Keys & files, Anthropic, ElevenLabs,
       Game data, Audio) marked `✓ [OK]`. This is the installed-app equivalent of the old `check_setup` CLI.
