@@ -13,6 +13,20 @@ The in-app update notifier also points you there when a newer build exists.
 
 _Nothing released yet._
 
+## [0.26.2] — 2026-07-23
+
+A **Foundation** patch finishing the control-panel chooser consolidation from 0.26.0.
+
+### Changed
+- **The main-panel voice picker now matches the rest of the app.** The quick-panel ElevenLabs voice
+  chooser was the last control still using the old dropdown + type-to-filter + search cluster; it now
+  uses the **same single trigger + command palette** as the Settings and Crew pages, so every voice
+  field in the app shares one control (issue #214). No behaviour change — picking, search, keyboard
+  navigation, and live cross-client sync all work as before. ([#214])
+
+### Migration
+- Nothing to do.
+
 ## [0.26.1] — 2026-07-23
 
 An **Immerse** patch: a QA + review pass over the translated control-panel catalogs.
